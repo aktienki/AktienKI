@@ -7,6 +7,9 @@ import pandas as pd
 
 from app.models.decision import Decision
 from app.repositories.cross_asset_repository import CrossAssetRepository
+from app.repositories.market_snapshot_repository import (
+    MarketSnapshotRepository,
+)
 from app.repositories.prediction_repository import PredictionRepository
 from app.repositories.raw_price_repository import RawPriceRepository
 from app.repositories.strategy_model_loader_repository import (
@@ -67,6 +70,15 @@ class StrategyPredictionEngine:
                 interval=strategy.interval,
             )
 
+            market_snapshot = None
+
+            if not base_frame.empty:
+                market_snapshot = MarketSnapshotRepository(
+                    session
+                ).latest_before(
+                    base_frame.index[-1]
+                )
+
         if base_frame.empty:
             raise RuntimeError(
                 "Keine Kursdaten für das Zielinstrument gefunden."
@@ -76,6 +88,7 @@ class StrategyPredictionEngine:
             base_frame=base_frame,
             strategy=strategy,
             cross_asset_frames=cross_asset_frames,
+            market_snapshot=market_snapshot,
         )
 
         feature_names = list(model_info["feature_names"])
@@ -180,6 +193,11 @@ class StrategyPredictionEngine:
             "cross_assets": sorted(
                 cross_asset_frames.keys()
             ),
+            "market_snapshot_time": (
+                str(market_snapshot.get("snapshot_time"))
+                if market_snapshot
+                else None
+            ),
             "summary": (
                 f"Long-Chance für {horizon} Handelstage."
                 if strategy_direction == "long"
@@ -222,6 +240,16 @@ class StrategyPredictionEngine:
                     dynamic_frame.index[-1]
                 ),
                 "predicted_return_raw": predicted_return,
+                "market_snapshot_time": (
+                    str(market_snapshot.get("snapshot_time"))
+                    if market_snapshot
+                    else None
+                ),
+                "market_context": (
+                    dict(market_snapshot.get("feature_data") or {})
+                    if market_snapshot
+                    else {}
+                ),
             },
         )
 
