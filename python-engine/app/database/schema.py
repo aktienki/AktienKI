@@ -30,3 +30,41 @@ price_bars = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint("instrument_id", "interval", "bar_time", name="price_bars_instrument_id_interval_bar_time_unique"),
 )
+
+market_snapshots = Table(
+    "market_snapshots",
+    metadata,
+
+    Column("id", BigInteger, primary_key=True),
+
+    Column(
+        "snapshot_time",
+        DateTime(timezone=True),
+        nullable=False,
+        unique=True,
+    ),
+
+    Column(
+        "market_data",
+        JSON,
+        nullable=False,
+    ),
+
+    Column(
+        "feature_data",
+        JSON,
+        nullable=False,
+    ),
+
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+    ),
+
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+    ),
+)
