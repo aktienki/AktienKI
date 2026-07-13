@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from app.core.feature_store_engine import FeatureStoreEngine
 from app.core.indicator_engine import IndicatorEngine
 from app.core.market_importer import MarketImporter
+from app.core.market_snapshot_engine import MarketSnapshotEngine
 from app.core.prediction_validation_engine import (
     PredictionValidationEngine,
 )
@@ -95,6 +96,13 @@ class DailyPipelineEngine:
                 ),
             ),
             (
+                "market_snapshot",
+                lambda: MarketSnapshotEngine(
+                    self.session_factory,
+                    YahooProvider(self.yahoo_timeout_seconds),
+                ).run(),
+            ),
+            (
                 "predict_strategy",
                 lambda: StrategyPredictionEngine(
                     self.session_factory
@@ -117,6 +125,7 @@ class DailyPipelineEngine:
         for name, operation in step_definitions:
             try:
                 result = operation()
+
                 steps.append(
                     PipelineStepResult(
                         name=name,
@@ -124,15 +133,19 @@ class DailyPipelineEngine:
                         result=result,
                     )
                 )
+
                 logger.info(
                     "Daily Pipeline Schritt '%s' abgeschlossen.",
                     name,
                 )
+
             except Exception as exception:
+
                 logger.exception(
                     "Daily Pipeline Schritt '%s' fehlgeschlagen.",
                     name,
                 )
+
                 steps.append(
                     PipelineStepResult(
                         name=name,
@@ -145,11 +158,15 @@ class DailyPipelineEngine:
                     break
 
         finished_at = datetime.now(timezone.utc)
+
         failed_steps = [
-            step for step in steps if step.status == "failed"
+            step
+            for step in steps
+            if step.status == "failed"
         ]
 
         return {
+            "pipeline_version": "17.1",
             "symbol": symbol,
             "instrument_id": instrument_id,
             "strategy_code": strategy_code,
@@ -165,12 +182,22 @@ class DailyPipelineEngine:
             "duration_seconds": (
                 finished_at - started_at
             ).total_seconds(),
-            "steps": [step.to_dict() for step in steps],
+            "steps": [
+                step.to_dict()
+                for step in steps
+            ],
         }
 
-    def _resolve_instrument_id(self, symbol: str) -> int:
+    def _resolve_instrument_id(
+        self,
+        symbol: str,
+    ) -> int:
+
         with self.session_factory() as session:
-            instruments = InstrumentRepository(session).active(
+
+            instruments = InstrumentRepository(
+                session
+            ).active(
                 symbol=symbol,
                 limit=1,
             )
