@@ -8,49 +8,102 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('model_definitions', function (Blueprint $table): void {
-            $table->foreignId('strategy_profile_id')
-                ->nullable()
-                ->after('id')
-                ->constrained('strategy_profiles')
-                ->nullOnDelete();
+        if (
+            Schema::hasTable('model_definitions')
+            && ! Schema::hasColumn(
+                'model_definitions',
+                'strategy_profile_id'
+            )
+        ) {
+            Schema::table(
+                'model_definitions',
+                function (Blueprint $table): void {
+                    $table->foreignId('strategy_profile_id')
+                        ->nullable()
+                        ->constrained('strategy_profiles')
+                        ->nullOnDelete();
+                }
+            );
+        }
 
-            $table->unsignedInteger('strategy_profile_version')
-                ->nullable()
-                ->after('strategy_profile_id');
-        });
+        if (
+            Schema::hasTable('model_definitions')
+            && ! Schema::hasColumn(
+                'model_definitions',
+                'strategy_profile_version'
+            )
+        ) {
+            Schema::table(
+                'model_definitions',
+                function (Blueprint $table): void {
+                    $table->unsignedInteger(
+                        'strategy_profile_version'
+                    )->nullable();
+                }
+            );
+        }
 
-        Schema::table('training_runs', function (Blueprint $table): void {
-            $table->foreignId('strategy_profile_id')
-                ->nullable()
-                ->after('public_id')
-                ->constrained('strategy_profiles')
-                ->nullOnDelete();
+        if (
+            Schema::hasTable('training_runs')
+            && ! Schema::hasColumn(
+                'training_runs',
+                'strategy_profile_id'
+            )
+        ) {
+            Schema::table(
+                'training_runs',
+                function (Blueprint $table): void {
+                    $table->foreignId('strategy_profile_id')
+                        ->nullable()
+                        ->constrained('strategy_profiles')
+                        ->nullOnDelete();
+                }
+            );
+        }
 
-            $table->unsignedInteger('strategy_profile_version')
-                ->nullable()
-                ->after('strategy_profile_id');
+        if (
+            Schema::hasTable('training_runs')
+            && ! Schema::hasColumn(
+                'training_runs',
+                'strategy_profile_version'
+            )
+        ) {
+            Schema::table(
+                'training_runs',
+                function (Blueprint $table): void {
+                    $table->unsignedInteger(
+                        'strategy_profile_version'
+                    )->nullable();
+                }
+            );
+        }
 
-            $table->jsonb('resolved_configuration')
-                ->nullable()
-                ->after('parameters');
-        });
+        if (
+            Schema::hasTable('training_runs')
+            && ! Schema::hasColumn(
+                'training_runs',
+                'resolved_configuration'
+            )
+        ) {
+            Schema::table(
+                'training_runs',
+                function (Blueprint $table): void {
+                    $table->json(
+                        'resolved_configuration'
+                    )->nullable();
+                }
+            );
+        }
     }
 
     public function down(): void
     {
-        Schema::table('training_runs', function (Blueprint $table): void {
-            $table->dropConstrainedForeignId('strategy_profile_id');
-
-            $table->dropColumn([
-                'strategy_profile_version',
-                'resolved_configuration',
-            ]);
-        });
-
-        Schema::table('model_definitions', function (Blueprint $table): void {
-            $table->dropConstrainedForeignId('strategy_profile_id');
-            $table->dropColumn('strategy_profile_version');
-        });
+        /*
+         * Diese Migration ergänzt nur fehlende Kompatibilitätsfelder.
+         *
+         * Die Spalten können im aktuellen Schema bereits von früheren
+         * Basismigrationen angelegt worden sein. Deshalb werden sie hier
+         * beim Rollback bewusst nicht entfernt.
+         */
     }
 };

@@ -2,28 +2,20 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class ModelChampionTablesTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_champion_challenger_comparison_and_elo_tables_exist(): void
     {
-        $this->assertTrue(
-            Schema::hasTable('model_champions')
-        );
-
-        $this->assertTrue(
-            Schema::hasTable('model_challengers')
-        );
-
-        $this->assertTrue(
-            Schema::hasTable('model_comparisons')
-        );
-
-        $this->assertTrue(
-            Schema::hasTable('model_elo_history')
-        );
+        $this->assertTrue(Schema::hasTable('model_champions'));
+        $this->assertTrue(Schema::hasTable('model_challengers'));
+        $this->assertTrue(Schema::hasTable('model_comparisons'));
+        $this->assertTrue(Schema::hasTable('model_elo_history'));
     }
 
     public function test_model_champions_has_required_columns(): void
