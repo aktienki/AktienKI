@@ -1,0 +1,2 @@
+[console_scripts]
+aktienki-import-market = aktienki_market.cli:main

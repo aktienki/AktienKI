@@ -1,0 +1,46 @@
+# macOS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Umgebungsdateien
+.env
+.env.*
+!.env.example
+
+# Laravel
+laravel/vendor/
+laravel/node_modules/
+laravel/public/build/
+laravel/bootstrap/cache/*
+laravel/storage/logs/*
+laravel/storage/framework/cache/*
+laravel/storage/framework/sessions/*
+laravel/storage/framework/views/*
+
+# Python
+python-engine/.venv/
+python-engine/venv/
+python-engine/**/__pycache__/
+python-engine/.pytest_cache/
+python-engine/.mypy_cache/
+python-engine/.ruff_cache/
+python-engine/*.egg-info/
+*.pyc
+*.pyo
+
+# Modelle und große Daten
+python-engine/storage/models/*
+!python-engine/storage/models/.gitkeep
+storage/models/*
+!storage/models/.gitkeep
+*.joblib
+*.pkl
+*.pickle
+*.parquet
+
+# Archive
+*.zip
+*.tar
+*.tar.gz
+*.bak

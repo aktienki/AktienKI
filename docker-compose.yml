@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aktienki}
+      POSTGRES_USER: ${POSTGRES_USER:-aktienki_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aktienki_app} -d ${POSTGRES_DB:-aktienki}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+
+  python-api:
+    build:
+      context: ./python-engine
+      dockerfile: ../infrastructure/docker/python.Dockerfile
+    env_file:
+      - ./python-engine/.env.example
+    ports:
+      - "${PYTHON_API_PORT:-8100}:8100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./python-engine:/app
+      - ./storage:/shared-storage
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8100 --reload
+
+  python-worker:
+    build:
+      context: ./python-engine
+      dockerfile: ../infrastructure/docker/python.Dockerfile
+    env_file:
+      - ./python-engine/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./python-engine:/app
+      - ./storage:/shared-storage
+    command: python -m app.workers.main
+
+volumes:
+  postgres_data:
+  redis_data:

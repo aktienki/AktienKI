@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aktienki-engine"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+  "SQLAlchemy>=2.0,<3.0",
+  "psycopg[binary]>=3.2,<4.0",
+  "pandas>=2.2,<3.0",
+  "yfinance>=0.2.66,<0.3",
+  "python-dotenv>=1.0,<2.0"
+]
+
+[project.scripts]
+aktienki-engine = "app.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

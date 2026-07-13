@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: aktienki-market
+Version: 0.1.0
+Summary: AktienKI market data importer
+Requires-Python: >=3.12
+Requires-Dist: SQLAlchemy<3.0,>=2.0
+Requires-Dist: psycopg[binary]<4.0,>=3.2
+Requires-Dist: pandas<3.0,>=2.2
+Requires-Dist: yfinance<0.3,>=0.2.66
+Requires-Dist: python-dotenv<2.0,>=1.0

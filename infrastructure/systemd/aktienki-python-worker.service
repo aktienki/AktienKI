@@ -1,0 +1,15 @@
+[Unit]
+Description=AktienKI Python Worker
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=aktienki
+WorkingDirectory=/opt/aktienki/python-engine
+EnvironmentFile=/opt/aktienki/python-engine/.env
+ExecStart=/opt/aktienki/python-engine/.venv/bin/python -m app.workers.main
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
