@@ -38,6 +38,7 @@ def main():
             "validate-predictions",
             "daily-run",
             "list-models",
+            "train-ensemble",
         ],
     )
 
@@ -95,12 +96,27 @@ def main():
                 raise ValueError(
                     "--strategy ist erforderlich."
                 )
-
+        
             result = engine.import_cross_assets(
                 strategy_code=args.strategy,
                 full=args.full,
             )
 
+            
+        elif args.action == "train-ensemble":
+            if args.instrument_id is None:
+                raise ValueError(
+                    "--instrument-id ist erforderlich."
+                )
+
+            result = engine.train(
+                instrument_id=args.instrument_id,
+                algorithm="ensemble",
+                interval=args.interval,
+                feature_version=args.feature_version,
+                target_name=args.target,
+            )
+            
         elif args.action == "calculate-indicators":
             result = engine.calculate_indicators(
                 interval=args.interval,
