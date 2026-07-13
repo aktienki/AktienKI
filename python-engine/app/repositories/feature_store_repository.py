@@ -5,7 +5,15 @@ from sqlalchemy import text
 
 
 class FeatureStoreRepository:
-    FEATURE_COLUMNS = [
+    """
+    Lädt Trainingsdaten aus dem Feature Store.
+
+    Aktuell werden ausschließlich Instrumenten-Features verwendet.
+    Die Market-Features werden in Sprint 17.1 über den
+    MarketSnapshotBuilder ergänzt.
+    """
+
+    BASE_FEATURE_COLUMNS = [
         "close",
         "volume",
         "rsi_14",
@@ -16,6 +24,26 @@ class FeatureStoreRepository:
         "atr_14",
         "volatility_20",
     ]
+
+    MARKET_FEATURE_COLUMNS = [
+        "market_bull_score",
+        "market_bear_score",
+        "market_volatility_score",
+        "market_liquidity_score",
+        "market_risk_score",
+        "market_momentum_score",
+    ]
+
+    FEATURE_COLUMNS = [
+        *BASE_FEATURE_COLUMNS,
+        *MARKET_FEATURE_COLUMNS,
+    ]
+
+    SUPPORTED_TARGETS = {
+        "target_return_1d",
+        "target_return_5d",
+        "target_return_20d",
+    }
 
     def __init__(self, session):
         self.session = session
@@ -28,14 +56,13 @@ class FeatureStoreRepository:
         feature_version: str = "1.0.0",
         target_name: str = "target_return_5d",
     ) -> pd.DataFrame:
-        if target_name not in {
-            "target_return_1d",
-            "target_return_5d",
-            "target_return_20d",
-        }:
-            raise ValueError(f"Nicht unterstütztes Target: {target_name}")
 
-        columns_sql = ", ".join(self.FEATURE_COLUMNS)
+        if target_name not in self.SUPPORTED_TARGETS:
+            raise ValueError(
+                f"Nicht unterstütztes Target: {target_name}"
+            )
+
+        columns_sql = ", ".join(self.BASE_FEATURE_COLUMNS)
 
         query = text(
             f"""
@@ -65,11 +92,33 @@ class FeatureStoreRepository:
             return pd.DataFrame()
 
         frame = pd.DataFrame(rows)
-        frame["bar_time"] = pd.to_datetime(frame["bar_time"], utc=True)
 
-        for column in [*self.FEATURE_COLUMNS, "target"]:
-            frame[column] = pd.to_numeric(frame[column], errors="coerce")
+        frame["bar_time"] = pd.to_datetime(
+            frame["bar_time"],
+            utc=True,
+        )
 
-        return frame.dropna(
-            subset=[*self.FEATURE_COLUMNS, "target"]
+        for column in [
+            *self.BASE_FEATURE_COLUMNS,
+            "target",
+        ]:
+            frame[column] = pd.to_numeric(
+                frame[column],
+                errors="coerce",
+            )
+
+        frame = frame.dropna(
+            subset=[
+                *self.BASE_FEATURE_COLUMNS,
+                "target",
+            ]
         ).reset_index(drop=True)
+
+        #
+        # Market Snapshot Features werden in Sprint 17.1
+        # ergänzt.
+        #
+        for column in self.MARKET_FEATURE_COLUMNS:
+            frame[column] = 0.0
+
+        return frame
