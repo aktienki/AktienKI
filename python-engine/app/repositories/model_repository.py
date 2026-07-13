@@ -265,3 +265,22 @@ class ModelRepository:
                 "error_message": error_message[:10000],
             },
         )
+
+
+    def save_ensemble_metadata(self, trained_model_id:int, *, winner_algorithm:str, runner_up_algorithm:str|None, ensemble_score:float, ensemble_members:list, training_metadata:dict|None=None):
+        self.session.execute(text("""
+            UPDATE trained_models
+               SET metadata = json_patch(COALESCE(metadata,'{}'), :payload)
+             WHERE id = :id
+        """),{
+            'id':trained_model_id,
+            'payload': __import__('json').dumps({
+                'ensemble':{
+                    'winner_algorithm':winner_algorithm,
+                    'runner_up_algorithm':runner_up_algorithm,
+                    'ensemble_score':ensemble_score,
+                    'ensemble_members':ensemble_members,
+                    'training_metadata':training_metadata or {}
+                }
+            })
+        })
