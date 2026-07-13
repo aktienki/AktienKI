@@ -16,6 +16,15 @@ from app.scoring.decision_scorer import DecisionScorer
 
 
 class PredictionEngine:
+    MARKET_FEATURE_COLUMNS = [
+        "market_bull_score",
+        "market_bear_score",
+        "market_volatility_score",
+        "market_liquidity_score",
+        "market_risk_score",
+        "market_momentum_score",
+    ]
+
     def __init__(self, session_factory):
         self.session_factory = session_factory
         self.scorer = DecisionScorer()
@@ -65,15 +74,30 @@ class PredictionEngine:
         model = joblib.load(artifact_path)
 
         feature_names = list(model_info["feature_names"])
-        feature_values = {
-            name: float(feature_row[name])
-            for name in feature_names
-        }
+        feature_values = self._feature_values(
+            feature_row=feature_row,
+            feature_names=feature_names,
+        )
 
-        frame = pd.DataFrame([feature_values])
+        frame = pd.DataFrame(
+            [feature_values],
+            columns=feature_names,
+        )
+
         predicted_return = float(model.predict(frame)[0])
 
+        if not math.isfinite(predicted_return):
+            raise RuntimeError(
+                "Das Modell hat keinen gültigen Rückgabewert erzeugt."
+            )
+
         current_price = float(feature_row["close"])
+
+        if current_price <= 0:
+            raise RuntimeError(
+                "Der aktuelle Kurs muss größer als null sein."
+            )
+
         predicted_price = current_price * (1.0 + predicted_return)
 
         price_difference = predicted_price - current_price
@@ -109,6 +133,10 @@ class PredictionEngine:
             trend_strength=trend_strength,
         )
 
+        market_context = self._market_context(
+            feature_row
+        )
+
         explanation = self._explanation(
             strategy=strategy,
             market_return=market_return,
@@ -119,6 +147,7 @@ class PredictionEngine:
             ),
             trend_strength=trend_strength,
             confidence=confidence,
+            market_context=market_context,
         )
 
         decision = Decision(
@@ -147,6 +176,7 @@ class PredictionEngine:
                 "feature_version": model_info["feature_version"],
                 "feature_bar_time": str(feature_row["bar_time"]),
                 "predicted_return_raw": predicted_return,
+                "market_context": market_context,
             },
         )
 
@@ -164,6 +194,66 @@ class PredictionEngine:
             "prediction_id": prediction_id,
             **decision.to_dict(),
         }
+
+    @staticmethod
+    def _feature_values(
+        *,
+        feature_row: dict,
+        feature_names: list[str],
+    ) -> dict[str, float]:
+        missing = [
+            name
+            for name in feature_names
+            if name not in feature_row
+        ]
+
+        if missing:
+            raise RuntimeError(
+                "Fehlende Modell-Features: "
+                + ", ".join(missing)
+            )
+
+        values: dict[str, float] = {}
+
+        for name in feature_names:
+            raw_value = feature_row[name]
+
+            if raw_value is None:
+                raise RuntimeError(
+                    f"Feature '{name}' enthält keinen Wert."
+                )
+
+            value = float(raw_value)
+
+            if not math.isfinite(value):
+                raise RuntimeError(
+                    f"Feature '{name}' enthält keinen gültigen Wert."
+                )
+
+            values[name] = value
+
+        return values
+
+    @classmethod
+    def _market_context(
+        cls,
+        feature_row: dict,
+    ) -> dict[str, float]:
+        context: dict[str, float] = {}
+
+        for column in cls.MARKET_FEATURE_COLUMNS:
+            raw_value = feature_row.get(column, 0.0)
+
+            try:
+                value = float(raw_value or 0.0)
+            except (TypeError, ValueError):
+                value = 0.0
+
+            context[column] = (
+                value if math.isfinite(value) else 0.0
+            )
+
+        return context
 
     @staticmethod
     def _confidence_from_metrics(metrics: dict) -> float:
@@ -215,6 +305,7 @@ class PredictionEngine:
         rsi: float | None,
         trend_strength: float,
         confidence: float,
+        market_context: dict[str, float],
     ) -> dict:
         reasons = [
             {
@@ -236,6 +327,22 @@ class PredictionEngine:
                 "value": confidence,
                 "text": f"Modellkonfidenz: {confidence:.1f} %.",
             },
+            {
+                "type": "market_risk",
+                "value": market_context["market_risk_score"],
+                "text": (
+                    "Marktrisiko: "
+                    f"{market_context['market_risk_score']:.1f} %."
+                ),
+            },
+            {
+                "type": "market_momentum",
+                "value": market_context["market_momentum_score"],
+                "text": (
+                    "Marktmomentum: "
+                    f"{market_context['market_momentum_score']:.1f} %."
+                ),
+            },
         ]
 
         if rsi is not None:
@@ -254,5 +361,6 @@ class PredictionEngine:
                 if strategy == "long"
                 else "Short-Chance auf Basis des erwarteten Zielkurses."
             ),
+            "market_context": market_context,
             "reasons": reasons,
         }
