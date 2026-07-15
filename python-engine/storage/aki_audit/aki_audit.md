@@ -1,11 +1,11 @@
 # AKI Engineering Audit
 
-- Architecture Score: **97.11/100**
-- Python-Dateien: **201**
-- Codezeilen: **14895**
+- Architecture Score: **97.63/100**
+- Python-Dateien: **198**
+- Codezeilen: **14563**
 - Syntaxfehler: **0**
-- Duplikatgruppen: **3**
-- Mögliche Orphan-Module: **61**
+- Duplikatgruppen: **1**
+- Mögliche Orphan-Module: **59**
 
 ## Findings
 
@@ -20,7 +20,6 @@
 - **INFO** `orphan_module` — `app.knowledge.knowledge_store`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `app.providers.provider_manager`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `app.repositories.market_registry_repository`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
-- **INFO** `orphan_module` — `app.strategies.strategy_experiment_repository`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `app.trainers.aki_climate_trainer`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `app.trainers.aki_nexus_trainer`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `app.trainers.base_trainer`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
@@ -44,7 +43,6 @@
 - **INFO** `orphan_module` — `market.repository.instrument_repository`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `market.repository.price_repository`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `market.services.history_sync`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
-- **INFO** `orphan_module` — `providers.yahoo_provider`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `run`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `run_import`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `src.aktienki_market.config`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
@@ -71,9 +69,7 @@
 - **INFO** `orphan_module` — `tests.test_xgboost_trainer`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `tools.aki_audit`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
 - **INFO** `orphan_module` — `tools.tests.test_smoke`: Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen
-- **WARNING** `duplicate_code` — `/Users/silviotaubert/AktienKI/python-engine/app/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/core/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/database/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/experiments/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/models/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/providers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/repositories/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/training/adapters/__init__.py, /Users/silviotaubert/AktienKI/python-engine/providers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/src/aktienki_market/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/analyzers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/fixers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/reports/__init__.py`: AST-identisch, Ähnlichkeit 100.0%
-- **WARNING** `duplicate_code` — `/Users/silviotaubert/AktienKI/python-engine/app/providers/yahoo_provider.py, /Users/silviotaubert/AktienKI/python-engine/providers/yahoo_provider.py`: AST-identisch, Ähnlichkeit 100.0%
-- **WARNING** `duplicate_code` — `/Users/silviotaubert/AktienKI/python-engine/app/repositories/strategy_experiment_repository.py, /Users/silviotaubert/AktienKI/python-engine/app/strategies/strategy_experiment_repository.py`: AST-identisch, Ähnlichkeit 100.0%
+- **WARNING** `duplicate_code` — `/Users/silviotaubert/AktienKI/python-engine/app/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/core/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/database/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/experiments/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/models/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/providers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/repositories/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/training/adapters/__init__.py, /Users/silviotaubert/AktienKI/python-engine/src/aktienki_market/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/analyzers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/fixers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/reports/__init__.py`: AST-identisch, Ähnlichkeit 100.0%
 
 ## Größte Dateien
 
@@ -88,7 +84,6 @@
 - `app/features/volatility_features.py` — 349 Zeilen, Komplexität 6
 - `app/features/test_symbol_feature_selection.py` — 334 Zeilen, Komplexität 7
 - `app/repositories/strategy_experiment_repository.py` — 318 Zeilen, Komplexität 2
-- `app/strategies/strategy_experiment_repository.py` — 318 Zeilen, Komplexität 2
 - `test_symbol_advanced.py` — 314 Zeilen, Komplexität 7
 - `app/repositories/strategy_training_repository.py` — 301 Zeilen, Komplexität 2
 - `app/core/strategy_prediction_engine.py` — 287 Zeilen, Komplexität 27
@@ -97,3 +92,4 @@
 - `app/repositories/model_repository.py` — 286 Zeilen, Komplexität 3
 - `app/training/adaptive_weight_engine.py` — 285 Zeilen, Komplexität 11
 - `app/cli.py` — 259 Zeilen, Komplexität 30
+- `app/features/candlestick_features.py` — 250 Zeilen, Komplexität 1

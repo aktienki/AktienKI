@@ -1,9 +1,9 @@
 {
   "project_root": "/Users/silviotaubert/AktienKI/python-engine",
-  "generated_at": "2026-07-15T12:53:47.444409+00:00",
-  "python_files": 201,
-  "total_lines": 19427,
-  "total_code_lines": 14895,
+  "generated_at": "2026-07-15T13:09:24.662965+00:00",
+  "python_files": 198,
+  "total_lines": 19076,
+  "total_code_lines": 14563,
   "package_counts": {
     "app/__init__.py": 1,
     "app/cli.py": 1,
@@ -18,7 +18,7 @@
     "app/providers": 7,
     "app/repositories": 22,
     "app/scoring": 1,
-    "app/strategies": 8,
+    "app/strategies": 7,
     "app/trainers": 6,
     "app/training": 44,
     "cleanup_aki_structure.py": 1,
@@ -28,8 +28,6 @@
     "market/providers": 1,
     "market/repository": 2,
     "market/services": 2,
-    "providers/__init__.py": 1,
-    "providers/yahoo_provider.py": 1,
     "run.py": 1,
     "run_import.py": 1,
     "src/aktienki_market": 9,
@@ -936,15 +934,6 @@
       "complexity": 1
     },
     {
-      "path": "app/strategies/strategy_experiment_repository.py",
-      "lines": 318,
-      "code_lines": 304,
-      "classes": 1,
-      "functions": 8,
-      "imports": 4,
-      "complexity": 2
-    },
-    {
       "path": "app/trainers/__init__.py",
       "lines": 16,
       "code_lines": 10,
@@ -1474,24 +1463,6 @@
       "functions": 2,
       "imports": 1,
       "complexity": 1
-    },
-    {
-      "path": "providers/__init__.py",
-      "lines": 0,
-      "code_lines": 0,
-      "classes": 0,
-      "functions": 0,
-      "imports": 0,
-      "complexity": 1
-    },
-    {
-      "path": "providers/yahoo_provider.py",
-      "lines": 33,
-      "code_lines": 28,
-      "classes": 1,
-      "functions": 2,
-      "imports": 2,
-      "complexity": 6
     },
     {
       "path": "run.py",
@@ -2772,7 +2743,6 @@
     "app.knowledge.knowledge_store",
     "app.providers.provider_manager",
     "app.repositories.market_registry_repository",
-    "app.strategies.strategy_experiment_repository",
     "app.trainers.aki_climate_trainer",
     "app.trainers.aki_nexus_trainer",
     "app.trainers.base_trainer",
@@ -2796,7 +2766,6 @@
     "market.repository.instrument_repository",
     "market.repository.price_repository",
     "market.services.history_sync",
-    "providers.yahoo_provider",
     "run",
     "run_import",
     "src.aktienki_market.config",
@@ -2836,27 +2805,10 @@
         "/Users/silviotaubert/AktienKI/python-engine/app/providers/__init__.py",
         "/Users/silviotaubert/AktienKI/python-engine/app/repositories/__init__.py",
         "/Users/silviotaubert/AktienKI/python-engine/app/training/adapters/__init__.py",
-        "/Users/silviotaubert/AktienKI/python-engine/providers/__init__.py",
         "/Users/silviotaubert/AktienKI/python-engine/src/aktienki_market/__init__.py",
         "/Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/analyzers/__init__.py",
         "/Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/fixers/__init__.py",
         "/Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/reports/__init__.py"
-      ],
-      "reason": "AST-identisch"
-    },
-    {
-      "similarity": 1.0,
-      "files": [
-        "/Users/silviotaubert/AktienKI/python-engine/app/providers/yahoo_provider.py",
-        "/Users/silviotaubert/AktienKI/python-engine/providers/yahoo_provider.py"
-      ],
-      "reason": "AST-identisch"
-    },
-    {
-      "similarity": 1.0,
-      "files": [
-        "/Users/silviotaubert/AktienKI/python-engine/app/repositories/strategy_experiment_repository.py",
-        "/Users/silviotaubert/AktienKI/python-engine/app/strategies/strategy_experiment_repository.py"
       ],
       "reason": "AST-identisch"
     }
@@ -2927,12 +2879,6 @@
       "severity": "info",
       "type": "orphan_module",
       "path": "app.repositories.market_registry_repository",
-      "message": "Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen"
-    },
-    {
-      "severity": "info",
-      "type": "orphan_module",
-      "path": "app.strategies.strategy_experiment_repository",
       "message": "Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen"
     },
     {
@@ -3071,12 +3017,6 @@
       "severity": "info",
       "type": "orphan_module",
       "path": "market.services.history_sync",
-      "message": "Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen"
-    },
-    {
-      "severity": "info",
-      "type": "orphan_module",
-      "path": "providers.yahoo_provider",
       "message": "Kein interner Import gefunden; Entry-Point oder Dead-Code prüfen"
     },
     {
@@ -3238,21 +3178,9 @@
     {
       "severity": "warning",
       "type": "duplicate_code",
-      "path": "/Users/silviotaubert/AktienKI/python-engine/app/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/core/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/database/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/experiments/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/models/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/providers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/repositories/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/training/adapters/__init__.py, /Users/silviotaubert/AktienKI/python-engine/providers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/src/aktienki_market/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/analyzers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/fixers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/reports/__init__.py",
-      "message": "AST-identisch, Ähnlichkeit 100.0%"
-    },
-    {
-      "severity": "warning",
-      "type": "duplicate_code",
-      "path": "/Users/silviotaubert/AktienKI/python-engine/app/providers/yahoo_provider.py, /Users/silviotaubert/AktienKI/python-engine/providers/yahoo_provider.py",
-      "message": "AST-identisch, Ähnlichkeit 100.0%"
-    },
-    {
-      "severity": "warning",
-      "type": "duplicate_code",
-      "path": "/Users/silviotaubert/AktienKI/python-engine/app/repositories/strategy_experiment_repository.py, /Users/silviotaubert/AktienKI/python-engine/app/strategies/strategy_experiment_repository.py",
+      "path": "/Users/silviotaubert/AktienKI/python-engine/app/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/core/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/database/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/experiments/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/models/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/providers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/repositories/__init__.py, /Users/silviotaubert/AktienKI/python-engine/app/training/adapters/__init__.py, /Users/silviotaubert/AktienKI/python-engine/src/aktienki_market/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/analyzers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/fixers/__init__.py, /Users/silviotaubert/AktienKI/python-engine/tools/aki_engineering/reports/__init__.py",
       "message": "AST-identisch, Ähnlichkeit 100.0%"
     }
   ],
-  "architecture_score": 97.11
+  "architecture_score": 97.63
 }
