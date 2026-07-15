@@ -1,0 +1,1065 @@
+{
+  "project_root": "/Users/silviotaubert/AktienKI/python-engine",
+  "app_root": "/Users/silviotaubert/AktienKI/python-engine/app",
+  "mode": "apply",
+  "generated_actions": [
+    {
+      "kind": "delete_generated_file",
+      "path": ".DS_Store",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": ".pytest_cache",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/.DS_Store",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": "app/__pycache__",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/__pycache__/__init__.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": "app/config/__pycache__",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/config/__pycache__/__init__.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/config/__pycache__/aki_settings.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/config/__pycache__/model_registry.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": "app/enums/__pycache__",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/enums/__pycache__/model_scope.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/enums/__pycache__/timeframe.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": "app/features/__pycache__",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/features/__pycache__/__init__.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/features/__pycache__/candlestick_features.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/features/__pycache__/feature_store.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/features/__pycache__/market_features.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/features/__pycache__/momentum_features.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/features/__pycache__/target_builder.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/features/__pycache__/time_features.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/features/__pycache__/trend_features.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/features/__pycache__/volatility_features.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/features/__pycache__/volume_features.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": "app/providers/__pycache__",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/providers/__pycache__/__init__.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/providers/__pycache__/daily_market_provider.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/providers/__pycache__/hourly_market_provider.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/providers/__pycache__/provider_factory.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": "app/strategies/__pycache__",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/strategies/__pycache__/aki_climate.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/strategies/__pycache__/aki_horizon.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/strategies/__pycache__/aki_nexus.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/strategies/__pycache__/aki_pulse.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/strategies/__pycache__/base_strategy.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": "app/training/__pycache__",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/__pycache__/__init__.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/__pycache__/base.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/__pycache__/ensemble_trainer.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/__pycache__/evaluator.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/__pycache__/factory.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/__pycache__/multi_target_training_engine.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/__pycache__/strategy_loader.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/__pycache__/strategy_manager.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": "app/training/adapters/__pycache__",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/adapters/__pycache__/__init__.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/adapters/__pycache__/catboost_adapter.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/adapters/__pycache__/lightgbm_adapter.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "app/training/adapters/__pycache__/xgboost_adapter.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": "src/aktienki_market/__pycache__",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "src/aktienki_market/__pycache__/__init__.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "src/aktienki_market/__pycache__/cli.cpython-312.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_directory",
+      "path": "tests/__pycache__",
+      "reason": "Generierter Cache-Ordner",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_daily_pipeline_result.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_decision_scorer.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_experiment_selector.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_feature_builder.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_indicators.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_market_importer.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_model_factory.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_prediction_validation_math.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_regression_evaluator.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_strategy_prediction_math.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_variant_generator.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    },
+    {
+      "kind": "delete_generated_file",
+      "path": "tests/__pycache__/test_xgboost_trainer.cpython-39-pytest-7.1.2.pyc",
+      "reason": "Generierte/macOS-Datei",
+      "destination": null,
+      "safe": true
+    }
+  ],
+  "prototype_actions": [
+    {
+      "kind": "quarantine_prototype",
+      "path": "app/training/consensus_engine.py",
+      "reason": "Nicht referenzierter Prototyp; kanonische Datei: app/training/nexus_engine.py; referenziert durch: app/trainers/aki_nexus_trainer.py",
+      "destination": "storage/cleanup_quarantine/20260715_120454/app/training/consensus_engine.py",
+      "safe": false
+    },
+    {
+      "kind": "quarantine_prototype",
+      "path": "app/training/nexus_engine_adaptive.py",
+      "reason": "Nicht referenzierter Prototyp; kanonische Datei: app/training/nexus_engine.py",
+      "destination": "storage/cleanup_quarantine/20260715_120454/app/training/nexus_engine_adaptive.py",
+      "safe": true
+    }
+  ],
+  "duplicate_groups": [
+    [
+      "app/__init__.py",
+      "app/core/__init__.py",
+      "app/database/__init__.py",
+      "app/experiments/__init__.py",
+      "app/models/__init__.py",
+      "app/providers/__init__.py",
+      "app/repositories/__init__.py",
+      "app/training/adapters/__init__.py"
+    ],
+    [
+      "app/repositories/strategy_experiment_repository.py",
+      "app/strategies/strategy_experiment_repository.py"
+    ]
+  ],
+  "import_references": {
+    "app/__init__.py": [
+      "app/cli.py",
+      "app/config/aki_settings.py",
+      "app/config/model_registry.py",
+      "app/core/cross_asset_import_engine.py",
+      "app/core/daily_pipeline_engine.py",
+      "app/core/engine.py",
+      "app/core/feature_engine.py",
+      "app/core/feature_store_engine.py",
+      "app/core/indicator_engine.py",
+      "app/core/market_importer.py",
+      "app/core/market_registry.py",
+      "app/core/market_snapshot_engine.py",
+      "app/core/prediction_engine.py",
+      "app/core/prediction_validation_engine.py",
+      "app/core/strategy_experiment_engine.py",
+      "app/core/strategy_prediction_engine.py",
+      "app/core/strategy_training_engine.py",
+      "app/core/training_engine.py",
+      "app/features/feature_factory.py",
+      "app/features/feature_selector.py",
+      "app/features/feature_store.py",
+      "app/features/test_symbol_feature_selection.py",
+      "app/knowledge/knowledge_store.py",
+      "app/models/market_instrument.py",
+      "app/providers/provider_factory.py",
+      "app/providers/provider_manager.py",
+      "app/providers/provider_registry.py",
+      "app/repositories/feature_store_writer_repository.py",
+      "app/repositories/indicator_repository.py",
+      "app/repositories/instrument_repository.py",
+      "app/repositories/market_registry_repository.py",
+      "app/repositories/market_snapshot_repository.py",
+      "app/repositories/prediction_repository.py",
+      "app/repositories/price_bar_repository.py",
+      "app/repositories/price_history_repository.py",
+      "app/repositories/strategy_profile_repository.py",
+      "app/strategies/aki_climate.py",
+      "app/strategies/aki_horizon.py",
+      "app/strategies/aki_pulse.py",
+      "app/strategies/base_strategy.py",
+      "app/trainers/aki_climate_trainer.py",
+      "app/trainers/aki_horizon_trainer.py",
+      "app/trainers/aki_nexus_trainer.py",
+      "app/trainers/aki_pulse_trainer.py",
+      "app/training/__init__.py",
+      "app/training/adapters/catboost_adapter.py",
+      "app/training/adapters/lightgbm_adapter.py",
+      "app/training/adapters/xgboost_adapter.py",
+      "app/training/challenger_engine.py",
+      "app/training/consensus_engine.py",
+      "app/training/dataset_builder.py",
+      "app/training/engine.py",
+      "app/training/ensemble_runner.py",
+      "app/training/ensemble_trainer.py",
+      "app/training/factory.py",
+      "app/training/feature_selection_engine.py",
+      "app/training/model_lifecycle_manager.py",
+      "app/training/model_registry.py",
+      "app/training/multi_horizon_engine.py",
+      "app/training/multi_target_training_engine.py",
+      "app/training/nexus_engine_adaptive.py",
+      "app/training/pipeline.py",
+      "app/training/prediction_engine.py",
+      "app/training/prediction_result.py",
+      "app/training/prime_selector.py",
+      "app/training/strategy_loader.py",
+      "app/training/strategy_manager.py",
+      "app/training/training_context.py",
+      "app/training/training_runner.py"
+    ],
+    "app/training/__init__.py": [
+      "app/cli.py",
+      "app/core/strategy_training_engine.py",
+      "app/core/training_engine.py",
+      "app/features/test_symbol_feature_selection.py",
+      "app/trainers/aki_nexus_trainer.py",
+      "app/trainers/aki_pulse_trainer.py",
+      "app/training/__init__.py",
+      "app/training/adapters/catboost_adapter.py",
+      "app/training/adapters/lightgbm_adapter.py",
+      "app/training/adapters/xgboost_adapter.py",
+      "app/training/challenger_engine.py",
+      "app/training/engine.py",
+      "app/training/ensemble_runner.py",
+      "app/training/ensemble_trainer.py",
+      "app/training/factory.py",
+      "app/training/feature_selection_engine.py",
+      "app/training/model_lifecycle_manager.py",
+      "app/training/model_registry.py",
+      "app/training/multi_horizon_engine.py",
+      "app/training/multi_target_training_engine.py",
+      "app/training/nexus_engine_adaptive.py",
+      "app/training/pipeline.py",
+      "app/training/prediction_engine.py",
+      "app/training/prediction_result.py",
+      "app/training/prime_selector.py",
+      "app/training/strategy_manager.py",
+      "app/training/training_runner.py"
+    ],
+    "app/training/factory.py": [
+      "app/cli.py",
+      "app/core/strategy_training_engine.py",
+      "app/core/training_engine.py",
+      "app/trainers/aki_pulse_trainer.py",
+      "app/training/__init__.py",
+      "app/training/ensemble_trainer.py"
+    ],
+    "app/core/__init__.py": [
+      "app/cli.py",
+      "app/core/cross_asset_import_engine.py",
+      "app/core/daily_pipeline_engine.py",
+      "app/core/engine.py",
+      "app/core/market_snapshot_engine.py",
+      "app/core/strategy_experiment_engine.py"
+    ],
+    "app/core/engine.py": [
+      "app/cli.py"
+    ],
+    "app/enums/timeframe.py": [
+      "app/config/aki_settings.py",
+      "app/config/model_registry.py"
+    ],
+    "app/enums/model_scope.py": [
+      "app/config/model_registry.py",
+      "app/features/feature_factory.py",
+      "app/providers/provider_factory.py",
+      "app/providers/provider_registry.py",
+      "app/training/pipeline.py"
+    ],
+    "app/providers/__init__.py": [
+      "app/core/cross_asset_import_engine.py",
+      "app/core/daily_pipeline_engine.py",
+      "app/core/engine.py",
+      "app/providers/provider_factory.py",
+      "app/providers/provider_manager.py",
+      "app/providers/provider_registry.py",
+      "app/training/dataset_builder.py"
+    ],
+    "app/providers/yahoo_provider.py": [
+      "app/core/cross_asset_import_engine.py",
+      "app/core/daily_pipeline_engine.py",
+      "app/core/engine.py"
+    ],
+    "app/core/market_importer.py": [
+      "app/core/cross_asset_import_engine.py",
+      "app/core/daily_pipeline_engine.py",
+      "app/core/engine.py"
+    ],
+    "app/repositories/__init__.py": [
+      "app/core/cross_asset_import_engine.py",
+      "app/core/daily_pipeline_engine.py",
+      "app/core/feature_store_engine.py",
+      "app/core/indicator_engine.py",
+      "app/core/market_importer.py",
+      "app/core/market_registry.py",
+      "app/core/market_snapshot_engine.py",
+      "app/core/prediction_engine.py",
+      "app/core/prediction_validation_engine.py",
+      "app/core/strategy_experiment_engine.py",
+      "app/core/strategy_prediction_engine.py",
+      "app/core/strategy_training_engine.py",
+      "app/core/training_engine.py"
+    ],
+    "app/repositories/strategy_profile_repository.py": [
+      "app/core/cross_asset_import_engine.py",
+      "app/core/strategy_experiment_engine.py",
+      "app/core/strategy_prediction_engine.py",
+      "app/core/strategy_training_engine.py"
+    ],
+    "app/core/feature_store_engine.py": [
+      "app/core/daily_pipeline_engine.py",
+      "app/core/engine.py"
+    ],
+    "app/core/indicator_engine.py": [
+      "app/core/daily_pipeline_engine.py",
+      "app/core/engine.py"
+    ],
+    "app/core/market_snapshot_engine.py": [
+      "app/core/daily_pipeline_engine.py"
+    ],
+    "app/core/prediction_validation_engine.py": [
+      "app/core/daily_pipeline_engine.py",
+      "app/core/engine.py"
+    ],
+    "app/repositories/instrument_repository.py": [
+      "app/core/daily_pipeline_engine.py",
+      "app/core/feature_store_engine.py",
+      "app/core/indicator_engine.py",
+      "app/core/market_importer.py",
+      "app/core/market_registry.py"
+    ],
+    "app/core/strategy_prediction_engine.py": [
+      "app/core/daily_pipeline_engine.py",
+      "app/core/engine.py"
+    ],
+    "app/database/__init__.py": [
+      "app/core/engine.py",
+      "app/repositories/feature_store_writer_repository.py",
+      "app/repositories/indicator_repository.py",
+      "app/repositories/instrument_repository.py",
+      "app/repositories/market_snapshot_repository.py",
+      "app/repositories/price_bar_repository.py",
+      "app/repositories/price_history_repository.py"
+    ],
+    "app/database/session.py": [
+      "app/core/engine.py"
+    ],
+    "app/core/daily_pipeline_engine.py": [
+      "app/core/engine.py"
+    ],
+    "app/config/__init__.py": [
+      "app/core/engine.py",
+      "app/strategies/base_strategy.py",
+      "app/training/strategy_loader.py",
+      "app/training/strategy_manager.py",
+      "app/training/training_context.py"
+    ],
+    "app/config/settings.py": [
+      "app/core/engine.py"
+    ],
+    "app/core/training_engine.py": [
+      "app/core/engine.py"
+    ],
+    "app/core/cross_asset_import_engine.py": [
+      "app/core/engine.py"
+    ],
+    "app/core/prediction_engine.py": [
+      "app/core/engine.py"
+    ],
+    "app/core/strategy_experiment_engine.py": [
+      "app/core/engine.py"
+    ],
+    "app/core/strategy_training_engine.py": [
+      "app/core/engine.py",
+      "app/core/strategy_experiment_engine.py"
+    ],
+    "app/features/__init__.py": [
+      "app/core/feature_engine.py",
+      "app/core/feature_store_engine.py",
+      "app/core/indicator_engine.py",
+      "app/features/feature_factory.py",
+      "app/features/feature_selector.py",
+      "app/features/feature_store.py",
+      "app/features/test_symbol_feature_selection.py",
+      "app/training/dataset_builder.py",
+      "app/training/feature_selection_engine.py"
+    ],
+    "app/features/feature_builder.py": [
+      "app/core/feature_engine.py",
+      "app/core/feature_store_engine.py"
+    ],
+    "app/repositories/feature_input_repository.py": [
+      "app/core/feature_store_engine.py"
+    ],
+    "app/repositories/feature_store_writer_repository.py": [
+      "app/core/feature_store_engine.py"
+    ],
+    "app/repositories/price_history_repository.py": [
+      "app/core/indicator_engine.py"
+    ],
+    "app/features/indicators.py": [
+      "app/core/indicator_engine.py"
+    ],
+    "app/repositories/indicator_repository.py": [
+      "app/core/indicator_engine.py"
+    ],
+    "app/models/__init__.py": [
+      "app/core/market_importer.py",
+      "app/core/prediction_engine.py",
+      "app/core/strategy_prediction_engine.py",
+      "app/repositories/instrument_repository.py",
+      "app/repositories/market_registry_repository.py",
+      "app/repositories/prediction_repository.py"
+    ],
+    "app/models/market.py": [
+      "app/core/market_importer.py",
+      "app/repositories/instrument_repository.py"
+    ],
+    "app/repositories/price_bar_repository.py": [
+      "app/core/market_importer.py"
+    ],
+    "app/enums/market_role.py": [
+      "app/core/market_registry.py",
+      "app/models/market_instrument.py",
+      "app/repositories/instrument_repository.py",
+      "app/repositories/market_registry_repository.py"
+    ],
+    "app/core/market_registry.py": [
+      "app/core/market_snapshot_engine.py"
+    ],
+    "app/repositories/market_snapshot_repository.py": [
+      "app/core/market_snapshot_engine.py",
+      "app/core/strategy_prediction_engine.py"
+    ],
+    "app/repositories/latest_feature_repository.py": [
+      "app/core/prediction_engine.py"
+    ],
+    "app/repositories/trained_model_loader_repository.py": [
+      "app/core/prediction_engine.py"
+    ],
+    "app/scoring/decision_scorer.py": [
+      "app/core/prediction_engine.py",
+      "app/core/strategy_prediction_engine.py"
+    ],
+    "app/models/decision.py": [
+      "app/core/prediction_engine.py",
+      "app/core/strategy_prediction_engine.py",
+      "app/repositories/prediction_repository.py"
+    ],
+    "app/repositories/prediction_repository.py": [
+      "app/core/prediction_engine.py",
+      "app/core/strategy_prediction_engine.py"
+    ],
+    "app/repositories/prediction_validation_repository.py": [
+      "app/core/prediction_validation_engine.py"
+    ],
+    "app/repositories/validation_price_repository.py": [
+      "app/core/prediction_validation_engine.py"
+    ],
+    "app/experiments/__init__.py": [
+      "app/core/strategy_experiment_engine.py"
+    ],
+    "app/experiments/selector.py": [
+      "app/core/strategy_experiment_engine.py"
+    ],
+    "app/repositories/strategy_experiment_repository.py": [
+      "app/core/strategy_experiment_engine.py"
+    ],
+    "app/experiments/variant_generator.py": [
+      "app/core/strategy_experiment_engine.py"
+    ],
+    "app/repositories/cross_asset_repository.py": [
+      "app/core/strategy_prediction_engine.py",
+      "app/core/strategy_training_engine.py"
+    ],
+    "app/strategies/dynamic_feature_builder.py": [
+      "app/core/strategy_prediction_engine.py",
+      "app/core/strategy_training_engine.py"
+    ],
+    "app/repositories/raw_price_repository.py": [
+      "app/core/strategy_prediction_engine.py",
+      "app/core/strategy_training_engine.py"
+    ],
+    "app/repositories/strategy_model_loader_repository.py": [
+      "app/core/strategy_prediction_engine.py"
+    ],
+    "app/training/evaluator.py": [
+      "app/core/strategy_training_engine.py",
+      "app/core/training_engine.py",
+      "app/trainers/aki_pulse_trainer.py",
+      "app/training/__init__.py",
+      "app/training/adapters/catboost_adapter.py",
+      "app/training/adapters/lightgbm_adapter.py",
+      "app/training/adapters/xgboost_adapter.py",
+      "app/training/ensemble_trainer.py"
+    ],
+    "app/repositories/strategy_training_repository.py": [
+      "app/core/strategy_training_engine.py"
+    ],
+    "app/repositories/feature_store_repository.py": [
+      "app/core/training_engine.py"
+    ],
+    "app/repositories/model_repository.py": [
+      "app/core/training_engine.py"
+    ],
+    "app/features/aki_pulse_features.py": [
+      "app/features/feature_factory.py"
+    ],
+    "app/features/aki_horizon_features.py": [
+      "app/features/feature_factory.py"
+    ],
+    "app/features/feature_importance.py": [
+      "app/features/feature_selector.py",
+      "app/features/test_symbol_feature_selection.py"
+    ],
+    "app/features/candlestick_features.py": [
+      "app/features/feature_store.py"
+    ],
+    "app/features/volatility_features.py": [
+      "app/features/feature_store.py"
+    ],
+    "app/features/market_features.py": [
+      "app/features/feature_store.py"
+    ],
+    "app/features/trend_features.py": [
+      "app/features/feature_store.py"
+    ],
+    "app/features/time_features.py": [
+      "app/features/feature_store.py"
+    ],
+    "app/features/volume_features.py": [
+      "app/features/feature_store.py"
+    ],
+    "app/features/momentum_features.py": [
+      "app/features/feature_store.py"
+    ],
+    "app/training/dataset_builder.py": [
+      "app/features/test_symbol_feature_selection.py",
+      "app/training/pipeline.py",
+      "app/training/training_runner.py"
+    ],
+    "app/training/train_test_split.py": [
+      "app/features/test_symbol_feature_selection.py",
+      "app/training/pipeline.py"
+    ],
+    "app/training/strategy_manager.py": [
+      "app/features/test_symbol_feature_selection.py",
+      "app/training/ensemble_runner.py",
+      "app/training/multi_horizon_engine.py",
+      "app/training/training_runner.py"
+    ],
+    "app/features/feature_selector.py": [
+      "app/features/test_symbol_feature_selection.py",
+      "app/training/feature_selection_engine.py"
+    ],
+    "app/training/ensemble_trainer.py": [
+      "app/features/test_symbol_feature_selection.py",
+      "app/training/__init__.py",
+      "app/training/feature_selection_engine.py",
+      "app/training/multi_target_training_engine.py"
+    ],
+    "app/knowledge/__init__.py": [
+      "app/knowledge/knowledge_store.py"
+    ],
+    "app/knowledge/model_memory.py": [
+      "app/knowledge/knowledge_store.py"
+    ],
+    "app/providers/hourly_market_provider.py": [
+      "app/providers/provider_factory.py",
+      "app/providers/provider_registry.py"
+    ],
+    "app/providers/daily_market_provider.py": [
+      "app/providers/provider_factory.py",
+      "app/providers/provider_registry.py"
+    ],
+    "app/providers/provider_registry.py": [
+      "app/providers/provider_manager.py"
+    ],
+    "app/database/schema_feature_store.py": [
+      "app/repositories/feature_store_writer_repository.py"
+    ],
+    "app/database/schema_indicators.py": [
+      "app/repositories/indicator_repository.py"
+    ],
+    "app/database/schema.py": [
+      "app/repositories/instrument_repository.py",
+      "app/repositories/market_snapshot_repository.py",
+      "app/repositories/price_bar_repository.py",
+      "app/repositories/price_history_repository.py"
+    ],
+    "app/models/market_instrument.py": [
+      "app/repositories/market_registry_repository.py"
+    ],
+    "app/strategies/models.py": [
+      "app/repositories/strategy_profile_repository.py"
+    ],
+    "app/strategies/base_strategy.py": [
+      "app/strategies/aki_climate.py",
+      "app/strategies/aki_horizon.py",
+      "app/strategies/aki_pulse.py"
+    ],
+    "app/config/model_registry.py": [
+      "app/strategies/base_strategy.py",
+      "app/training/strategy_loader.py",
+      "app/training/strategy_manager.py",
+      "app/training/training_context.py"
+    ],
+    "app/trainers/__init__.py": [
+      "app/trainers/aki_climate_trainer.py",
+      "app/trainers/aki_horizon_trainer.py",
+      "app/training/pipeline.py"
+    ],
+    "app/trainers/aki_pulse_trainer.py": [
+      "app/trainers/aki_climate_trainer.py",
+      "app/trainers/aki_horizon_trainer.py",
+      "app/training/pipeline.py"
+    ],
+    "app/training/consensus_engine.py": [
+      "app/trainers/aki_nexus_trainer.py"
+    ],
+    "app/training/model_alias.py": [
+      "app/trainers/aki_pulse_trainer.py"
+    ],
+    "app/training/base.py": [
+      "app/trainers/aki_pulse_trainer.py",
+      "app/training/__init__.py",
+      "app/training/adapters/catboost_adapter.py",
+      "app/training/adapters/lightgbm_adapter.py",
+      "app/training/adapters/xgboost_adapter.py",
+      "app/training/factory.py"
+    ],
+    "app/training/prime_selector.py": [
+      "app/training/challenger_engine.py"
+    ],
+    "app/training/edge_selector.py": [
+      "app/training/challenger_engine.py"
+    ],
+    "app/strategies/aki_nexus.py": [
+      "app/training/consensus_engine.py",
+      "app/training/strategy_loader.py"
+    ],
+    "app/providers/provider_factory.py": [
+      "app/training/dataset_builder.py"
+    ],
+    "app/training/training_runner.py": [
+      "app/training/engine.py",
+      "app/training/multi_horizon_engine.py"
+    ],
+    "app/training/prediction_engine.py": [
+      "app/training/engine.py"
+    ],
+    "app/training/pipeline.py": [
+      "app/training/ensemble_runner.py"
+    ],
+    "app/training/adapters/__init__.py": [
+      "app/training/factory.py"
+    ],
+    "app/training/adapters/catboost_adapter.py": [
+      "app/training/factory.py"
+    ],
+    "app/training/adapters/xgboost_adapter.py": [
+      "app/training/factory.py"
+    ],
+    "app/training/adapters/lightgbm_adapter.py": [
+      "app/training/factory.py"
+    ],
+    "app/training/model_quality_gate.py": [
+      "app/training/feature_selection_engine.py",
+      "app/training/model_lifecycle_manager.py",
+      "app/training/prime_selector.py"
+    ],
+    "app/training/retraining_engine.py": [
+      "app/training/model_lifecycle_manager.py"
+    ],
+    "app/training/model_history.py": [
+      "app/training/model_lifecycle_manager.py"
+    ],
+    "app/training/drift_detector.py": [
+      "app/training/model_lifecycle_manager.py"
+    ],
+    "app/training/model_monitor.py": [
+      "app/training/model_registry.py"
+    ],
+    "app/training/adaptive_weight_engine.py": [
+      "app/training/nexus_engine_adaptive.py"
+    ],
+    "app/trainers/aki_horizon_trainer.py": [
+      "app/training/pipeline.py"
+    ],
+    "app/training/multi_horizon_engine.py": [
+      "app/training/prediction_engine.py"
+    ],
+    "app/training/model_result.py": [
+      "app/training/prediction_result.py"
+    ],
+    "app/strategies/aki_climate.py": [
+      "app/training/strategy_loader.py"
+    ],
+    "app/strategies/aki_horizon.py": [
+      "app/training/strategy_loader.py"
+    ],
+    "app/strategies/aki_pulse.py": [
+      "app/training/strategy_loader.py"
+    ],
+    "app/training/strategy_loader.py": [
+      "app/training/strategy_manager.py"
+    ],
+    "app/training/training_context.py": [
+      "app/training/training_runner.py"
+    ]
+  },
+  "compile_success": true,
+  "test_command": "python test_multi_target.py NVDA",
+  "test_success": true,
+  "backup_path": "/Users/silviotaubert/AktienKI/python-engine/storage/cleanup_backups/app_before_cleanup_20260715_120454.zip",
+  "quarantine_path": "/Users/silviotaubert/AktienKI/python-engine/storage/cleanup_quarantine/20260715_120454"
+}
