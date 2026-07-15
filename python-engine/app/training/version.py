@@ -1,0 +1,17 @@
+AKI_CORE_VERSION = "1.0.0"
+
+AKI_BUILD = "2026.07"
+
+AKI_ENGINE = "AKI-Core"
+
+AKI_MODELS = [
+
+    "AKI-PULSE",
+
+    "AKI-HORIZON",
+
+    "AKI-CLIMATE",
+
+    "AKI-NEXUS",
+
+]

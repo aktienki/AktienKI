@@ -1,0 +1,159 @@
+{
+  "model_alias": "AKI-PULSE",
+  "algorithm": "catboost",
+  "symbol": "NVDA",
+  "timeframe": "1h",
+  "feature_count": 30,
+  "features": [
+    {
+      "feature": "keltner_upper_20",
+      "importance": 0.19241067515141747,
+      "rank": 1
+    },
+    {
+      "feature": "ema_200",
+      "importance": 0.13067667959946833,
+      "rank": 2
+    },
+    {
+      "feature": "garman_klass_volatility_20",
+      "importance": 0.10327181501486817,
+      "rank": 3
+    },
+    {
+      "feature": "obv",
+      "importance": 0.058044943447732346,
+      "rank": 4
+    },
+    {
+      "feature": "trend_strength",
+      "importance": 0.03991453448656904,
+      "rank": 5
+    },
+    {
+      "feature": "ema_144_slope",
+      "importance": 0.03671811528534527,
+      "rank": 6
+    },
+    {
+      "feature": "volume_mean_50",
+      "importance": 0.035685711716818,
+      "rank": 7
+    },
+    {
+      "feature": "donchian_width_55",
+      "importance": 0.03488211021827478,
+      "rank": 8
+    },
+    {
+      "feature": "volatility_zscore_20",
+      "importance": 0.03452835357718478,
+      "rank": 9
+    },
+    {
+      "feature": "ad_line",
+      "importance": 0.030823930050796935,
+      "rank": 10
+    },
+    {
+      "feature": "volatility_expansion",
+      "importance": 0.03020125560486558,
+      "rank": 11
+    },
+    {
+      "feature": "bollinger_width_50",
+      "importance": 0.0259303031543456,
+      "rank": 12
+    },
+    {
+      "feature": "ema_89_slope",
+      "importance": 0.023407995957126317,
+      "rank": 13
+    },
+    {
+      "feature": "volatility_composite",
+      "importance": 0.022302390165179656,
+      "rank": 14
+    },
+    {
+      "feature": "keltner_width_20",
+      "importance": 0.02155492224740523,
+      "rank": 15
+    },
+    {
+      "feature": "bollinger_width_20",
+      "importance": 0.021549271095616,
+      "rank": 16
+    },
+    {
+      "feature": "atr_14",
+      "importance": 0.019913633986310016,
+      "rank": 17
+    },
+    {
+      "feature": "macd_signal",
+      "importance": 0.01930812793752999,
+      "rank": 18
+    },
+    {
+      "feature": "donchian_position_55",
+      "importance": 0.0163105511805586,
+      "rank": 19
+    },
+    {
+      "feature": "ema_34_slope",
+      "importance": 0.016183985431196608,
+      "rank": 20
+    },
+    {
+      "feature": "macd",
+      "importance": 0.014817040958643508,
+      "rank": 21
+    },
+    {
+      "feature": "atr_7",
+      "importance": 0.014578814299589628,
+      "rank": 22
+    },
+    {
+      "feature": "ema_55_distance",
+      "importance": 0.014436050551566708,
+      "rank": 23
+    },
+    {
+      "feature": "volume_mean_20",
+      "importance": 0.009300628127742336,
+      "rank": 24
+    },
+    {
+      "feature": "realized_volatility_20",
+      "importance": 0.009013046971516865,
+      "rank": 25
+    },
+    {
+      "feature": "volume_std_50",
+      "importance": 0.008912745898006893,
+      "rank": 26
+    },
+    {
+      "feature": "donchian_width_20",
+      "importance": 0.006070542576104272,
+      "rank": 27
+    },
+    {
+      "feature": "realized_volatility_50",
+      "importance": 0.005081135141144716,
+      "rank": 28
+    },
+    {
+      "feature": "ema_21_slope",
+      "importance": 0.004170690167076465,
+      "rank": 29
+    },
+    {
+      "feature": "bollinger_lower_distance_20",
+      "importance": 0.0,
+      "rank": 30
+    }
+  ]
+}

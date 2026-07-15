@@ -1,0 +1,29 @@
+{
+  "model_alias": "AKI-HORIZON",
+  "algorithm": "catboost",
+  "symbol": "NVDA",
+  "timeframe": "1d",
+  "feature_count": 4,
+  "features": [
+    {
+      "feature": "volume_std_20",
+      "importance": 0.3945118209542084,
+      "rank": 1
+    },
+    {
+      "feature": "bollinger_middle_50",
+      "importance": 0.333342396166771,
+      "rank": 2
+    },
+    {
+      "feature": "ema_200_slope",
+      "importance": 0.16132592628465695,
+      "rank": 3
+    },
+    {
+      "feature": "ema_cross_21_55",
+      "importance": 0.1108198565943636,
+      "rank": 4
+    }
+  ]
+}

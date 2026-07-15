@@ -7,35 +7,39 @@ from app.training.base import ModelAdapter
 
 
 class ModelFactory:
-    _adapters: dict[str, type[ModelAdapter]] = {
+    """
+    Zentrale Factory für die internen Modelladapter.
+
+    Öffentliche AKI-Aliase gehören in Strategy Profiles und Metadaten.
+    Die Factory kennt ausschließlich interne Adapter.
+    """
+
+    _ADAPTERS: dict[str, type[ModelAdapter]] = {
         "xgboost": XGBoostAdapter,
         "lightgbm": LightGBMAdapter,
         "catboost": CatBoostAdapter,
     }
 
     @classmethod
-    def register(
-        cls,
-        name: str,
-        adapter: type[ModelAdapter],
-    ) -> None:
-        cls._adapters[name.lower()] = adapter
+    def create(cls, algorithm: str) -> ModelAdapter:
+        normalized = algorithm.lower().strip()
 
-    @classmethod
-    def create(cls, name: str) -> ModelAdapter:
-        key = name.lower().strip()
+        adapter_class = cls._ADAPTERS.get(normalized)
 
-        try:
-            adapter_class = cls._adapters[key]
-        except KeyError as exception:
-            supported = ", ".join(sorted(cls._adapters))
+        if adapter_class is None:
+            available = ", ".join(cls.available_models())
+
             raise ValueError(
-                f"Unbekanntes Modell '{name}'. "
-                f"Unterstützt: {supported}"
-            ) from exception
+                f"Unbekannter Algorithmus '{algorithm}'. "
+                f"Verfügbar: {available}"
+            )
 
         return adapter_class()
 
     @classmethod
     def available_models(cls) -> list[str]:
-        return sorted(cls._adapters)
+        return sorted(cls._ADAPTERS.keys())
+
+    @classmethod
+    def is_supported(cls, algorithm: str) -> bool:
+        return algorithm.lower().strip() in cls._ADAPTERS

@@ -1,0 +1,107 @@
+{
+  "symbol": "NVDA",
+  "alias": "AKI-HORIZON",
+  "scope": "long_term",
+  "timeframe": "1d",
+  "training_window_days": 3650,
+  "prediction_horizon_minutes": 28800,
+  "rows_total": 2392,
+  "rows_train": 1913,
+  "rows_validation": 479,
+  "features_before_selection": 203,
+  "features_after_selection": 4,
+  "selected_features": [
+    "bollinger_middle_50",
+    "volume_std_20",
+    "ema_200_slope",
+    "ema_cross_21_55"
+  ],
+  "baseline": {
+    "winner_algorithm": "catboost",
+    "runner_up_algorithm": "xgboost",
+    "metrics": {
+      "mae": 0.08366815394618922,
+      "rmse": 0.10246168073987716,
+      "normalized_rmse": 1.0231776196309503,
+      "r2": -0.04689244131365777,
+      "direction_accuracy": 0.592901878914405,
+      "ensemble_score": 16.6821
+    }
+  },
+  "selected": {
+    "winner": "AKI-PRIME",
+    "winner_algorithm": "catboost",
+    "runner_up_algorithm": "xgboost",
+    "metrics": {
+      "mae": 0.08372041165380742,
+      "rmse": 0.10261232486373026,
+      "normalized_rmse": 1.0246819449059448,
+      "r2": -0.0499730882162297,
+      "direction_accuracy": 0.592901878914405,
+      "ensemble_score": 16.582
+    },
+    "prediction": 0.052622923718347904,
+    "direction": "long"
+  },
+  "quality_gate": {
+    "accepted": false,
+    "status": "rejected",
+    "reasons": [
+      "R² zu niedrig"
+    ]
+  },
+  "lifecycle": {
+    "promote": false,
+    "retrain": true,
+    "drift_detected": false,
+    "status": "rejected",
+    "reasons": [
+      "R² zu niedrig",
+      "Retraining ist aufgrund des Modellalters oder fehlender Historie erforderlich."
+    ],
+    "current_version": "20260715T074306Z",
+    "previous_version": null
+  },
+  "feature_importance_report": "storage/reports/aki-horizon/NVDA/feature_importance.json",
+  "candidates": [
+    {
+      "algorithm": "catboost",
+      "metrics": {
+        "mae": 0.08372041165380742,
+        "rmse": 0.10261232486373026,
+        "normalized_rmse": 1.0246819449059448,
+        "r2": -0.0499730882162297,
+        "direction_accuracy": 0.592901878914405,
+        "ensemble_score": 16.582
+      },
+      "rank": 1,
+      "is_winner": true
+    },
+    {
+      "algorithm": "xgboost",
+      "metrics": {
+        "mae": 0.13784757754506546,
+        "rmse": 0.16792034760459543,
+        "normalized_rmse": 1.676844848815796,
+        "r2": -1.8118086470000705,
+        "direction_accuracy": 0.6116910229645094,
+        "ensemble_score": 3.79
+      },
+      "rank": 2,
+      "is_winner": false
+    },
+    {
+      "algorithm": "lightgbm",
+      "metrics": {
+        "mae": 0.14202094781855204,
+        "rmse": 0.16927071776772254,
+        "normalized_rmse": 1.690329583002782,
+        "r2": -1.8572140991743593,
+        "direction_accuracy": 0.605427974947808,
+        "ensemble_score": 3.5895
+      },
+      "rank": 3,
+      "is_winner": false
+    }
+  ]
+}

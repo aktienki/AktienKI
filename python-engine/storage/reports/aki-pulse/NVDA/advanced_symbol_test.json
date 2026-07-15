@@ -1,0 +1,131 @@
+{
+  "symbol": "NVDA",
+  "alias": "AKI-PULSE",
+  "scope": "short_term",
+  "timeframe": "1h",
+  "training_window_days": 730,
+  "prediction_horizon_minutes": 1440,
+  "rows_total": 3258,
+  "rows_train": 2606,
+  "rows_validation": 652,
+  "features_before_selection": 203,
+  "features_after_selection": 30,
+  "selected_features": [
+    "ema_200",
+    "keltner_upper_20",
+    "volatility_zscore_20",
+    "garman_klass_volatility_20",
+    "donchian_position_55",
+    "donchian_width_55",
+    "trend_strength",
+    "ema_144_slope",
+    "ema_55_distance",
+    "keltner_width_20",
+    "volume_mean_20",
+    "macd",
+    "atr_7",
+    "volume_mean_50",
+    "bollinger_width_50",
+    "bollinger_width_20",
+    "ad_line",
+    "ema_89_slope",
+    "realized_volatility_20",
+    "atr_14",
+    "donchian_width_20",
+    "volatility_composite",
+    "realized_volatility_50",
+    "volatility_expansion",
+    "volume_std_50",
+    "ema_34_slope",
+    "ema_21_slope",
+    "obv",
+    "bollinger_lower_distance_20",
+    "macd_signal"
+  ],
+  "baseline": {
+    "winner_algorithm": "catboost",
+    "runner_up_algorithm": "lightgbm",
+    "metrics": {
+      "mae": 0.036387578668588584,
+      "rmse": 0.04356358444541536,
+      "normalized_rmse": 0.9899238108938979,
+      "r2": 0.020050848625302264,
+      "direction_accuracy": 0.5552147239263804,
+      "ensemble_score": 15.7217
+    }
+  },
+  "selected": {
+    "winner": "AKI-PRIME",
+    "winner_algorithm": "catboost",
+    "runner_up_algorithm": "xgboost",
+    "metrics": {
+      "mae": 0.03580367085102054,
+      "rmse": 0.043133476468691756,
+      "normalized_rmse": 0.9801501861374782,
+      "r2": 0.03930561261466714,
+      "direction_accuracy": 0.5966257668711656,
+      "ensemble_score": 20.1723
+    },
+    "prediction": -0.005787108477580065,
+    "direction": "short"
+  },
+  "quality_gate": {
+    "accepted": true,
+    "status": "accepted",
+    "reasons": []
+  },
+  "lifecycle": {
+    "promote": true,
+    "retrain": true,
+    "drift_detected": false,
+    "status": "promote_to_prime",
+    "reasons": [
+      "Retraining ist aufgrund des Modellalters oder fehlender Historie erforderlich.",
+      "Quality Gate bestanden und kein kritischer Drift erkannt."
+    ],
+    "current_version": "20260715T074048Z",
+    "previous_version": null
+  },
+  "feature_importance_report": "storage/reports/aki-pulse/NVDA/feature_importance.json",
+  "candidates": [
+    {
+      "algorithm": "catboost",
+      "metrics": {
+        "mae": 0.03580367085102054,
+        "rmse": 0.043133476468691756,
+        "normalized_rmse": 0.9801501861374782,
+        "r2": 0.03930561261466714,
+        "direction_accuracy": 0.5966257668711656,
+        "ensemble_score": 20.1723
+      },
+      "rank": 1,
+      "is_winner": true
+    },
+    {
+      "algorithm": "xgboost",
+      "metrics": {
+        "mae": 0.0401111852344446,
+        "rmse": 0.05080984989294882,
+        "normalized_rmse": 1.1545854382115284,
+        "r2": -0.33306753413010637,
+        "direction_accuracy": 0.6104294478527608,
+        "ensemble_score": 11.5364
+      },
+      "rank": 2,
+      "is_winner": false
+    },
+    {
+      "algorithm": "lightgbm",
+      "metrics": {
+        "mae": 0.04227366029587692,
+        "rmse": 0.05392838944954952,
+        "normalized_rmse": 1.2254500514336484,
+        "r2": -0.5017278285587314,
+        "direction_accuracy": 0.6226993865030674,
+        "ensemble_score": 9.9977
+      },
+      "rank": 3,
+      "is_winner": false
+    }
+  ]
+}
