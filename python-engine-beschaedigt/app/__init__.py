@@ -1,1 +1,0 @@
-"""AktienKI Python application package."""

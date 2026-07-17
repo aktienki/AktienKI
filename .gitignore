@@ -44,3 +44,11 @@ storage/models/*
 *.tar
 *.tar.gz
 *.bak
+python-engine-beschaedigt/
+laravel-beschaedigt/
+.venv/
+vendor/
+python-engine-beschaedigt/
+laravel-beschaedigt/
+.venv/
+vendor/

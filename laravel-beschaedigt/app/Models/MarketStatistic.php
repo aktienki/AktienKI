@@ -1,3 +1,0 @@
-<?php
-namespace App\Models; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
-class MarketStatistic extends Model { protected $fillable=['market_snapshot_id','companies_total','buy_count','sell_count','hold_count','average_score','average_confidence','average_prediction','average_hitrate','metadata']; protected $casts=['average_score'=>'float','average_confidence'=>'float','average_prediction'=>'float','average_hitrate'=>'float','metadata'=>'array']; public function snapshot():BelongsTo{return $this->belongsTo(MarketSnapshot::class,'market_snapshot_id');} }
