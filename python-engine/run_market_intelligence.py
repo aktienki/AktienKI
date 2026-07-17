@@ -16,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.market_intelligence import MarketIntelligenceService
+from app.market_assets.collector import MarketAssetCollector
 
 
 def load_environment() -> Path | None:
@@ -88,6 +89,11 @@ def main() -> int:
         logging.info("Konfiguration geladen aus %s", env_file)
     else:
         logging.warning("Keine .env-Datei gefunden; verwende Prozess-Umgebungsvariablen.")
+
+    with session_factory() as session:
+        collector = MarketAssetCollector(session)
+        collector.run()
+        session.commit()
 
     service = MarketIntelligenceService(session_factory)
     result = service.run()
