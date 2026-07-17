@@ -1,0 +1,3 @@
+<?php
+namespace App\Console\Commands; use App\Services\Market\MarketSnapshotService; use Illuminate\Console\Command;
+class ShowMarketSnapshot extends Command { protected $signature='market:snapshot-show'; protected $description='Zeigt den neuesten Market Snapshot'; public function handle(MarketSnapshotService $service):int{$s=$service->latest(); if(!$s){$this->warn('Kein Market Snapshot vorhanden.'); return self::FAILURE;} $this->info("Snapshot: {$s->snapshot_time} | Score: {$s->market_score} | {$s->risk_mode}"); $this->table(['Symbol','Preis','Änderung %','Signal','Score'],$s->assets->map(fn($a)=>[$a->symbol,$a->price,$a->change_percent,$a->signal,$a->score])->all()); return self::SUCCESS;} }
