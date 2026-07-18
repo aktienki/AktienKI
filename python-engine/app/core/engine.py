@@ -16,7 +16,7 @@ from app.core.training_engine import TrainingEngine
 from app.database.session import build_engine, build_session_factory
 from app.providers.yahoo_provider import YahooProvider
 from app.providers.provider_manager import ProviderManager
-
+from app.core.bootstrap_service import BootstrapService
 
 class Engine:
     def __init__(self, settings=None):
@@ -34,6 +34,11 @@ class Engine:
         self.session_factory = build_session_factory(
             build_engine(self.settings)
         )
+
+    def bootstrap(self):
+        return BootstrapService(
+            self.session_factory
+        ).run()
 
     def import_market(self, **kwargs):
 

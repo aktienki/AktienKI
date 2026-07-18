@@ -101,3 +101,13 @@ class HourlyMarketProvider:
         )
 
         return df
+
+    def history(
+            self,
+            symbol: str,
+            *,
+            interval: str,
+            period: str,
+            start=None,
+    ) -> pd.DataFrame:
+        return self.load(symbol)

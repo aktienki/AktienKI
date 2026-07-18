@@ -28,6 +28,7 @@ def main():
     parser.add_argument(
         "action",
         choices=[
+            "bootstrap",
             "import-market",
             "import-cross-assets",
             "calculate-indicators",
@@ -98,16 +99,21 @@ def main():
                         f"StrategyProfile '{args.strategy}' wurde nicht gefunden."
                     )
 
-            result = engine.import_market(
-                strategy_profile=strategy_profile,
-                interval=args.interval,
-                period=args.period,
-                types=args.types,
-                limit=args.limit,
-                symbol=args.symbol,
-                instrument_id=args.instrument_id,
-                full=args.full,
-            )
+            if args.action == "bootstrap":
+                result = engine.bootstrap()
+
+            elif args.action == "import-market":
+
+                result = engine.import_market(
+                    strategy_profile=strategy_profile,
+                    interval=args.interval,
+                    period=args.period,
+                    types=args.types,
+                    limit=args.limit,
+                    symbol=args.symbol,
+                    instrument_id=args.instrument_id,
+                    full=args.full,
+                )
 
         elif args.action == "import-cross-assets":
             if not args.strategy:
@@ -248,11 +254,14 @@ def main():
                 limit=args.limit,
             )
 
-        else:
+
+        elif args.action == "daily-run":
+
             if not args.symbol:
                 raise ValueError(
                     "--symbol ist für daily-run erforderlich."
                 )
+
             if not args.strategy:
                 raise ValueError(
                     "--strategy ist für daily-run erforderlich."
@@ -265,6 +274,23 @@ def main():
                 interval=args.interval,
                 validation_horizon_days=args.horizon_days,
                 continue_on_error=args.continue_on_error,
+            )
+
+        elif args.action == "bootstrap":
+            result = engine.bootstrap()
+
+
+        elif args.action == "bootstrap":
+
+            result = engine.bootstrap()
+
+
+        else:
+
+            raise RuntimeError(
+
+                f"Unbekannte Aktion: {args.action}"
+
             )
 
     except Exception:

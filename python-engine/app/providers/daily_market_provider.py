@@ -77,3 +77,13 @@ class DailyMarketProvider:
         dataframe.dropna(inplace=True)
 
         return dataframe
+
+    def history(
+            self,
+            symbol: str,
+            *,
+            interval: str,
+            period: str,
+            start=None,
+    ) -> pd.DataFrame:
+        return self.load(symbol)
