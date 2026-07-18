@@ -1,0 +1,211 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Instrument;
+use App\Models\MarketSnapshot;
+use App\Models\ModelChampion;
+use App\Models\Prediction;
+use App\Models\TrainingRun;
+use Illuminate\Contracts\View\View;
+
+class DashboardController extends Controller
+{
+    public function __invoke(): View
+    {
+        $snapshot = MarketSnapshot::query()
+            ->with([
+                'assets' => fn ($query) => $query->orderBy('category')->orderBy('name'),
+                'sectors' => fn ($query) => $query->orderBy('rank')->limit(8),
+                'statistics',
+            ])
+            ->latest('snapshot_time')
+            ->latest('id')
+            ->first();
+
+        $topSignals = Prediction::query()
+            ->with('instrument')
+            ->whereNotNull('ai_score')
+            ->whereHas('instrument')
+            ->latest('prediction_time')
+            ->orderByDesc('ai_score')
+            ->limit(8)
+            ->get()
+            ->unique('instrument_id')
+            ->take(5)
+            ->values();
+
+        $latestRun = TrainingRun::query()
+            ->with(['trainedModel.definition', 'instrument'])
+            ->latest('started_at')
+            ->latest('id')
+            ->first();
+
+        $champions = ModelChampion::query()
+            ->with(['activeModel.definition', 'instrument'])
+            ->where('status', 'active')
+            ->latest('activated_at')
+            ->limit(5)
+            ->get();
+
+        $signalCounts = $this->signalCounts($snapshot);
+        $signalTotal = max(1, array_sum($signalCounts));
+
+        return view('dashboard', [
+            'snapshot' => $snapshot,
+            'marketAssets' => $snapshot?->assets ?? collect(),
+            'sectorSnapshots' => $snapshot?->sectors ?? collect(),
+            'topSignals' => $topSignals,
+            'latestRun' => $latestRun,
+            'champions' => $champions,
+            'signalCounts' => $signalCounts,
+            'signalTotal' => $signalTotal,
+            'instrumentCount' => Instrument::query()->where('is_active', true)->count(),
+            'countryCoverage' => $this->countryCoverage(),
+        ]);
+    }
+
+    /**
+     * Country coverage for the atlas map. Countries are normalized to ISO 3166-1
+     * numeric IDs because world-atlas uses those IDs in its country geometry.
+     *
+     * @return array<int, array{id:string, code:string, name:string, count:int}>
+     */
+    private function countryCoverage(): array
+    {
+        $countries = Instrument::query()
+            ->where('is_active', true)
+            ->whereNotNull('country')
+            ->where('country', '<>', '')
+            ->selectRaw('country, COUNT(*) AS aggregate')
+            ->groupBy('country')
+            ->orderByDesc('aggregate')
+            ->get();
+
+        $coverage = [];
+
+        foreach ($countries as $country) {
+            $resolved = $this->resolveCountry((string) $country->country);
+
+            if ($resolved === null) {
+                continue;
+            }
+
+            $id = $resolved['id'];
+
+            if (! isset($coverage[$id])) {
+                $coverage[$id] = [
+                    'id' => $id,
+                    'code' => $resolved['code'],
+                    'name' => $resolved['name'],
+                    'count' => 0,
+                ];
+            }
+
+            $coverage[$id]['count'] += (int) $country->aggregate;
+        }
+
+        usort($coverage, fn (array $a, array $b): int => $b['count'] <=> $a['count']);
+
+        return array_values($coverage);
+    }
+
+    /**
+     * Resolve common country names and ISO alpha-2 codes to the numeric country
+     * identifier used by world-atlas. Add aliases here if an importer supplies
+     * another spelling.
+     *
+     * @return array{id:string,code:string,name:string}|null
+     */
+    private function resolveCountry(string $value): ?array
+    {
+        $key = mb_strtolower(trim($value));
+        $key = str_replace(['.', '_'], ['', ' '], $key);
+        $key = preg_replace('/\s+/', ' ', $key) ?? $key;
+
+        $countries = [
+            'de' => ['276', 'DE', 'Deutschland'], 'germany' => ['276', 'DE', 'Deutschland'], 'deutschland' => ['276', 'DE', 'Deutschland'],
+            'us' => ['840', 'US', 'USA'], 'usa' => ['840', 'US', 'USA'], 'united states' => ['840', 'US', 'USA'], 'united states of america' => ['840', 'US', 'USA'],
+            'ca' => ['124', 'CA', 'Kanada'], 'canada' => ['124', 'CA', 'Kanada'], 'kanada' => ['124', 'CA', 'Kanada'],
+            'gb' => ['826', 'GB', 'Vereinigtes Königreich'], 'uk' => ['826', 'GB', 'Vereinigtes Königreich'], 'united kingdom' => ['826', 'GB', 'Vereinigtes Königreich'], 'great britain' => ['826', 'GB', 'Vereinigtes Königreich'],
+            'fr' => ['250', 'FR', 'Frankreich'], 'france' => ['250', 'FR', 'Frankreich'], 'frankreich' => ['250', 'FR', 'Frankreich'],
+            'it' => ['380', 'IT', 'Italien'], 'italy' => ['380', 'IT', 'Italien'], 'italien' => ['380', 'IT', 'Italien'],
+            'es' => ['724', 'ES', 'Spanien'], 'spain' => ['724', 'ES', 'Spanien'], 'spanien' => ['724', 'ES', 'Spanien'],
+            'pt' => ['620', 'PT', 'Portugal'], 'portugal' => ['620', 'PT', 'Portugal'],
+            'nl' => ['528', 'NL', 'Niederlande'], 'netherlands' => ['528', 'NL', 'Niederlande'], 'niederlande' => ['528', 'NL', 'Niederlande'],
+            'be' => ['056', 'BE', 'Belgien'], 'belgium' => ['056', 'BE', 'Belgien'], 'belgien' => ['056', 'BE', 'Belgien'],
+            'lu' => ['442', 'LU', 'Luxemburg'], 'luxembourg' => ['442', 'LU', 'Luxemburg'], 'luxemburg' => ['442', 'LU', 'Luxemburg'],
+            'ch' => ['756', 'CH', 'Schweiz'], 'switzerland' => ['756', 'CH', 'Schweiz'], 'schweiz' => ['756', 'CH', 'Schweiz'],
+            'at' => ['040', 'AT', 'Österreich'], 'austria' => ['040', 'AT', 'Österreich'], 'österreich' => ['040', 'AT', 'Österreich'],
+            'ie' => ['372', 'IE', 'Irland'], 'ireland' => ['372', 'IE', 'Irland'], 'irland' => ['372', 'IE', 'Irland'],
+            'dk' => ['208', 'DK', 'Dänemark'], 'denmark' => ['208', 'DK', 'Dänemark'], 'dänemark' => ['208', 'DK', 'Dänemark'],
+            'se' => ['752', 'SE', 'Schweden'], 'sweden' => ['752', 'SE', 'Schweden'], 'schweden' => ['752', 'SE', 'Schweden'],
+            'no' => ['578', 'NO', 'Norwegen'], 'norway' => ['578', 'NO', 'Norwegen'], 'norwegen' => ['578', 'NO', 'Norwegen'],
+            'fi' => ['246', 'FI', 'Finnland'], 'finland' => ['246', 'FI', 'Finnland'], 'finnland' => ['246', 'FI', 'Finnland'],
+            'is' => ['352', 'IS', 'Island'], 'iceland' => ['352', 'IS', 'Island'], 'island' => ['352', 'IS', 'Island'],
+            'pl' => ['616', 'PL', 'Polen'], 'poland' => ['616', 'PL', 'Polen'], 'polen' => ['616', 'PL', 'Polen'],
+            'cz' => ['203', 'CZ', 'Tschechien'], 'czechia' => ['203', 'CZ', 'Tschechien'], 'czech republic' => ['203', 'CZ', 'Tschechien'], 'tschechien' => ['203', 'CZ', 'Tschechien'],
+            'hu' => ['348', 'HU', 'Ungarn'], 'hungary' => ['348', 'HU', 'Ungarn'], 'ungarn' => ['348', 'HU', 'Ungarn'],
+            'ro' => ['642', 'RO', 'Rumänien'], 'romania' => ['642', 'RO', 'Rumänien'], 'rumänien' => ['642', 'RO', 'Rumänien'],
+            'gr' => ['300', 'GR', 'Griechenland'], 'greece' => ['300', 'GR', 'Griechenland'], 'griechenland' => ['300', 'GR', 'Griechenland'],
+            'tr' => ['792', 'TR', 'Türkei'], 'turkey' => ['792', 'TR', 'Türkei'], 'türkiye' => ['792', 'TR', 'Türkei'], 'türkei' => ['792', 'TR', 'Türkei'],
+            'ru' => ['643', 'RU', 'Russland'], 'russia' => ['643', 'RU', 'Russland'], 'russian federation' => ['643', 'RU', 'Russland'], 'russland' => ['643', 'RU', 'Russland'],
+            'ua' => ['804', 'UA', 'Ukraine'], 'ukraine' => ['804', 'UA', 'Ukraine'],
+            'jp' => ['392', 'JP', 'Japan'], 'japan' => ['392', 'JP', 'Japan'],
+            'cn' => ['156', 'CN', 'China'], 'china' => ['156', 'CN', 'China'],
+            'hk' => ['344', 'HK', 'Hongkong'], 'hong kong' => ['344', 'HK', 'Hongkong'], 'hongkong' => ['344', 'HK', 'Hongkong'],
+            'tw' => ['158', 'TW', 'Taiwan'], 'taiwan' => ['158', 'TW', 'Taiwan'],
+            'kr' => ['410', 'KR', 'Südkorea'], 'south korea' => ['410', 'KR', 'Südkorea'], 'korea republic' => ['410', 'KR', 'Südkorea'], 'südkorea' => ['410', 'KR', 'Südkorea'],
+            'in' => ['356', 'IN', 'Indien'], 'india' => ['356', 'IN', 'Indien'], 'indien' => ['356', 'IN', 'Indien'],
+            'sg' => ['702', 'SG', 'Singapur'], 'singapore' => ['702', 'SG', 'Singapur'], 'singapur' => ['702', 'SG', 'Singapur'],
+            'my' => ['458', 'MY', 'Malaysia'], 'malaysia' => ['458', 'MY', 'Malaysia'],
+            'id' => ['360', 'ID', 'Indonesien'], 'indonesia' => ['360', 'ID', 'Indonesien'], 'indonesien' => ['360', 'ID', 'Indonesien'],
+            'th' => ['764', 'TH', 'Thailand'], 'thailand' => ['764', 'TH', 'Thailand'],
+            'vn' => ['704', 'VN', 'Vietnam'], 'vietnam' => ['704', 'VN', 'Vietnam'],
+            'ph' => ['608', 'PH', 'Philippinen'], 'philippines' => ['608', 'PH', 'Philippinen'], 'philippinen' => ['608', 'PH', 'Philippinen'],
+            'au' => ['036', 'AU', 'Australien'], 'australia' => ['036', 'AU', 'Australien'], 'australien' => ['036', 'AU', 'Australien'],
+            'nz' => ['554', 'NZ', 'Neuseeland'], 'new zealand' => ['554', 'NZ', 'Neuseeland'], 'neuseeland' => ['554', 'NZ', 'Neuseeland'],
+            'br' => ['076', 'BR', 'Brasilien'], 'brazil' => ['076', 'BR', 'Brasilien'], 'brasilien' => ['076', 'BR', 'Brasilien'],
+            'ar' => ['032', 'AR', 'Argentinien'], 'argentina' => ['032', 'AR', 'Argentinien'], 'argentinien' => ['032', 'AR', 'Argentinien'],
+            'cl' => ['152', 'CL', 'Chile'], 'chile' => ['152', 'CL', 'Chile'],
+            'mx' => ['484', 'MX', 'Mexiko'], 'mexico' => ['484', 'MX', 'Mexiko'], 'mexiko' => ['484', 'MX', 'Mexiko'],
+            'za' => ['710', 'ZA', 'Südafrika'], 'south africa' => ['710', 'ZA', 'Südafrika'], 'südafrika' => ['710', 'ZA', 'Südafrika'],
+            'eg' => ['818', 'EG', 'Ägypten'], 'egypt' => ['818', 'EG', 'Ägypten'], 'ägypten' => ['818', 'EG', 'Ägypten'],
+            'il' => ['376', 'IL', 'Israel'], 'israel' => ['376', 'IL', 'Israel'],
+            'sa' => ['682', 'SA', 'Saudi-Arabien'], 'saudi arabia' => ['682', 'SA', 'Saudi-Arabien'], 'saudi-arabien' => ['682', 'SA', 'Saudi-Arabien'],
+            'ae' => ['784', 'AE', 'Vereinigte Arabische Emirate'], 'united arab emirates' => ['784', 'AE', 'Vereinigte Arabische Emirate'], 'uae' => ['784', 'AE', 'Vereinigte Arabische Emirate'],
+        ];
+
+        if (! isset($countries[$key])) {
+            return null;
+        }
+
+        [$id, $code, $name] = $countries[$key];
+
+        return compact('id', 'code', 'name');
+    }
+
+    /** @return array{buy:int,hold:int,sell:int} */
+    private function signalCounts(?MarketSnapshot $snapshot): array
+    {
+        if ($snapshot) {
+            return [
+                'buy' => (int) $snapshot->buy_signals,
+                'hold' => (int) $snapshot->hold_signals,
+                'sell' => (int) $snapshot->sell_signals,
+            ];
+        }
+
+        $counts = Prediction::query()
+            ->selectRaw("UPPER(signal) AS normalized_signal, COUNT(*) AS aggregate")
+            ->whereNotNull('signal')
+            ->groupByRaw('UPPER(signal)')
+            ->pluck('aggregate', 'normalized_signal');
+
+        return [
+            'buy' => (int) ($counts['BUY'] ?? 0),
+            'hold' => (int) ($counts['HOLD'] ?? 0),
+            'sell' => (int) ($counts['SELL'] ?? 0),
+        ];
+    }
+}

@@ -101,11 +101,19 @@ class FeatureStoreEngine:
             return 0
 
         built = self.builder.build(frame)
+
+        print("=" * 80)
+        print("INPUT :", frame.shape)
+        print("OUTPUT:", built.shape)
+        print(built.head())
+        print("=" * 80)
+
         rows = self._to_rows(
             built,
             instrument_id=instrument_id,
             interval=interval,
         )
+
 
         if not rows:
             return 0
@@ -138,7 +146,7 @@ class FeatureStoreEngine:
         rows: list[dict] = []
 
         for bar_time, values in frame.iterrows():
-            close = values.get("close")
+            close = values.get("Close")
 
             if pd.isna(close):
                 continue
@@ -150,8 +158,9 @@ class FeatureStoreEngine:
                     "bar_time": bar_time.to_pydatetime(),
                     "close": float(close),
                     "volume": self._nullable_float(
-                        values.get("volume")
+                        values.get("Volume")
                     ),
+
                     "rsi_14": self._nullable_float(
                         values.get("rsi_14")
                     ),

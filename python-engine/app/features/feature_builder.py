@@ -116,26 +116,26 @@ class FeatureBuilder:
         dataframe = dataframe.copy()
 
         dataframe["target_return_1d"] = (
-            dataframe["close"].shift(-1)
-            / dataframe["close"]
+            dataframe["Close"].shift(-1)
+            / dataframe["Close"]
             - 1
         )
 
         dataframe["target_return_5d"] = (
-            dataframe["close"].shift(-5)
-            / dataframe["close"]
+            dataframe["Close"].shift(-5)
+            / dataframe["Close"]
             - 1
         )
 
         dataframe["target_return_20d"] = (
-            dataframe["close"].shift(-20)
-            / dataframe["close"]
+            dataframe["Close"].shift(-20)
+            / dataframe["Close"]
             - 1
         )
 
         dataframe["target_return_60d"] = (
-            dataframe["close"].shift(-60)
-            / dataframe["close"]
+            dataframe["Close"].shift(-60)
+            / dataframe["Close"]
             - 1
         )
 

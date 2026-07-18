@@ -16,16 +16,19 @@ class FeatureInputRepository:
             text(
                 """
                 SELECT
-                    pb.bar_time,
-                    pb.close,
-                    pb.volume,
-                    ti.rsi_14,
-                    ti.ema_20,
-                    ti.ema_50,
-                    ti.ema_200,
-                    ti.macd,
-                    ti.atr_14,
-                    ti.volatility_20
+                pb.bar_time,
+                pb.open,
+                pb.high,
+                pb.low,
+                pb.close,
+                pb.volume,
+                ti.rsi_14,
+                ti.ema_20,
+                ti.ema_50,
+                ti.ema_200,
+                ti.macd,
+                ti.atr_14,
+                ti.volatility_20
                 FROM price_bars pb
                 INNER JOIN technical_indicators ti
                     ON ti.instrument_id = pb.instrument_id
@@ -46,6 +49,17 @@ class FeatureInputRepository:
             return pd.DataFrame()
 
         frame = pd.DataFrame(rows)
+
+        frame = frame.rename(
+            columns={
+                "open": "Open",
+                "high": "High",
+                "low": "Low",
+                "close": "Close",
+                "volume": "Volume",
+            }
+        )
+
         frame["bar_time"] = pd.to_datetime(
             frame["bar_time"],
             utc=True,

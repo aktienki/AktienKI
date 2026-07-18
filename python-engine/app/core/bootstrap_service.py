@@ -23,11 +23,31 @@ SYSTEM_PROFILES: tuple[dict[str, Any], ...] = (
         "history_years": 10,
         "retraining_interval_days": 30,
         "configuration": {
-            "features": {
-                "ema": [20, 50, 200],
-                "rsi": 14,
-                "macd": [12, 26, 9],
-                "atr": 14,
+            "technical_features": {
+                "ema_periods": [20, 50, 200],
+                "sma_periods": [20, 50, 200],
+                "rsi_periods": [14],
+                "atr_periods": [14],
+                "macd_variants": [
+                    {
+                        "fast": 12,
+                        "slow": 26,
+                        "signal": 9,
+                    }
+                ],
+                "crossovers": [
+                    {
+                        "fast": 20,
+                        "slow": 50,
+                    },
+                    {
+                        "fast": 50,
+                        "slow": 200,
+                    },
+                ],
+            },
+            "cross_asset_features": {
+                "enabled": False,
             },
             "training": {
                 "algorithm": "ensemble",
@@ -59,11 +79,31 @@ SYSTEM_PROFILES: tuple[dict[str, Any], ...] = (
         "history_years": 3,
         "retraining_interval_days": 7,
         "configuration": {
-            "features": {
-                "ema": [12, 26, 50],
-                "rsi": 14,
-                "macd": [12, 26, 9],
-                "atr": 14,
+            "technical_features": {
+                "ema_periods": [9, 21, 50],
+                "sma_periods": [20, 50],
+                "rsi_periods": [7, 14],
+                "atr_periods": [14],
+                "macd_variants": [
+                    {
+                        "fast": 12,
+                        "slow": 26,
+                        "signal": 9,
+                    }
+                ],
+                "crossovers": [
+                    {
+                        "fast": 9,
+                        "slow": 21,
+                    },
+                    {
+                        "fast": 21,
+                        "slow": 50,
+                    },
+                ],
+            },
+            "cross_asset_features": {
+                "enabled": False,
             },
             "training": {
                 "algorithm": "ensemble",

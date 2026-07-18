@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 420">
+<defs>
+<linearGradient id="grad" x1="0%" y1="100%" x2="100%" y2="0%">
+  <stop offset="0%" stop-color="#4C1D95"/>
+  <stop offset="50%" stop-color="#7C3AED"/>
+  <stop offset="100%" stop-color="#C084FC"/>
+</linearGradient>
+<style>
+.brand{font-family:'Inter','Segoe UI',Arial,sans-serif;font-weight:800;font-size:118px;letter-spacing:-3px}
+.tag{font-family:'Inter','Segoe UI',Arial,sans-serif;font-weight:500;font-size:34px;letter-spacing:8px;fill:#374151}
+</style>
+</defs>
+
+<rect width="100%" height="100%" fill="white"/>
+
+<!-- Icon -->
+<g transform="translate(40,35)">
+  <path d="M55 320 A150 150 0 1 1 285 320"
+        fill="none" stroke="url(#grad)" stroke-width="10"/>
+
+  <rect x="105" y="220" width="44" height="95" rx="5" fill="url(#grad)"/>
+  <rect x="165" y="170" width="44" height="145" rx="5" fill="url(#grad)"/>
+  <rect x="225" y="90" width="44" height="225" rx="5" fill="url(#grad)"/>
+
+  <path d="M82 238
+           C130 220 170 190 205 145
+           C230 115 252 82 270 42"
+        fill="none"
+        stroke="url(#grad)"
+        stroke-width="12"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <path d="M270 42 L250 48 L274 10 L305 28 Z"
+        fill="url(#grad)"/>
+</g>
+
+<line x1="365" y1="55" x2="365" y2="345" stroke="#1F2937" stroke-width="4"/>
+
+<text x="430" y="190" class="brand" fill="#0B1028">
+  aktien<tspan fill="url(#grad)">KI</tspan><tspan fill="#0B1028">.com</tspan>
+</text>
+
+<line x1="430" y1="265" x2="505" y2="265" stroke="url(#grad)" stroke-width="5" stroke-linecap="round"/>
+<text x="535" y="277" class="tag">MARKET INTELLIGENCE PLATFORM</text>
+<line x1="1335" y1="265" x2="1410" y2="265" stroke="url(#grad)" stroke-width="5" stroke-linecap="round"/>
+
+</svg>

@@ -1,0 +1,98 @@
+@php
+    $preferredSymbols = ['^GDAXI', '^GSPC', '^IXIC', 'GC=F', 'EURUSD=X'];
+
+    $marketNames = [
+        '^GDAXI' => ['name' => 'DAX', 'icon' => '🇩🇪'],
+        '^GSPC' => ['name' => 'S&P 500', 'icon' => '🇺🇸'],
+        '^IXIC' => ['name' => 'NASDAQ Composite', 'icon' => '🇺🇸'],
+        'GC=F' => ['name' => 'Gold', 'icon' => '🥇'],
+        'EURUSD=X' => ['name' => 'Euro / US-Dollar', 'icon' => '💶'],
+    ];
+
+    $filteredAssets = collect($marketAssets ?? [])
+        ->filter(fn ($asset) => in_array($asset->symbol, $preferredSymbols, true))
+        ->sortBy(fn ($asset) => array_search($asset->symbol, $preferredSymbols, true))
+        ->values();
+@endphp
+
+<section>
+    <div class="mb-4 flex items-end justify-between gap-4">
+        <div>
+            <h2 class="text-lg font-semibold text-white">Marktübersicht</h2>
+            <p class="mt-1 text-sm text-zinc-400">
+                Die wichtigsten Märkte auf einen Blick.
+            </p>
+        </div>
+
+        <span class="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_9px_rgba(110,231,183,.9)]"></span>
+            Aktueller Snapshot
+        </span>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        @forelse($filteredAssets as $asset)
+            @php
+                $change = (float) ($asset->change_percent ?? 0);
+                $positive = $change >= 0;
+                $display = $marketNames[$asset->symbol] ?? [
+                    'name' => $asset->name ?? $asset->symbol,
+                    'icon' => '•',
+                ];
+            @endphp
+
+            <article class="group relative overflow-hidden rounded-3xl border border-violet-200/25 bg-gradient-to-br from-white/[0.16] via-white/[0.11] to-violet-300/[0.08] p-5 shadow-2xl shadow-black/10 backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:border-violet-200/45 hover:bg-white/[0.18]">
+                <div class="absolute inset-x-0 top-0 h-1 {{ $positive ? 'bg-gradient-to-r from-emerald-400/80 via-emerald-300/60 to-transparent' : 'bg-gradient-to-r from-rose-400/80 via-rose-300/60 to-transparent' }}"></div>
+
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl leading-none">{{ $display['icon'] }}</span>
+                            <div class="truncate text-base font-semibold text-white">
+                                {{ $display['name'] }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border {{ $positive ? 'border-emerald-300/25 bg-emerald-400/12 text-emerald-300' : 'border-rose-300/25 bg-rose-400/12 text-rose-300' }}">
+                        <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4" stroke="currentColor" stroke-width="2">
+                            @if($positive)
+                                <path d="M4 16l5-5 4 4 7-8" stroke-linecap="round" stroke-linejoin="round"/>
+                            @else
+                                <path d="M4 8l5 5 4-4 7 8" stroke-linecap="round" stroke-linejoin="round"/>
+                            @endif
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="mt-7 text-3xl font-semibold tracking-tight text-white">
+                    {{ is_null($asset->price) ? '—' : number_format((float) $asset->price, 2, ',', '.') }}
+                </div>
+
+                <div class="mt-3">
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-sm font-semibold {{ $positive ? 'bg-emerald-400/12 text-emerald-300' : 'bg-rose-400/12 text-rose-300' }}">
+                        {{ $positive ? '▲' : '▼' }}
+                        {{ $positive ? '+' : '' }}{{ number_format($change, 2, ',', '.') }} %
+                    </span>
+                </div>
+            </article>
+        @empty
+            @foreach([
+                ['icon' => '🇩🇪', 'name' => 'DAX'],
+                ['icon' => '🇺🇸', 'name' => 'S&P 500'],
+                ['icon' => '🇺🇸', 'name' => 'NASDAQ Composite'],
+                ['icon' => '🥇', 'name' => 'Gold'],
+                ['icon' => '💶', 'name' => 'Euro / US-Dollar'],
+            ] as $placeholder)
+                <article class="rounded-3xl border border-dashed border-violet-200/25 bg-white/[0.10] p-5 backdrop-blur-2xl">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">{{ $placeholder['icon'] }}</span>
+                        <div class="text-base font-semibold text-white">{{ $placeholder['name'] }}</div>
+                    </div>
+                    <div class="mt-7 text-3xl font-semibold text-zinc-500">—</div>
+                    <div class="mt-3 text-xs text-zinc-500">Noch keine Marktdaten</div>
+                </article>
+            @endforeach
+        @endforelse
+    </div>
+</section>

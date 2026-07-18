@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="500" viewBox="0 0 1600 500" role="img" aria-labelledby="title desc">
+  <title id="title">aktienKI.com Logo</title>
+  <desc id="desc">Vektorlogo mit violettem Marktgrafik-Symbol, Wortmarke und dem Zusatz Market Intelligence Platform.</desc>
+
+  <defs>
+    <linearGradient id="violet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B21B6"/>
+      <stop offset="52%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#C084FC"/>
+    </linearGradient>
+
+    <linearGradient id="violetVertical" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#6D28D9"/>
+      <stop offset="100%" stop-color="#B56CFF"/>
+    </linearGradient>
+
+    <style>
+      .wordmark {
+        font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+        font-weight: 750;
+        letter-spacing: -5px;
+      }
+      .tagline {
+        font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+        font-weight: 500;
+        letter-spacing: 8px;
+      }
+    </style>
+  </defs>
+
+  <rect width="1600" height="500" fill="#FFFFFF"/>
+
+  <!-- Icon -->
+  <g transform="translate(30 55)">
+    <!-- Open circular arc -->
+    <path d="M 54 322
+             A 155 155 0 1 1 270 324"
+          fill="none"
+          stroke="url(#violet)"
+          stroke-width="12"
+          stroke-linecap="square"/>
+
+    <!-- Bars -->
+    <rect x="92" y="228" width="38" height="82" rx="4" fill="url(#violetVertical)"/>
+    <rect x="147" y="188" width="38" height="122" rx="4" fill="url(#violetVertical)"/>
+    <rect x="202" y="128" width="38" height="182" rx="4" fill="url(#violetVertical)"/>
+
+    <!-- Growth line -->
+    <path d="M 72 260
+             C 112 245, 138 228, 164 202
+             C 190 176, 214 143, 236 111"
+          fill="none"
+          stroke="url(#violet)"
+          stroke-width="11"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+
+    <!-- Arrow head -->
+    <path d="M 236 111 L 222 116 L 234 93 L 253 84 L 249 105 Z"
+          fill="url(#violet)"/>
+  </g>
+
+  <!-- Divider -->
+  <line x1="380" y1="55" x2="380" y2="390" stroke="#253047" stroke-width="4"/>
+
+  <!-- Wordmark -->
+  <text x="450" y="215" class="wordmark" font-size="124" fill="#111827">
+    aktien<tspan fill="url(#violet)">KI</tspan><tspan fill="#111827">.com</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="570" y="320" class="tagline" font-size="38" fill="#384152">
+    MARKET INTELLIGENCE PLATFORM
+  </text>
+</svg>
