@@ -6,16 +6,19 @@ from app.strategies.models import StrategyProfile
 
 
 class ProviderManager:
+    INTERVAL_SCOPE_MAP = {
+        "1d": ModelScope.LONG_TERM,
+        "1h": ModelScope.SHORT_TERM,
+    }
+
     @classmethod
     def create(cls, scope: ModelScope):
-        provider = PROVIDER_REGISTRY.get(scope)
+        provider_class = PROVIDER_REGISTRY.get(scope)
 
-        if provider is None:
-            raise RuntimeError(
-                f"No provider for {scope}"
-            )
+        if provider_class is None:
+            raise RuntimeError(f"No provider for {scope}")
 
-        return provider()
+        return provider_class()
 
     @classmethod
     def from_strategy(
@@ -23,13 +26,7 @@ class ProviderManager:
         strategy_profile: StrategyProfile,
     ):
         interval = strategy_profile.interval.strip().lower()
-
-        scope_by_interval = {
-            "1d": ModelScope.LONG_TERM,
-            "1h": ModelScope.SHORT_TERM,
-        }
-
-        scope = scope_by_interval.get(interval)
+        scope = cls.INTERVAL_SCOPE_MAP.get(interval)
 
         if scope is None:
             raise RuntimeError(

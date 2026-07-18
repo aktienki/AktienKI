@@ -7,6 +7,8 @@ from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Iterable, TypeVar
 
+from app.strategies.models import StrategyProfile
+
 import pandas as pd
 
 from app.models.market import PriceBar
@@ -76,16 +78,24 @@ class MarketImporter:
         self.retry_delay_seconds = retry_delay_seconds
 
     def run(
-        self,
-        *,
-        interval: str = "1d",
-        period: str = "10y",
-        types: Iterable[str] | None = None,
-        limit: int | None = None,
-        symbol: str | None = None,
-        instrument_id: int | None = None,
-        full: bool = False,
-    ) -> dict[str, int]:
+            self,
+            *,
+            strategy_profile: StrategyProfile | None = None,
+            interval: str | None = None,
+            period: str | None = None,
+            types: Iterable[str] | None = None,
+            limit: int | None = None,
+            symbol: str | None = None,
+            instrument_id: int | None = None,
+            full: bool = False,
+        ) -> dict[str, int]:
+        if strategy_profile is not None:
+            interval = strategy_profile.interval
+            period = f"{strategy_profile.history_years}y"
+
+        interval = interval or "1d"
+        period = period or "10y"
+
         targets = self._load_targets(
             types=types,
             limit=limit,
