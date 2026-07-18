@@ -15,6 +15,7 @@ from app.core.strategy_training_engine import StrategyTrainingEngine
 from app.core.training_engine import TrainingEngine
 from app.database.session import build_engine, build_session_factory
 from app.providers.yahoo_provider import YahooProvider
+from app.providers.provider_manager import ProviderManager
 
 
 class Engine:
@@ -35,9 +36,18 @@ class Engine:
         )
 
     def import_market(self, **kwargs):
+        strategy_profile = kwargs.get("strategy_profile")
+
+        if strategy_profile is not None:
+            provider = ProviderManager.from_strategy(strategy_profile)
+        else:
+            provider = YahooProvider(
+                self.settings.yahoo_timeout_seconds
+            )
+
         return MarketImporter(
             self.session_factory,
-            YahooProvider(self.settings.yahoo_timeout_seconds),
+            provider,
             batch_size=self.settings.import_batch_size,
         ).run(**kwargs)
 
