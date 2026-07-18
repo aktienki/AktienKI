@@ -10,7 +10,9 @@ from app.repositories.feature_store_repository import FeatureStoreRepository
 from app.repositories.model_repository import ModelRepository
 from app.training.evaluator import RegressionEvaluator
 from app.training.factory import ModelFactory
-
+from app.features.feature_store_builder import (
+    FeatureStoreBuilder,
+)
 
 class TrainingEngine:
     def __init__(
@@ -37,9 +39,6 @@ class TrainingEngine:
         candidate_algorithms = self._candidate_algorithms(
             requested_algorithm
         )
-        feature_names = list(
-            FeatureStoreRepository.FEATURE_COLUMNS
-        )
 
         with self.session_factory() as session:
             feature_repository = FeatureStoreRepository(session)
@@ -51,6 +50,18 @@ class TrainingEngine:
                 feature_version=feature_version,
                 target_name=target_name,
             )
+
+            feature_names = list(
+                FeatureStoreRepository.FEATURE_COLUMNS
+            )
+
+            feature_hash = hashlib.sha256(
+                json.dumps(
+                    feature_names,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
 
             if len(frame) < 300:
                 raise ValueError(
@@ -211,6 +222,8 @@ class TrainingEngine:
             )
 
             metadata_path = artifact_path.with_suffix(".json")
+
+
             metadata_path.write_text(
                 json.dumps(
                     {
@@ -224,7 +237,10 @@ class TrainingEngine:
                         "feature_names": feature_names,
                         "parameters": winner_result.parameters,
                         "metrics": metrics,
-                    },
+                        "feature_count": len(feature_names),
+                        "feature_version": feature_version,
+                        "feature_hash": feature_hash,
+                       },
                     indent=2,
                     default=str,
                 ),
@@ -277,6 +293,9 @@ class TrainingEngine:
                 "candidate_algorithms": candidate_algorithms,
                 "candidate_errors": candidate_errors,
                 "artifact_path": str(artifact_path),
+                "metadata_path": str(metadata_path),
+                "feature_hash": feature_hash,
+                "feature_count": len(feature_names),
                 "metrics": metrics,
                 "rows": {
                     "training": len(train),
