@@ -17,8 +17,12 @@ class Instrument:
     name: str
     type: str
 
-    exchange: str | None = None
+    exchange_id: int | None = None
     currency: str | None = None
+    country: str | None = None
+    sector: str | None = None
+    industry: str | None = None
+    market_cap: Decimal | None = None
 
     meta: dict[str, Any] = field(default_factory=dict)
 
@@ -44,7 +48,6 @@ class Instrument:
 
     def has_role(self, role: str) -> bool:
         return self.market_role == role
-
 
 @dataclass(frozen=True, slots=True)
 class PriceBar:

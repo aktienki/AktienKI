@@ -5,7 +5,9 @@ from pathlib import Path
 
 from app.core.engine import Engine
 from app.training.factory import ModelFactory
-
+from app.repositories.strategy_profile_repository import (
+    StrategyProfileRepository,
+)
 
 def load_json_file(path: str | None) -> dict:
     if path is None:
@@ -81,7 +83,23 @@ def main():
 
     try:
         if args.action == "import-market":
+
+            strategy_profile = None
+
+            if args.strategy:
+                with engine.session_factory() as session:
+                    strategy_profile = (
+                        StrategyProfileRepository(session)
+                        .get_by_code(args.strategy)
+                    )
+
+                if strategy_profile is None:
+                    raise RuntimeError(
+                        f"StrategyProfile '{args.strategy}' wurde nicht gefunden."
+                    )
+
             result = engine.import_market(
+                strategy_profile=strategy_profile,
                 interval=args.interval,
                 period=args.period,
                 types=args.types,

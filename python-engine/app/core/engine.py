@@ -36,6 +36,7 @@ class Engine:
         )
 
     def import_market(self, **kwargs):
+
         strategy_profile = kwargs.get("strategy_profile")
 
         if strategy_profile is not None:

@@ -30,7 +30,7 @@ class InstrumentRepository:
                 instruments.c.provider_symbol,
                 instruments.c.name,
                 instruments.c.type,
-                instruments.c.exchange,
+                instruments.c.exchange_id,
                 instruments.c.currency,
                 instruments.c.meta,
             )
@@ -155,7 +155,7 @@ class InstrumentRepository:
             ),
             name=str(row["name"]),
             type=str(row["type"]),
-            exchange=row.get("exchange"),
+            exchange_id=row.get("exchange_id"),
             currency=row.get("currency"),
             meta=dict(row.get("meta") or {}),
         )
