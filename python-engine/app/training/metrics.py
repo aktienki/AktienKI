@@ -106,11 +106,13 @@ def cagr(
     if start <= 0:
         return 0.0
 
-    years = len(equity_curve) / periods_per_year
+    periods = len(equity_curve) - 1
+    years = periods / periods_per_year
+
+    if years <= 0:
+        return 0.0
 
     return (end / start) ** (1 / years) - 1
-
-
 def expectancy(
     returns: Sequence[float],
 ) -> float:
