@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620">
+  <style>.text{fill:#fff;font-family:Inter,Arial,sans-serif}.muted{fill:#aeb8ca;font-family:Inter,Arial,sans-serif}.grid{stroke:#2b1d5d;stroke-width:1;opacity:.28}.orbit{fill:none;stroke:#a78bfa;stroke-opacity:.48;stroke-width:2;animation:spin 10s linear infinite;transform-origin:390px 290px}.planet{animation:float 3s ease-in-out infinite}.score{animation:grow 2s ease forwards;transform-origin:left}@keyframes spin{to{transform:rotate(360deg)}}@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}@keyframes grow{from{transform:scaleX(.2)}to{transform:scaleX(1)}}</style>
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <radialGradient id="planet">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="45%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#160b35"/>
+    </radialGradient>
+  </defs>
+  <rect width="980" height="620" fill="#070b22"/>
+  <g opacity=".55">
+    <path class="grid" d="M80 80H900M80 140H900M80 200H900M80 260H900M80 320H900M80 380H900M80 440H900M80 500H900"/>
+    <path class="grid" d="M120 60V540M220 60V540M320 60V540M420 60V540M520 60V540M620 60V540M720 60V540M820 60V540"/>
+  </g>
+  <text class="text" x="75" y="82" font-size="24" font-weight="800">T&#xE4;glicher KI-Score</text>
+  <text class="muted" x="75" y="116" font-size="17">Der Markt wird automatisch bewertet und verdichtet</text>
+  <g filter="url(#glow)">
+    <g class="planet">
+      <circle cx="390" cy="290" r="116" fill="url(#planet)" stroke="#a78bfa" stroke-width="3"/>
+      <ellipse class="orbit" cx="390" cy="290" rx="180" ry="48"/>
+      <ellipse class="orbit" cx="390" cy="290" rx="150" ry="84"/>
+      <text class="text" x="390" y="284" text-anchor="middle" font-size="28" font-weight="900">MARKT</text>
+      <text class="muted" x="390" y="316" text-anchor="middle" font-size="15">Daily Scan</text>
+    </g>
+    <g>
+      <rect x="135" y="180" width="135" height="58" rx="16" fill="#120b2d" stroke="#a78bfa" stroke-opacity=".6"/>
+      <text class="text" x="202" y="214" text-anchor="middle" font-size="15" font-weight="800">Aktien</text>
+      <rect x="520" y="160" width="145" height="58" rx="16" fill="#120b2d" stroke="#a78bfa" stroke-opacity=".6"/>
+      <text class="text" x="592" y="194" text-anchor="middle" font-size="15" font-weight="800">Sektoren</text>
+      <rect x="135" y="382" width="145" height="58" rx="16" fill="#120b2d" stroke="#a78bfa" stroke-opacity=".6"/>
+      <text class="text" x="207" y="416" text-anchor="middle" font-size="15" font-weight="800">Rohstoffe</text>
+      <rect x="520" y="390" width="150" height="58" rx="16" fill="#120b2d" stroke="#a78bfa" stroke-opacity=".6"/>
+      <text class="text" x="595" y="424" text-anchor="middle" font-size="15" font-weight="800">W&#xE4;hrungen</text>
+    </g>
+  </g>
+  <g transform="translate(690 170)">
+    <rect width="230" height="300" rx="24" fill="#0d0922" stroke="#8b5cf6" stroke-opacity=".5"/>
+    <text class="text" x="25" y="42" font-size="18" font-weight="900">KI Score</text>
+    <text class="muted" x="25" y="68" font-size="13">allgemeine Bewertung</text>
+    <g transform="translate(24 100)">
+      <text class="text" x="0" y="0" font-size="14">Signal A</text>
+      <text class="text" x="160" y="0" font-size="14">85</text>
+      <rect y="14" width="176" height="8" rx="4" fill="#132033"/>
+      <rect class="score" y="14" width="150" height="8" rx="4" fill="#22c55e"/>
+    </g>
+    <g transform="translate(24 158)">
+      <text class="text" x="0" y="0" font-size="14">Signal B</text>
+      <text class="text" x="160" y="0" font-size="14">67</text>
+      <rect y="14" width="176" height="8" rx="4" fill="#132033"/>
+      <rect class="score" y="14" width="118" height="8" rx="4" fill="#facc15"/>
+    </g>
+    <g transform="translate(24 216)">
+      <text class="text" x="0" y="0" font-size="14">Signal C</text>
+      <text class="text" x="160" y="0" font-size="14">34</text>
+      <rect y="14" width="176" height="8" rx="4" fill="#132033"/>
+      <rect class="score" y="14" width="60" height="8" rx="4" fill="#fb7185"/>
+    </g>
+  </g>
+</svg>

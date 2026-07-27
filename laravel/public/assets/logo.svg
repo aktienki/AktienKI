@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 80" role="img" aria-labelledby="title desc">
+  <title id="title">aktienKI.com</title>
+  <desc id="desc">Ein steigender Aktienchart bildet gemeinsam mit einer Kerze die Buchstaben KI.</desc>
+  <defs>
+    <linearGradient id="frame" x1="10" y1="8" x2="134" y2="72" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7562A8"/>
+      <stop offset=".55" stop-color="#55447F"/>
+      <stop offset="1" stop-color="#3B315C"/>
+    </linearGradient>
+    <linearGradient id="chart" x1="31" y1="57" x2="91" y2="22" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7562A8"/>
+      <stop offset=".55" stop-color="#9A87C7"/>
+      <stop offset="1" stop-color="#D8C8F4"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="103" y1="17" x2="111" y2="63" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4D58A"/>
+      <stop offset="1" stop-color="#C6923E"/>
+    </linearGradient>
+    <filter id="shadow" x="-25%" y="-35%" width="150%" height="175%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#03040D" flood-opacity=".42"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="4" y="4" width="136" height="72" rx="18" fill="#111024"/>
+    <rect x="5" y="5" width="134" height="70" rx="17" fill="none" stroke="url(#frame)" stroke-width="2"/>
+    <path d="M18 62H126M18 45H126M18 28H126" stroke="#A995D5" stroke-opacity=".08"/>
+
+    <!-- K: Stamm plus zwei klare, steigende Chartsegmente -->
+    <path d="M34 20V60" stroke="#CFC3E9" stroke-width="7" stroke-linecap="round"/>
+    <path d="M35 43L57 28L74 36L93 18" fill="none" stroke="#080914" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M35 43L57 28L74 36L93 18" fill="none" stroke="url(#chart)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M35 43L58 58L76 46L92 58" fill="none" stroke="#73619C" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M84 18H93V27" fill="none" stroke="#D8C8F4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- I: eine einzelne, amberfarbene Kurskerze -->
+    <path d="M108 16V64" stroke="#E8BD63" stroke-width="3" stroke-linecap="round"/>
+    <rect x="102" y="27" width="12" height="25" rx="4" fill="url(#amber)"/>
+    <circle cx="108" cy="17" r="3" fill="#F4D58A"/>
+  </g>
+</svg>

@@ -1,0 +1,257 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        background:
+            radial-gradient(circle at 73% 34%,rgba(124,58,237,.28),transparent 31%),
+            radial-gradient(circle at 28% 92%,rgba(34,211,238,.12),transparent 32%),
+            linear-gradient(135deg,#020617 0%,#04081c 42%,#090321 100%);
+
+        color: #F8FAFC;
+        overflow-x: hidden;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+}
+
+@layer components {
+    .ak-background {
+
+    position: fixed;
+    inset: 0;
+
+    z-index: -100;
+
+    background:
+
+        radial-gradient(
+            circle at 73% 34%,
+            rgba(124,58,237,.28),
+            transparent 31%
+        ),
+
+        radial-gradient(
+            circle at 28% 92%,
+            rgba(34,211,238,.12),
+            transparent 32%
+        ),
+
+        linear-gradient(
+            135deg,
+            #020617 0%,
+            #04081c 42%,
+            #090321 100%
+        );
+
+}
+
+.ak-background::before{
+
+    content:"";
+
+    position:absolute;
+    inset:0;
+
+    background-image:
+
+        linear-gradient(
+            rgba(139,92,246,.045) 1px,
+            transparent 1px
+        ),
+
+        linear-gradient(
+            90deg,
+            rgba(139,92,246,.045) 1px,
+            transparent 1px
+        );
+
+    background-size:56px 56px;
+
+    mask-image:
+        radial-gradient(
+            circle at 66% 45%,
+            black 0%,
+            transparent 72%
+        );
+
+}
+    .ak-page-shell {
+        @apply min-h-screen text-slate-100;
+    }
+
+    .ak-container {
+        width: 100%;
+        max-width: 100%;
+        padding-inline: clamp(1rem, 2vw, 2rem);
+        margin-inline: auto;
+    }
+
+    .ak-page {
+        min-height: calc(100vh - clamp(5rem, 9vh, 7rem));
+        display: flex;
+        flex-direction: column;
+        gap: clamp(1rem, 1.4vh, 1.6rem);
+        width: 100%;
+    }
+
+    .ak-section-title {
+        margin-bottom: clamp(0.55rem, 0.9vh, 0.9rem);
+        padding-left: 0.15rem;
+        font-size: clamp(0.65rem, 0.8vw, 0.8rem);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.25em;
+        color: rgb(196 181 253);
+    }
+
+    .ak-card-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: clamp(0.75rem, 1vw, 1rem);
+        width: 100%;
+    }
+
+    .ak-top-link {
+        @apply inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl border border-transparent px-3.5 py-2 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-violet-400/30 hover:bg-violet-500/10 hover:text-white;
+    }
+
+    .ak-top-link-active {
+        @apply inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl border border-violet-400/35 bg-violet-500/15 px-3.5 py-2 text-sm font-medium text-white shadow-lg shadow-violet-950/30;
+    }
+
+    .ak-top-link svg,
+    .ak-top-link-active svg {
+        @apply h-4 w-4 shrink-0 text-violet-300;
+    }
+
+    .ak-card {
+        min-height: clamp(5.8rem, 10vh, 8rem);
+        border-radius: clamp(1rem, 1.3vw, 1.5rem);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(39, 46, 63, 0.88);
+        padding: clamp(0.7rem, 1vw, 1rem);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+        transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease, background-color .25s ease;
+    }
+
+    .ak-card:hover {
+        transform: translateY(-0.25rem);
+        border-color: rgba(167, 139, 250, 0.35);
+        background: rgba(46, 54, 73, 0.92);
+        box-shadow: 0 20px 55px rgba(124, 58, 237, 0.20);
+    }
+
+    .ak-signal-card {
+        min-height: clamp(10rem, 20vh, 16rem);
+        border-radius: clamp(1rem, 1.3vw, 1.5rem);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(39, 46, 63, 0.88);
+        padding: clamp(0.85rem, 1.1vw, 1.25rem);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+        transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease, background-color .25s ease;
+    }
+
+    .ak-signal-card:hover {
+        transform: translateY(-0.25rem);
+        border-color: rgba(167, 139, 250, 0.38);
+        background: rgba(46, 54, 73, 0.94);
+        box-shadow: 0 20px 55px rgba(124, 58, 237, 0.22);
+    }
+
+    .ak-card-soft {
+        @apply rounded-3xl border border-white/10 bg-white/5 shadow-xl shadow-black/20 backdrop-blur-xl;
+    }
+
+    .ak-card-label {
+        font-size: clamp(0.65rem, 0.7vw, 0.75rem);
+        color: rgb(203 213 225);
+    }
+
+    .ak-card-value {
+        margin-top: clamp(.35rem,.7vh,.7rem);
+        font-size: clamp(1rem,1.45vw,1.55rem);
+        font-weight: 700;
+        color: white;
+        line-height: 1.1;
+    }
+
+    .ak-card-sub {
+        margin-top: clamp(.2rem,.5vh,.5rem);
+        font-size: clamp(.62rem,.65vw,.72rem);
+        color: rgb(148 163 184);
+    }
+
+    .ak-input {
+        @apply rounded-2xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm text-white placeholder:text-slate-400 focus:border-violet-400 focus:ring-violet-400;
+    }
+
+    .ak-badge {
+        @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-medium;
+    }
+
+    .ak-badge-violet {
+        @apply ak-badge bg-violet-500/15 text-violet-200 ring-1 ring-violet-400/20;
+    }
+
+    .ak-badge-green {
+        @apply ak-badge bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/20;
+    }
+
+    .ak-badge-amber {
+        @apply ak-badge bg-amber-400/10 text-amber-300 ring-1 ring-amber-400/20;
+    }
+
+    .ak-badge-red {
+        @apply ak-badge bg-rose-400/10 text-rose-300 ring-1 ring-rose-400/20;
+    }
+
+    .ak-muted {
+        @apply text-slate-400;
+    }
+
+    .ak-label {
+        @apply text-[11px] font-medium uppercase tracking-[0.2em] text-violet-200/80;
+    }
+
+    @media (max-width: 1400px) {
+        .ak-card-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 1100px) {
+        .ak-card-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 768px) {
+        .ak-card-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 520px) {
+        .ak-container {
+            padding-inline: 1rem;
+        }
+
+        .ak-card-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .ak-page {
+            justify-content: flex-start;
+        }
+    }
+}

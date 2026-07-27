@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" role="img" aria-labelledby="title desc">
+  <title id="title">Von Tradern für Trader</title>
+  <desc id="desc">AktienKI verbindet praktische Markterfahrung mit intelligenter Technologie</desc>
+  <defs>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#a79dbe"/><stop offset=".5" stop-color="#685b91"/><stop offset="1" stop-color="#6670b8"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#e6c875"/><stop offset=".55" stop-color="#c99a45"/><stop offset="1" stop-color="#9f7435"/>
+    </linearGradient>
+    <radialGradient id="core"><stop stop-color="#5c4c83" stop-opacity=".42"/><stop offset="1" stop-color="#120b2d"/></radialGradient>
+    <radialGradient id="amberCore"><stop stop-color="#c99a45" stop-opacity=".24"/><stop offset=".62" stop-color="#3b2b19" stop-opacity=".36"/><stop offset="1" stop-color="#120b2d"/></radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <style>
+      .text{fill:#fff;font-family:Inter,Arial,sans-serif}.muted{fill:#94a3b8;font-family:Inter,Arial,sans-serif}.line{fill:none;stroke:url(#violet);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.amber-line{stroke:url(#amber)}.flow{stroke-dasharray:10 12;animation:flow 4s linear infinite}@keyframes flow{to{stroke-dashoffset:-88}}@media (prefers-reduced-motion:reduce){.flow{animation:none}}
+    </style>
+  </defs>
+  <rect width="980" height="620" fill="#070b22"/>
+  <g opacity=".30" stroke="#2b1d5d"><path d="M70 100H910M70 170H910M70 240H910M70 310H910M70 380H910M70 450H910M70 520H910"/><path d="M110 65V550M220 65V550M330 65V550M440 65V550M550 65V550M660 65V550M770 65V550M880 65V550"/></g>
+
+  <text class="muted" x="490" y="78" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="4">PRAXIS · TECHNOLOGIE · VORSPRUNG</text>
+  <text class="text" x="490" y="126" text-anchor="middle" font-size="38" font-weight="900">Von Tradern für Trader</text>
+  <text class="muted" x="490" y="158" text-anchor="middle" font-size="17">Entwickelt aus echter Markterfahrung</text>
+
+  <path class="line flow" d="M285 332C355 250 405 250 452 300" opacity=".65"/>
+  <path class="line flow amber-line" d="M528 300C578 250 630 250 700 332" opacity=".62"/>
+
+  <g class="float-a">
+    <rect x="72" y="220" width="280" height="285" rx="28" fill="#0d0922" stroke="#66568f" stroke-opacity=".32"/>
+    <circle cx="212" cy="284" r="40" fill="#66568f" fill-opacity=".14" stroke="#8275a8" stroke-width="2"/>
+    <circle cx="212" cy="274" r="12" fill="#aaa0c4"/><path d="M186 308c8-23 44-23 52 0" fill="#66568f"/>
+    <text class="text experience-title" x="212" y="342" text-anchor="middle" font-size="20" font-weight="900">20+ Jahre Markterfahrung</text>
+    <text class="muted" x="212" y="367" text-anchor="middle" font-size="12">Erfahrung in verschiedenen Märkten</text>
+    <g transform="translate(104 382)" font-family="Inter,Arial,sans-serif" font-size="9.5" font-weight="800" text-anchor="middle">
+      <g><rect width="102" height="24" rx="12" fill="#66568f" fill-opacity=".16" stroke="#8275a8" stroke-opacity=".35"/><text x="51" y="16" fill="#aaa0c4">CFD</text></g>
+      <g transform="translate(112)"><rect width="102" height="24" rx="12" fill="#66568f" fill-opacity=".16" stroke="#8275a8" stroke-opacity=".35"/><text x="51" y="16" fill="#aaa0c4">FOREX</text></g>
+      <g transform="translate(0 32)"><rect width="102" height="24" rx="12" fill="#66568f" fill-opacity=".16" stroke="#8275a8" stroke-opacity=".35"/><text x="51" y="16" fill="#aaa0c4">ROHSTOFFE</text></g>
+      <g transform="translate(112 32)"><rect width="102" height="24" rx="12" fill="#66568f" fill-opacity=".16" stroke="#8275a8" stroke-opacity=".35"/><text x="51" y="16" fill="#aaa0c4">Aktien</text></g>
+    </g>
+    <path class="line" d="M126 498l31-15 25 8 32-20 40 11 42-25"/>
+    <circle cx="296" cy="457" r="5" fill="#22d3ee" filter="url(#glow)"/>
+  </g>
+
+  <g filter="url(#glow)">
+    <circle cx="490" cy="325" r="92" fill="url(#amberCore)" stroke="#c99a45" stroke-opacity=".72" stroke-width="3"/>
+    <circle cx="490" cy="325" r="72" fill="none" stroke="#e6c875" stroke-opacity=".12"/>
+
+    <!-- KI-Markt-Kern: Prozessor, neuronale Knoten und Kursbewegung -->
+    <rect x="449" y="284" width="82" height="82" rx="22" fill="#c99a45" fill-opacity=".07" stroke="#e6c875" stroke-opacity=".58" stroke-width="2"/>
+    <g stroke="#c99a45" stroke-width="3" stroke-linecap="round" opacity=".55">
+      <path d="M466 284v-10M490 284v-13M514 284v-10M466 366v10M490 366v13M514 366v10"/>
+      <path d="M449 302h-10M449 325h-13M449 348h-10M531 302h10M531 325h13M531 348h10"/>
+    </g>
+
+    <g fill="none" stroke="#e6c875" stroke-opacity=".42" stroke-width="2">
+      <path d="M466 307l24 18 23-25M466 345l24-20 24 20"/>
+      <path d="M466 307v38M513 300l1 45"/>
+    </g>
+    <g fill="#120b2d" stroke="#e6c875" stroke-width="3">
+      <circle cx="466" cy="307" r="5"/>
+      <circle cx="466" cy="345" r="5"/>
+      <circle cx="490" cy="325" r="7" fill="#c99a45"/>
+      <circle cx="513" cy="300" r="5"/>
+      <circle cx="514" cy="345" r="5"/>
+    </g>
+
+    <path d="M458 348l14-12 12 4 14-20 12 5 14-22" fill="none" stroke="url(#amber)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M516 303h8v8" fill="none" stroke="#e6c875" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="538" cy="285" r="5" fill="#e6c875"/>
+  </g>
+  <text x="490" y="467" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="21" font-weight="800" fill="#fff">aktien<tspan fill="#66568f" font-size="31" font-weight="900">KI</tspan><tspan fill="#fff" font-size="21">.com</tspan></text>
+  <text class="muted" x="490" y="493" text-anchor="middle" font-size="12">Intelligence for decisions</text>
+
+  <g class="float-b">
+    <rect x="628" y="220" width="280" height="285" rx="28" fill="#0d0922" stroke="#66568f" stroke-opacity=".32"/>
+    <rect x="700" y="258" width="135" height="82" rx="14" fill="#120b2d" stroke="#8275a8" stroke-opacity=".45"/>
+    <path class="line" d="M717 318l23-22 18 10 25-33 33 14"/>
+    <g class="scan"><path d="M744 250v98" stroke="#22d3ee" stroke-width="2" opacity=".7"/></g>
+    <text class="text" x="767" y="378" text-anchor="middle" font-size="21" font-weight="900">Für deinen Handel</text>
+    <text class="muted" x="767" y="406" text-anchor="middle" font-size="14">Klar · intelligent · fokussiert</text>
+    <g transform="translate(700 426)"><rect width="135" height="8" rx="4" fill="#1e293b"/><rect width="103" height="8" rx="4" fill="url(#violet)"/></g>
+  </g>
+
+  <g transform="translate(250 530)"><rect width="480" height="48" rx="24" fill="#66568f" fill-opacity=".12" stroke="#8275a8" stroke-opacity=".35"/><text class="text" x="240" y="30" text-anchor="middle" font-size="14" font-weight="800" letter-spacing="1.5">RESEARCH – INTELLIGENCE – DECISIONS</text></g>
+</svg>

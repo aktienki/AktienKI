@@ -1,0 +1,380 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" role="img" aria-labelledby="title desc">
+<title id="title">Machine Learning KI Engine Szene</title>
+<desc id="desc">Animierte SVG Szene mit zentraler KI Engine, Datenströmen, Modellkarten und Output-Bereich ohne unteren Statusbalken.</desc>
+
+<style>
+    .bg { fill:#070b22; }
+    .grid { stroke:#2b1d5d; stroke-width:1; opacity:.30; }
+
+    .text {
+        fill:#ffffff;
+        font-family: Inter, Arial, sans-serif;
+    }
+
+    .muted {
+        fill:#aeb8ca;
+        font-family: Inter, Arial, sans-serif;
+    }
+
+    .label {
+        fill:#aaa0c4;
+        font-family: Inter, Arial, sans-serif;
+        font-weight:800;
+        letter-spacing:.06em;
+    }
+
+    .panel {
+        fill:#090f2a;
+        stroke:#66568f;
+        stroke-opacity:.28;
+        stroke-width:1.4;
+    }
+
+    .panel-soft {
+        fill:#0d1433;
+        stroke:#66568f;
+        stroke-opacity:.20;
+        stroke-width:1.2;
+    }
+
+    .output-card {
+        fill:#241d14;
+        stroke:#c99a45;
+        stroke-opacity:.30;
+    }
+
+    .output-panel .model-check {
+        fill:#c99a45;
+        filter:none;
+    }
+
+    .engine-chip {
+        transform-origin: 490px 315px;
+        filter:url(#purpleGlow);
+    }
+
+    .chip-layer-1 {
+        fill:#15103a;
+        stroke:#857ba1;
+        stroke-width:2.4;
+    }
+
+    .chip-layer-2 {
+        fill:#1b1450;
+        stroke:#a79dbe;
+        stroke-width:1.8;
+        opacity:.92;
+    }
+
+    .chip-core {
+        fill:#23136a;
+        stroke:#d8cff0;
+        stroke-width:2;
+    }
+
+    .flow-line {
+        fill:none;
+        stroke:url(#flowGradient);
+        stroke-width:2.1;
+        stroke-linecap:round;
+        stroke-dasharray:10 14;
+        animation: dashMove 4.4s linear infinite;
+        filter:url(#lineGlow);
+    }
+
+    .flow-line.alt {
+        stroke:url(#flowGradientAlt);
+        animation-duration:5.2s;
+        opacity:.82;
+    }
+
+    .flow-line.output {
+        stroke:url(#amberFlow);
+        opacity:.72;
+    }
+
+    .circuit {
+        fill:none;
+        stroke:#57417f;
+        stroke-width:1.1;
+        opacity:.42;
+        stroke-dasharray:8 10;
+        animation: dashMove 8s linear infinite;
+    }
+
+    .node {
+        fill:#aaa0c4;
+        stroke:#ffffff;
+        stroke-opacity:.75;
+        stroke-width:1.3;
+        filter:url(#nodeGlow);
+    }
+
+    .node.cyan, .node.green { fill:#8275a8; }
+
+    .data-dot {
+        fill:#8275a8;
+        filter:url(#nodeGlow);
+        display:none;
+    }
+
+    .output-dot {
+        display:none;
+    }
+
+    .model-check {
+        fill:#8275a8;
+        filter:url(#nodeGlow);
+    }
+
+    .spark {
+        stroke:#8275a8;
+        stroke-width:2;
+        stroke-linecap:round;
+    }
+
+    .brain-path {
+        fill:none;
+        stroke:#cfc6df;
+        stroke-width:5;
+        stroke-linecap:round;
+        stroke-linejoin:round;
+        filter:url(#purpleGlow);
+    }
+
+    @keyframes dashMove {
+        to { stroke-dashoffset:-240; }
+    }
+
+
+
+</style>
+
+<defs>
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="60%">
+        <stop offset="0%" stop-color="#5c4c83" stop-opacity=".16"/>
+        <stop offset="55%" stop-color="#111636" stop-opacity=".25"/>
+        <stop offset="100%" stop-color="#070b22" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="flowGradient" x1="0" x2="1">
+        <stop offset="0%" stop-color="#66568f" stop-opacity="0"/>
+        <stop offset="45%" stop-color="#857ba1" stop-opacity=".72"/>
+        <stop offset="100%" stop-color="#6670b8" stop-opacity=".20"/>
+    </linearGradient>
+
+    <linearGradient id="flowGradientAlt" x1="0" x2="1">
+        <stop offset="0%" stop-color="#6670b8" stop-opacity=".08"/>
+        <stop offset="55%" stop-color="#685b91" stop-opacity=".72"/>
+        <stop offset="100%" stop-color="#7385a8" stop-opacity=".14"/>
+    </linearGradient>
+
+    <linearGradient id="amberFlow" x1="0" x2="1">
+        <stop offset="0%" stop-color="#9f7435" stop-opacity=".08"/>
+        <stop offset="55%" stop-color="#c99a45" stop-opacity=".78"/>
+        <stop offset="100%" stop-color="#e6c875" stop-opacity=".34"/>
+    </linearGradient>
+
+    <filter id="purpleGlow" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feColorMatrix in="blur" type="matrix" values="0.65 0 0 0 0.45  0 0.25 0 0 0.15  0 0 1 0 0.95  0 0 0 .7 0"/>
+        <feMerge>
+            <feMergeNode/>
+            <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+    </filter>
+
+    <filter id="lineGlow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="2" result="blur"/>
+        <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+    </filter>
+
+    <filter id="nodeGlow" x="-70%" y="-70%" width="240%" height="240%">
+        <feGaussianBlur stdDeviation="2" result="blur"/>
+        <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+    </filter>
+
+    <filter id="greenGlow" x="-70%" y="-70%" width="240%" height="240%">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+    </filter>
+</defs>
+
+<rect class="bg" width="980" height="620"/>
+<rect width="980" height="620" fill="url(#bgGlow)"/>
+
+<g opacity=".55">
+    <path class="grid" d="M70 80H910M70 140H910M70 200H910M70 260H910M70 320H910M70 380H910M70 440H910M70 500H910"/>
+    <path class="grid" d="M110 60V540M210 60V540M310 60V540M410 60V540M510 60V540M610 60V540M710 60V540M810 60V540"/>
+</g>
+
+<text class="text" x="60" y="72" font-size="24" font-weight="900">Machine Learning</text>
+<text class="muted" x="60" y="104" font-size="16">Daten werden verarbeitet, Modelle trainiert und Signale erzeugt</text>
+
+<!-- Left input panel -->
+<g>
+    <rect class="panel" x="60" y="142" width="250" height="372" rx="24"/>
+    <text class="label" x="90" y="182" font-size="13">DATENSTRÖME</text>
+
+    <g class="card-float">
+        <rect class="panel-soft" x="90" y="210" width="180" height="58" rx="14"/>
+        <text class="text" x="118" y="235" font-size="14" font-weight="800">Kursdaten</text>
+        <text class="muted" x="118" y="254" font-size="11">OHLCV · Volumen</text>
+        <circle class="node cyan" cx="284" cy="239" r="5"/>
+    </g>
+
+    <g class="card-float two">
+        <rect class="panel-soft" x="90" y="292" width="180" height="58" rx="14"/>
+        <text class="text" x="118" y="317" font-size="14" font-weight="800">Fundamentaldaten</text>
+        <text class="muted" x="118" y="336" font-size="11">Bilanz · Cashflow</text>
+        <circle class="node cyan" cx="284" cy="321" r="5"/>
+    </g>
+
+    <g class="card-float three">
+        <rect class="panel-soft" x="90" y="374" width="180" height="58" rx="14"/>
+        <text class="text" x="118" y="399" font-size="14" font-weight="800">Makrodaten</text>
+        <text class="muted" x="118" y="418" font-size="11">Rohstoffe · Währung</text>
+        <circle class="node cyan" cx="284" cy="403" r="5"/>
+    </g>
+
+    <g class="card-float four">
+        <rect class="panel-soft" x="90" y="456" width="180" height="38" rx="12"/>
+        <text class="muted" x="118" y="480" font-size="12">Features werden erstellt</text>
+        <circle class="node cyan" cx="284" cy="475" r="5"/>
+    </g>
+</g>
+
+<!-- Data flow into engine -->
+<path class="flow-line" d="M 290 239 C 360 238 370 282 405 292"/>
+<path class="flow-line alt" d="M 290 321 C 355 322 375 315 405 318"/>
+<path class="flow-line" d="M 290 403 C 355 395 380 352 405 340"/>
+<path class="flow-line alt" d="M 290 475 C 365 455 385 375 405 352"/>
+
+<circle class="data-dot" r="4"/>
+<circle class="data-dot d2" r="4"/>
+<circle class="data-dot d3" r="4"/>
+<circle class="data-dot d4" r="4"/>
+<circle class="data-dot d5" r="4"/>
+
+<!-- Center engine area -->
+<g>
+    <rect class="panel" x="344" y="146" width="292" height="380" rx="34"/>
+    <text class="label" x="490" y="182" font-size="14" text-anchor="middle">KI ENGINE</text>
+
+    <path class="circuit" d="M390 235 H430 V210 H458"/>
+    <path class="circuit" d="M590 235 H550 V210 H522"/>
+    <path class="circuit" d="M390 395 H430 V420 H458"/>
+    <path class="circuit" d="M590 395 H550 V420 H522"/>
+    <path class="circuit" d="M430 250 C460 220 520 220 550 250"/>
+    <path class="circuit" d="M430 382 C460 415 520 415 550 382"/>
+
+    <circle class="node" cx="430" cy="210" r="5"/>
+    <circle class="node" cx="550" cy="210" r="5"/>
+    <circle class="node" cx="430" cy="420" r="5"/>
+    <circle class="node" cx="550" cy="420" r="5"/>
+    <circle class="node cyan" cx="490" cy="222" r="5"/>
+    <circle class="node green" cx="490" cy="408" r="5"/>
+
+    <g class="engine-chip">
+        <path class="chip-layer-1" d="M490 220 L595 276 L595 360 L490 416 L385 360 L385 276 Z"/>
+        <path class="chip-layer-2" d="M490 246 L560 284 L560 350 L490 388 L420 350 L420 284 Z"/>
+        <path class="chip-core" d="M490 270 L535 294 L535 340 L490 364 L445 340 L445 294 Z"/>
+
+        <g opacity=".82">
+            <path d="M385 286 H360M385 306 H360M385 326 H360M385 346 H360" stroke="#8275a8" stroke-width="3" stroke-linecap="round"/>
+            <path d="M595 286 H620M595 306 H620M595 326 H620M595 346 H620" stroke="#8275a8" stroke-width="3" stroke-linecap="round"/>
+            <path d="M438 248 V225M464 234 V211M516 234 V211M542 248 V225" stroke="#8275a8" stroke-width="3" stroke-linecap="round"/>
+            <path d="M438 382 V405M464 396 V419M516 396 V419M542 382 V405" stroke="#8275a8" stroke-width="3" stroke-linecap="round"/>
+        </g>
+
+        <path class="brain-path" d="M472 303c-10-13-31-5-30 12-13 3-13 23 1 26 3 14 23 14 29 3"/>
+        <path class="brain-path" d="M508 303c10-13 31-5 30 12 13 3 13 23-1 26-3 14-23 14-29 3"/>
+        <path class="brain-path" d="M490 292v64"/>
+        <path class="brain-path" d="M472 321h-15M508 321h15M472 342h-10M508 342h10"/>
+    </g>
+
+    <g class="card-float">
+        <rect class="panel-soft" x="372" y="202" width="102" height="54" rx="14"/>
+        <text class="muted" x="423" y="225" font-size="11" text-anchor="middle">Feature</text>
+        <text class="text" x="423" y="242" font-size="12" font-weight="800" text-anchor="middle">Engineering</text>
+    </g>
+
+    <g class="card-float two">
+        <rect class="panel-soft" x="506" y="202" width="102" height="54" rx="14"/>
+        <text class="muted" x="557" y="225" font-size="11" text-anchor="middle">Deep</text>
+        <text class="text" x="557" y="242" font-size="12" font-weight="800" text-anchor="middle">Learning</text>
+    </g>
+
+    <g class="card-float three">
+        <rect class="panel-soft" x="372" y="440" width="102" height="54" rx="14"/>
+        <text class="muted" x="423" y="463" font-size="11" text-anchor="middle">Pattern</text>
+        <text class="text" x="423" y="480" font-size="12" font-weight="800" text-anchor="middle">Recognition</text>
+    </g>
+
+    <g class="card-float four">
+        <rect class="panel-soft" x="506" y="440" width="102" height="54" rx="14"/>
+        <text class="muted" x="557" y="463" font-size="11" text-anchor="middle">Ensemble</text>
+        <text class="text" x="557" y="480" font-size="12" font-weight="800" text-anchor="middle">Modelle</text>
+    </g>
+</g>
+
+<!-- Output flow -->
+<path class="flow-line output" d="M 620 285 C 642 270 650 240 675 232"/>
+<path class="flow-line alt output" d="M 620 310 C 642 308 652 300 675 300"/>
+<path class="flow-line output" d="M 620 335 C 642 345 652 362 675 368"/>
+<path class="flow-line alt output" d="M 620 360 C 642 385 652 425 675 436"/>
+
+<circle class="output-dot" r="4"/>
+<circle class="output-dot o2" r="4"/>
+<circle class="output-dot o3" r="4"/>
+
+<!-- Right output panel -->
+<g class="output-panel">
+    <rect class="panel" x="670" y="142" width="254" height="372" rx="24"/>
+    <text class="label" x="797" y="180" font-size="12" text-anchor="middle">OUTPUT</text>
+
+    <g transform="translate(694 204)">
+        <rect class="panel-soft output-card" width="206" height="56" rx="14"/>
+        <circle class="model-check" cx="18" cy="18" r="5"/>
+        <text class="text" x="32" y="22" font-size="13" font-weight="800">Score</text>
+        <text class="muted" x="18" y="43" font-size="11">0 bis 100</text>
+    </g>
+
+    <g transform="translate(694 272)">
+        <rect class="panel-soft output-card" width="206" height="56" rx="14"/>
+        <circle class="model-check" cx="18" cy="18" r="5"/>
+        <text class="text" x="32" y="22" font-size="13" font-weight="800">Signal</text>
+        <text class="muted" x="18" y="43" font-size="11">Buy · Hold</text>
+    </g>
+
+    <g transform="translate(694 340)">
+        <rect class="panel-soft output-card" width="206" height="56" rx="14"/>
+        <circle class="model-check" cx="18" cy="18" r="5"/>
+        <text class="text" x="32" y="22" font-size="13" font-weight="800">Prognose</text>
+        <text class="muted" x="18" y="43" font-size="11">Täglich</text>
+    </g>
+
+    <g transform="translate(694 408)">
+        <rect class="panel-soft output-card" width="206" height="56" rx="14"/>
+        <circle class="model-check" cx="18" cy="18" r="5"/>
+        <text class="text" x="32" y="22" font-size="13" font-weight="800">Risikoanalyse</text>
+        <text class="muted" x="18" y="43" font-size="11">Volatilität · Verlust</text>
+    </g>
+</g>
+
+<!-- tiny sparks -->
+<g opacity=".85">
+    <path class="spark" d="M668 148v12M662 154h12"/>
+    <path class="spark" d="M706 506v10M701 511h10"/>
+    <path class="spark" d="M328 184v10M323 189h10"/>
+</g>
+</svg>
