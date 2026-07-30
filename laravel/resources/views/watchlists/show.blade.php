@@ -121,7 +121,7 @@
                                                             <span class="truncate">{{ $itemIndices->isNotEmpty() ? $itemIndices->pluck('symbol')->join(', ') : '—' }}</span>
                                                         </span>
                                                         <span class="inline-flex max-w-32 items-center gap-1 rounded-md bg-amber-300/[.07] px-1.5 py-0.5 text-[9px] font-bold text-amber-200/80" title="{{ __('Sektor') }}">
-                                                            <x-heroicon-o-squares-2x2 class="h-3 w-3 shrink-0" />
+                                                            <x-sector-icon :sector="$item->instrument->sector" class="h-3 w-3 shrink-0" />
                                                             <span class="truncate">{{ __($item->instrument->sector ?: '—') }}</span>
                                                         </span>
                                                     </span>

@@ -7,6 +7,7 @@ namespace App\Livewire\Dashboard;
 use App\Services\MarketService;
 use App\Services\YahooFinanceService;
 use App\Services\IndexAiScoreService;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class MarketData extends Component
@@ -20,6 +21,10 @@ class MarketData extends Component
     public array $overallAssessment = [];
 
     public array $countryAiScores = [];
+
+    public ?string $marketComment = null;
+
+    public array $marketAnalysis = [];
 
     protected array $symbols = [
 
@@ -103,6 +108,25 @@ class MarketData extends Component
             $this->dailyAiScores,
             (string) $riskLevel,
         );
+        $dailyMarketAnalysis = DB::table('daily_market_ai_analyses')
+            ->orderByDesc('analysis_date')
+            ->orderByDesc('id')
+            ->first();
+        $this->marketComment = $dailyMarketAnalysis?->executive_summary;
+        $this->marketAnalysis = $dailyMarketAnalysis ? [
+            'date' => $dailyMarketAnalysis->analysis_date,
+            'model' => $dailyMarketAnalysis->model,
+            'outlook' => $dailyMarketAnalysis->market_outlook,
+            'confidence' => (int) $dailyMarketAnalysis->confidence,
+            'riskLevel' => $dailyMarketAnalysis->risk_level,
+            'headline' => $dailyMarketAnalysis->headline,
+            'summary' => $dailyMarketAnalysis->executive_summary,
+            'breadth' => $dailyMarketAnalysis->breadth_analysis,
+            'sectors' => $this->decodeJson($dailyMarketAnalysis->sector_analysis),
+            'opportunities' => $this->decodeJson($dailyMarketAnalysis->opportunities),
+            'risks' => $this->decodeJson($dailyMarketAnalysis->risks),
+            'watchlist' => $this->decodeJson($dailyMarketAnalysis->watchlist),
+        ] : [];
 
         $this->sentiment = $marketService->sentiment($this->markets);
     }
@@ -117,7 +141,20 @@ class MarketData extends Component
                 'dailyAiScores' => $this->dailyAiScores,
                 'overallAssessment' => $this->overallAssessment,
                 'countryAiScores' => $this->countryAiScores,
+                'marketComment' => $this->marketComment,
+                'marketAnalysis' => $this->marketAnalysis,
             ]
         );
+    }
+
+    private function decodeJson(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        $decoded = is_string($value) ? json_decode($value, true) : null;
+
+        return is_array($decoded) ? $decoded : [];
     }
 }

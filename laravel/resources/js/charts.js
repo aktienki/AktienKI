@@ -84,6 +84,12 @@ window.candlestick = (series = []) => ({
     chart: null,
 
     init() {
+        const element = this.$refs.chart;
+        if (!element) return;
+
+        element.__aktienkiChart?.destroy?.();
+        element.replaceChildren();
+
         if (!Array.isArray(series) || series.length === 0) {
             series = [
                 { x: 1, y: [99, 102, 98, 101] },
@@ -105,7 +111,7 @@ window.candlestick = (series = []) => ({
             ? closes.reduce((sum, value) => sum + value, 0) / closes.length
             : null;
 
-        this.chart = new ApexCharts(this.$refs.chart, {
+        this.chart = new ApexCharts(element, {
             chart: {
                 type: 'candlestick',
                 height: '100%',
@@ -119,12 +125,15 @@ window.candlestick = (series = []) => ({
                 width: 1,
             },
             plotOptions: {
+                bar: {
+                    columnWidth: '62%',
+                },
                 candlestick: {
                     colors: {
                         upward: '#34d399',
                         downward: '#e66b78',
                     },
-                    wick: { useFillColor: true },
+                    wick: { useFillColor: false },
                 },
             },
             grid: { show: false, padding: { top: 2, right: 1, bottom: 2, left: 1 } },
@@ -141,11 +150,15 @@ window.candlestick = (series = []) => ({
             yaxis: { labels: { show: false }, tooltip: { enabled: false } },
         });
 
+        element.__aktienkiChart = this.chart;
         this.chart.render();
     },
 
     destroy() {
         this.chart?.destroy();
+        if (this.$refs.chart?.__aktienkiChart === this.chart) {
+            delete this.$refs.chart.__aktienkiChart;
+        }
     },
 });
 
@@ -370,8 +383,8 @@ window.dailyAiScoreChart = (series = []) => ({
 
     init() {
         const lightTheme = document.documentElement.dataset.theme === 'light';
-        const accent = lightTheme ? '#14b8a6' : '#8b5cf6';
-        const marker = lightTheme ? '#0f766e' : '#a78bfa';
+        const accent = lightTheme ? 'rgba(13, 148, 136, .68)' : 'rgba(45, 212, 191, .52)';
+        const marker = lightTheme ? 'rgba(15, 118, 110, .78)' : 'rgba(94, 234, 212, .68)';
 
         this.chart = new ApexCharts(this.$refs.chart, {
             chart: {
@@ -384,9 +397,9 @@ window.dailyAiScoreChart = (series = []) => ({
             },
             series: [{ name: 'KI-Score', data: series }],
             colors: [accent],
-            stroke: { width: 2.5, curve: 'smooth' },
+            stroke: { width: 2, curve: 'smooth' },
             markers: {
-                size: 3,
+                size: 2,
                 colors: [marker],
                 strokeColors: '#ffffff',
                 strokeWidth: 1,
@@ -394,7 +407,7 @@ window.dailyAiScoreChart = (series = []) => ({
             },
             fill: {
                 type: 'gradient',
-                gradient: { opacityFrom: 0.32, opacityTo: 0.02, stops: [0, 95] },
+                gradient: { opacityFrom: 0.16, opacityTo: 0.01, stops: [0, 95] },
             },
             dataLabels: { enabled: false },
             grid: { borderColor: 'rgba(148, 163, 184, .12)', strokeDashArray: 4 },

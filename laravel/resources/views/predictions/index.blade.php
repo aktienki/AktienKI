@@ -1,5 +1,5 @@
 <x-app-layout>
-    <div class="flex h-[calc(100dvh-89px)] min-h-0 flex-col py-4 text-[var(--ak-text)]">
+    <div id="predictions-page" class="flex h-[calc(100dvh-89px)] min-h-0 flex-col py-4 text-[var(--ak-text)]">
         <div class="mb-4 flex shrink-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div class="flex items-center gap-3">
                 <div class="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300 shadow-[0_0_22px_rgba(245,158,11,.08)]">
@@ -55,11 +55,29 @@
                         <option value="{{ $model->id }}" @selected((int) request('model') === (int) $model->id)>{{ $model->public_alias }}</option>
                     @endforeach
                 </select>
+                <select name="quality_tier" @change="$root.requestSubmit()" class="ak-input h-10 w-48 shrink-0 text-sm">
+                    <option value="">{{ __('Alle Modellstufen') }}</option>
+                    @foreach ($qualityTiers as $qualityTier)
+                        <option value="{{ $qualityTier->code }}" @selected(request('quality_tier') === $qualityTier->code)>{{ __($qualityTier->name) }}</option>
+                    @endforeach
+                </select>
                 <select name="signal" @change="$root.requestSubmit()" class="ak-input h-10 w-40 shrink-0 text-sm">
                     <option value="">{{ __('Alle Signale') }}</option>
                     @foreach (['BUY', 'WATCH', 'HOLD', 'SELL'] as $signal)
                         @continue(! $signals->contains($signal))
                         <option value="{{ $signal }}" @selected(strtoupper((string) request('signal')) === $signal)>{{ $signal }}</option>
+                    @endforeach
+                </select>
+                <select name="score_min" @change="$root.requestSubmit()" class="ak-input h-10 w-40 shrink-0 text-sm">
+                    <option value="">{{ __('Alle KI-Scores') }}</option>
+                    @foreach ([8 => '8,0', 7 => '7,0', 6 => '6,0', 5 => '5,0'] as $value => $label)
+                        <option value="{{ $value }}" @selected((string) request('score_min') === (string) $value)>{{ __('KI-Score ab') }} {{ $label }}</option>
+                    @endforeach
+                </select>
+                <select name="confidence_min" @change="$root.requestSubmit()" class="ak-input h-10 w-44 shrink-0 text-sm">
+                    <option value="">{{ __('Alle Konfidenzen') }}</option>
+                    @foreach ([90, 80, 70, 60, 50] as $value)
+                        <option value="{{ $value }}" @selected((string) request('confidence_min') === (string) $value)>{{ __('Konfidenz ab') }} {{ $value }} %</option>
                     @endforeach
                 </select>
                 <select name="validation" @change="$root.requestSubmit()" class="ak-input h-10 w-40 shrink-0 text-sm">
@@ -95,17 +113,16 @@
                     <colgroup>
                         <col style="width: 3.5%;">
                         <col style="width: 9%;">
-                        <col style="width: 13.5%;">
-                        <col style="width: 10%;">
+                        <col style="width: 15%;">
+                        <col style="width: 11%;">
                         <col style="width: 6%;">
-                        <col style="width: 7.5%;">
-                        <col style="width: 6.5%;">
-                        <col style="width: 6.5%;">
-                        <col style="width: 9%;">
                         <col style="width: 8%;">
-                        <col style="width: 6.5%;">
-                        <col style="width: 6.5%;">
-                        <col style="width: 7.5%;">
+                        <col style="width: 7%;">
+                        <col style="width: 7%;">
+                        <col style="width: 10%;">
+                        <col style="width: 8%;">
+                        <col style="width: 7%;">
+                        <col style="width: 8.5%;">
                     </colgroup>
                     <thead class="sticky top-0 z-20 bg-[#151426] text-[10px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)] shadow-[0_1px_0_var(--ak-border),0_8px_18px_rgba(0,0,0,.22)]">
                         <tr>
@@ -123,7 +140,6 @@
                                 ['score', __('KI-Score'), 'text-center'],
                                 ['confidence', __('Konfidenz'), 'text-center'],
                                 ['risk', __('Risiko'), 'text-center'],
-                                ['quality', __('Qualität'), 'text-center'],
                                 ['validation', __('Validierung'), 'text-center'],
                             ] as [$column, $heading, $alignment])
                                 <th class="border-b border-[var(--ak-border)] px-2 py-3 {{ $alignment }}">
@@ -146,9 +162,35 @@
                                     default => 'border-[#bd8737] bg-[#a97429] text-white shadow-[0_0_8px_rgba(169,116,41,.15)]',
                                 };
                                 $currency = $prediction->currency ?: 'EUR';
+                                $score = is_numeric($prediction->score_10) ? max(0, min(10, (float) $prediction->score_10)) : null;
                                 $scorePercent = is_numeric($prediction->score_10) ? max(0, min(100, (float) $prediction->score_10 * 10)) : null;
                                 $confidencePercent = is_numeric($prediction->confidence_percent) ? max(0, min(100, (float) $prediction->confidence_percent)) : null;
                                 $riskPercent = is_numeric($prediction->risk_percent) ? max(0, min(100, (float) $prediction->risk_percent)) : null;
+                                $confidenceColor = match (true) {
+                                    $confidencePercent === null => '#64748b',
+                                    $confidencePercent < 40 => '#ef4444',
+                                    $confidencePercent < 60 => '#f97316',
+                                    $confidencePercent < 75 => '#eab308',
+                                    $confidencePercent < 88 => '#84cc16',
+                                    default => '#10b981',
+                                };
+                                $riskColor = match (true) {
+                                    $riskPercent === null => '#64748b',
+                                    $riskPercent < 10 => '#10b981',
+                                    $riskPercent < 20 => '#84cc16',
+                                    $riskPercent < 30 => '#eab308',
+                                    $riskPercent < 40 => '#f97316',
+                                    default => '#ef4444',
+                                };
+                                $modelTierCode = $prediction->model_quality_tier_code ?: 'unqualified';
+                                $modelTierName = $prediction->model_quality_tier_name ? __($prediction->model_quality_tier_name) : __('Nicht qualifiziert');
+                                $modelTierClass = match ($modelTierCode) {
+                                    'top' => 'ak-model-tier-top',
+                                    'strong' => 'ak-model-tier-strong',
+                                    'solid' => 'ak-model-tier-solid',
+                                    'test' => 'ak-model-tier-test',
+                                    default => 'ak-model-tier-unqualified',
+                                };
                                 $predictionWatchlistIds = $watchlistMemberships->get((int) $prediction->instrument_id, collect());
                                 $isWatched = $predictionWatchlistIds->isNotEmpty();
                             @endphp
@@ -190,17 +232,47 @@
                                         <div class="min-w-0"><p class="truncate font-black text-teal-700">{{ $prediction->symbol }}</p><p class="mt-0.5 truncate text-[9px] text-[var(--ak-muted)]">{{ $prediction->name }}</p></div>
                                     </div>
                                 </td>
-                                <td class="border-b border-[var(--ak-border)] px-2 py-3"><p class="truncate font-bold text-[var(--ak-text)]">{{ $prediction->model_alias ?: ucfirst((string) $prediction->ai_type) }}</p><p class="mt-0.5 truncate text-[9px] uppercase text-[var(--ak-muted)]">{{ $prediction->interval ?: '—' }}</p></td>
+                                <td class="border-b border-[var(--ak-border)] px-2 py-2">
+                                    <p class="truncate font-bold text-[var(--ak-text)]">{{ $prediction->model_alias ?: ucfirst((string) $prediction->ai_type) }}</p>
+                                    <div class="mt-1 flex min-w-0 items-center gap-1">
+                                        <span class="ak-model-tier {{ $modelTierClass }}">{{ $modelTierName }}</span>
+                                        @if (is_numeric($prediction->model_quality_score))
+                                            <small class="shrink-0 text-[8px] font-bold text-[var(--ak-muted)]">{{ number_format((float) $prediction->model_quality_score * 100, 0, ',', '.') }} %</small>
+                                        @endif
+                                    </div>
+                                </td>
                                 <td class="border-b border-[var(--ak-border)] px-1 py-3 text-center"><span class="inline-flex h-7 w-full max-w-16 items-center justify-center rounded-lg border px-1 text-[9px] font-black {{ $signalClass }}">{{ $signal }}</span></td>
                                 <td class="truncate border-b border-[var(--ak-border)] px-2 py-3 text-right font-bold tabular-nums text-[var(--ak-text)]">{{ is_numeric($prediction->current_price) ? number_format($prediction->current_price, 2, ',', '.').' '.$currency : '—' }}</td>
                                 @foreach (['expected_return_5d', 'expected_return_20d'] as $returnField)
                                     @php $return = $prediction->{$returnField}; @endphp
                                     <td class="truncate border-b border-[var(--ak-border)] px-2 py-3 text-right font-black tabular-nums {{ is_numeric($return) ? ($return >= 0 ? 'text-emerald-400' : 'text-rose-400') : 'text-[var(--ak-muted)]' }}">{{ is_numeric($return) ? ($return >= 0 ? '+' : '').number_format($return, 2, ',', '.').' %' : '—' }}</td>
                                 @endforeach
-                                <td class="border-b border-[var(--ak-border)] px-2 py-3 [&>div]:!min-w-0"><x-dashboard.stock-score-gauge :percent="$scorePercent" compact /></td>
-                                <td class="border-b border-[var(--ak-border)] px-2 py-3 [&>div]:!min-w-0"><x-dashboard.stock-score-gauge :percent="$confidencePercent" compact purple percentage /></td>
-                                <td class="border-b border-[var(--ak-border)] px-2 py-3 [&>div]:!min-w-0"><x-dashboard.stock-score-gauge :percent="$riskPercent" compact reverse /></td>
-                                <td class="border-b border-[var(--ak-border)] px-1 py-3 text-center"><span class="inline-block max-w-full truncate rounded-md bg-[var(--ak-surface-muted)] px-1.5 py-1 text-[9px] font-bold uppercase text-[var(--ak-muted)]">{{ $prediction->quality_band ?: '—' }}</span></td>
+                                <td class="border-b border-[var(--ak-border)] px-2 py-2">
+                                    @if ($score !== null)
+                                        <div class="flex h-full flex-col justify-center">
+                                            <div class="mb-1 flex items-baseline justify-between"><strong class="text-xs font-black text-[var(--ak-text)]">{{ number_format($score, 1, ',', '.') }}</strong><small class="text-[8px] text-[var(--ak-muted)]">/ 10</small></div>
+                                            <x-dashboard.score-stripes :percent="$scorePercent" />
+                                        </div>
+                                    @else<span class="block text-center text-[var(--ak-muted)]">—</span>@endif
+                                </td>
+                                <td class="border-b border-[var(--ak-border)] px-2 py-2">
+                                    <div class="flex h-full items-center justify-center">
+                                        @if ($confidencePercent !== null)
+                                            <div class="ak-prediction-donut" style="--value:{{ $confidencePercent }}%;--color:{{ $confidenceColor }}" role="meter" aria-label="{{ __('Konfidenz') }}" aria-valuenow="{{ round($confidencePercent) }}">
+                                                <span>{{ number_format($confidencePercent, 0, ',', '.') }}<small>%</small></span>
+                                            </div>
+                                        @else<span class="text-[var(--ak-muted)]">—</span>@endif
+                                    </div>
+                                </td>
+                                <td class="border-b border-[var(--ak-border)] px-2 py-2">
+                                    <div class="flex h-full items-center justify-center">
+                                        @if ($riskPercent !== null)
+                                            <div class="ak-prediction-donut" style="--value:{{ $riskPercent }}%;--color:{{ $riskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuenow="{{ round($riskPercent) }}">
+                                                <span>{{ number_format($riskPercent, 0, ',', '.') }}<small>%</small></span>
+                                            </div>
+                                        @else<span class="text-[var(--ak-muted)]">—</span>@endif
+                                    </div>
+                                </td>
                                 <td class="border-b border-[var(--ak-border)] px-1 py-3 text-center">
                                     @if ($prediction->validated_at)
                                         <span class="inline-flex items-center gap-1 text-[10px] font-bold {{ $prediction->direction_correct === true ? 'text-emerald-300' : ($prediction->direction_correct === false ? 'text-rose-300' : 'text-slate-300') }}"><x-heroicon-o-check-badge class="h-4 w-4" />{{ __('Validiert') }}</span>
@@ -210,11 +282,56 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="13" class="px-6 py-16 text-center text-sm text-[var(--ak-muted)]">{{ __('Keine Prognosen für diese Filter gefunden.') }}</td></tr>
+                            <tr><td colspan="12" class="px-6 py-16 text-center text-sm text-[var(--ak-muted)]">{{ __('Keine Prognosen für diese Filter gefunden.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
+
+            <style>
+                #predictions-page {
+                    --ak-muted: #b8c2d4;
+                }
+
+                :root[data-theme="light"] #predictions-page {
+                    --ak-muted: #64748b;
+                }
+
+                .ak-prediction-donut {
+                    position: relative;
+                    display: grid;
+                    width: 44px;
+                    height: 44px;
+                    flex: 0 0 44px;
+                    place-items: center;
+                    border-radius: 999px;
+                    background: conic-gradient(var(--color) 0 var(--value), rgba(148, 163, 184, .16) var(--value) 100%);
+                    box-shadow: 0 0 12px color-mix(in srgb, var(--color) 16%, transparent);
+                }
+
+                .ak-prediction-donut::after {
+                    position: absolute;
+                    inset: 5px;
+                    border-radius: inherit;
+                    background: var(--ak-card);
+                    content: '';
+                }
+
+                .ak-prediction-donut span {
+                    position: relative;
+                    z-index: 1;
+                    color: var(--ak-text);
+                    font-size: 10px;
+                    font-weight: 900;
+                    line-height: 1;
+                }
+
+                .ak-prediction-donut small {
+                    margin-left: 1px;
+                    color: var(--ak-muted);
+                    font-size: 7px;
+                }
+            </style>
 
         </section>
     </div>

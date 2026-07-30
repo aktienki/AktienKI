@@ -23,6 +23,9 @@ final class StockPredictionsTable extends Component
     #[Url(except: '')]
     public string $signal = '';
 
+    #[Url(except: '')]
+    public string $exchange = '';
+
     #[Url(as: 'score_min', except: '')]
     public string $minScore = '';
 
@@ -46,6 +49,15 @@ final class StockPredictionsTable extends Component
         if ($this->country === '' && request()->filled('country')) {
             $this->country = strtoupper((string) request()->query('country'));
         }
+
+        if ($this->exchange === '' && request()->filled('exchange')) {
+            $this->exchange = strtoupper(trim((string) request()->query('exchange')));
+        }
+
+        if ($this->signal === '' && request()->filled('signal')) {
+            $signal = strtoupper(trim((string) request()->query('signal')));
+            $this->signal = in_array($signal, ['SELL', 'HOLD', 'WATCH', 'BUY'], true) ? $signal : '';
+        }
     }
 
     public function sortBy(string $field): void
@@ -65,7 +77,7 @@ final class StockPredictionsTable extends Component
 
     public function clearFilters(): void
     {
-        $this->reset('search', 'country', 'sector', 'signal', 'minScore', 'maxScore');
+        $this->reset('search', 'country', 'sector', 'signal', 'exchange', 'minScore', 'maxScore');
     }
 
     public function toggleComparison(int $instrumentId): void
@@ -94,6 +106,7 @@ final class StockPredictionsTable extends Component
         $exists = DB::table('instruments')
             ->where('id', $instrumentId)
             ->where('type', 'stock')
+            ->where('is_active', true)
             ->whereNull('deleted_at')
             ->exists();
 
@@ -123,6 +136,7 @@ final class StockPredictionsTable extends Component
         $instrumentExists = DB::table('instruments')
             ->where('id', $instrumentId)
             ->where('type', 'stock')
+            ->where('is_active', true)
             ->whereNull('deleted_at')
             ->exists();
 
@@ -160,6 +174,7 @@ final class StockPredictionsTable extends Component
         $instrumentExists = DB::table('instruments')
             ->where('id', $instrumentId)
             ->where('type', 'stock')
+            ->where('is_active', true)
             ->whereNull('deleted_at')
             ->exists();
 
@@ -219,6 +234,7 @@ final class StockPredictionsTable extends Component
             })
             ->when($this->country !== '', fn (Builder $query) => $query->where('instrument.country', $this->country))
             ->when($this->sector !== '', fn (Builder $query) => $query->where('instrument.sector', $this->sector))
+            ->when($this->exchange !== '', fn (Builder $query) => $query->where('exchange.code', $this->exchange))
             ->when($this->signal !== '', fn (Builder $query) =>
                 $query->whereRaw("({$signalSql}) = ?", [$this->signal]))
             ->when($this->minScore !== '' && is_numeric($this->minScore), fn (Builder $query) =>
@@ -251,7 +267,11 @@ final class StockPredictionsTable extends Component
                 ->groupBy('instrument_id')
                 ->map(fn ($items) => $items->pluck('watchlist_id')->map(fn ($id) => (int) $id)->all());
         $watchlistPickerInstrument = $this->watchlistPickerInstrumentId
-            ? DB::table('instruments')->where('id', $this->watchlistPickerInstrumentId)->first(['id', 'symbol', 'name'])
+            ? DB::table('instruments')
+                ->where('id', $this->watchlistPickerInstrumentId)
+                ->where('is_active', true)
+                ->whereNull('deleted_at')
+                ->first(['id', 'symbol', 'name'])
             : null;
 
         return view('livewire.stocks.stock-predictions-table', [
@@ -273,10 +293,12 @@ final class StockPredictionsTable extends Component
             ->groupBy('instrument_id');
 
         return DB::table('instruments as instrument')
+            ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
             ->leftJoinSub($latestPredictions, 'latest', fn ($join) =>
                 $join->on('latest.instrument_id', '=', 'instrument.id'))
             ->leftJoin('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
             ->where('instrument.type', 'stock')
+            ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
             ->select([
                 'instrument.id', 'instrument.symbol', 'instrument.name', 'instrument.country',
@@ -311,7 +333,7 @@ final class StockPredictionsTable extends Component
     private function filterOptions(string $column)
     {
         return DB::table('instruments')
-            ->where('type', 'stock')->whereNull('deleted_at')
+            ->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at')
             ->whereNotNull($column)->where($column, '<>', '')
             ->distinct()->orderBy($column)->pluck($column);
     }

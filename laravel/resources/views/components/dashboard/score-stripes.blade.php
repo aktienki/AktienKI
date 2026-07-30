@@ -1,4 +1,4 @@
-@props(['percent' => 0])
+@props(['percent' => 0, 'reverse' => false])
 
 @php
     $normalized = max(0, min(100, (float) $percent));
@@ -7,6 +7,9 @@
         '#ef4444', '#f05252', '#f97316', '#fb923c', '#f59e0b',
         '#eab308', '#a3e635', '#84cc16', '#4ade80', '#22c55e',
     ];
+    if ($reverse) {
+        $colors = array_reverse($colors);
+    }
 @endphp
 
 <div

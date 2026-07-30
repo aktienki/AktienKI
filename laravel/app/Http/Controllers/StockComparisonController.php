@@ -33,6 +33,7 @@ final class StockComparisonController extends Controller
             ->leftJoin('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
             ->whereIn('instrument.id', $instrumentIds)
             ->where('instrument.type', 'stock')
+            ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
             ->select([
                 'instrument.id',

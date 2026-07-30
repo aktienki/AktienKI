@@ -53,33 +53,161 @@
             <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'ak-top-link-active' : 'ak-top-link' }}">
                 <x-heroicon-o-squares-2x2 /><span>Dashboard</span>
             </a>
-            @if(Route::has('stocks.index'))
-                <a href="{{ route('stocks.index') }}" class="{{ request()->routeIs('stocks.index') ? 'ak-top-link-active' : 'ak-top-link' }}">
-                    <x-heroicon-o-chart-bar-square /><span>Aktien</span>
-                </a>
-            @endif
-            <a href="{{ route('predictions.index') }}" class="{{ request()->routeIs('predictions.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
-                <x-heroicon-o-chart-bar /><span>{{ __('Prognosen') }}</span>
-            </a>
+            <div
+                x-data="{
+                    open: false,
+                    left: 0,
+                    top: 0,
+                    toggle() {
+                        const bounds = this.$refs.trigger.getBoundingClientRect();
+                        this.left = bounds.left;
+                        this.top = bounds.bottom + 8;
+                        this.open = !this.open;
+                    }
+                }"
+                @click.outside="open = false"
+                class="relative shrink-0"
+            >
+                <button
+                    x-ref="trigger"
+                    type="button"
+                    @click="toggle()"
+                    class="{{ request()->routeIs('markets.*', 'daily-market-analysis', 'sectors.*') ? 'ak-top-link-active' : 'ak-top-link' }}"
+                    :aria-expanded="open"
+                >
+                    <x-heroicon-o-globe-alt />
+                    <span>{{ __('Märkte') }}</span>
+                    <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition" x-bind:class="{ 'rotate-180': open }" />
+                </button>
+                <template x-teleport="body">
+                    <div
+                        x-cloak
+                        x-show="open"
+                        @keydown.escape.window="open = false"
+                        x-transition.origin.top.left
+                        class="fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
+                        :style="`left: ${left}px; top: ${top}px`"
+                    >
+                        <a href="{{ route('markets.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                            <x-heroicon-o-building-library class="h-5 w-5 text-teal-500" />
+                            {{ __('Märkte') }}
+                        </a>
+                        <a href="{{ route('sectors.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                            <x-heroicon-o-building-office-2 class="h-5 w-5 text-teal-500" />
+                            {{ __('Sektoren') }}
+                        </a>
+                        <a href="{{ route('daily-market-analysis') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                            <x-heroicon-o-scale class="h-5 w-5 text-amber-500" />
+                            {{ __('Chancen & Risiken') }}
+                        </a>
+                    </div>
+                </template>
+            </div>
+            <div
+                x-data="{
+                    open: false,
+                    left: 0,
+                    top: 0,
+                    toggle() {
+                        const bounds = this.$refs.trigger.getBoundingClientRect();
+                        this.left = bounds.left;
+                        this.top = bounds.bottom + 8;
+                        this.open = !this.open;
+                    }
+                }"
+                @click.outside="open = false"
+                class="relative shrink-0"
+            >
+                <button
+                    x-ref="trigger"
+                    type="button"
+                    @click="toggle()"
+                    class="{{ request()->routeIs('predictions.*', 'recommendations.*', 'signal-changes.*') ? 'ak-top-link-active' : 'ak-top-link' }}"
+                    :aria-expanded="open"
+                >
+                    <x-heroicon-o-chart-bar />
+                    <span>{{ __('Prognosen') }}</span>
+                    <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition" x-bind:class="{ 'rotate-180': open }" />
+                </button>
+                <template x-teleport="body">
+                    <div
+                        x-cloak
+                        x-show="open"
+                        @keydown.escape.window="open = false"
+                        x-transition.origin.top.left
+                        class="fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
+                        :style="`left: ${left}px; top: ${top}px`"
+                    >
+                        <a href="{{ route('recommendations.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                            <x-heroicon-o-sparkles class="h-5 w-5 text-amber-500" />
+                            {{ __('Empfehlung Top 3') }}
+                        </a>
+                        <a href="{{ route('predictions.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                            <x-heroicon-o-chart-bar-square class="h-5 w-5 text-teal-500" />
+                            {{ __('Prognosetabelle') }}
+                        </a>
+                        <a href="{{ route('signal-changes.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                            <x-heroicon-o-arrows-right-left class="h-5 w-5 text-amber-500" />
+                            {{ __('Signaländerungen') }}
+                        </a>
+                    </div>
+                </template>
+            </div>
             @auth
-                <a href="{{ route('watchlists.index') }}" class="{{ request()->routeIs('watchlists.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
-                    <x-heroicon-o-star /><span>Watchlist</span>
-                </a>
-                <a href="{{ route('depots.index') }}" class="{{ request()->routeIs('depots.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
-                    <x-heroicon-o-briefcase /><span>{{ __('Depots') }}</span>
-                </a>
-                <a href="{{ route('paper-depots.index') }}" class="{{ request()->routeIs('paper-depots.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
-                    <x-heroicon-o-beaker /><span>{{ __('Musterdepots') }}</span>
-                </a>
+                <div
+                    x-data="{
+                        open: false,
+                        left: 0,
+                        top: 0,
+                        toggle() {
+                            const bounds = this.$refs.trigger.getBoundingClientRect();
+                            this.left = bounds.left;
+                            this.top = bounds.bottom + 8;
+                            this.open = !this.open;
+                        }
+                    }"
+                    @click.outside="open = false"
+                    class="relative shrink-0"
+                >
+                    <button
+                        x-ref="trigger"
+                        type="button"
+                        @click="toggle()"
+                        class="{{ request()->routeIs('depots.*', 'paper-depots.*', 'watchlists.*') ? 'ak-top-link-active' : 'ak-top-link' }}"
+                        :aria-expanded="open"
+                    >
+                        <x-heroicon-o-briefcase />
+                        <span>{{ __('Depots & Watchlist') }}</span>
+                        <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition" x-bind:class="{ 'rotate-180': open }" />
+                    </button>
+                    <template x-teleport="body">
+                        <div
+                            x-cloak
+                            x-show="open"
+                            @keydown.escape.window="open = false"
+                            x-transition.origin.top.left
+                            class="fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
+                            :style="`left: ${left}px; top: ${top}px`"
+                        >
+                            <a href="{{ route('depots.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                                <x-heroicon-o-briefcase class="h-5 w-5 text-teal-500" />
+                                {{ __('aKI Depot') }}
+                            </a>
+                            <a href="{{ route('paper-depots.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                                <x-heroicon-o-beaker class="h-5 w-5 text-amber-500" />
+                                {{ __('Musterdepot') }}
+                            </a>
+                            <a href="{{ route('watchlists.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                                <x-heroicon-o-star class="h-5 w-5 text-amber-500" />
+                                Watchlist
+                            </a>
+                        </div>
+                    </template>
+                </div>
             @endauth
-            <a href="{{ route('sectors.index') }}" class="{{ request()->routeIs('sectors.index') ? 'ak-top-link-active' : 'ak-top-link' }}">
-                <x-heroicon-o-building-office-2 /><span>{{ __('Sektoren') }}</span>
-            </a>
             <a href="{{ route('stocks.apple') }}" class="{{ request()->routeIs('stocks.apple') ? 'ak-top-link-active' : 'ak-top-link' }}">
                 <x-heroicon-o-presentation-chart-line /><span>Apple</span>
             </a>
-            <a href="#" class="ak-top-link"><x-heroicon-o-globe-alt /><span>Märkte</span></a>
-            <a href="{{ route('recommendations.index') }}" class="{{ request()->routeIs('recommendations.*') ? 'ak-top-link-active' : 'ak-top-link' }}"><x-heroicon-o-sparkles /><span>{{ __('Empfehlungen') }}</span></a>
             <a href="#" class="ak-top-link"><x-heroicon-o-cpu-chip /><span>KI Status</span></a>
             <a href="#" class="ak-top-link"><x-heroicon-o-newspaper /><span>News</span></a>
             @guest

@@ -14,13 +14,16 @@ class IndexAiScoreService
             ->groupBy('instrument_id');
 
         return DB::table('instruments as instrument')
-            ->joinSub($latestPredictions, 'latest', fn ($join) =>
+            ->leftJoinSub($latestPredictions, 'latest', fn ($join) =>
                 $join->on('latest.instrument_id', '=', 'instrument.id'))
-            ->join('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
+            ->leftJoin('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
             ->where('instrument.type', 'stock')
+            ->where('instrument.is_active', true)
+            ->whereNull('instrument.deleted_at')
             ->whereNotNull('instrument.country')
+            ->where('instrument.country', '<>', '')
             ->groupBy('instrument.country')
-            ->selectRaw('instrument.country, AVG(prediction.prediction_score) AS score, COUNT(*) AS stocks')
+            ->selectRaw('instrument.country, AVG(prediction.prediction_score) AS score, COUNT(instrument.id) AS stocks')
             ->get()
             ->mapWithKeys(function ($row) {
                 $score = AiScore::toPercent($row->score) ?? 0;

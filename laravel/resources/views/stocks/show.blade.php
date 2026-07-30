@@ -112,11 +112,12 @@
                         <h1 class="inline-flex max-w-full truncate rounded-xl border border-amber-300/30 bg-[linear-gradient(135deg,rgba(139,92,246,.18),rgba(251,191,36,.11))] px-3.5 py-1.5 text-2xl font-black text-[var(--ak-text)] shadow-[0_10px_28px_rgba(0,0,0,.16)]">{{ $instrument->name }}</h1>
                         <span class="rounded-lg bg-violet-500/10 px-2.5 py-1 text-xs font-black text-violet-300">{{ $instrument->symbol }}</span>
                     </div>
-                    <p class="mt-1 text-sm text-[var(--ak-muted)]">
-                        {{ __($instrument->sector ?: 'Keine Branche') }}
+                    <p class="mt-1 flex items-center gap-1.5 text-sm text-[var(--ak-muted)]">
+                        <x-sector-icon :sector="$instrument->sector" class="h-4 w-4 shrink-0 text-teal-500" />
+                        <span>{{ __($instrument->sector ?: 'Keine Branche') }}
                         @if ($instrument->industry) · {{ $instrument->industry }} @endif
                         @if ($instrument->country) · {{ $instrument->country }} @endif
-                        · {{ $currency }}
+                        · {{ $currency }}</span>
                     </p>
                 </div>
             </div>
@@ -168,6 +169,10 @@
                         <x-heroicon-o-star class="h-5 w-5" />
                     </a>
                 @endif
+
+                <a href="{{ route('stocks.chart-analysis', $instrument->symbol) }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-teal-500/25 bg-teal-500/10 px-4 text-xs font-black text-teal-600 transition hover:border-teal-500/45 hover:bg-teal-500/15">
+                    <x-heroicon-o-chart-bar-square class="h-4 w-4" />{{ __('Chartanalyse') }}
+                </a>
 
                 <a href="{{ $returnTo ?: ($requestedPredictionId > 0 ? route('predictions.index') : route('stocks.index')) }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 text-xs font-bold text-[var(--ak-muted)] transition hover:border-violet-400/30 hover:text-[var(--ak-text)]">
                     <x-heroicon-o-arrow-left class="h-4 w-4" />{{ $returnLabel ?: ($requestedPredictionId > 0 ? __('Zurück zu Prognosen') : __('Zur Aktienliste')) }}
@@ -262,6 +267,9 @@
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-2">
+                        <a href="{{ route('stocks.chart-analysis', $instrument->symbol) }}" class="inline-flex items-center gap-1.5 rounded-xl border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-teal-600 transition hover:border-teal-500/50 hover:bg-teal-500/15">
+                            <x-heroicon-o-magnifying-glass-plus class="h-4 w-4" />{{ __('Intensive Chartanalyse') }}
+                        </a>
                         @if ($chartLast !== null)
                             <span class="rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-sm font-black text-violet-200">
                                 {{ number_format((float) $chartLast, 2, ',', '.') }} {{ $currency }}
@@ -366,6 +374,68 @@
             </article>
         </section>
 
+        <section class="rounded-[1.5rem] border border-teal-500/20 bg-[linear-gradient(120deg,rgba(20,184,166,.07),var(--ak-card))] p-5 shadow-[var(--ak-shadow)]">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-11 w-11 items-center justify-center rounded-xl border border-teal-500/25 bg-teal-500/10 p-1.5 shadow-[0_0_18px_rgba(20,184,166,.08)]">
+                        <img src="{{ asset('assets/aki-robot-logo.svg') }}" alt="{{ __('aKI Logo') }}" class="h-full w-full object-contain">
+                    </span>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-[.16em] text-teal-600">{{ __('aKI-Kommentar') }}</p>
+                        <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Zusätzliche KI-Einordnung') }}</h2>
+                    </div>
+                </div>
+                @if ($aiAssessment)
+                    @php
+                        $assessmentSignal = strtoupper((string) $aiAssessment->recommendation);
+                        $assessmentSignalClass = match ($assessmentSignal) {
+                            'BUY' => 'border-emerald-500/30 bg-emerald-500/15 text-emerald-500',
+                            'SELL' => 'border-rose-500/30 bg-rose-500/15 text-rose-500',
+                            default => 'border-amber-500/30 bg-amber-500/15 text-amber-500',
+                        };
+                    @endphp
+                    <div class="flex items-center gap-2">
+                        <span class="rounded-lg border px-3 py-1 text-xs font-black {{ $assessmentSignalClass }}">{{ $assessmentSignal }}</span>
+                        <span class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-1 text-xs font-black text-[var(--ak-muted)]">{{ $aiAssessment->confidence }} %</span>
+                    </div>
+                @endif
+            </div>
+
+            @if ($aiAssessment)
+                <p class="mt-4 text-sm font-medium leading-6 text-[var(--ak-text)]">{{ $aiAssessment->summary }}</p>
+                <div class="mt-4 grid gap-3 md:grid-cols-3">
+                    @foreach ([
+                        [__('Chancen'), $aiAssessmentOpportunities, 'text-emerald-500', 'border-emerald-500/15 bg-emerald-500/[.05]'],
+                        [__('Risiken'), $aiAssessmentRisks, 'text-rose-500', 'border-rose-500/15 bg-rose-500/[.05]'],
+                        [__('Schlüsselfaktoren'), $aiAssessmentFactors, 'text-amber-500', 'border-amber-500/15 bg-amber-500/[.05]'],
+                    ] as [$assessmentTitle, $assessmentItems, $assessmentTone, $assessmentBox])
+                        <div class="rounded-xl border p-3 {{ $assessmentBox }}">
+                            <p class="text-[9px] font-black uppercase tracking-[.12em] {{ $assessmentTone }}">{{ $assessmentTitle }}</p>
+                            <ul class="mt-2 space-y-1.5">
+                                @forelse ($assessmentItems as $assessmentItem)
+                                    <li class="flex gap-2 text-xs leading-5 text-[var(--ak-muted)]">
+                                        <span class="mt-2 h-1 w-1 shrink-0 rounded-full bg-current {{ $assessmentTone }}"></span>
+                                        <span>{{ is_scalar($assessmentItem) ? $assessmentItem : json_encode($assessmentItem, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</span>
+                                    </li>
+                                @empty
+                                    <li class="text-xs text-[var(--ak-muted)]">—</li>
+                                @endforelse
+                            </ul>
+                        </div>
+                    @endforeach
+                </div>
+                <p class="mt-3 text-[9px] font-bold text-[var(--ak-muted)]">
+                    {{ \Illuminate\Support\Carbon::parse($aiAssessment->assessment_date)->format('d.m.Y') }}
+                    · {{ $aiAssessment->model }}
+                    · {{ __('Keine Anlageberatung') }}
+                </p>
+            @else
+                <div class="mt-4 rounded-xl border border-dashed border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 py-5 text-center">
+                    <p class="text-sm font-bold text-[var(--ak-muted)]">{{ __('Für diese Aktie ist noch kein gespeicherter aKI-Kommentar vorhanden.') }}</p>
+                </div>
+            @endif
+        </section>
+
         <section class="grid gap-5 lg:grid-cols-2">
             <article class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 shadow-[var(--ak-shadow)]">
                 <div class="flex items-center gap-3">
@@ -421,6 +491,39 @@
                     <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300"><x-heroicon-o-sparkles class="h-5 w-5" /></span>
                     <div><h2 class="font-black text-[var(--ak-text)]">{{ __('Alle Prognosewerte') }}</h2><p class="text-xs text-[var(--ak-muted)]">{{ __('Neueste verfügbare Modellberechnung') }}</p></div>
                 </div>
+                @if ($modelQuality)
+                    @php
+                        $modelTierCode = $modelQuality->tier_code ?: 'unqualified';
+                        $modelTierName = $modelQuality->tier_name ? __($modelQuality->tier_name) : __('Nicht qualifiziert');
+                        $modelTierClass = match ($modelTierCode) {
+                            'top' => 'ak-model-tier-top',
+                            'strong' => 'ak-model-tier-strong',
+                            'solid' => 'ak-model-tier-solid',
+                            'test' => 'ak-model-tier-test',
+                            default => 'ak-model-tier-unqualified',
+                        };
+                        $modelQualityPercent = is_numeric($modelQuality->quality_score)
+                            ? ((float) $modelQuality->quality_score <= 1
+                                ? (float) $modelQuality->quality_score * 100
+                                : (float) $modelQuality->quality_score)
+                            : null;
+                    @endphp
+                    <div class="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-panel)] px-4 py-3">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--ak-muted)]">{{ __('Modell') }}</p>
+                            <p class="mt-0.5 truncate text-sm font-black text-[var(--ak-text)]">{{ $modelQuality->model_alias ?: '—' }}</p>
+                        </div>
+                        <span class="ak-model-tier {{ $modelTierClass }}">
+                            {{ $modelTierName }}
+                        </span>
+                        @if ($modelQualityPercent !== null)
+                            <div class="text-right">
+                                <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--ak-muted)]">{{ __('Modellqualität') }}</p>
+                                <p class="mt-0.5 text-sm font-black text-[var(--ak-text)]">{{ number_format($modelQualityPercent, 1, ',', '.') }} %</p>
+                            </div>
+                        @endif
+                    </div>
+                @endif
                 @if ($predictionData)
                     <dl class="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
                         @foreach ($predictionData as $key => $value)
@@ -435,69 +538,6 @@
                 @endif
             </article>
         </section>
-
-        @if ($predictionExplanation || $predictionMetadata)
-            <section class="grid gap-5 lg:grid-cols-2">
-                <article class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 shadow-[var(--ak-shadow)]">
-                    <div class="flex items-center gap-3">
-                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300"><x-heroicon-o-chat-bubble-left-right class="h-5 w-5" /></span>
-                        <div><h2 class="font-black text-[var(--ak-text)]">{{ __('Erklärung der KI-Analyse') }}</h2><p class="text-xs text-[var(--ak-muted)]">{{ __('Strukturierte Begründung der Modellbewertung') }}</p></div>
-                    </div>
-                    @if ($predictionExplanation)
-                        <div class="mt-5"><x-dashboard.structured-data :data="$predictionExplanation" /></div>
-                    @else
-                        <p class="mt-5 text-sm text-[var(--ak-muted)]">{{ __('Keine strukturierte Erklärung vorhanden.') }}</p>
-                    @endif
-                </article>
-
-                <article class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 shadow-[var(--ak-shadow)]">
-                    <div class="flex items-center gap-3">
-                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300"><x-heroicon-o-code-bracket-square class="h-5 w-5" /></span>
-                        <div><h2 class="font-black text-[var(--ak-text)]">{{ __('Analyse-Metadaten') }}</h2><p class="text-xs text-[var(--ak-muted)]">{{ __('Zusätzliche Angaben der Modellberechnung') }}</p></div>
-                    </div>
-                    @if ($predictionMetadata)
-                        <div class="mt-5"><x-dashboard.structured-data :data="$predictionMetadata" /></div>
-                    @else
-                        <p class="mt-5 text-sm text-[var(--ak-muted)]">{{ __('Keine Metadaten vorhanden.') }}</p>
-                    @endif
-                </article>
-            </section>
-        @endif
-
-        <section class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 shadow-[var(--ak-shadow)]">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300"><x-heroicon-o-document-chart-bar class="h-5 w-5" /></span>
-                    <div><h2 class="font-black text-[var(--ak-text)]">{{ __('Fundamentaldaten') }}</h2><p class="text-xs text-[var(--ak-muted)]">{{ __('Alle Werte des neuesten Fundamentaldatensatzes') }}</p></div>
-                </div>
-                @if ($fundamental?->snapshot_date)
-                    <span class="text-xs font-bold text-[var(--ak-muted)]">{{ \Carbon\Carbon::parse($fundamental->snapshot_date)->format('d.m.Y') }}</span>
-                @endif
-            </div>
-            @if ($fundamentalData)
-                <dl class="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                    @foreach (collect($fundamentalData)->sortKeys() as $key => $value)
-                        <div class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3">
-                            <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $label($key) }}</dt>
-                            <dd class="mt-1.5 break-words text-sm font-black text-[var(--ak-text)]">{{ $formatValue($key, $value) }}</dd>
-                        </div>
-                    @endforeach
-                </dl>
-            @else
-                <p class="mt-6 text-sm text-[var(--ak-muted)]">{{ __('Noch keine Fundamentaldaten vorhanden.') }}</p>
-            @endif
-        </section>
-
-        @if ($instrumentMeta)
-            <section class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 shadow-[var(--ak-shadow)]">
-                <h2 class="font-black text-[var(--ak-text)]">{{ __('Weitere Instrumentdaten') }}</h2>
-                <dl class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                    @foreach (collect($instrumentMeta)->sortKeys() as $key => $value)
-                        <div><dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $label($key) }}</dt><dd class="mt-1 break-words text-sm font-bold text-[var(--ak-text)]">{{ $formatValue($key, $value) }}</dd></div>
-                    @endforeach
-                </dl>
-            </section>
-        @endif
 
         <p class="pb-3 text-center text-[10px] text-[var(--ak-muted)]">{{ __('Die Darstellung dient ausschließlich Informationszwecken und stellt keine Anlageberatung dar.') }}</p>
         </div>
@@ -573,53 +613,11 @@
                 };
 
                 const chartSeries = () => {
-                    const series = [{
+                    return [{
                         name: @json($instrument->symbol),
                         type: 'candlestick',
-                        color: '#22c55e',
                         data: currentCandles,
                     }];
-
-                    const lastCandle = forecastOrigin();
-                    const lastTimestamp = lastCandle ? new Date(lastCandle.x).getTime() : NaN;
-                    const lastClose = Number(lastCandle?.y?.[3]);
-
-                    if (Number.isFinite(predictedPrice20d) && Number.isFinite(lastTimestamp) && Number.isFinite(lastClose)) {
-                        const targetTimestamp = addTradingDays(lastTimestamp, 20);
-                        const rangeAtTarget = [
-                            Math.min(lastClose, predictedPrice20d),
-                            Math.max(lastClose, predictedPrice20d),
-                        ];
-
-                        series.push({
-                            name: @json(__('Prognosebereich')),
-                            type: 'rangeArea',
-                            data: [
-                                { x: lastTimestamp, y: [lastClose, lastClose] },
-                                { x: targetTimestamp, y: rangeAtTarget },
-                            ],
-                        });
-                        series.push({
-                            name: @json(__('Aktueller Kurs')),
-                            type: 'line',
-                            color: sectorColor,
-                            data: [
-                                { x: lastTimestamp, y: lastClose },
-                                { x: targetTimestamp, y: lastClose },
-                            ],
-                        });
-                        series.push({
-                            name: @json(__('20-Tage-Ausblick')),
-                            type: 'line',
-                            color: sectorColor,
-                            data: [
-                                { x: lastTimestamp, y: lastClose },
-                                { x: targetTimestamp, y: predictedPrice20d },
-                            ],
-                        });
-                    }
-
-                    return series;
                 };
 
                 const rsiData = (period = 14) => {
@@ -655,21 +653,26 @@
                 };
 
                 const chartTimeRange = () => {
+                    const origin = forecastOrigin();
+                    const forecastStart = origin ? new Date(origin.x).getTime() : NaN;
+                    const forecastEnd = Number.isFinite(forecastStart)
+                        ? addTradingDays(forecastStart, 20)
+                        : NaN;
+
                     if (Number.isFinite(chartFocusAt)) {
                         const fiftyDays = 50 * 24 * 60 * 60 * 1000;
 
                         return {
                             min: chartFocusAt - fiftyDays,
-                            max: chartFocusAt + fiftyDays,
+                            max: Number.isFinite(forecastEnd) ? forecastEnd : chartFocusAt + fiftyDays,
                         };
                     }
 
                     const firstTimestamp = new Date(currentCandles[0]?.x).getTime();
-                    const lastTimestamp = new Date(currentCandles[currentCandles.length - 1]?.x).getTime();
 
                     return {
                         min: Number.isFinite(firstTimestamp) ? firstTimestamp : undefined,
-                        max: Number.isFinite(lastTimestamp) ? addTradingDays(lastTimestamp, 20) : undefined,
+                        max: Number.isFinite(forecastEnd) ? forecastEnd : undefined,
                     };
                 };
 
@@ -688,40 +691,9 @@
                     return { min: minimum - padding, max: maximum + padding };
                 };
 
-                const styleForecastLines = () => {
-                    const lastClose = Number(forecastOrigin()?.y?.[3]);
-                    if (!Number.isFinite(predictedPrice20d) || !Number.isFinite(lastClose)) return;
-
-                    const linePaths = element.querySelectorAll('path.apexcharts-line');
-                    if (linePaths.length < 2) return;
-
-                    const currentPricePath = linePaths[linePaths.length - 2];
-                    const forecastPath = linePaths[linePaths.length - 1];
-
-                    [
-                        [currentPricePath, '1.25'],
-                        [forecastPath, '1.75'],
-                    ].forEach(([path, width]) => {
-                        path.setAttribute('stroke', sectorColor);
-                        path.setAttribute('stroke-width', width);
-                        path.setAttribute('stroke-dasharray', '2 6');
-                        path.setAttribute('stroke-linecap', 'round');
-                        path.setAttribute('stroke-opacity', '0.58');
-                        path.style.stroke = sectorColor;
-                        path.style.strokeWidth = width;
-                        path.style.strokeDasharray = '2 6';
-                        path.style.strokeOpacity = '0.58';
-                    });
-                };
-
-                const options = () => {
+                const options = (includeSeries = true) => {
                     const light = document.documentElement.dataset.theme === 'light';
                     const series = chartSeries();
-                    const lastClose = Number(forecastOrigin()?.y?.[3]);
-                    const positiveOutlook = Number.isFinite(predictedPrice20d)
-                        && Number.isFinite(lastClose)
-                        && predictedPrice20d >= lastClose;
-                    const outlookColor = positiveOutlook ? '#22c55e' : '#ef4444';
                     const entryAnnotation = watchlistEntry?.price ? [{
                         y: Number(watchlistEntry.price),
                         borderColor: '#f59e0b',
@@ -755,53 +727,37 @@
                         },
                     }] : [];
 
-                    return {
+                    const chartOptions = {
                         chart: {
-                            type: 'line',
+                            type: 'candlestick',
                             height: '100%',
                             background: 'transparent',
                             toolbar: { show: false },
-                            zoom: { enabled: true },
+                            zoom: {
+                                enabled: false,
+                                allowMouseWheelZoom: false,
+                            },
+                            selection: { enabled: false },
+                            pan: { enabled: false },
                             animations: { enabled: true, speed: 350 },
                         },
-                        series,
-                        colors: series.map(item => item.name === @json(__('Prognosebereich')) ? outlookColor : item.color),
-                        stroke: {
-                            width: series.map(item => item.type === 'candlestick'
-                                ? 1
-                                : (item.type === 'rangeArea'
-                                    ? 0
-                                    : (item.name === @json(__('20-Tage-Ausblick'))
-                                        ? 1.75
-                                        : (item.name === @json(__('Aktueller Kurs')) ? 1.25 : 2)))),
-                            curve: 'straight',
-                            dashArray: series.map(item => [@json(__('20-Tage-Ausblick')), @json(__('Aktueller Kurs'))].includes(item.name) ? 2 : 0),
-                            lineCap: 'round',
-                        },
-                        fill: {
-                            type: series.map(item => item.type === 'rangeArea' ? 'pattern' : 'solid'),
-                            opacity: series.map(item => item.type === 'candlestick' ? 1 : (item.type === 'rangeArea' ? 0.26 : 0)),
-                            pattern: {
-                                style: series.map(item => item.type === 'rangeArea' ? 'slantedLines' : 'verticalLines'),
-                                width: 7,
-                                height: 7,
-                                strokeWidth: 0.75,
-                            },
-                        },
-                        markers: {
-                            size: series.map(item => item.name === @json(__('20-Tage-Ausblick')) ? 5 : 0),
-                            strokeWidth: 2,
-                            strokeColors: sectorColor,
-                            colors: [sectorColor],
-                        },
+                        stroke: { width: 1 },
+                        fill: { opacity: 1 },
                         plotOptions: {
+                            bar: {
+                                columnWidth: '62%',
+                            },
                             candlestick: {
                                 colors: { upward: '#22c55e', downward: '#ef4444' },
-                                wick: { useFillColor: true },
+                                wick: { useFillColor: false },
                             },
                         },
                         annotations: { yaxis: entryAnnotation, xaxis: focusAnnotation },
                         dataLabels: { enabled: false },
+                        states: {
+                            hover: { filter: { type: 'none' } },
+                            active: { filter: { type: 'none' } },
+                        },
                         grid: { borderColor: light ? 'rgba(51,65,85,.12)' : 'rgba(148,163,184,.10)', strokeDashArray: 4 },
                         xaxis: {
                             type: 'datetime',
@@ -814,6 +770,7 @@
                             },
                             axisBorder: { show: false },
                             axisTicks: { show: false },
+                            crosshairs: { show: false },
                         },
                         yaxis: {
                             opposite: true,
@@ -826,6 +783,9 @@
                         tooltip: { theme: light ? 'light' : 'dark', x: { format: 'dd.MM.yyyy' } },
                         theme: { mode: light ? 'light' : 'dark' }
                     };
+                    if (includeSeries) chartOptions.series = series;
+
+                    return chartOptions;
                 };
 
                 const rsiOptions = () => {
@@ -838,7 +798,9 @@
                             height: 78,
                             background: 'transparent',
                             toolbar: { show: false },
-                            zoom: { enabled: false },
+                            zoom: { enabled: false, allowMouseWheelZoom: false },
+                            selection: { enabled: false },
+                            pan: { enabled: false },
                             animations: { enabled: true, speed: 250 },
                             parentHeightOffset: 0,
                         },
@@ -847,6 +809,10 @@
                         stroke: { width: 2, curve: 'smooth' },
                         markers: { size: 0 },
                         dataLabels: { enabled: false },
+                        states: {
+                            hover: { filter: { type: 'none' } },
+                            active: { filter: { type: 'none' } },
+                        },
                         grid: {
                             borderColor: light ? 'rgba(51,65,85,.10)' : 'rgba(148,163,184,.08)',
                             strokeDashArray: 4,
@@ -910,11 +876,10 @@
                 };
 
                 const drawSmaLines = () => {
-                    if (!indicatorOverlay || !chart?.w?.globals) return;
+                    if (!indicatorOverlay) return;
 
                     const width = indicatorOverlay.clientWidth;
                     const height = indicatorOverlay.clientHeight;
-                    const globals = chart.w.globals;
                     const timeRange = chartTimeRange();
                     const priceRange = chartPriceRange();
                     if (!width || !height || !Number.isFinite(timeRange.min) || !Number.isFinite(timeRange.max)
@@ -923,12 +888,58 @@
                     indicatorOverlay.setAttribute('viewBox', `0 0 ${width} ${height}`);
                     indicatorOverlay.replaceChildren();
 
-                    const left = Number(globals.translateX) || 0;
-                    const top = Number(globals.translateY) || 0;
-                    const plotWidth = Number(globals.gridWidth) || width;
-                    const plotHeight = Number(globals.gridHeight) || height;
+                    const left = 18;
+                    const top = 16;
+                    const plotWidth = Math.max(1, width - left - 86);
+                    const plotHeight = Math.max(1, height - top - 32);
                     const xSpan = timeRange.max - timeRange.min;
                     const ySpan = priceRange.max - priceRange.min;
+
+                    const forecastCandle = forecastOrigin();
+                    const forecastStart = forecastCandle ? new Date(forecastCandle.x).getTime() : NaN;
+                    const forecastStartPrice = Number(forecastCandle?.y?.[3]);
+                    if (Number.isFinite(predictedPrice20d) && Number.isFinite(forecastStart) && Number.isFinite(forecastStartPrice)) {
+                        const forecastEnd = addTradingDays(forecastStart, 20);
+                        const positive = predictedPrice20d >= forecastStartPrice;
+                        const forecastColor = positive ? '#22c55e' : '#ef4444';
+                        const toX = timestamp => left + ((timestamp - timeRange.min) / xSpan) * plotWidth;
+                        const toY = price => top + plotHeight - ((price - priceRange.min) / ySpan) * plotHeight;
+
+                        const definitions = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                        const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+                        const patternId = `forecast-hatch-${@json($instrument->id)}`;
+                        pattern.setAttribute('id', patternId);
+                        pattern.setAttribute('width', '7');
+                        pattern.setAttribute('height', '7');
+                        pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+                        pattern.setAttribute('patternTransform', 'rotate(35)');
+                        const hatch = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        hatch.setAttribute('x1', '0');
+                        hatch.setAttribute('y1', '0');
+                        hatch.setAttribute('x2', '0');
+                        hatch.setAttribute('y2', '7');
+                        hatch.setAttribute('stroke', forecastColor);
+                        hatch.setAttribute('stroke-width', '1');
+                        hatch.setAttribute('stroke-opacity', '0.38');
+                        pattern.appendChild(hatch);
+                        definitions.appendChild(pattern);
+                        indicatorOverlay.appendChild(definitions);
+
+                        const triangle = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                        triangle.setAttribute('points', [
+                            `${toX(forecastStart)},${toY(forecastStartPrice)}`,
+                            `${toX(forecastEnd)},${toY(Math.max(forecastStartPrice, predictedPrice20d))}`,
+                            `${toX(forecastEnd)},${toY(Math.min(forecastStartPrice, predictedPrice20d))}`,
+                        ].join(' '));
+                        triangle.setAttribute('fill', `url(#${patternId})`);
+                        triangle.setAttribute('stroke', forecastColor);
+                        triangle.setAttribute('stroke-width', '1.15');
+                        triangle.setAttribute('stroke-dasharray', '5 5');
+                        triangle.setAttribute('stroke-opacity', '0.62');
+                        triangle.setAttribute('stroke-linejoin', 'round');
+                        triangle.setAttribute('vector-effect', 'non-scaling-stroke');
+                        indicatorOverlay.appendChild(triangle);
+                    }
 
                     [
                         ['sma20', 20, '#fb923c'],
@@ -965,13 +976,118 @@
                     });
                 };
 
-                chart = new window.ApexCharts(element, options());
-                chart.render().then(() => {
-                    styleForecastLines();
+                const svgNode = (name, attributes = {}) => {
+                    const node = document.createElementNS('http://www.w3.org/2000/svg', name);
+                    Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, value));
+                    return node;
+                };
+
+                const renderMainChart = () => {
+                    const width = element.clientWidth;
+                    const height = element.clientHeight;
+                    if (!width || !height) return;
+
+                    const light = document.documentElement.dataset.theme === 'light';
+                    const timeRange = chartTimeRange();
+                    const priceRange = chartPriceRange();
+                    const left = 18;
+                    const top = 16;
+                    const right = 86;
+                    const bottom = 32;
+                    const plotWidth = Math.max(1, width - left - right);
+                    const plotHeight = Math.max(1, height - top - bottom);
+                    const xSpan = Math.max(1, timeRange.max - timeRange.min);
+                    const ySpan = Math.max(0.0001, priceRange.max - priceRange.min);
+                    const toX = timestamp => left + ((timestamp - timeRange.min) / xSpan) * plotWidth;
+                    const toY = price => top + plotHeight - ((price - priceRange.min) / ySpan) * plotHeight;
+                    const svg = svgNode('svg', {
+                        viewBox: `0 0 ${width} ${height}`,
+                        width: '100%',
+                        height: '100%',
+                        role: 'img',
+                    });
+                    const gridColor = light ? 'rgba(51,65,85,.13)' : 'rgba(148,163,184,.11)';
+                    const labelColor = light ? '#64748b' : '#94a3b8';
+
+                    for (let index = 0; index <= 4; index += 1) {
+                        const ratio = index / 4;
+                        const y = top + ratio * plotHeight;
+                        const price = priceRange.max - ratio * ySpan;
+                        svg.appendChild(svgNode('line', {
+                            x1: left, x2: left + plotWidth, y1: y, y2: y,
+                            stroke: gridColor, 'stroke-dasharray': '4 5',
+                        }));
+                        const label = svgNode('text', {
+                            x: left + plotWidth + 10, y: y + 3,
+                            fill: labelColor, 'font-size': '10', 'font-family': 'inherit',
+                        });
+                        label.textContent = `${price.toFixed(2)} ${currency}`;
+                        svg.appendChild(label);
+                    }
+
+                    const visibleCandles = currentCandles.filter(candle => {
+                        const timestamp = new Date(candle.x).getTime();
+                        return Number.isFinite(timestamp) && timestamp >= timeRange.min && timestamp <= timeRange.max;
+                    });
+                    const candleWidth = Math.max(2.5, Math.min(7, (plotWidth / Math.max(visibleCandles.length, 1)) * 0.42));
+
+                    visibleCandles.forEach(candle => {
+                        const timestamp = new Date(candle.x).getTime();
+                        const [open, high, low, close] = candle.y.map(Number);
+                        if (![open, high, low, close].every(Number.isFinite)) return;
+                        const x = toX(timestamp);
+                        const color = close >= open ? '#22c55e' : '#ef4444';
+                        svg.appendChild(svgNode('line', {
+                            x1: x, x2: x, y1: toY(high), y2: toY(low),
+                            stroke: color, 'stroke-width': '1', 'stroke-opacity': '.72',
+                        }));
+                        svg.appendChild(svgNode('rect', {
+                            x: x - candleWidth / 2,
+                            y: Math.min(toY(open), toY(close)),
+                            width: candleWidth,
+                            height: Math.max(2, Math.abs(toY(open) - toY(close))),
+                            rx: '.75',
+                            fill: color,
+                        }));
+                    });
+
+                    if (watchlistEntry?.price && Number.isFinite(Number(watchlistEntry.price))) {
+                        const entryY = toY(Number(watchlistEntry.price));
+                        svg.appendChild(svgNode('line', {
+                            x1: left, x2: left + plotWidth, y1: entryY, y2: entryY,
+                            stroke: '#f59e0b', 'stroke-width': '1',
+                            'stroke-dasharray': '6 6', 'stroke-opacity': '.8',
+                        }));
+                    }
+
+                    if (Number.isFinite(chartFocusAt)) {
+                        const focusX = toX(chartFocusAt);
+                        svg.appendChild(svgNode('line', {
+                            x1: focusX, x2: focusX, y1: top, y2: top + plotHeight,
+                            stroke: '#f59e0b', 'stroke-width': '1',
+                            'stroke-dasharray': '5 6', 'stroke-opacity': '.65',
+                        }));
+                    }
+
+                    const tickCount = 7;
+                    for (let index = 0; index < tickCount; index += 1) {
+                        const timestamp = timeRange.min + (xSpan * index / (tickCount - 1));
+                        const label = svgNode('text', {
+                            x: toX(timestamp), y: height - 8,
+                            fill: labelColor, 'font-size': '10', 'text-anchor': 'middle',
+                            'font-family': 'inherit',
+                        });
+                        label.textContent = new Date(timestamp).toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+                        svg.appendChild(label);
+                    }
+
+                    element.replaceChildren(svg);
                     drawSmaLines();
-                });
+                };
+
+                renderMainChart();
                 if (indicatorOverlay && window.ResizeObserver) {
-                    new ResizeObserver(() => drawSmaLines()).observe(indicatorOverlay);
+                    new ResizeObserver(() => renderMainChart()).observe(element);
                 }
                 if (rsiElement) {
                     rsiChart = new window.ApexCharts(rsiElement, rsiOptions());
@@ -1001,19 +1117,14 @@
                     activeIndicators.clear();
                     activeIndicators.add('rsi');
                     syncIndicatorUi();
-                    drawSmaLines();
-                    chart.resetSeries();
-                    await chart.updateOptions(options(), false, true);
-                    styleForecastLines();
+                    renderMainChart();
                     if (rsiChart) {
                         await rsiChart.updateOptions(rsiOptions(), false, true);
                         updateRsiValue();
                     }
                 });
                 window.addEventListener('aktienki:theme-changed', async () => {
-                    await chart.updateOptions(options(), false, true);
-                    styleForecastLines();
-                    drawSmaLines();
+                    renderMainChart();
                     if (rsiChart) await rsiChart.updateOptions(rsiOptions(), false, true);
                 });
 
@@ -1034,9 +1145,7 @@
                         if (JSON.stringify(nextCandles) !== JSON.stringify(currentCandles) || entryChanged) {
                             currentCandles = nextCandles;
                             watchlistEntry = payload.watchlist_entry || null;
-                            await chart.updateOptions(options(), false, true);
-                            styleForecastLines();
-                            drawSmaLines();
+                            renderMainChart();
                             if (rsiChart) {
                                 await rsiChart.updateOptions(rsiOptions(), false, true);
                                 updateRsiValue();

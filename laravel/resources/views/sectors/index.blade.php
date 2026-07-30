@@ -1,168 +1,253 @@
 <x-app-layout>
-    <div class="flex h-[calc(100dvh-89px)] min-h-0 flex-col py-4 text-[var(--ak-text)]">
-        <div class="mb-4 flex shrink-0 flex-col gap-4 border-b border-[var(--ak-border)] pb-3 sm:flex-row sm:items-end sm:justify-between">
-            <div class="flex items-center gap-3">
-                <span class="flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-400/25 bg-violet-500/10 text-violet-300">
-                    <x-heroicon-o-building-office-2 class="h-6 w-6" />
-                </span>
+    <div id="sectors-page" class="ak-body text-[var(--ak-text)]">
+        <div id="sectors-page-heading" class="z-30 border-b border-[var(--ak-border)] bg-[var(--ak-bg)]/95 py-4 backdrop-blur-xl">
+            <div class="ak-container flex items-center justify-between gap-4">
                 <div>
-                    <p class="text-[10px] font-black uppercase tracking-[.18em] text-violet-300">{{ __('Marktstruktur') }}</p>
-                    <h1 class="mt-1 text-2xl font-black tracking-tight">{{ __('Sektoren') }}</h1>
-                    <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ __('Aggregierte KI-Auswertung der aktuell analysierten Aktien.') }}</p>
+                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-teal-500">{{ __('Marktstruktur') }}</p>
+                    <h1 class="mt-1 text-2xl font-black">{{ __('Sektoren') }}</h1>
                 </div>
-            </div>
-
-            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 py-2.5 text-xs text-[var(--ak-muted)]">
-                <strong class="text-[var(--ak-text)]">{{ $sectors->count() }}</strong> {{ __('Sektoren') }}
+                <span class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-3 py-2 text-xs font-bold text-[var(--ak-muted)]">
+                    {{ $sectors->count() }} {{ __('Sektoren') }}
+                </span>
             </div>
         </div>
 
-        <div class="min-h-0 flex-1 overflow-y-auto pr-1">
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,25rem),25rem))] gap-4 pb-2">
-                @forelse ($sectors as $sector)
-                @php
-                    $scorePercent = \App\Support\AiScore::toPercent($sector->average_score);
-                    $scoreChange = is_numeric($sector->five_day_score_change)
-                        ? \App\Support\AiScore::toTen($sector->average_score) - \App\Support\AiScore::toTen($sector->five_day_baseline_score)
-                        : null;
-                    $scoreDirection = $scoreChange === null || abs($scoreChange) < 0.05 ? 'stable' : ($scoreChange > 0 ? 'up' : 'down');
-                    $pe = is_numeric($sector->average_pe) ? (float) $sector->average_pe : null;
-                    $profitMargin = is_numeric($sector->average_profit_margin) ? (float) $sector->average_profit_margin * 100 : null;
-                    $revenueGrowth = is_numeric($sector->average_revenue_growth) ? (float) $sector->average_revenue_growth * 100 : null;
-                    $dividendYield = is_numeric($sector->average_dividend_yield) ? (float) $sector->average_dividend_yield : null;
-                @endphp
+        <main id="sectors-page-content" class="ak-container mt-5 pb-4" x-data="{ active: 'sectors' }">
+            <div id="sectors-tabs" class="mb-2 inline-flex items-end gap-1.5">
+                <button type="button" @click="active = 'sectors'" class="ak-sector-tab" :class="active === 'sectors' ? 'ak-sector-tab-active' : 'ak-sector-tab-idle'">
+                    <x-heroicon-o-squares-2x2 class="h-3.5 w-3.5" />
+                    {{ __('Sektoren') }}
+                </button>
+                <button type="button" @click="active = 'comments'" class="ak-sector-tab" :class="active === 'comments' ? 'ak-sector-tab-active' : 'ak-sector-tab-idle'">
+                    <x-heroicon-o-chat-bubble-left-right class="h-3.5 w-3.5" />
+                    {{ __('Kommentare') }}
+                </button>
+            </div>
 
-                <article class="group relative cursor-pointer rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 shadow-[var(--ak-shadow)] transition duration-200 hover:-translate-y-0.5 hover:border-violet-400/30 hover:bg-[var(--ak-card-hover)] hover:shadow-[var(--ak-shadow-hover)]">
-                    <a
-                        href="{{ route('stocks.index', ['sector' => $sector->sector]) }}"
-                        class="absolute inset-0 z-10 rounded-[1.5rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-                        aria-label="{{ __('Aktien anzeigen') }}: {{ __($sector->sector) }}"
-                    ></a>
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <h2 class="truncate text-lg font-black text-[var(--ak-text)]">{{ __($sector->sector) }}</h2>
-                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ $sector->analyzed_count }} / {{ $sector->stocks_count }} {{ __('Aktien analysiert') }}</p>
-                        </div>
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300">
-                            @switch($sector->sector)
-                                @case('Technology')
-                                    <x-heroicon-o-cpu-chip class="h-5 w-5" />
-                                    @break
-                                @case('Healthcare')
-                                    <x-heroicon-o-heart class="h-5 w-5" />
-                                    @break
-                                @case('Financial Services')
-                                    <x-heroicon-o-building-library class="h-5 w-5" />
-                                    @break
-                                @case('Energy')
-                                    <x-heroicon-o-bolt class="h-5 w-5" />
-                                    @break
-                                @case('Industrials')
-                                    <x-heroicon-o-cog-6-tooth class="h-5 w-5" />
-                                    @break
-                                @case('Basic Materials')
-                                    <x-heroicon-o-cube-transparent class="h-5 w-5" />
-                                    @break
-                                @case('Communication Services')
-                                    <x-heroicon-o-signal class="h-5 w-5" />
-                                    @break
-                                @case('Consumer Cyclical')
-                                    <x-heroicon-o-shopping-cart class="h-5 w-5" />
-                                    @break
-                                @case('Consumer Defensive')
-                                    <x-heroicon-o-shield-check class="h-5 w-5" />
-                                    @break
-                                @default
-                                    <x-heroicon-o-building-office-2 class="h-5 w-5" />
-                            @endswitch
-                        </span>
-                    </div>
+            <section id="sectors-table-pane" x-show="active === 'sectors'">
+                <div id="sectors-table-scroll">
+                    <table id="sectors-table" class="w-full table-fixed border-separate border-spacing-x-0 border-spacing-y-2 text-left">
+                        <colgroup>
+                            <col style="width: 14%">
+                            <col style="width: 7%">
+                            <col style="width: 13%">
+                            <col style="width: 9%">
+                            <col style="width: 10%">
+                            <col style="width: 9%">
+                            <col style="width: 9%">
+                            <col style="width: 29%">
+                        </colgroup>
+                        <thead class="text-[10px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">
+                            <tr>
+                                <th class="px-4 py-3"><button type="button" data-sort="sector" data-type="text" class="ak-sector-sort">{{ __('Sektor') }} <span>↕</span></button></th>
+                                <th class="px-3 py-3 text-center"><button type="button" data-sort="stocks" data-type="number" class="ak-sector-sort mx-auto">{{ __('Aktien') }} <span>↕</span></button></th>
+                                <th class="px-4 py-3 text-center"><button type="button" data-sort="score" data-type="number" class="ak-sector-sort mx-auto">{{ __('KI-Score') }} <span>↕</span></button></th>
+                                <th class="px-3 py-3 text-center"><button type="button" data-sort="trend" data-type="number" class="ak-sector-sort mx-auto">{{ __('Trend 5T') }} <span>↕</span></button></th>
+                                <th class="px-3 py-3 text-center"><button type="button" data-sort="forecast" data-type="number" class="ak-sector-sort mx-auto">{{ __('Prognose 20T') }} <span>↕</span></button></th>
+                                <th class="px-3 py-3 text-center"><button type="button" data-sort="confidence" data-type="number" class="ak-sector-sort mx-auto">{{ __('Konfidenz') }} <span>↕</span></button></th>
+                                <th class="px-3 py-3 text-center">
+                                    <button type="button" data-sort="risk" data-type="number" class="ak-sector-sort mx-auto" title="{{ __('75 % der Aktien dieses Sektors liegen unter diesem Drawdown-Risikowert.') }}">
+                                        {{ __('Risiko P75') }} <span>↕</span>
+                                    </button>
+                                </th>
+                                <th class="px-4 py-3">{{ __('Signale') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($sectors as $sector)
+                                @php
+                                    $score = \App\Support\AiScore::toTen($sector->average_score);
+                                    $scorePercent = \App\Support\AiScore::toPercent($sector->average_score);
+                                    $scoreChange = is_numeric($sector->five_day_score_change)
+                                        ? \App\Support\AiScore::toTen($sector->average_score) - \App\Support\AiScore::toTen($sector->five_day_baseline_score)
+                                        : null;
+                                    $forecast20d = is_numeric($sector->average_expected_return_20d)
+                                        ? (float) $sector->average_expected_return_20d
+                                        : null;
+                                    $confidence = is_numeric($sector->average_confidence)
+                                        ? min(100, max(0, (float) $sector->average_confidence <= 1 ? (float) $sector->average_confidence * 100 : (float) $sector->average_confidence))
+                                        : null;
+                                    $risk = is_numeric($sector->risk_p75)
+                                        ? min(100, max(0, (float) $sector->risk_p75 <= 1 ? (float) $sector->risk_p75 * 100 : (float) $sector->risk_p75))
+                                        : null;
+                                    $scoreClass = $score >= 6.5 ? 'text-emerald-500' : ($score < 4.5 ? 'text-rose-500' : 'text-amber-500');
+                                    $confidenceColor = match (true) {
+                                        $confidence === null => '#64748b',
+                                        $confidence < 40 => '#ef4444',
+                                        $confidence < 60 => '#f97316',
+                                        $confidence < 75 => '#eab308',
+                                        $confidence < 88 => '#84cc16',
+                                        default => '#10b981',
+                                    };
+                                    $riskColor = match (true) {
+                                        $risk === null => '#64748b',
+                                        $risk < 10 => '#10b981',
+                                        $risk < 20 => '#84cc16',
+                                        $risk < 30 => '#eab308',
+                                        $risk < 40 => '#f97316',
+                                        default => '#ef4444',
+                                    };
+                                    $target = route('stocks.index', ['sector' => $sector->sector]);
+                                @endphp
+                                <tr onclick="window.location.href=@js($target)" class="cursor-pointer text-sm">
+                                    <td colspan="8" class="p-0">
+                                        <div class="ak-sector-row-grid">
+                                            <div data-column="sector" data-value="{{ $sector->sector }}" class="flex min-w-0 items-center gap-3 px-4 py-3">
+                                                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal-500/10 text-teal-500">
+                                                    <x-sector-icon :sector="$sector->sector" class="h-5 w-5" />
+                                                </span>
+                                                <div class="min-w-0">
+                                                    <p class="truncate font-black">{{ __($sector->sector) }}</p>
+                                                    <p class="truncate text-[10px] text-[var(--ak-muted)]">{{ $sector->analyzed_count }} {{ __('analysiert') }}</p>
+                                                </div>
+                                            </div>
+                                            <div data-column="stocks" data-value="{{ $sector->stocks_count }}" class="flex items-center justify-center px-3 font-black">{{ $sector->stocks_count }}</div>
+                                            <div data-column="score" data-value="{{ $score ?? '' }}" class="flex flex-col justify-center px-4">
+                                                @if ($score !== null)
+                                                    <div class="mb-1.5 flex items-baseline justify-between"><strong class="{{ $scoreClass }}">{{ number_format($score, 1, ',', '.') }}</strong><small class="text-[9px] text-[var(--ak-muted)]">/ 10</small></div>
+                                                    <x-dashboard.score-stripes :percent="$scorePercent" />
+                                                @else
+                                                    <span class="text-center text-[var(--ak-muted)]">—</span>
+                                                @endif
+                                            </div>
+                                            <div data-column="trend" data-value="{{ $scoreChange ?? '' }}" class="flex items-center justify-center px-3">
+                                                <span class="ak-sector-trend {{ ($scoreChange ?? 0) > .05 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : (($scoreChange ?? 0) < -.05 ? 'border-rose-400/30 bg-rose-400/10 text-rose-400' : 'border-[var(--ak-border)] text-[var(--ak-muted)]') }}">
+                                                    @if (($scoreChange ?? 0) > .05)<x-heroicon-o-arrow-trending-up class="h-4 w-4" />
+                                                    @elseif (($scoreChange ?? 0) < -.05)<x-heroicon-o-arrow-trending-down class="h-4 w-4" />
+                                                    @else<x-heroicon-o-arrow-right class="h-4 w-4" />@endif
+                                                    {{ $scoreChange !== null ? (($scoreChange > 0 ? '+' : '').number_format($scoreChange, 1, ',', '.')) : '—' }}
+                                                </span>
+                                            </div>
+                                            <div data-column="forecast" data-value="{{ $forecast20d ?? '' }}" class="flex items-center justify-center px-3">
+                                                <span class="ak-sector-trend {{ ($forecast20d ?? 0) > .05 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : (($forecast20d ?? 0) < -.05 ? 'border-rose-400/30 bg-rose-400/10 text-rose-400' : 'border-[var(--ak-border)] text-[var(--ak-muted)]') }}">
+                                                    @if (($forecast20d ?? 0) > .05)<x-heroicon-o-arrow-trending-up class="h-4 w-4" />
+                                                    @elseif (($forecast20d ?? 0) < -.05)<x-heroicon-o-arrow-trending-down class="h-4 w-4" />
+                                                    @else<x-heroicon-o-arrow-right class="h-4 w-4" />@endif
+                                                    {{ $forecast20d !== null ? (($forecast20d > 0 ? '+' : '').number_format($forecast20d, 1, ',', '.').' %') : '—' }}
+                                                </span>
+                                            </div>
+                                            <div data-column="confidence" data-value="{{ $confidence ?? '' }}" class="flex items-center justify-center px-3">
+                                                @if ($confidence !== null)
+                                                    <div class="ak-sector-donut" style="--value: {{ $confidence }}%; --color: {{ $confidenceColor }}" role="meter" aria-label="{{ __('Konfidenz') }}" aria-valuenow="{{ round($confidence) }}">
+                                                        <span>{{ number_format($confidence, 0, ',', '.') }}<small>%</small></span>
+                                                    </div>
+                                                @else<span class="text-[var(--ak-muted)]">—</span>@endif
+                                            </div>
+                                            <div data-column="risk" data-value="{{ $risk ?? '' }}" class="flex items-center justify-center px-3">
+                                                @if ($risk !== null)
+                                                    <div class="ak-sector-donut" style="--value: {{ $risk }}%; --color: {{ $riskColor }}" role="meter" aria-label="{{ __('Risiko P75') }}" aria-valuenow="{{ round($risk) }}">
+                                                        <span>{{ number_format($risk, 0, ',', '.') }}<small>%</small><em>P75</em></span>
+                                                    </div>
+                                                @else<span class="text-[var(--ak-muted)]">—</span>@endif
+                                            </div>
+                                            <div class="flex items-center px-4">
+                                                <div class="ak-sector-signal-grid">
+                                                    @foreach ([
+                                                        ['SELL', 'sell_count', 'sell'],
+                                                        ['HOLD', 'hold_count', 'hold'],
+                                                        ['WATCH', 'watch_count', 'watch'],
+                                                        ['BUY', 'buy_count', 'buy'],
+                                                    ] as [$signal, $countKey, $tone])
+                                                        @if ((int) $sector->{$countKey} > 0)
+                                                            <a href="{{ route('stocks.index', ['sector' => $sector->sector, 'signal' => $signal]) }}" onclick="event.stopPropagation()" class="ak-sector-signal ak-sector-signal-{{ $tone }}">
+                                                                <span>{{ __(ucfirst(strtolower($signal))) }}</span><b>{{ $sector->{$countKey} }}</b>
+                                                            </a>
+                                                        @else
+                                                            <span class="ak-sector-signal ak-sector-signal-{{ $tone }} ak-sector-signal-empty" aria-hidden="true"></span>
+                                                        @endif
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="8" class="py-16 text-center text-sm text-[var(--ak-muted)]">{{ __('Noch keine Sektordaten vorhanden.') }}</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
-                    <div class="mt-5">
-                        <div class="mb-2">
-                            <span class="text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Ø KI-Score') }}</span>
-                        </div>
-                        <div class="grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] items-center gap-3">
-                            <div class="min-w-0">
-                                <x-dashboard.stock-score-gauge :percent="$scorePercent" />
-                            </div>
-                            <span
-                                class="inline-flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-base font-black shadow-sm {{ $scoreDirection === 'up' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : ($scoreDirection === 'down' ? 'border-rose-400/30 bg-rose-400/10 text-rose-400' : 'border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-[var(--ak-muted)]') }}"
-                                title="{{ __('Veränderung des durchschnittlichen KI-Scores innerhalb der letzten 5 Tage') }}"
-                            >
-                                @if ($scoreDirection === 'up')
-                                    <x-heroicon-o-arrow-trending-up class="h-6 w-6" />
-                                @elseif ($scoreDirection === 'down')
-                                    <x-heroicon-o-arrow-trending-down class="h-6 w-6" />
-                                @else
-                                    <x-heroicon-o-arrow-right class="h-6 w-6" />
+            <section id="sectors-comments-pane" x-cloak x-show="active === 'comments'">
+                @if ($sectorComments->isNotEmpty())
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        @foreach ($sectorComments as $comment)
+                            @php
+                                $outlook = strtoupper((string) ($comment['outlook'] ?? 'NEUTRAL'));
+                                $outlookClass = match ($outlook) {
+                                    'BULLISH' => 'border-emerald-500/35 bg-emerald-500/15 text-emerald-400',
+                                    'BEARISH' => 'border-rose-500/35 bg-rose-500/15 text-rose-400',
+                                    default => 'border-amber-500/35 bg-amber-500/15 text-amber-400',
+                                };
+                            @endphp
+                            <article class="ak-card ak-card-static flex min-h-[240px] flex-col p-6">
+                                <div class="ak-sector-comment-heading flex items-start justify-between gap-4">
+                                    <div class="flex min-w-0 items-start gap-3">
+                                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-500">
+                                            <x-sector-icon :sector="$comment['sector'] ?? null" class="h-5 w-5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <p class="text-[9px] font-black uppercase tracking-[.16em] text-teal-500">{{ __('Sektorenkommentar') }}</p>
+                                            <h2 class="mt-1 truncate text-lg font-black text-[var(--ak-text)]">{{ __((string) ($comment['sector'] ?? '—')) }}</h2>
+                                        </div>
+                                    </div>
+                                    <span class="shrink-0 rounded-lg border px-3 py-2 text-[10px] font-black {{ $outlookClass }}">{{ __($outlook) }}</span>
+                                </div>
+                                <p class="ak-comment-copy mt-5 flex-1 border-t border-[var(--ak-border)] pt-5 text-sm leading-7">{{ $comment['summary'] ?? '—' }}</p>
+                                @if ($sectorAnalysisDate)
+                                    <p class="mt-4 border-t border-[var(--ak-border)] pt-3 text-right text-[9px] font-bold text-[var(--ak-muted)]">{{ \Carbon\Carbon::parse($sectorAnalysisDate)->format('d.m.Y') }}</p>
                                 @endif
-                                <span>
-                                    @if ($scoreChange !== null && abs($scoreChange) >= 0.05)
-                                        {{ ($scoreChange > 0 ? '+' : '').number_format($scoreChange, 1, ',', '.') }}
-                                    @else
-                                        {{ __('stabil') }}
-                                    @endif
-                                </span>
-                                <small class="text-xs font-bold opacity-70">5T</small>
-                            </span>
-                        </div>
+                            </article>
+                        @endforeach
                     </div>
-
-                    <div class="mt-6 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3">
-                        <p class="mb-2.5 text-[11px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]" title="{{ __('Der Status wird aus der KI-Bewertung und deinem gewählten Risikoprofil abgeleitet.') }}">{{ __('Aktive Signale') }}</p>
-                        <div class="grid grid-cols-4 gap-1.5">
-                            <a href="{{ route('stocks.index', ['sector' => $sector->sector, 'signal' => 'SELL']) }}" class="relative z-20 flex items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[10px] font-black transition hover:brightness-125 {{ $sector->sell_count > 0 ? 'border-rose-400/30 bg-rose-400/10 text-rose-400' : 'border-[var(--ak-border)] text-[var(--ak-muted)] opacity-45' }}">
-                                SELL <span>{{ $sector->sell_count }}</span>
-                            </a>
-                            <a href="{{ route('stocks.index', ['sector' => $sector->sector, 'signal' => 'HOLD']) }}" class="relative z-20 flex items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[10px] font-black transition hover:brightness-125 {{ $sector->hold_count > 0 ? 'border-amber-300/30 bg-amber-300/10 text-amber-300' : 'border-[var(--ak-border)] text-[var(--ak-muted)] opacity-45' }}">
-                                HOLD <span>{{ $sector->hold_count }}</span>
-                            </a>
-                            <a href="{{ route('stocks.index', ['sector' => $sector->sector, 'signal' => 'WATCH']) }}" class="relative z-20 flex items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[10px] font-black transition hover:brightness-125 {{ $sector->watch_count > 0 ? 'border-lime-300/30 bg-lime-300/10 text-lime-300' : 'border-[var(--ak-border)] text-[var(--ak-muted)] opacity-45' }}">
-                                WATCH <span>{{ $sector->watch_count }}</span>
-                            </a>
-                            <a href="{{ route('stocks.index', ['sector' => $sector->sector, 'signal' => 'BUY']) }}" class="relative z-20 flex items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[10px] font-black transition hover:brightness-125 {{ $sector->buy_count > 0 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-[var(--ak-border)] text-[var(--ak-muted)] opacity-45' }}">
-                                BUY <span>{{ $sector->buy_count }}</span>
-                            </a>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 border-t border-[var(--ak-border)] pt-4">
-                        <div class="mb-3 flex items-center justify-between gap-3">
-                            <p class="text-[11px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Fundamentaldaten') }}</p>
-                            <span class="text-[11px] text-[var(--ak-muted)]">{{ $sector->fundamental_count }} {{ __('Unternehmen') }}</span>
-                        </div>
-                        <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
-                            <div>
-                                <dt class="text-xs text-[var(--ak-muted)]">{{ __('Ø KGV') }}</dt>
-                                <dd class="mt-1 text-base font-black text-[var(--ak-text)]">{{ $pe !== null ? number_format($pe, 1, ',', '.') : '—' }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-xs text-[var(--ak-muted)]">{{ __('Ø Gewinnmarge') }}</dt>
-                                <dd class="mt-1 text-base font-black {{ ($profitMargin ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">
-                                    {{ $profitMargin !== null ? number_format($profitMargin, 1, ',', '.').' %' : '—' }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt class="text-xs text-[var(--ak-muted)]">{{ __('Ø Umsatzwachstum') }}</dt>
-                                <dd class="mt-1 text-base font-black {{ ($revenueGrowth ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">
-                                    {{ $revenueGrowth !== null ? (($revenueGrowth > 0 ? '+' : '').number_format($revenueGrowth, 1, ',', '.').' %') : '—' }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt class="text-xs text-[var(--ak-muted)]">{{ __('Ø Dividendenrendite') }}</dt>
-                                <dd class="mt-1 text-base font-black text-violet-300">{{ $dividendYield !== null ? number_format($dividendYield, 2, ',', '.').' %' : '—' }}</dd>
-                            </div>
-                        </dl>
-                    </div>
-
-                </article>
-                @empty
-                    <div class="col-span-full rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-6 py-16 text-center text-sm text-[var(--ak-muted)]">
-                        {{ __('Noch keine Sektordaten vorhanden.') }}
-                    </div>
-                @endforelse
-            </div>
-        </div>
+                @else
+                    <article class="ak-card grid min-h-[280px] place-items-center text-sm text-[var(--ak-muted)]">{{ __('Noch keine Sektorenkommentare verfügbar.') }}</article>
+                @endif
+            </section>
+        </main>
     </div>
+
+    <style>
+        #sectors-page{display:flex;flex-direction:column;height:calc(100dvh - 73px - 1rem)!important;min-height:0!important;overflow:hidden!important}
+        #sectors-page-heading,#sectors-tabs{flex:0 0 auto}
+        #sectors-page-content{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;overflow:hidden}
+        #sectors-table-pane,#sectors-comments-pane{flex:1 1 auto;min-height:0;overflow:hidden}
+        #sectors-table-scroll{height:100%;overflow:auto;overscroll-behavior:contain}
+        #sectors-comments-pane{height:100%;overflow:auto;overscroll-behavior:contain}
+        #sectors-comments-pane .ak-sector-comment-heading{flex:0 0 64px;height:64px;min-height:64px;overflow:hidden}
+        #sectors-comments-pane .ak-comment-copy{color:color-mix(in srgb,var(--ak-text) 86%,var(--ak-muted) 14%)}
+        .ak-sector-tab{display:inline-flex;width:116px;height:34px;align-items:center;justify-content:center;gap:6px;border:1px solid var(--ak-border);border-bottom-width:2px;border-radius:9px 9px 5px 5px;padding:0 10px;font-size:10px;font-weight:900;letter-spacing:.035em;box-shadow:0 4px 10px rgba(3,7,18,.1);transition:none}
+        .ak-sector-tab-active{border-color:color-mix(in srgb,rgb(20 184 166) 38%,var(--ak-border));border-bottom-color:rgb(20 184 166);background:var(--ak-card);color:rgb(20 184 166);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 4px 12px rgba(3,7,18,.14)}
+        .ak-sector-tab-idle{background:color-mix(in srgb,var(--ak-card) 72%,var(--ak-bg) 28%);color:var(--ak-muted)}
+        #sectors-table{min-width:1180px}
+        #sectors-table thead,#sectors-table thead th{background:var(--ak-surface)!important}
+        #sectors-table thead th{position:sticky;top:0;z-index:20;box-shadow:0 1px 0 var(--ak-border),0 8px 16px rgba(3,7,18,.15)}
+        #sectors-table tbody td{border:0!important;background:transparent!important}
+        .ak-sector-row-grid{display:grid;grid-template-columns:14% 7% 13% 9% 10% 9% 9% 29%;height:72px;align-items:stretch;overflow:hidden;border:1px solid var(--ak-border);border-radius:16px;background:var(--ak-card);box-shadow:0 5px 14px rgba(5,10,28,.14)}
+        #sectors-table tbody tr:nth-child(even) .ak-sector-row-grid{background:var(--ak-card-hover)}
+        #sectors-table tbody tr:hover .ak-sector-row-grid{background:color-mix(in srgb,var(--ak-card-hover) 90%,rgb(45 212 191) 10%)}
+        .ak-sector-sort{display:flex;align-items:center;gap:.35rem;white-space:nowrap}
+        .ak-sector-sort span{font-size:.7rem;opacity:.55}
+        .ak-sector-sort[aria-sort] span{color:rgb(20 184 166);opacity:1}
+        .ak-sector-trend{display:inline-flex;width:84px;height:30px;flex:0 0 84px;align-items:center;justify-content:center;gap:6px;border-width:1px;border-radius:8px;padding:0 7px;font-weight:900;white-space:nowrap}
+        .ak-sector-donut{position:relative;display:grid;width:48px;height:48px;flex:0 0 48px;place-items:center;border-radius:999px;background:conic-gradient(var(--color) 0 var(--value),rgba(148,163,184,.16) var(--value) 100%);box-shadow:0 0 14px color-mix(in srgb,var(--color) 18%,transparent)}
+        .ak-sector-donut:after{position:absolute;inset:5px;border-radius:inherit;background:var(--ak-card);content:''}
+        #sectors-table tbody tr:nth-child(even) .ak-sector-donut:after{background:var(--ak-card-hover)}
+        .ak-sector-donut span{position:relative;z-index:1;display:grid;grid-template-columns:auto auto;place-items:center;font-size:11px;font-weight:900;line-height:1}
+        .ak-sector-donut small{margin-left:1px;color:var(--ak-muted);font-size:7px}
+        .ak-sector-donut em{grid-column:1/-1;margin-top:2px;color:var(--ak-muted);font-size:6px;font-style:normal;letter-spacing:.08em}
+        .ak-sector-signal-grid{display:grid;grid-template-columns:repeat(4,80px);gap:6px;width:max-content;font-size:10px;font-weight:900}
+        .ak-sector-signal{display:flex;width:80px;height:30px;align-items:center;justify-content:space-between;gap:5px;border:1px solid;border-radius:8px;padding:0 8px;color:#fff;white-space:nowrap}
+        .ak-sector-signal b{min-width:21px;border:0;border-radius:0;background:transparent;padding:0;color:inherit;text-align:center}
+        .ak-sector-signal-sell{border-color:rgba(251,113,133,.72);background:rgba(225,29,72,.58)}
+        .ak-sector-signal-hold{border-color:rgba(252,211,77,.72);background:rgba(217,119,6,.56)}
+        .ak-sector-signal-watch{border-color:rgba(190,242,100,.68);background:rgba(101,163,13,.52)}
+        .ak-sector-signal-buy{border-color:rgba(110,231,183,.82);background:rgba(5,150,105,.72)}
+        .ak-sector-signal-empty{pointer-events:none;opacity:0;user-select:none}
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded',()=>{const table=document.getElementById('sectors-table');if(!table)return;const body=table.tBodies[0],buttons=[...table.querySelectorAll('[data-sort]')];let active=null,direction=1;buttons.forEach(button=>button.addEventListener('click',()=>{const key=button.dataset.sort,type=button.dataset.type;direction=active===key?direction*-1:1;active=key;const rows=[...body.rows].filter(row=>row.querySelector(`[data-column="${key}"]`));rows.sort((a,b)=>{const left=a.querySelector(`[data-column="${key}"]`)?.dataset.value??'',right=b.querySelector(`[data-column="${key}"]`)?.dataset.value??'';if(left===''&&right!=='')return 1;if(right===''&&left!=='')return-1;const result=type==='number'?Number(left)-Number(right):left.localeCompare(right,document.documentElement.lang,{numeric:true,sensitivity:'base'});return result*direction});rows.forEach(row=>body.appendChild(row));buttons.forEach(item=>{item.removeAttribute('aria-sort');item.querySelector('span').textContent='↕'});button.setAttribute('aria-sort',direction===1?'ascending':'descending');button.querySelector('span').textContent=direction===1?'↑':'↓'}))});
+    </script>
 </x-app-layout>

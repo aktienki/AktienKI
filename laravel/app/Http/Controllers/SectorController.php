@@ -35,6 +35,7 @@ class SectorController extends Controller
                 $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
             ->leftJoin('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental.fundamental_id')
             ->where('instrument.type', 'stock')
+            ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
             ->whereNotNull('instrument.sector')
             ->where('instrument.sector', '<>', '')
@@ -43,6 +44,14 @@ class SectorController extends Controller
             ->selectRaw('COUNT(*) AS stocks_count')
             ->selectRaw('COUNT(prediction.id) AS analyzed_count')
             ->selectRaw('AVG(prediction.prediction_score) AS average_score')
+            ->selectRaw('AVG(
+                ((prediction.predicted_price_20d - prediction.current_price)
+                / NULLIF(prediction.current_price, 0)) * 100
+            ) AS average_expected_return_20d')
+            ->selectRaw('AVG(prediction.confidence) AS average_confidence')
+            ->selectRaw('PERCENTILE_CONT(0.75) WITHIN GROUP (
+                ORDER BY COALESCE(prediction.risk_score, prediction.drawdown_risk_factor)
+            ) AS risk_p75')
             ->selectRaw('AVG(baseline_prediction.prediction_score) AS five_day_baseline_score')
             ->selectRaw('AVG(prediction.prediction_score) - AVG(baseline_prediction.prediction_score) AS five_day_score_change')
             ->selectRaw("COUNT(*) FILTER (WHERE ({$signalSql}) = 'BUY') AS buy_count")
@@ -57,6 +66,14 @@ class SectorController extends Controller
             ->orderByRaw('AVG(prediction.prediction_score) DESC NULLS LAST')
             ->get();
 
-        return view('sectors.index', compact('sectors'));
+        $latestAnalysis = DB::table('daily_market_ai_analyses')
+            ->orderByDesc('analysis_date')
+            ->orderByDesc('id')
+            ->first(['analysis_date', 'sector_analysis']);
+        $sectorComments = json_decode((string) ($latestAnalysis?->sector_analysis ?? '[]'), true);
+        $sectorComments = is_array($sectorComments) ? collect($sectorComments) : collect();
+        $sectorAnalysisDate = $latestAnalysis?->analysis_date;
+
+        return view('sectors.index', compact('sectors', 'sectorComments', 'sectorAnalysisDate'));
     }
 }

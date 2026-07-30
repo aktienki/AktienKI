@@ -14,6 +14,139 @@ use Throwable;
 
 class StockController extends Controller
 {
+    public function chartAnalysis(string $symbol): View
+    {
+        $instrument = $this->instrument($symbol);
+        $exchange = $instrument->exchange_id
+            ? DB::table('exchanges')->where('id', $instrument->exchange_id)->first()
+            : null;
+        $indicators = DB::table('technical_indicators')
+            ->where('instrument_id', $instrument->id)
+            ->where('interval', '1d')
+            ->where('bar_time', '>=', now()->subYears(3)->startOfDay())
+            ->orderByDesc('bar_time')
+            ->get([
+                'bar_time', 'sma_20', 'sma_50', 'sma_200', 'ema_20', 'ema_50',
+                'bollinger_upper', 'bollinger_middle', 'bollinger_lower', 'bollinger_width',
+                'rsi_14', 'macd', 'macd_signal', 'macd_histogram', 'adx_14', 'atr_14',
+                'stochastic_k', 'stochastic_d', 'volatility_20', 'momentum_10',
+            ])
+            ->reverse()
+            ->values();
+        $features = $indicators->isEmpty()
+            ? collect()
+            : DB::table('feature_store')
+                ->where('instrument_id', $instrument->id)
+                ->where('interval', '1d')
+                ->whereIn('bar_time', $indicators->pluck('bar_time'))
+                ->get(['bar_time', 'close', 'target_return_20d'])
+                ->keyBy(fn (object $row): string => CarbonImmutable::parse($row->bar_time)->toIso8601String());
+
+        $chartRows = $indicators->map(function (object $indicator) use ($features): array {
+            $time = CarbonImmutable::parse($indicator->bar_time);
+            $feature = $features->get($time->toIso8601String());
+
+            return [
+                'x' => $time->getTimestampMs(),
+                'c' => $this->number($feature?->close),
+                'sma20' => $this->number($indicator?->sma_20),
+                'sma50' => $this->number($indicator?->sma_50),
+                'sma200' => $this->number($indicator?->sma_200),
+                'ema20' => $this->number($indicator?->ema_20),
+                'ema50' => $this->number($indicator?->ema_50),
+                'bbUpper' => $this->number($indicator?->bollinger_upper),
+                'bbMiddle' => $this->number($indicator?->bollinger_middle),
+                'bbLower' => $this->number($indicator?->bollinger_lower),
+                'bbWidth' => $this->number($indicator?->bollinger_width),
+                'rsi' => $this->number($indicator?->rsi_14),
+                'macd' => $this->number($indicator?->macd),
+                'macdSignal' => $this->number($indicator?->macd_signal),
+                'macdHistogram' => $this->number($indicator?->macd_histogram),
+                'adx' => $this->number($indicator?->adx_14),
+                'atr' => $this->number($indicator?->atr_14),
+                'stochK' => $this->number($indicator?->stochastic_k),
+                'stochD' => $this->number($indicator?->stochastic_d),
+                'volatility' => $this->number($indicator?->volatility_20),
+                'momentum10' => $this->number($indicator?->momentum_10),
+                'targetReturn20d' => $this->number($feature?->target_return_20d),
+            ];
+        });
+
+        $indicatorDefinitions = [
+            'rsi_14' => ['label' => 'RSI 14', 'field' => 'rsi', 'unit' => ''],
+            'adx_14' => ['label' => 'ADX 14', 'field' => 'adx', 'unit' => ''],
+            'stochastic_k' => ['label' => 'Stochastik %K', 'field' => 'stochK', 'unit' => ''],
+            'volatility_20' => ['label' => __('Volatilität 20T'), 'field' => 'volatility', 'unit' => '%'],
+            'atr_14_pct' => ['label' => 'ATR 14', 'field' => 'atr', 'unit' => $instrument->currency ?: ''],
+            'bollinger_width' => ['label' => __('Bollinger-Bandbreite'), 'field' => 'bbWidth', 'unit' => '%'],
+            'macd_histogram_pct' => ['label' => 'MACD Histogramm', 'field' => 'macdHistogram', 'unit' => ''],
+            'momentum_10_pct' => ['label' => __('Momentum 10T'), 'field' => 'momentum10Pct', 'unit' => '%'],
+        ];
+        $valueFor = function (?array $row, string $field): ?float {
+            if (! $row) {
+                return null;
+            }
+            $close = (float) ($row['c'] ?? 0);
+
+            return match ($field) {
+                'atrPct' => $close > 0 && $row['atr'] !== null ? $row['atr'] / $close : null,
+                'macdHistogramPct' => $close > 0 && $row['macdHistogram'] !== null ? $row['macdHistogram'] / $close : null,
+                'momentum10Pct' => abs($close - (float) ($row['momentum10'] ?? 0)) > 0.000001 && $row['momentum10'] !== null
+                    ? $row['momentum10'] / ($close - $row['momentum10'])
+                    : null,
+                default => isset($row[$field]) && is_numeric($row[$field]) ? (float) $row[$field] : null,
+            };
+        };
+        $currentRow = $chartRows->last();
+        $fiveDayRow = $chartRows->count() >= 6 ? $chartRows->get($chartRows->count() - 6) : null;
+        $indicatorCards = collect($indicatorDefinitions)->map(function (array $definition) use ($chartRows, $currentRow, $fiveDayRow, $valueFor): array {
+            $scale = $definition['unit'] === '%' ? 100.0 : 1.0;
+            $currentRawValue = $valueFor($currentRow, $definition['field']);
+            $fiveDayRawValue = $valueFor($fiveDayRow, $definition['field']);
+            $fiveDayChange = $currentRawValue !== null && $fiveDayRawValue !== null
+                ? ($currentRawValue - $fiveDayRawValue) * $scale
+                : null;
+            $points = $chartRows->map(function (array $row) use ($definition, $scale, $valueFor): ?array {
+                $rawValue = $valueFor($row, $definition['field']);
+                if ($rawValue === null || ! is_numeric($row['targetReturn20d'])) {
+                    return null;
+                }
+                $return = (float) $row['targetReturn20d'];
+
+                return [
+                    'x' => $rawValue * $scale,
+                    'y' => $return * 100,
+                    'up' => $return > 0,
+                    'date' => CarbonImmutable::createFromTimestampMs($row['x'])->format('d.m.Y'),
+                ];
+            })->filter()->values();
+            $nearby = $currentRawValue === null
+                ? collect()
+                : $points->sortBy(fn (array $point): float => abs($point['x'] - ($currentRawValue * $scale)))
+                    ->take(min(40, $points->count()));
+            $riseProbability = $nearby->isEmpty()
+                ? null
+                : ($nearby->where('up', true)->count() / $nearby->count()) * 100;
+
+            return [
+                ...$definition,
+                'currentValue' => $currentRawValue === null ? null : $currentRawValue * $scale,
+                'fiveDayChange' => $fiveDayChange,
+                'fiveDayDirection' => $fiveDayChange === null
+                    ? null
+                    : (abs($fiveDayChange) < 0.000001 ? 'flat' : ($fiveDayChange > 0 ? 'up' : 'down')),
+                'currentProbability' => $riseProbability,
+                'currentFallProbability' => $riseProbability === null ? null : 100 - $riseProbability,
+                'comparisonSamples' => $nearby->count(),
+                'points' => $points,
+            ];
+        })->values();
+
+        return view('stocks.chart-analysis', compact(
+            'instrument', 'exchange', 'indicatorCards'
+        ));
+    }
+
     public function show(
         Request $request,
         string $symbol,
@@ -40,6 +173,36 @@ class StockController extends Controller
 
         $prediction = $predictionQuery->first();
         abort_if($requestedPredictionId > 0 && ! $prediction, 404);
+        $modelQuality = $prediction?->trained_model_id
+            ? DB::table('trained_models as trained_model')
+                ->leftJoin('model_definitions as model_definition', 'model_definition.id', '=', 'trained_model.model_definition_id')
+                ->leftJoin('model_quality_rankings as model_quality', function ($join): void {
+                    $join->on('model_quality.trained_model_id', '=', 'trained_model.id')
+                        ->whereRaw('model_quality.id = (
+                            SELECT MAX(latest_model_quality.id)
+                            FROM model_quality_rankings AS latest_model_quality
+                            WHERE latest_model_quality.trained_model_id = trained_model.id
+                        )');
+                })
+                ->leftJoin('model_quality_tiers as quality_tier', 'quality_tier.id', '=', 'model_quality.tier_id')
+                ->where('trained_model.id', $prediction->trained_model_id)
+                ->first([
+                    'model_definition.public_alias as model_alias',
+                    'model_quality.quality_score',
+                    'model_quality.eligible',
+                    'quality_tier.code as tier_code',
+                    'quality_tier.name as tier_name',
+                ])
+            : null;
+        $aiAssessment = DB::table('stock_ai_assessments')
+            ->where('instrument_id', $instrument->id)
+            ->when($requestedPredictionId > 0, fn ($query) => $query->where('prediction_id', $requestedPredictionId))
+            ->orderByDesc('assessment_date')
+            ->orderByDesc('id')
+            ->first();
+        $aiAssessmentOpportunities = $this->decodeJson($aiAssessment?->opportunities);
+        $aiAssessmentRisks = $this->decodeJson($aiAssessment?->risks);
+        $aiAssessmentFactors = $this->decodeJson($aiAssessment?->key_factors);
         $chartFocusAt = $requestedPredictionId > 0 && $prediction?->prediction_time
             ? CarbonImmutable::parse($prediction->prediction_time)
             : null;
@@ -84,7 +247,7 @@ class StockController extends Controller
                 ->map(fn ($id) => (int) $id);
 
         $predictionData = collect((array) $prediction)
-            ->except(['id', 'instrument_id', 'personalized_signal', 'explanation', 'metadata', 'created_at', 'updated_at'])
+            ->except(['id', 'instrument_id', 'trained_model_id', 'personalized_signal', 'explanation', 'metadata', 'created_at', 'updated_at'])
             ->reject(fn ($value) => $value === null)
             ->all();
         $chartDataUrl = route('stocks.chart-data', $requestedPredictionId > 0
@@ -94,6 +257,11 @@ class StockController extends Controller
         return view('stocks.show', compact(
             'instrument',
             'prediction',
+            'modelQuality',
+            'aiAssessment',
+            'aiAssessmentOpportunities',
+            'aiAssessmentRisks',
+            'aiAssessmentFactors',
             'predictionData',
             'predictionExplanation',
             'predictionMetadata',
@@ -151,6 +319,11 @@ class StockController extends Controller
         abort_unless($instrument, 404);
 
         return $instrument;
+    }
+
+    private function number(mixed $value): ?float
+    {
+        return is_numeric($value) ? (float) $value : null;
     }
 
     private function chartSeries(
@@ -223,15 +396,22 @@ class StockController extends Controller
                     $focusAt->subDays(50)->startOfDay(),
                     $focusAt->addDays(50)->endOfDay(),
                 ])
-                ->orderBy('bar_time')
+                ->orderByDesc('bar_time')
                 ->get()
+                ->unique(fn ($bar) => CarbonImmutable::parse($bar->bar_time)->format('Y-m-d'))
+                ->sortBy('bar_time')
                 ->values();
         }
 
         return $query
             ->orderByDesc('bar_time')
-            ->limit(66)
+            // A provider can persist the same trading day with a different
+            // time component. Fetch enough rows, then keep exactly one OHLC
+            // record per calendar/trading day.
+            ->limit(160)
             ->get()
+            ->unique(fn ($bar) => CarbonImmutable::parse($bar->bar_time)->format('Y-m-d'))
+            ->take(66)
             ->reverse()
             ->values();
     }

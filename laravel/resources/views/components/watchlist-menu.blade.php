@@ -2,10 +2,15 @@
     @php
         $topbarWatchlists = \Illuminate\Support\Facades\DB::table('watchlists as watchlist')
             ->leftJoin('watchlist_items as item', 'item.watchlist_id', '=', 'watchlist.id')
+            ->leftJoin('instruments as instrument', function ($join) {
+                $join->on('instrument.id', '=', 'item.instrument_id')
+                    ->where('instrument.is_active', true)
+                    ->whereNull('instrument.deleted_at');
+            })
             ->where('watchlist.user_id', auth()->id())
             ->where('watchlist.active', true)
             ->groupBy('watchlist.id', 'watchlist.name', 'watchlist.is_default')
-            ->selectRaw('watchlist.id, watchlist.name, watchlist.is_default, COUNT(item.id) AS stocks_count')
+            ->selectRaw('watchlist.id, watchlist.name, watchlist.is_default, COUNT(instrument.id) AS stocks_count')
             ->orderByDesc('watchlist.is_default')
             ->orderBy('watchlist.name')
             ->get();

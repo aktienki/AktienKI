@@ -1,30 +1,7 @@
 <x-app-layout>
     @php
-        $strategyTemplates = [
-            ['strategy', 'Quality-Gate', __('Aktienauswahl mit Fokus auf Modellqualität, robuste Signale und bestandene Qualitätsprüfungen.'), 'shield', 'EUR', [
-                ['symbol' => 'MSFT', 'name' => 'Microsoft', 'purchase_date' => '03.06.2026', 'quantity' => 4, 'buy_price' => 510, 'current_price' => 560, 'value' => 2240, 'change' => 9.8],
-                ['symbol' => 'ASML.AS', 'name' => 'ASML Holding', 'purchase_date' => '07.06.2026', 'quantity' => 2, 'buy_price' => 930, 'current_price' => 980, 'value' => 1960, 'change' => 5.4],
-                ['symbol' => 'SAP.DE', 'name' => 'SAP', 'purchase_date' => '12.06.2026', 'quantity' => 8, 'buy_price' => 210, 'current_price' => 222.50, 'value' => 1780, 'change' => 6.0],
-                ['symbol' => 'JNJ', 'name' => 'Johnson & Johnson', 'purchase_date' => '18.06.2026', 'quantity' => 10, 'buy_price' => 148, 'current_price' => 151, 'value' => 1510, 'change' => 2.0],
-                ['symbol' => 'SIE.DE', 'name' => 'Siemens', 'purchase_date' => '24.06.2026', 'quantity' => 8, 'buy_price' => 202, 'current_price' => 211.25, 'value' => 1690, 'change' => 4.6],
-            ]],
-            ['strategy', 'Value Strategie', __('Unterbewertete Qualitätsunternehmen anhand fundamentaler Kennzahlen strukturiert beobachten.'), 'scale', 'EUR', [
-                ['symbol' => 'BRK-B', 'name' => 'Berkshire Hathaway', 'purchase_date' => '02.06.2026', 'quantity' => 5, 'buy_price' => 450, 'current_price' => 476, 'value' => 2380, 'change' => 5.8],
-                ['symbol' => 'JPM', 'name' => 'JPMorgan Chase', 'purchase_date' => '09.06.2026', 'quantity' => 7, 'buy_price' => 245, 'current_price' => 260, 'value' => 1820, 'change' => 6.1],
-                ['symbol' => 'CVX', 'name' => 'Chevron', 'purchase_date' => '14.06.2026', 'quantity' => 10, 'buy_price' => 160, 'current_price' => 157, 'value' => 1570, 'change' => -1.9],
-                ['symbol' => 'BMW.DE', 'name' => 'BMW', 'purchase_date' => '20.06.2026', 'quantity' => 20, 'buy_price' => 70, 'current_price' => 73, 'value' => 1460, 'change' => 4.3],
-                ['symbol' => 'SHEL.L', 'name' => 'Shell', 'purchase_date' => '27.06.2026', 'quantity' => 60, 'buy_price' => 28, 'current_price' => 29, 'value' => 1740, 'change' => 3.6],
-            ]],
-            ['strategy', 'Low Volatility', __('Ein defensiver Ansatz mit Fokus auf stabilere Kursverläufe und geringere Schwankungen.'), 'wave', 'EUR', [
-                ['symbol' => 'KO', 'name' => 'Coca-Cola', 'purchase_date' => '04.06.2026', 'quantity' => 30, 'buy_price' => 62, 'current_price' => 64, 'value' => 1920, 'change' => 3.2],
-                ['symbol' => 'PG', 'name' => 'Procter & Gamble', 'purchase_date' => '10.06.2026', 'quantity' => 11, 'buy_price' => 168, 'current_price' => 170, 'value' => 1870, 'change' => 1.2],
-                ['symbol' => 'WMT', 'name' => 'Walmart', 'purchase_date' => '16.06.2026', 'quantity' => 16, 'buy_price' => 106, 'current_price' => 110, 'value' => 1760, 'change' => 3.8],
-                ['symbol' => 'NESN.SW', 'name' => 'Nestlé', 'purchase_date' => '22.06.2026', 'quantity' => 20, 'buy_price' => 83, 'current_price' => 82, 'value' => 1640, 'change' => -1.2],
-                ['symbol' => 'MCD', 'name' => 'McDonald’s', 'purchase_date' => '29.06.2026', 'quantity' => 5, 'buy_price' => 355, 'current_price' => 362, 'value' => 1810, 'change' => 2.0],
-            ]],
-        ];
         $depotExplorerData = collect($strategyTemplates)->values()->mapWithKeys(function ($template, $index) {
-            [$type, $name, $description, $icon, $currency, $stocks] = $template;
+            [$type, $name, $description, $icon, $currency, $stocks, $history] = array_pad($template, 7, []);
             $value = collect($stocks)->sum(fn ($stock) => (float) ($stock['value'] ?? 0));
             $invested = collect($stocks)->sum(function ($stock) {
                 $stockValue = (float) ($stock['value'] ?? 0);
@@ -41,7 +18,7 @@
                 'value' => round($value, 2),
                 'performance' => round($performance, 2),
                 'stocks' => collect($stocks)->sortByDesc('purchase_date')->values()->all(),
-                'chart' => collect($shape)->map(fn ($factor, $point) => [
+                'chart' => $history ?: collect($shape)->map(fn ($factor, $point) => [
                     'x' => now()->subDays((count($shape) - 1 - $point) * 3)->format('Y-m-d'),
                     'y' => round($performance * $factor + sin($point * 1.7) * .28, 2),
                     'score' => round(58 + (($targetScore - 58) * $factor) + sin($point * 1.25) * 2.2, 1),
@@ -57,7 +34,7 @@
                 </div>
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-[.18em] text-teal-700">{{ $paperMode ? __('Virtuelle Portfolioübersicht') : __('Portfolioübersicht') }}</p>
-                    <h1 class="mt-1 text-2xl font-black tracking-tight">{{ $paperMode ? __('Meine Musterdepots') : 'aKI Simulationsdepots' }}</h1>
+                    <h1 class="mt-1 text-2xl font-black tracking-tight">{{ $paperMode ? __('Meine Musterdepots') : __('aKI Virtuelle Depots') }}</h1>
                     @if ($paperMode)
                         <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ __('Teste Strategien und KI-Empfehlungen ohne reales Kapital.') }}</p>
                     @endif
@@ -218,7 +195,11 @@
                     <div class="grid max-h-64 gap-1.5 overflow-y-auto p-3">
                         <template x-for="stock in active?.stocks || []" :key="stock.symbol">
                             <div class="grid grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,.65fr))] items-center gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2">
-                                <div class="min-w-0"><p class="truncate text-xs font-black" x-text="stock.name"></p><p class="text-[9px] font-bold text-amber-500"><span x-text="stock.symbol"></span> · <span x-text="stock.purchase_date"></span></p></div>
+                                <div class="min-w-0">
+                                    <p class="truncate text-xs font-black" x-text="stock.name"></p>
+                                    <p class="text-[9px] font-bold text-amber-500"><span x-text="stock.symbol"></span> · <span x-text="stock.purchase_date"></span></p>
+                                    <p class="truncate text-[8px] font-bold text-[var(--ak-muted)]"><span x-text="stock.country || '—'"></span> · <span x-text="stock.exchange_code || '{{ __('Keine Exchange') }}'"></span></p>
+                                </div>
                                 <div><p class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Anzahl') }}</p><p class="mt-0.5 text-[10px] font-bold tabular-nums" x-text="stock.quantity"></p></div>
                                 <div><p class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Kaufpreis') }}</p><p class="mt-0.5 text-[10px] font-bold tabular-nums" x-text="formatMoney(stock.buy_price)"></p></div>
                                 <div><p class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Ergebnis') }}</p><p class="mt-0.5 text-[10px] font-black tabular-nums" :class="stock.change >= 0 ? 'text-emerald-400' : 'text-rose-400'" x-text="formatPercent(stock.change)"></p></div>

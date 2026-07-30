@@ -6,9 +6,58 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Pool;
 
 class YahooFinanceService
 {
+    public function quotes(array $symbols): array
+    {
+        $symbols = collect($symbols)->filter()->unique()->values();
+        $quotes = [];
+        $missing = [];
+
+        foreach ($symbols as $symbol) {
+            $cached = Cache::get("quote_{$symbol}");
+            if (is_array($cached)) {
+                $quotes[$symbol] = $cached;
+            } else {
+                $missing[] = $symbol;
+            }
+        }
+
+        if ($missing) {
+            $aliases = collect($missing)->mapWithKeys(fn (string $symbol) => ['q_'.sha1($symbol) => $symbol]);
+            $responses = Http::pool(fn (Pool $pool) => $aliases
+                ->map(fn (string $symbol, string $alias) => $pool
+                    ->as($alias)
+                    ->withHeaders(['User-Agent' => 'Mozilla/5.0'])
+                    ->timeout(10)
+                    ->get('https://query1.finance.yahoo.com/v8/finance/chart/'.rawurlencode($symbol), [
+                        'interval' => '1m',
+                        'range' => '1d',
+                    ]))
+                ->all());
+
+            foreach ($aliases as $alias => $symbol) {
+                $response = $responses[$alias] ?? null;
+                $result = $response?->successful() ? $response->json('chart.result.0') : null;
+                $meta = $result['meta'] ?? [];
+                $price = $meta['regularMarketPrice'] ?? null;
+                $previous = $meta['chartPreviousClose'] ?? null;
+                $quote = [
+                    'price' => $price,
+                    'currency' => $meta['currency'] ?? '',
+                    'change_percent' => $price && $previous ? (($price - $previous) / $previous) * 100 : null,
+                    'timestamp' => $meta['regularMarketTime'] ?? null,
+                ];
+                $quotes[$symbol] = $quote;
+                Cache::put("quote_{$symbol}", $quote, now()->addMinute());
+            }
+        }
+
+        return $quotes;
+    }
+
     public function quote(string $symbol): ?array
     {
         return Cache::remember(

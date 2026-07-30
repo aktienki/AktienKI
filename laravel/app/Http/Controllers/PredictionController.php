@@ -32,14 +32,37 @@ final class PredictionController extends Controller
             : 'time';
         $direction = strtolower((string) $request->query('direction')) === 'asc' ? 'asc' : 'desc';
 
-        $baseQuery = fn (): Builder => DB::table('predictions as prediction')
+        $latestQualityRankings = DB::table('model_quality_rankings')
+            ->selectRaw('trained_model_id, MAX(id) AS ranking_id')
+            ->groupBy('trained_model_id');
+
+        $historicalBaseQuery = fn (): Builder => DB::table('predictions as prediction')
             ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
             ->leftJoin('trained_models as trained_model', 'trained_model.id', '=', 'prediction.trained_model_id')
             ->leftJoin('model_definitions as model_definition', 'model_definition.id', '=', 'trained_model.model_definition_id')
+            ->leftJoinSub($latestQualityRankings, 'latest_quality', fn ($join) =>
+                $join->on('latest_quality.trained_model_id', '=', 'trained_model.id'))
+            ->leftJoin('model_quality_rankings as model_quality', 'model_quality.id', '=', 'latest_quality.ranking_id')
+            ->leftJoin('model_quality_tiers as quality_tier', 'quality_tier.id', '=', 'model_quality.tier_id')
             ->where('instrument.type', 'stock')
+            ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at');
 
-        $applyFilters = function (Builder $query, ?string $excluded = null) use ($request, $signalSql): Builder {
+        $baseQuery = fn (): Builder => $historicalBaseQuery()
+            ->whereRaw('prediction.id = (
+                SELECT latest_prediction.id
+                FROM predictions AS latest_prediction
+                WHERE latest_prediction.instrument_id = prediction.instrument_id
+                ORDER BY latest_prediction.prediction_time DESC NULLS LAST, latest_prediction.id DESC
+                LIMIT 1
+            )');
+
+        $scoreSql = '(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END)';
+        $confidenceSql = '(CASE WHEN prediction.confidence <= 1 THEN prediction.confidence * 100 ELSE prediction.confidence END)';
+
+        $applyFilters = function (Builder $query, ?string $excluded = null) use ($request, $signalSql, $scoreSql, $confidenceSql): Builder {
+            $qualityTier = (string) $request->query('quality_tier');
+
             return $query
             ->when($request->filled('q'), function (Builder $query) use ($request): void {
                 $term = '%'.strtolower(trim((string) $request->query('q'))).'%';
@@ -51,12 +74,20 @@ final class PredictionController extends Controller
                 $query->where('prediction.ai_type', $request->query('ai_type')))
             ->when($excluded !== 'model' && $request->integer('model') > 0, fn (Builder $query) =>
                 $query->where('trained_model.model_definition_id', $request->integer('model')))
+            ->when($excluded !== 'quality_tier' && in_array($qualityTier, ['top', 'strong', 'solid', 'test'], true), fn (Builder $query) =>
+                $query->where('quality_tier.code', $qualityTier))
+            ->when($excluded !== 'quality_tier' && $qualityTier === 'unqualified', fn (Builder $query) =>
+                $query->whereNull('quality_tier.code'))
             ->when($excluded !== 'signal' && in_array(strtoupper((string) $request->query('signal')), ['SELL', 'HOLD', 'WATCH', 'BUY'], true), fn (Builder $query) =>
                 $query->whereRaw("({$signalSql}) = ?", [strtoupper((string) $request->query('signal'))]))
             ->when($excluded !== 'validation' && $request->query('validation') === 'validated', fn (Builder $query) =>
                 $query->whereNotNull('prediction.validated_at'))
             ->when($excluded !== 'validation' && $request->query('validation') === 'pending', fn (Builder $query) =>
-                $query->whereNull('prediction.validated_at'));
+                $query->whereNull('prediction.validated_at'))
+            ->when($excluded !== 'score' && $request->filled('score_min') && is_numeric($request->query('score_min')), fn (Builder $query) =>
+                $query->whereRaw("{$scoreSql} >= ?", [max(0, min(10, (float) $request->query('score_min')))]))
+            ->when($excluded !== 'confidence' && $request->filled('confidence_min') && is_numeric($request->query('confidence_min')), fn (Builder $query) =>
+                $query->whereRaw("{$confidenceSql} >= ?", [max(0, min(100, (float) $request->query('confidence_min')))]));
         };
 
         $query = $applyFilters($baseQuery())
@@ -82,12 +113,16 @@ final class PredictionController extends Controller
                 'instrument.country',
                 'instrument.currency',
                 'model_definition.public_alias as model_alias',
+                'model_quality.quality_score as model_quality_score',
+                'model_quality.eligible as model_quality_eligible',
+                'quality_tier.code as model_quality_tier_code',
+                'quality_tier.name as model_quality_tier_name',
             ])
             ->selectRaw("{$signalSql} AS personalized_signal")
             ->selectRaw('((prediction.predicted_price_5d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100 AS expected_return_5d')
             ->selectRaw('((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100 AS expected_return_20d')
-            ->selectRaw('(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END) AS score_10')
-            ->selectRaw('(CASE WHEN prediction.confidence <= 1 THEN prediction.confidence * 100 ELSE prediction.confidence END) AS confidence_percent')
+            ->selectRaw("{$scoreSql} AS score_10")
+            ->selectRaw("{$confidenceSql} AS confidence_percent")
             ->selectRaw('(CASE WHEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) <= 1 THEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) * 100 ELSE COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) END) AS risk_percent');
 
         $query
@@ -96,10 +131,7 @@ final class PredictionController extends Controller
 
         $predictions = $query->get();
 
-        $summary = DB::table('predictions as prediction')
-            ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
-            ->where('instrument.type', 'stock')
-            ->whereNull('instrument.deleted_at')
+        $summary = $baseQuery()
             ->selectRaw('COUNT(*) AS total')
             ->selectRaw('COUNT(DISTINCT prediction.instrument_id) AS instruments')
             ->selectRaw('COUNT(prediction.validated_at) AS validated')
@@ -120,6 +152,14 @@ final class PredictionController extends Controller
             ->orderBy('model_definition.public_alias')
             ->get();
 
+        $qualityTiers = $applyFilters($baseQuery(), 'quality_tier')
+            ->selectRaw("COALESCE(quality_tier.code, 'unqualified') AS code")
+            ->selectRaw("COALESCE(quality_tier.name, 'Nicht qualifiziert') AS name")
+            ->distinct()
+            ->get()
+            ->sortBy(fn (object $tier): int => array_search($tier->code, ['top', 'strong', 'solid', 'test', 'unqualified'], true))
+            ->values();
+
         $signals = $applyFilters($baseQuery(), 'signal')
             ->selectRaw("({$signalSql}) AS available_signal")
             ->distinct()
@@ -136,7 +176,7 @@ final class PredictionController extends Controller
 
         $scoreBucketSql = 'LEAST(9, GREATEST(0, FLOOR(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END)))::integer';
         $confidenceBucketSql = 'LEAST(9, GREATEST(0, FLOOR((CASE WHEN prediction.confidence <= 1 THEN prediction.confidence * 100 ELSE prediction.confidence END) / 10)))::integer';
-        $heatmap = $applyFilters($baseQuery(), 'validation')
+        $heatmap = $applyFilters($historicalBaseQuery(), 'validation')
             ->whereNotNull('prediction.validated_at')
             ->whereNotNull('prediction.prediction_score')
             ->whereNotNull('prediction.confidence')
@@ -168,6 +208,7 @@ final class PredictionController extends Controller
             'summary',
             'aiTypes',
             'models',
+            'qualityTiers',
             'signals',
             'validationStates',
             'heatmap',

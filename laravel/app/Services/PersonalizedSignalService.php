@@ -22,23 +22,29 @@ class PersonalizedSignalService
         $confidence = "(CASE WHEN {$predictionAlias}.confidence > 1 THEN {$predictionAlias}.confidence / 100 ELSE {$predictionAlias}.confidence END)";
         $riskSource = "COALESCE({$predictionAlias}.risk_score, {$predictionAlias}.drawdown_risk_factor)";
         $risk = "(CASE WHEN {$riskSource} > 1 THEN {$riskSource} / 100 ELSE {$riskSource} END)";
-        $return = "(({$predictionAlias}.predicted_price_5d - {$predictionAlias}.current_price) / NULLIF({$predictionAlias}.current_price, 0) * 100)";
+        $return5d = "(({$predictionAlias}.predicted_price_5d - {$predictionAlias}.current_price) / NULLIF({$predictionAlias}.current_price, 0) * 100)";
+        $return20d = "(({$predictionAlias}.predicted_price_20d - {$predictionAlias}.current_price) / NULLIF({$predictionAlias}.current_price, 0) * 100)";
 
         return <<<SQL
             CASE
                 WHEN {$predictionAlias}.id IS NULL THEN 'HOLD'
                 WHEN {$score} < {$thresholds['sell_score']}
-                    OR ({$return} IS NOT NULL AND {$return} <= {$thresholds['sell_return']})
+                    OR ({$return5d} IS NOT NULL AND {$return5d} <= {$thresholds['sell_return']})
                     THEN 'SELL'
                 WHEN {$score} >= {$thresholds['buy_score']}
                     AND COALESCE({$confidence}, 0) >= {$thresholds['buy_confidence']}
                     AND ({$risk} IS NULL OR {$risk} <= {$thresholds['buy_risk']})
-                    AND ({$return} IS NULL OR {$return} >= {$thresholds['buy_return']})
+                    AND ({$return5d} IS NULL OR {$return5d} >= 0)
+                    AND ({$return20d} IS NULL OR {$return20d} >= 0)
+                    AND (
+                        ({$return5d} IS NOT NULL AND {$return5d} >= {$thresholds['buy_return']})
+                        OR ({$return20d} IS NOT NULL AND {$return20d} >= {$thresholds['buy_return_20d']})
+                    )
                     THEN 'BUY'
                 WHEN {$score} >= {$thresholds['watch_score']}
                     AND COALESCE({$confidence}, 0) >= {$thresholds['watch_confidence']}
                     AND ({$risk} IS NULL OR {$risk} <= {$thresholds['watch_risk']})
-                    AND ({$return} IS NULL OR {$return} >= {$thresholds['watch_return']})
+                    AND ({$return5d} IS NULL OR {$return5d} >= {$thresholds['watch_return']})
                     THEN 'WATCH'
                 ELSE 'HOLD'
             END
@@ -65,7 +71,8 @@ class PersonalizedSignalService
                 'buy_score' => 68,
                 'buy_confidence' => 0.65,
                 'buy_risk' => 0.35,
-                'buy_return' => 0,
+                'buy_return' => 1.5,
+                'buy_return_20d' => 1.5,
                 'watch_score' => 55,
                 'watch_confidence' => 0.50,
                 'watch_risk' => 0.55,
@@ -77,7 +84,8 @@ class PersonalizedSignalService
                 'buy_score' => 57,
                 'buy_confidence' => 0.45,
                 'buy_risk' => 0.80,
-                'buy_return' => -0.5,
+                'buy_return' => 0.5,
+                'buy_return_20d' => 0.5,
                 'watch_score' => 46,
                 'watch_confidence' => 0.30,
                 'watch_risk' => 0.90,
@@ -89,7 +97,8 @@ class PersonalizedSignalService
                 'buy_score' => 62,
                 'buy_confidence' => 0.55,
                 'buy_risk' => 0.60,
-                'buy_return' => 0,
+                'buy_return' => 1,
+                'buy_return_20d' => 1,
                 'watch_score' => 50,
                 'watch_confidence' => 0.40,
                 'watch_risk' => 0.75,

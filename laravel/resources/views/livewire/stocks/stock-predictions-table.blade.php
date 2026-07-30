@@ -1,6 +1,6 @@
 @php
     $flags = ['DE' => '🇩🇪', 'US' => '🇺🇸', 'JP' => '🇯🇵', 'CN' => '🇨🇳', 'GB' => '🇬🇧', 'FR' => '🇫🇷', 'CH' => '🇨🇭', 'NL' => '🇳🇱', 'AU' => '🇦🇺', 'CA' => '🇨🇦'];
-    $hasFilters = $search !== '' || $country !== '' || $sector !== '' || $signal !== '' || $minScore !== '' || $maxScore !== '';
+    $hasFilters = $search !== '' || $country !== '' || $sector !== '' || $signal !== '' || $exchange !== '' || $minScore !== '' || $maxScore !== '';
 @endphp
 
 <div class="flex h-full min-h-0 flex-col">
@@ -48,6 +48,20 @@
 
     <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--ak-border)] bg-violet-500/[.035] px-4 py-2.5">
         <div class="flex items-center gap-3 text-xs text-[var(--ak-muted)]">
+            @if ($exchange !== '')
+                <span class="inline-flex h-7 items-center rounded-lg border border-teal-500/35 bg-teal-500/12 px-2.5 font-black text-teal-700">
+                    {{ __('Exchange') }}: {{ $exchange }}
+                </span>
+            @endif
+            @if ($signal !== '')
+                <span class="inline-flex h-7 items-center rounded-lg border px-2.5 font-black text-white
+                    {{ $signal === 'BUY' ? 'border-emerald-400/60 bg-emerald-600/75' : '' }}
+                    {{ $signal === 'WATCH' ? 'border-lime-400/60 bg-lime-600/70' : '' }}
+                    {{ $signal === 'HOLD' ? 'border-amber-400/60 bg-amber-600/70' : '' }}
+                    {{ $signal === 'SELL' ? 'border-rose-400/60 bg-rose-600/75' : '' }}">
+                    {{ __('Signal') }}: {{ __($signal) }}
+                </span>
+            @endif
             <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-lg border border-teal-500/25 bg-teal-500/10 px-2 font-black text-teal-700">{{ count($comparisonSelection) }}/5</span>
             <span>{{ __('Aktien für den Vergleich auswählen') }}</span>
             @if ($comparisonLimitReached)
@@ -65,8 +79,14 @@
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto">
-        <table class="ak-stocks-table w-full min-w-[1530px] border-collapse text-left">
-            <thead class="sticky top-0 z-20 bg-[#151426] shadow-[0_1px_0_var(--ak-border),0_8px_18px_rgba(0,0,0,.22)]">
+        <table id="stock-screener-table" class="ak-stocks-table w-full text-left">
+            <colgroup>
+                <col style="width:4%"><col style="width:4%"><col style="width:7%"><col style="width:12%">
+                <col style="width:5%"><col style="width:8%"><col style="width:7%"><col style="width:7%">
+                <col style="width:7%"><col style="width:12%"><col style="width:6%"><col style="width:6%">
+                <col style="width:7%"><col style="width:8%">
+            </colgroup>
+            <thead>
                 <tr>
                     <th class="w-12 border-b border-[var(--ak-border)] px-3 py-3 text-center" title="{{ __('Vergleichen') }}">
                         <x-heroicon-o-arrows-right-left class="mx-auto h-4 w-4 text-[var(--ak-muted)]" />
@@ -80,7 +100,7 @@
                         ['prediction_score', __('KI-Score')], ['confidence', __('Konfidenz')], ['risk_score', __('Risiko')],
                         ['signal', __('Signal')], ['prediction_time', __('Analyse')]
                     ] as [$field, $label])
-                        <th class="border-b border-[var(--ak-border)] px-3 py-3 text-[10px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)] {{ in_array($field, ['prediction_score', 'risk_score'], true) ? 'min-w-44' : ($field === 'confidence' ? 'min-w-28' : '') }}">
+                        <th class="border-b border-[var(--ak-border)] px-2 py-3 text-[9px] font-black uppercase tracking-[.06em] text-[var(--ak-muted)]">
                             <button wire:click="sortBy('{{ $field }}')" type="button" class="flex w-full items-center gap-1.5 whitespace-nowrap text-left transition hover:text-teal-700">
                                 {{ $label }}
                                 @if ($field === 'prediction_score')
@@ -113,12 +133,29 @@
                     @endforeach
                 </tr>
             </thead>
-            <tbody class="divide-y divide-[var(--ak-border)]">
+            <tbody>
                 @forelse ($rows as $row)
                     @php
+                        $score = \App\Support\AiScore::toTen($row->prediction_score);
                         $scorePercent = \App\Support\AiScore::toPercent($row->prediction_score);
                         $confidencePercent = is_numeric($row->confidence) ? max(0, min(100, (float) $row->confidence <= 1 ? (float) $row->confidence * 100 : (float) $row->confidence)) : null;
                         $riskPercent = is_numeric($row->risk_score) ? max(0, min(100, (float) $row->risk_score <= 1 ? (float) $row->risk_score * 100 : (float) $row->risk_score)) : null;
+                        $confidenceColor = match (true) {
+                            $confidencePercent === null => '#64748b',
+                            $confidencePercent < 40 => '#ef4444',
+                            $confidencePercent < 60 => '#f97316',
+                            $confidencePercent < 75 => '#eab308',
+                            $confidencePercent < 88 => '#84cc16',
+                            default => '#10b981',
+                        };
+                        $riskColor = match (true) {
+                            $riskPercent === null => '#64748b',
+                            $riskPercent < 10 => '#10b981',
+                            $riskPercent < 20 => '#84cc16',
+                            $riskPercent < 30 => '#eab308',
+                            $riskPercent < 40 => '#f97316',
+                            default => '#ef4444',
+                        };
                         $signalName = strtoupper((string) ($row->signal ?: 'N/A'));
                         $signalClass = str_contains($signalName, 'BUY')
                             ? 'border-emerald-300/80 bg-emerald-400/30 text-emerald-50 shadow-[0_0_18px_rgba(52,211,153,.38)] ring-1 ring-emerald-300/25'
@@ -216,13 +253,36 @@
                         </td>
                         <td class="px-3 py-3"><div class="min-w-52"><a href="{{ route('stocks.show', $row->symbol) }}" class="block text-sm font-bold text-[var(--ak-text)] transition hover:text-teal-700">{{ $row->name }}</a><span class="mt-0.5 block text-[10px] text-[var(--ak-muted)]">{{ $row->industry ?: __('Keine Branche') }}</span></div></td>
                         <td class="px-3 py-3"><span class="inline-flex items-center gap-1.5 text-xs text-[var(--ak-text)]">{{ $flags[$row->country] ?? '🌐' }} {{ $row->country ?: '—' }}</span></td>
-                        <td class="px-3 py-3 text-xs text-[var(--ak-muted)]">{{ $row->sector ?: '—' }}</td>
+                        <td class="px-3 py-3 text-xs text-[var(--ak-muted)]"><span class="inline-flex items-center gap-1.5"><x-sector-icon :sector="$row->sector" class="h-3.5 w-3.5 shrink-0 text-teal-600" /><span class="truncate">{{ $row->sector ?: '—' }}</span></span></td>
                         <td class="px-3 py-3 text-xs font-bold text-[var(--ak-text)]">{{ is_numeric($row->current_price) ? number_format($row->current_price, 2, ',', '.').' '.$row->currency : '—' }}</td>
                         <td class="px-3 py-3 text-xs font-bold text-[var(--ak-text)]">{{ is_numeric($row->predicted_price_5d) ? number_format($row->predicted_price_5d, 2, ',', '.').' '.$row->currency : '—' }}</td>
                         <td class="px-3 py-3 text-xs font-black {{ ($row->expected_return_5d ?? 0) > 0 ? 'text-emerald-400' : (($row->expected_return_5d ?? 0) < 0 ? 'text-rose-400' : 'text-[var(--ak-muted)]') }}">{{ is_numeric($row->expected_return_5d) ? (($row->expected_return_5d > 0 ? '+' : '').number_format($row->expected_return_5d, 2, ',', '.').' %') : '—' }}</td>
-                        <td class="min-w-44 px-3 py-3"><x-dashboard.stock-score-gauge :percent="$scorePercent" compact /></td>
-                        <td class="min-w-28 px-3 py-3"><x-dashboard.stock-score-gauge :percent="$confidencePercent" compact purple percentage /></td>
-                        <td class="min-w-44 px-3 py-3"><x-dashboard.stock-score-gauge :percent="$riskPercent" compact reverse /></td>
+                        <td class="px-3 py-2">
+                            <div class="flex h-full flex-col justify-center">
+                                @if ($score !== null)
+                                    <div class="mb-1.5 flex items-baseline justify-between"><strong class="text-sm font-black">{{ number_format($score, 1, ',', '.') }}</strong><small class="text-[8px] text-[var(--ak-muted)]">/ 10</small></div>
+                                    <x-dashboard.score-stripes :percent="$scorePercent" />
+                                @else<span class="text-center text-[var(--ak-muted)]">—</span>@endif
+                            </div>
+                        </td>
+                        <td class="px-2 py-2">
+                            <div class="flex h-full items-center justify-center">
+                                @if ($confidencePercent !== null)
+                                    <div class="ak-screener-donut" style="--value:{{ $confidencePercent }}%;--color:{{ $confidenceColor }}" role="meter" aria-label="{{ __('Konfidenz') }}" aria-valuenow="{{ round($confidencePercent) }}">
+                                        <span>{{ number_format($confidencePercent, 0, ',', '.') }}<small>%</small></span>
+                                    </div>
+                                @else<span class="text-[var(--ak-muted)]">—</span>@endif
+                            </div>
+                        </td>
+                        <td class="px-2 py-2">
+                            <div class="flex h-full items-center justify-center">
+                                @if ($riskPercent !== null)
+                                    <div class="ak-screener-donut" style="--value:{{ $riskPercent }}%;--color:{{ $riskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuenow="{{ round($riskPercent) }}">
+                                        <span>{{ number_format($riskPercent, 0, ',', '.') }}<small>%</small></span>
+                                    </div>
+                                @else<span class="text-[var(--ak-muted)]">—</span>@endif
+                            </div>
+                        </td>
                         <td class="px-3 py-3"><span class="inline-flex h-7 w-20 items-center justify-center rounded-lg border px-2 text-center text-[10px] font-black {{ $signalClass }}">{{ str_replace('_', ' ', $signalName) }}</span></td>
                         <td class="px-3 py-3 text-[10px] text-[var(--ak-muted)]">{{ $row->prediction_time ? \Carbon\Carbon::parse($row->prediction_time)->format('d.m.Y H:i') : '—' }}</td>
                     </tr>
@@ -232,6 +292,111 @@
             </tbody>
         </table>
     </div>
+
+    <style>
+        #stock-screener-table {
+            width: 100%;
+            min-width: 0;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+        }
+
+        #stock-screener-table thead,
+        #stock-screener-table thead th {
+            background: var(--ak-surface) !important;
+        }
+
+        #stock-screener-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            border-bottom: 0 !important;
+            box-shadow: 0 1px 0 var(--ak-border), 0 8px 16px rgba(3, 7, 18, .15);
+        }
+
+        #stock-screener-table tbody tr[data-href] {
+            height: 72px;
+        }
+
+        #stock-screener-table tbody tr[data-href] > td {
+            height: 72px;
+            min-width: 0 !important;
+            overflow: hidden;
+            border-top: 1px solid var(--ak-border) !important;
+            border-right: 0 !important;
+            border-bottom: 1px solid var(--ak-border) !important;
+            border-left: 0 !important;
+            background: var(--ak-card) !important;
+        }
+
+        #stock-screener-table tbody tr[data-href] > td:first-child {
+            border-left: 1px solid var(--ak-border) !important;
+            border-radius: 16px 0 0 16px;
+        }
+
+        #stock-screener-table tbody tr[data-href] > td:last-child {
+            border-right: 1px solid var(--ak-border) !important;
+            border-radius: 0 16px 16px 0;
+        }
+
+        #stock-screener-table tbody tr[data-href]:nth-child(even) > td {
+            background: var(--ak-card-hover) !important;
+        }
+
+        #stock-screener-table tbody tr[data-href]:hover > td {
+            background: color-mix(in srgb, var(--ak-card-hover) 90%, rgb(45 212 191) 10%) !important;
+        }
+
+        #stock-screener-table thead button,
+        #stock-screener-table tbody td {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #stock-screener-table thead button {
+            min-width: 0;
+        }
+
+        .ak-screener-donut {
+            position: relative;
+            display: grid;
+            width: 48px;
+            height: 48px;
+            flex: 0 0 48px;
+            place-items: center;
+            border-radius: 999px;
+            background: conic-gradient(var(--color) 0 var(--value), rgba(148, 163, 184, .16) var(--value) 100%);
+            box-shadow: 0 0 14px color-mix(in srgb, var(--color) 18%, transparent);
+        }
+
+        .ak-screener-donut::after {
+            position: absolute;
+            inset: 5px;
+            border-radius: inherit;
+            background: var(--ak-card);
+            content: '';
+        }
+
+        #stock-screener-table tbody tr[data-href]:nth-child(even) .ak-screener-donut::after {
+            background: var(--ak-card-hover);
+        }
+
+        .ak-screener-donut span {
+            position: relative;
+            z-index: 1;
+            color: var(--ak-text);
+            font-size: 11px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .ak-screener-donut small {
+            margin-left: 1px;
+            color: var(--ak-muted);
+            font-size: 7px;
+        }
+    </style>
 
     @if ($watchlistPickerInstrument)
         <div
