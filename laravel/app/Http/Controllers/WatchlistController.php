@@ -59,16 +59,21 @@ class WatchlistController extends Controller
             ->flatMap(fn (Watchlist $watchlist) => $watchlist->items->pluck('instrument_id'))
             ->unique()
             ->values();
-        $latestPredictions = DB::table('predictions')
+        $latestQuotes = DB::table('current_stock_quotes')
             ->whereIn('instrument_id', $instrumentIds)
-            ->selectRaw('instrument_id, MAX(id) AS prediction_id')
+            ->where('status', 'current')
+            ->selectRaw('instrument_id, MAX(id) AS quote_id')
             ->groupBy('instrument_id');
         $currentPrices = $instrumentIds->isEmpty()
             ? collect()
-            : DB::table('predictions as prediction')
-                ->joinSub($latestPredictions, 'latest', fn ($join) =>
-                    $join->on('latest.prediction_id', '=', 'prediction.id'))
-                ->get(['prediction.instrument_id', 'prediction.current_price', 'prediction.prediction_time'])
+            : DB::table('current_stock_quotes as quote')
+                ->joinSub($latestQuotes, 'latest', fn ($join) =>
+                    $join->on('latest.quote_id', '=', 'quote.id'))
+                ->get([
+                    'quote.instrument_id',
+                    'quote.price as current_price',
+                    'quote.quote_time as prediction_time',
+                ])
                 ->keyBy('instrument_id');
 
         $watchlistPerformance = $watchlists->mapWithKeys(function (Watchlist $watchlist) use ($currentPrices): array {
@@ -115,17 +120,25 @@ class WatchlistController extends Controller
             ->whereIn('instrument_id', $instrumentIds)
             ->selectRaw('instrument_id, MAX(id) AS prediction_id')
             ->groupBy('instrument_id');
+        $latestQuoteIds = DB::table('current_stock_quotes')
+            ->whereIn('instrument_id', $instrumentIds)
+            ->where('status', 'current')
+            ->selectRaw('instrument_id, MAX(id) AS quote_id')
+            ->groupBy('instrument_id');
 
         $latestPredictions = $instrumentIds->isEmpty()
             ? collect()
             : DB::table('predictions as prediction')
                 ->joinSub($latestPredictionIds, 'latest', fn ($join) =>
                     $join->on('latest.prediction_id', '=', 'prediction.id'))
+                ->leftJoinSub($latestQuoteIds, 'latest_quote', fn ($join) =>
+                    $join->on('latest_quote.instrument_id', '=', 'prediction.instrument_id'))
+                ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
                 ->get([
                     'prediction.instrument_id',
-                    'prediction.current_price',
                     'prediction.prediction_score',
                     'prediction.prediction_time',
+                    DB::raw('COALESCE(current_quote.price, prediction.current_price) AS current_price'),
                 ])
                 ->keyBy('instrument_id');
 

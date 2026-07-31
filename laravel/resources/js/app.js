@@ -2,6 +2,7 @@
 
 import './bootstrap';
 import './preferences';
+import './live-prices';
 
 import Alpine from 'alpinejs';
 import ApexCharts from 'apexcharts';

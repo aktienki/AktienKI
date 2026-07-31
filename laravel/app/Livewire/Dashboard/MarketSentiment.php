@@ -5,7 +5,7 @@
 namespace App\Livewire\Dashboard;
 
 use App\Services\MarketService;
-use App\Services\YahooFinanceService;
+use App\Services\TwelveDataService;
 use App\Services\IndexAiScoreService;
 use Livewire\Component;
 
@@ -24,7 +24,7 @@ class MarketSentiment extends Component
     ];
 
     public function mount(
-        YahooFinanceService $yahoo,
+        TwelveDataService $yahoo,
         MarketService $marketService,
         IndexAiScoreService $indexAiScores
     ): void
@@ -33,7 +33,7 @@ class MarketSentiment extends Component
     }
 
     public function refreshData(
-        YahooFinanceService $yahoo,
+        TwelveDataService $yahoo,
         MarketService $marketService,
         IndexAiScoreService $indexAiScores
     ): void
@@ -42,7 +42,7 @@ class MarketSentiment extends Component
     }
 
     protected function load(
-        YahooFinanceService $yahoo,
+        TwelveDataService $yahoo,
         MarketService $marketService,
         IndexAiScoreService $indexAiScores
     ): void

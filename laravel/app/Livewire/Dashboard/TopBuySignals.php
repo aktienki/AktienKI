@@ -4,12 +4,12 @@ namespace App\Livewire\Dashboard;
 
 use App\Models\ModelRun;
 use App\Models\Prediction;
-use App\Services\YahooFinanceService;
+use App\Services\TwelveDataService;
 use Livewire\Component;
 
 class TopBuySignals extends Component
 {
-    public function render(YahooFinanceService $yahoo)
+    public function render(TwelveDataService $yahoo)
     {
         $lastRun = ModelRun::query()
             ->latest('finished_at')

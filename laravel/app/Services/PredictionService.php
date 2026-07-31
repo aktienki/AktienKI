@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class PredictionService
 {
     public function __construct(
-        protected YahooFinanceService $yahoo
+        protected TwelveDataService $yahoo
     ) {
     }
 

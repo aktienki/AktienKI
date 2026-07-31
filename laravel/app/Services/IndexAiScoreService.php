@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Support\AiScore;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class IndexAiScoreService
 {
     public function countryScores(): array
     {
+        return Cache::remember('dashboard_country_ai_scores', now()->addMinutes(2), function (): array {
         $latestPredictions = DB::table('predictions')
             ->selectRaw('instrument_id, MAX(id) AS prediction_id')
             ->groupBy('instrument_id');
@@ -34,11 +36,12 @@ class IndexAiScoreService
                 ]];
             })
             ->all();
+        });
     }
 
     public function dailyAverages(int $days = 14): array
     {
-        return DB::table('predictions')
+        return Cache::remember("dashboard_daily_ai_averages_{$days}", now()->addMinutes(2), fn (): array => DB::table('predictions')
             ->whereNotNull('prediction_score')
             ->selectRaw('DATE(prediction_time) AS day, AVG(prediction_score) AS score')
             ->groupByRaw('DATE(prediction_time)')
@@ -53,11 +56,12 @@ class IndexAiScoreService
                 ];
             })
             ->values()
-            ->all();
+            ->all());
     }
 
     public function scores(): array
     {
+        return Cache::remember('dashboard_index_ai_scores', now()->addMinutes(2), function (): array {
         $latestPredictions = DB::table('predictions')
             ->selectRaw('instrument_id, MAX(id) AS prediction_id')
             ->groupBy('instrument_id');
@@ -94,5 +98,6 @@ class IndexAiScoreService
         }
 
         return $scores;
+        });
     }
 }

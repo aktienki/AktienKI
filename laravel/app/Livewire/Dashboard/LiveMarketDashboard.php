@@ -3,12 +3,12 @@
 namespace App\Livewire\Dashboard;
 
 use App\Models\Prediction;
-use App\Services\YahooFinanceService;
+use App\Services\TwelveDataService;
 use Livewire\Component;
 
 class LiveMarketDashboard extends Component
 {
-    public function render(YahooFinanceService $yahoo)
+    public function render(TwelveDataService $yahoo)
     {
         $marketSymbols = [
             'DAX' => '^GDAXI',

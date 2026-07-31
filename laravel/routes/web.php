@@ -21,6 +21,8 @@ use App\Http\Controllers\DailyMarketAnalysisController;
 use App\Http\Controllers\MarketOverviewController;
 use App\Livewire\Stocks\Index as StocksIndex;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\LivePriceSubscriptionController;
+use App\Http\Controllers\MarketQuotesController;
 use Illuminate\Http\Request;
 
 
@@ -172,6 +174,7 @@ Route::post('/locale/{locale}', function (Request $request, string $locale) {
 })->name('locale.update');
 
 Route::middleware(['auth'])->group(function () {
+    Route::post('/live-prices/subscribe', LivePriceSubscriptionController::class)->name('live-prices.subscribe');
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::get('/apple', AppleChartController::class)->name('stocks.apple');
     //Route::get('/stocks', StocksIndex::class)->name('stocks.index');
@@ -180,15 +183,26 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::get('/setup/filter', [PredictionController::class, 'filterSetup'])->name('setup.filter');
+    Route::post('/setup/filter/backtest', [PredictionController::class, 'startFilteredBacktest'])->name('setup.filter.backtest');
+    Route::get('/setup/filter/backtest/{publicId}/result', [PredictionController::class, 'filteredBacktestResult'])->name('setup.filter.backtest.result');
+    Route::get('/setup/filter/backtest/{publicId}/status', [PredictionController::class, 'filteredBacktestStatus'])->name('setup.filter.backtest.status');
+    Route::post('/setup/filter/backtest/{publicId}/cancel', [PredictionController::class, 'cancelFilteredBacktest'])->name('setup.filter.backtest.cancel');
+    Route::get('/setup/filter/backtest/{publicId}/report', [PredictionController::class, 'downloadFilteredBacktestReport'])->name('setup.filter.backtest.report');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    Route::get('/stocks', [StockListController::class, 'index'])->name('stocks.index');
+    Route::get('/stocks', fn (Request $request) =>
+        redirect()->route('predictions.index', $request->query())
+    )->name('stocks.index');
     Route::get('/predictions', [PredictionController::class, 'index'])->name('predictions.index');
+    Route::get('/predictions/heatmap', [PredictionController::class, 'heatmap'])->name('predictions.heatmap');
+    Route::get('/predictions/heatmap/trades', [PredictionController::class, 'backtestTrades'])->name('predictions.heatmap.trades');
     Route::get('/signal-changes', SignalChangeController::class)->name('signal-changes.index');
     Route::get('/recommendations', RecommendationController::class)->name('recommendations.index');
     Route::get('/markteinschaetzung', MarketAssessmentController::class)->name('market-assessment');
     Route::get('/taegliche-marktanalyse', DailyMarketAnalysisController::class)->name('daily-market-analysis');
     Route::get('/maerkte', MarketOverviewController::class)->name('markets.index');
+    Route::get('/maerkte/kurse', MarketQuotesController::class)->name('markets.quotes');
     Route::get('/depots', [DepotController::class, 'index'])->name('depots.index');
     Route::get('/musterdepots', [DepotController::class, 'paperIndex'])->name('paper-depots.index');
     Route::post('/depots', [DepotController::class, 'store'])->name('depots.store');

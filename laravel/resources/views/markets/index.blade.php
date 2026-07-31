@@ -1,8 +1,45 @@
 <x-app-layout>
     @php
-        $countryFlag = fn (string $country): string => strlen($country) === 2
+        $countryFlag = fn (?string $country): string => strlen((string) $country) === 2
             ? mb_chr(127397 + ord(strtoupper($country[0]))) . mb_chr(127397 + ord(strtoupper($country[1])))
             : '🌐';
+        $currencySymbol = fn (?string $currency): string => match (strtoupper((string) $currency)) {
+            'EUR' => '€',
+            'USD' => '$',
+            'GBP' => '£',
+            'JPY', 'CNY' => '¥',
+            'CHF' => 'Fr.',
+            'HKD' => 'HK$',
+            'AUD' => 'A$',
+            'CAD' => 'C$',
+            'ZAR' => 'R',
+            default => (string) $currency,
+        };
+        $continentFor = function (?string $country): string {
+            $country = strtoupper(trim((string) $country));
+
+            return match (true) {
+                in_array($country, ['US', 'USA', 'UNITED STATES', 'CA', 'CAN', 'CANADA'], true) => 'north-america',
+                in_array($country, ['JP', 'JPN', 'JAPAN', 'CN', 'CHN', 'CHINA', 'HK', 'HKG', 'HONG KONG', 'AU', 'AUS', 'AUSTRALIA'], true) => 'asia-pacific',
+                in_array($country, ['ZA', 'ZAF', 'SOUTH AFRICA'], true) => 'africa',
+                default => 'europe',
+            };
+        };
+        $continentLabels = [
+            'europe' => __('Europa'),
+            'north-america' => __('Nordamerika'),
+            'asia-pacific' => __('Asien-Pazifik'),
+            'africa' => __('Afrika'),
+        ];
+        $continentIcons = [
+            'europe' => '🌍',
+            'north-america' => '🌎',
+            'asia-pacific' => '🌏',
+            'africa' => '◉',
+        ];
+        $marketsByContinent = $exchanges
+            ->groupBy(fn ($exchange) => $continentFor($exchange->country))
+            ->sortBy(fn ($items, $continent) => array_search($continent, array_keys($continentLabels), true));
     @endphp
 
     <div id="markets-page" class="ak-body">
@@ -26,12 +63,102 @@
                 </button>
                 <button type="button" @click="active = 'comments'" class="ak-market-tab" :class="active === 'comments' ? 'ak-market-tab-active' : 'ak-market-tab-idle'">
                     <x-heroicon-o-chat-bubble-left-right class="h-3.5 w-3.5" />
-                    {{ __('Kommentare') }}
+                    {{ __('Analyse') }}
                 </button>
             </div>
 
             <section id="markets-exchange-pane" x-show="active === 'exchanges'" class="rounded-2xl">
-                <div id="markets-exchange-scroll">
+                <div id="markets-continent-scroll" class="h-full overflow-auto pr-1">
+                    <div class="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        @foreach ($continentLabels as $continent => $continentLabel)
+                            @php $continentMarkets = $marketsByContinent->get($continent, collect()); @endphp
+                            @continue($continentMarkets->isEmpty())
+                            <section class="min-w-0 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-2.5 shadow-[var(--ak-shadow)]">
+                                <div class="mb-2.5 flex h-10 items-center justify-between border-b border-[var(--ak-border)] px-1 pb-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="grid h-8 w-8 place-items-center rounded-lg bg-teal-500/10 text-base">{{ $continentIcons[$continent] }}</span>
+                                        <div>
+                                            <h2 class="text-sm font-black text-[var(--ak-text)]">{{ $continentLabel }}</h2>
+                                            <p class="text-[8px] font-black uppercase tracking-wider text-[var(--ak-muted)]">{{ __('Referenzindizes') }}</p>
+                                        </div>
+                                    </div>
+                                    <span class="rounded-md bg-[var(--ak-surface-muted)] px-2 py-1 text-[9px] font-black text-[var(--ak-muted)]">{{ $continentMarkets->count() }} {{ __('Indizes') }}</span>
+                                </div>
+
+                                <div class="grid gap-2">
+                                    @foreach ($continentMarkets as $exchange)
+                                        @php
+                                            $score = \App\Support\AiScore::toTen($exchange->average_score);
+                                            $confidence = is_numeric($exchange->average_confidence)
+                                                ? min(100, max(0, (float) $exchange->average_confidence <= 1 ? (float) $exchange->average_confidence * 100 : (float) $exchange->average_confidence))
+                                                : null;
+                                            $risk = is_numeric($exchange->risk_p75)
+                                                ? min(100, max(0, (float) $exchange->risk_p75 <= 1 ? (float) $exchange->risk_p75 * 100 : (float) $exchange->risk_p75))
+                                                : null;
+                                            $scoreClass = ($score ?? 0) >= 6.5 ? 'text-emerald-500' : (($score ?? 10) < 4.5 ? 'text-rose-500' : 'text-amber-500');
+                                            $target = route('stocks.index', ['exchange' => $exchange->code]);
+                                        @endphp
+                                        <article onclick="window.location.href=@js($target)" class="cursor-pointer overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
+                                            <div class="flex items-start justify-between gap-2 border-b border-[var(--ak-border)] p-2.5">
+                                                <div class="flex min-w-0 items-center gap-2">
+                                                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-teal-500/20 bg-teal-500/10 text-base">{{ $countryFlag($exchange->country) }}</span>
+                                                    <div class="min-w-0">
+                                                        <h3 class="truncate text-sm font-black text-[var(--ak-text)]">{{ $exchange->reference_name ?: $exchange->code }}</h3>
+                                                        <p class="truncate text-[9px] font-bold text-[var(--ak-muted)]">{{ $exchange->code }} · {{ $exchange->name }}</p>
+                                                    </div>
+                                                </div>
+                                                <span class="shrink-0 rounded-md border border-teal-500/20 bg-teal-500/10 px-1.5 py-1 text-[8px] font-black text-teal-500">{{ $exchange->instrument_count }} {{ __('Aktien') }}</span>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-1.5 p-2.5">
+                                                <div class="rounded-lg bg-[var(--ak-card)] p-2">
+                                                    <p class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Indexstand') }}</p>
+                                                    <p data-market-price="{{ $exchange->code }}" class="mt-0.5 truncate text-sm font-black tabular-nums text-[var(--ak-text)]">
+                                                        <span>{{ is_numeric($exchange->market_price) ? number_format($exchange->market_price, 2, ',', '.') : '—' }}</span>
+                                                        <small class="text-[8px] text-[var(--ak-muted)]">{{ $currencySymbol($exchange->market_currency) }}</small>
+                                                    </p>
+                                                </div>
+                                                <div class="rounded-lg bg-[var(--ak-card)] p-2">
+                                                    <p class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Performance 1T') }}</p>
+                                                    <p data-market-change="{{ $exchange->code }}" class="mt-0.5 text-sm font-black tabular-nums {{ ($exchange->market_change ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">
+                                                        {{ is_numeric($exchange->market_change) ? (($exchange->market_change > 0 ? '+' : '').number_format($exchange->market_change, 2, ',', '.').' %') : '—' }}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div class="px-2.5 pb-2.5">
+                                                <div class="mb-1.5 flex items-center justify-between">
+                                                    <span class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
+                                                    <strong class="text-xs font-black {{ $scoreClass }}">{{ $score !== null ? number_format($score, 1, ',', '.') : '—' }}<small class="ml-1 text-[7px] text-[var(--ak-muted)]">/10</small></strong>
+                                                </div>
+                                                <x-dashboard.score-stripes :percent="$score !== null ? $score * 10 : 0" />
+                                                <div class="mt-2 grid grid-cols-2 gap-1.5 text-[8px]">
+                                                    <div class="flex items-center justify-between rounded-md bg-[var(--ak-card)] px-1.5 py-1"><span class="text-[var(--ak-muted)]">{{ __('Konfidenz') }}</span><b>{{ $confidence !== null ? number_format($confidence, 0, ',', '.').' %' : '—' }}</b></div>
+                                                    <div class="flex items-center justify-between rounded-md bg-[var(--ak-card)] px-1.5 py-1"><span class="text-[var(--ak-muted)]">{{ __('Risiko P75') }}</span><b>{{ $risk !== null ? number_format($risk, 0, ',', '.').' %' : '—' }}</b></div>
+                                                </div>
+                                            </div>
+
+                                            <div class="grid grid-cols-4 gap-1 border-t border-[var(--ak-border)] p-2.5">
+                                                @foreach ([
+                                                    ['SELL', 'sell_count', 'ak-signal-sell'],
+                                                    ['HOLD', 'hold_count', 'ak-signal-hold'],
+                                                    ['WATCH', 'watch_count', 'ak-signal-watch'],
+                                                    ['BUY', 'buy_count', 'ak-signal-buy'],
+                                                ] as [$signal, $countKey, $signalClass])
+                                                    <a href="{{ route('stocks.index', ['exchange' => $exchange->code, 'signal' => $signal]) }}" onclick="event.stopPropagation()" class="flex h-6 min-w-0 items-center justify-center gap-0.5 rounded-md border px-0.5 text-[7px] font-black {{ $signalClass }} {{ (int) $exchange->{$countKey} === 0 ? 'pointer-events-none opacity-20' : '' }}">
+                                                        {{ __(ucfirst(strtolower($signal))) }} <b>{{ $exchange->{$countKey} }}</b>
+                                                    </a>
+                                                @endforeach
+                                            </div>
+                                        </article>
+                                    @endforeach
+                                </div>
+                            </section>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div id="markets-exchange-scroll" class="hidden">
                     <table id="exchange-table" class="w-full table-fixed border-separate border-spacing-x-0 border-spacing-y-2 text-left">
                         <colgroup>
                             <col style="width: 12%">
@@ -82,8 +209,8 @@
                                                 <div><p class="font-black">{{ $exchange->code }}</p><p class="text-[10px] text-[var(--ak-muted)]">{{ $exchange->name }}</p></div>
                                             </div>
                                             <div data-column="reference" data-value="{{ $exchange->reference_name }}" class="px-4 py-4"><p class="font-bold">{{ $exchange->reference_name ?: '—' }}</p><p class="text-[10px] text-[var(--ak-muted)]">{{ $exchange->reference_symbol }}</p></div>
-                                            <div data-column="price" data-value="{{ is_numeric($exchange->market_price) ? $exchange->market_price : '' }}" class="px-4 py-4 text-right font-black tabular-nums">{{ is_numeric($exchange->market_price) ? number_format($exchange->market_price, 2, ',', '.') : '—' }} <small class="text-[9px] text-[var(--ak-muted)]">{{ $exchange->market_currency }}</small></div>
-                                            <div data-column="performance" data-value="{{ is_numeric($exchange->market_change) ? $exchange->market_change : '' }}" class="px-4 py-4 text-right font-black tabular-nums {{ ($exchange->market_change ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ is_numeric($exchange->market_change) ? (($exchange->market_change > 0 ? '+' : '') . number_format($exchange->market_change, 2, ',', '.') . ' %') : '—' }}</div>
+                                            <div data-column="price" data-market-table-price="{{ $exchange->code }}" data-value="{{ is_numeric($exchange->market_price) ? $exchange->market_price : '' }}" class="px-4 py-4 text-right font-black tabular-nums">{{ is_numeric($exchange->market_price) ? number_format($exchange->market_price, 2, ',', '.') : '—' }} <small class="text-[9px] text-[var(--ak-muted)]">{{ $currencySymbol($exchange->market_currency) }}</small></div>
+                                            <div data-column="performance" data-market-table-change="{{ $exchange->code }}" data-value="{{ is_numeric($exchange->market_change) ? $exchange->market_change : '' }}" class="px-4 py-4 text-right font-black tabular-nums {{ ($exchange->market_change ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ is_numeric($exchange->market_change) ? (($exchange->market_change > 0 ? '+' : '') . number_format($exchange->market_change, 2, ',', '.') . ' %') : '—' }}</div>
                                             <div data-column="score" data-value="{{ $score ?? '' }}" class="px-4 py-4">
                                                 @if ($score !== null)
                                                     <div class="mb-1.5 flex items-baseline justify-between">
@@ -299,10 +426,10 @@
             }
 
             #markets-comments-pane .ak-market-comment-heading {
-                flex: 0 0 82px;
-                height: 82px;
-                min-height: 82px;
-                overflow: hidden;
+                flex: 0 0 108px;
+                height: 108px;
+                min-height: 108px;
+                overflow: visible;
             }
 
             #markets-comments-pane .ak-comment-copy {
@@ -580,6 +707,56 @@
 
         <script>
             document.addEventListener('DOMContentLoaded', () => {
+                const quoteUrl = @js(route('markets.quotes'));
+                const locale = document.documentElement.lang === 'de' ? 'de-DE' : 'en-US';
+                const number = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const currencySymbols = {
+                    EUR: '€', USD: '$', GBP: '£', JPY: '¥', CNY: '¥',
+                    CHF: 'Fr.', HKD: 'HK$', AUD: 'A$', CAD: 'C$', ZAR: 'R',
+                };
+                const currencySymbol = currency => currencySymbols[String(currency || '').toUpperCase()] || currency || '';
+                const updateQuotes = async () => {
+                    if (document.hidden) return;
+                    try {
+                        const response = await fetch(quoteUrl, {
+                            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                        });
+                        if (!response.ok) return;
+                        const { quotes = {} } = await response.json();
+                        Object.entries(quotes).forEach(([code, quote]) => {
+                            document.querySelectorAll(`[data-market-price="${code}"]`).forEach((element) => {
+                                const value = element.querySelector('span');
+                                const currency = element.querySelector('small');
+                                if (value) value.textContent = Number.isFinite(quote.price) ? number.format(quote.price) : '—';
+                                if (currency) currency.textContent = currencySymbol(quote.currency);
+                            });
+                            document.querySelectorAll(`[data-market-change="${code}"]`).forEach((element) => {
+                                const change = Number(quote.change_percent);
+                                element.textContent = Number.isFinite(change) ? `${change > 0 ? '+' : ''}${number.format(change)} %` : '—';
+                                element.classList.toggle('text-emerald-500', Number.isFinite(change) && change >= 0);
+                                element.classList.toggle('text-rose-500', Number.isFinite(change) && change < 0);
+                            });
+                            document.querySelectorAll(`[data-market-table-price="${code}"]`).forEach((element) => {
+                                element.dataset.value = Number.isFinite(quote.price) ? quote.price : '';
+                                element.innerHTML = `${Number.isFinite(quote.price) ? number.format(quote.price) : '—'} <small class="text-[9px] text-[var(--ak-muted)]">${currencySymbol(quote.currency)}</small>`;
+                            });
+                            document.querySelectorAll(`[data-market-table-change="${code}"]`).forEach((element) => {
+                                const change = Number(quote.change_percent);
+                                element.dataset.value = Number.isFinite(change) ? change : '';
+                                element.textContent = Number.isFinite(change) ? `${change > 0 ? '+' : ''}${number.format(change)} %` : '—';
+                                element.classList.toggle('text-emerald-500', Number.isFinite(change) && change >= 0);
+                                element.classList.toggle('text-rose-500', Number.isFinite(change) && change < 0);
+                            });
+                        });
+                    } catch (_) {
+                        // Der letzte bekannte Datenbankkurs bleibt sichtbar.
+                    }
+                };
+                updateQuotes();
+                const quoteTimer = window.setInterval(updateQuotes, 30_000);
+                window.addEventListener('pagehide', () => window.clearInterval(quoteTimer), { once: true });
+
                 const table = document.getElementById('exchange-table');
                 if (!table) return;
 

@@ -21,6 +21,10 @@ final class RecommendationController extends Controller
         $latestQualityRankings = DB::table('model_quality_rankings')
             ->selectRaw('trained_model_id, MAX(id) AS ranking_id')
             ->groupBy('trained_model_id');
+        $latestQuotes = DB::table('current_stock_quotes')
+            ->where('status', 'current')
+            ->selectRaw('instrument_id, MAX(id) AS quote_id')
+            ->groupBy('instrument_id');
         $recommendations = DB::table('predictions as prediction')
             ->join('daily_top_stock_selections as daily_selection', function ($join) use ($selectionDate): void {
                 $join->on('daily_selection.prediction_id', '=', 'prediction.id')
@@ -34,13 +38,15 @@ final class RecommendationController extends Controller
                 $join->on('latest_quality.trained_model_id', '=', 'trained_model.id'))
             ->leftJoin('model_quality_rankings as model_quality', 'model_quality.id', '=', 'latest_quality.ranking_id')
             ->leftJoin('model_quality_tiers as model_tier', 'model_tier.id', '=', 'model_quality.tier_id')
+            ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) =>
+                $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
+            ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
             ->whereNotNull('prediction.prediction_score')
             ->whereNotNull('prediction.confidence')
-            ->whereNotNull('prediction.current_price')
-            ->where('prediction.current_price', '>', 0)
+            ->whereRaw('COALESCE(current_quote.price, prediction.current_price) > 0')
             ->where('prediction.quality_gate_passed', true)
             ->when($country !== '', fn ($query) => $query->where('instrument.country', $country))
             ->when($sector !== '', fn ($query) => $query->where('instrument.sector', $sector))
@@ -53,7 +59,6 @@ final class RecommendationController extends Controller
                 'daily_selection.risk_percent as stored_risk_percent',
                 'prediction.instrument_id',
                 'prediction.prediction_time',
-                'prediction.current_price',
                 'prediction.predicted_price_5d',
                 'prediction.predicted_price_20d',
                 'prediction.economic_edge_return',
@@ -74,6 +79,8 @@ final class RecommendationController extends Controller
                 'model_tier.code as model_tier_code',
                 'model_tier.name as model_tier_name',
             ])
+            ->selectRaw('COALESCE(current_quote.price, prediction.current_price) AS current_price')
+            ->addSelect('current_quote.quote_time as current_quote_time')
             ->selectRaw("{$signalSql} AS personalized_signal")
             ->get()
             ->map(fn (object $row): object => $this->score($row))
@@ -82,7 +89,7 @@ final class RecommendationController extends Controller
             ->values();
 
         $recommendations = $recommendations
-            ->map(function (object $recommendation): object {
+            ->map(function (object $recommendation) use ($signalSql): object {
                 $recommendation->candles = DB::table('price_bars')
                     ->where('instrument_id', $recommendation->instrument_id)
                     ->where('interval', '1d')
@@ -102,6 +109,34 @@ final class RecommendationController extends Controller
                             (float) $bar->close,
                         ],
                     ]);
+                $signalHistory = DB::table('predictions as prediction')
+                    ->where('prediction.instrument_id', $recommendation->instrument_id)
+                    ->whereNotNull('prediction.prediction_time')
+                    ->orderByDesc('prediction.prediction_time')
+                    ->orderByDesc('prediction.id')
+                    ->limit(200)
+                    ->select('prediction.prediction_time', 'prediction.signal')
+                    ->selectRaw("{$signalSql} AS personalized_signal")
+                    ->get()
+                    ->unique(fn (object $row): string => \Illuminate\Support\Carbon::parse($row->prediction_time)->format('Y-m-d'))
+                    ->reverse()
+                    ->values()
+                    ->map(fn (object $row): array => [
+                        'x' => \Illuminate\Support\Carbon::parse($row->prediction_time)->getTimestampMs(),
+                        'signal' => strtoupper((string) ($row->personalized_signal ?: $row->signal ?: 'HOLD')),
+                    ]);
+                $recommendation->last_signal_transition = null;
+                for ($index = 1; $index < $signalHistory->count(); $index++) {
+                    $previous = $signalHistory->get($index - 1);
+                    $current = $signalHistory->get($index);
+                    if ($previous['signal'] !== $current['signal']) {
+                        $recommendation->last_signal_transition = [
+                            'x' => $current['x'],
+                            'from' => $previous['signal'],
+                            'to' => $current['signal'],
+                        ];
+                    }
+                }
 
                 return $recommendation;
             });

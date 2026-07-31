@@ -7,7 +7,7 @@
                 </div>
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-[.18em] text-teal-700">{{ __('Datenbasierte Auswahl') }}</p>
-                    <h1 class="mt-1 text-2xl font-black tracking-tight">{{ __('Empfehlung Top 3') }}</h1>
+                    <h1 class="mt-1 text-2xl font-black tracking-tight">{{ __('Top 3') }}</h1>
                     <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ __('Die drei aktuell stärksten Aktien mit bestandenem Quality Gate – gewichtet nach KI-Score, Modellqualität, Risiko und Renditepotenzial.') }}</p>
                 </div>
             </div>
@@ -120,16 +120,16 @@
                         : null;
                 @endphp
 
-                <article class="group flex min-w-0 flex-col overflow-hidden rounded-2xl border {{ $rank === 1 ? 'border-amber-400/35' : 'border-[var(--ak-border)]' }} bg-[var(--ak-card-strong)] shadow-[var(--ak-shadow)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-teal-500/35">
-                    <div class="flex items-start justify-between gap-3 border-b border-[var(--ak-border)] p-4">
+                <article class="flex min-w-0 flex-col overflow-hidden rounded-2xl border {{ $rank === 1 ? 'border-amber-400/35' : 'border-[var(--ak-border)]' }} bg-[var(--ak-card-strong)] shadow-[var(--ak-shadow)] backdrop-blur-xl">
+                    <div class="flex h-[112px] shrink-0 items-start justify-between gap-3 border-b border-[var(--ak-border)] p-3">
                         <div class="flex min-w-0 items-center gap-3">
-                            <div class="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--ak-border)] bg-white">
+                            <div class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--ak-border)] bg-white">
                                 <span class="text-[10px] font-black text-teal-700">{{ strtoupper(substr($recommendation->symbol, 0, 2)) }}</span>
-                                <img src="{{ route('stocks.icon', $recommendation->instrument_id) }}" alt="" class="absolute inset-1 h-10 w-10 object-contain" loading="eager" onerror="this.remove()">
+                                <img src="{{ route('stocks.icon', $recommendation->instrument_id) }}" alt="" class="absolute inset-1 h-8 w-8 object-contain" loading="eager" onerror="this.remove()">
                             </div>
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2">
-                                    <h2 class="truncate text-xl font-black text-teal-700">{{ $recommendation->symbol }}</h2>
+                                    <h2 class="truncate text-lg font-black text-teal-700">{{ $recommendation->symbol }}</h2>
                                     <span class="inline-flex h-7 items-center rounded-md border px-2 text-[9px] font-black {{ $signalClass }}">{{ $signal }}</span>
                                 </div>
                                 <p class="mt-0.5 truncate text-xs font-bold text-[var(--ak-text)]">{{ $recommendation->name }}</p>
@@ -189,23 +189,41 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2 p-4">
-                        <div class="rounded-xl bg-[var(--ak-surface-muted)] p-3">
-                            <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gesamtwertung') }}</p>
-                            <p class="mt-1 text-2xl font-black tabular-nums text-teal-700">{{ number_format($recommendation->recommendation_score, 1, ',', '.') }}<span class="ml-1 text-xs text-[var(--ak-muted)]">/100</span></p>
+                    <div class="mt-1 grid h-[84px] shrink-0 grid-cols-3 gap-2 px-3 pb-3 pt-3">
+                        <div class="min-h-0 overflow-hidden rounded-xl border border-emerald-400/20 bg-emerald-400/[.06] p-2 text-right">
+                            <p class="flex items-center justify-end gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                <span data-live-time-symbol="{{ $recommendation->symbol }}">
+                                    {{ $recommendation->current_quote_time
+                                        ? \Illuminate\Support\Carbon::parse($recommendation->current_quote_time)->timezone('Europe/Berlin')->format('H:i:s')
+                                        : __('Kurszeit') }}
+                                </span>
+                                <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_7px_rgba(52,211,153,.65)]" aria-label="{{ __('Live') }}"></span>
+                            </p>
+                            <p
+                                data-live-symbol="{{ $recommendation->symbol }}"
+                                data-live-currency="{{ $recommendation->currency ?: 'EUR' }}"
+                                data-live-decimals="2"
+                                class="mt-0.5 truncate text-lg font-black tabular-nums text-[var(--ak-text)]"
+                            >{{ is_numeric($recommendation->current_price) ? number_format((float) $recommendation->current_price, 2, ',', '.').' '.($recommendation->currency ?: 'EUR') : '—' }}</p>
                         </div>
-                        <div class="rounded-xl bg-[var(--ak-surface-muted)] p-3 text-right">
-                            <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Rendite 20 Tage') }}</p>
-                            <p class="mt-1 text-xl font-black tabular-nums {{ $recommendation->expected_return_20d >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $recommendation->expected_return_20d >= 0 ? '+' : '' }}{{ number_format($recommendation->expected_return_20d, 2, ',', '.') }} %</p>
+                        <div class="min-h-0 overflow-hidden rounded-xl bg-[var(--ak-surface-muted)] p-2 text-right">
+                            <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Zielkurs 20 Tage') }}</p>
+                            <p class="mt-0.5 truncate text-lg font-black tabular-nums text-[var(--ak-text)]">
+                                {{ is_numeric($recommendation->predicted_price_20d) ? number_format((float) $recommendation->predicted_price_20d, 2, ',', '.').' '.($recommendation->currency ?: 'EUR') : '—' }}
+                            </p>
+                        </div>
+                        <div class="min-h-0 overflow-hidden rounded-xl bg-[var(--ak-surface-muted)] p-2 text-right">
+                            <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Rendite Prognose 20 Tage') }}</p>
+                            <p class="mt-0.5 text-lg font-black tabular-nums {{ $recommendation->expected_return_20d >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $recommendation->expected_return_20d >= 0 ? '+' : '' }}{{ number_format($recommendation->expected_return_20d, 2, ',', '.') }} %</p>
                         </div>
                     </div>
 
-                    <div class="mx-4 mb-4 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
-                        <div class="flex items-center justify-between px-3 pt-2">
+                    <div class="mx-3 mb-2 mt-1 flex min-h-[108px] flex-1 flex-col overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
+                        <div class="flex shrink-0 items-center justify-between px-3 py-1.5">
                             <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf · 32 Tage') }}</p>
                             <span class="text-[9px] font-bold text-teal-700">{{ __('Tageskerzen') }}</span>
                         </div>
-                        <div id="recommendation-chart-{{ $recommendation->instrument_id }}" class="relative h-[clamp(145px,18dvh,180px)] min-h-[145px] w-full border-t border-[var(--ak-border)] bg-[color-mix(in_srgb,var(--ak-card)_72%,transparent)]" aria-label="{{ __('Kurschart für :symbol', ['symbol' => $recommendation->symbol]) }}">
+                        <div id="recommendation-chart-{{ $recommendation->instrument_id }}" class="relative min-h-[92px] w-full flex-1 border-t border-[var(--ak-border)] bg-[color-mix(in_srgb,var(--ak-card)_72%,transparent)]" aria-label="{{ __('Kurschart für :symbol', ['symbol' => $recommendation->symbol]) }}">
                             <span data-chart-placeholder class="absolute inset-0 flex items-center justify-center gap-2 text-[9px] font-bold text-[var(--ak-muted)]">
                                 <span class="h-3 w-3 animate-spin rounded-full border-2 border-teal-500/25 border-t-teal-600"></span>
                                 {{ __('Kursdaten werden geladen') }}
@@ -213,29 +231,7 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-3 px-4 pb-4">
-                        <div class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2.5 shadow-sm">
-                            <div class="mb-1.5 flex items-end justify-between gap-1">
-                                <span class="truncate text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
-                                <span class="shrink-0 text-[10px] font-black tabular-nums">{{ number_format($recommendation->score_10, 1, ',', '.') }}<small class="ml-0.5 text-[7px] text-[var(--ak-muted)]">/10</small></span>
-                            </div>
-                            <x-dashboard.score-stripes :percent="$recommendation->score_percent" />
-                        </div>
-                        <div class="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2.5 shadow-sm">
-                            <span class="min-w-0 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Modellqualität') }}</span>
-                            <div class="ak-prediction-donut" style="--value: {{ $recommendation->confidence_percent }}%; --color: {{ $modelQualityColor }}" role="meter" aria-label="{{ __('Modellqualität') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($recommendation->confidence_percent) }}">
-                                <span>{{ number_format($recommendation->confidence_percent, 0, ',', '.') }}<small>%</small></span>
-                            </div>
-                        </div>
-                        <div class="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2.5 shadow-sm">
-                            <span class="min-w-0 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Risiko') }}</span>
-                            <div class="ak-prediction-donut" style="--value: {{ $recommendation->risk_percent }}%; --color: {{ $riskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($recommendation->risk_percent) }}">
-                                <span>{{ number_format($recommendation->risk_percent, 0, ',', '.') }}<small>%</small></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mx-4 mb-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2.5">
+                    <div class="mx-3 mb-2 flex h-[52px] shrink-0 items-center justify-between gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2">
                         <div class="min-w-0">
                             <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Modellranking') }}</p>
                             <p class="mt-1 truncate text-sm font-black text-[var(--ak-text)]">{{ $recommendation->model_alias ?: '—' }}</p>
@@ -248,12 +244,33 @@
                         </div>
                     </div>
 
-                    <div class="mt-auto flex items-center justify-between border-t border-[var(--ak-border)] px-4 py-3">
-                        <div>
-                            <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Aktueller Kurs') }}</p>
-                            <p class="mt-0.5 text-sm font-black tabular-nums">{{ number_format($recommendation->current_price, 2, ',', '.') }} {{ $recommendation->currency ?: 'EUR' }}</p>
+                    <div class="grid h-[68px] shrink-0 grid-cols-3 gap-2 px-3 pb-2">
+                        <div class="h-full min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2 shadow-sm">
+                            <div class="mb-1.5 flex items-end justify-between gap-1">
+                                <span class="truncate text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
+                                <span class="shrink-0 text-[10px] font-black tabular-nums">{{ number_format($recommendation->score_10, 1, ',', '.') }}<small class="ml-0.5 text-[7px] text-[var(--ak-muted)]">/10</small></span>
+                            </div>
+                            <x-dashboard.score-stripes :percent="$recommendation->score_percent" />
                         </div>
-                        <a href="{{ route('stocks.show', ['symbol' => $recommendation->symbol, 'prediction' => $recommendation->prediction_id, 'return_to' => request()->getRequestUri()]) }}" class="inline-flex h-9 items-center gap-2 rounded-xl bg-teal-700 px-3 text-xs font-black text-white transition hover:bg-teal-600">
+                        <div class="flex h-full min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2 shadow-sm">
+                            <span class="min-w-0 text-[9px] font-black uppercase leading-[1.15] tracking-wide text-[var(--ak-muted)]">
+                                <span class="block">{{ __('Modell') }}</span>
+                                <span class="block">{{ __('Qualität') }}</span>
+                            </span>
+                            <div class="ak-prediction-donut" style="--value: {{ $recommendation->confidence_percent }}%; --color: {{ $modelQualityColor }}" role="meter" aria-label="{{ __('Modellqualität') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($recommendation->confidence_percent) }}">
+                                <span>{{ number_format($recommendation->confidence_percent, 0, ',', '.') }}<small>%</small></span>
+                            </div>
+                        </div>
+                        <div class="flex h-full min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2 shadow-sm">
+                            <span class="min-w-0 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Risiko') }}</span>
+                            <div class="ak-prediction-donut" style="--value: {{ $recommendation->risk_percent }}%; --color: {{ $riskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($recommendation->risk_percent) }}">
+                                <span>{{ number_format($recommendation->risk_percent, 0, ',', '.') }}<small>%</small></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto flex h-[48px] shrink-0 items-center justify-end border-t border-[var(--ak-border)] px-3 py-2">
+                        <a href="{{ route('stocks.show', ['symbol' => $recommendation->symbol, 'prediction' => $recommendation->prediction_id, 'return_to' => request()->getRequestUri()]) }}" class="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg bg-teal-700 px-3 text-xs font-black text-white transition hover:bg-teal-600">
                             {{ __('Details') }}<x-heroicon-o-arrow-right class="h-4 w-4" />
                         </a>
                     </div>
@@ -280,6 +297,7 @@
                     'currency' => $recommendation->currency ?: 'EUR',
                     'candles' => $recommendation->candles,
                     'forecast_return' => $recommendation->expected_return_20d,
+                    'signal_transition' => $recommendation->last_signal_transition,
                     'data_url' => route('stocks.chart-data', ['symbol' => $recommendation->symbol]),
                 ],
             ];
@@ -402,7 +420,7 @@
                     grid: {
                         borderColor: light ? 'rgba(51,65,85,.11)' : 'rgba(148,163,184,.10)',
                         strokeDashArray: 4,
-                        padding: { left: 4, right: 4, top: 4, bottom: 2 },
+                        padding: { left: 4, right: 4, top: 4, bottom: 10 },
                     },
                     xaxis: {
                         type: 'datetime',
@@ -431,6 +449,11 @@
                     tooltip: {
                         theme: light ? 'light' : 'dark',
                         x: { format: 'dd.MM.yyyy' },
+                        y: {
+                            formatter: value => Number.isFinite(Number(value))
+                                ? `${Number(value).toFixed(2)} ${stock.currency || 'USD'}`
+                                : '—',
+                        },
                     },
                     theme: { mode: light ? 'light' : 'dark' },
                 });
@@ -445,7 +468,7 @@
                     const left = 10;
                     const right = 56;
                     const top = 10;
-                    const bottom = 12;
+                    const bottom = 20;
                     const plotWidth = Math.max(1, width - left - right);
                     const plotHeight = Math.max(1, height - top - bottom);
                     const toX = timestamp => left + ((timestamp - xMin) / (xMax - xMin)) * plotWidth;
@@ -458,20 +481,63 @@
                     svg.innerHTML = `
                         <defs>
                             <pattern id="${patternId}" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
-                                <line x1="0" y1="0" x2="0" y2="7" stroke="${forecastColor}" stroke-width=".8" stroke-opacity=".34"></line>
+                                <line x1="0" y1="0" x2="0" y2="7" stroke="${forecastColor}" stroke-width="1" stroke-opacity=".48"></line>
                             </pattern>
                         </defs>
                         <polygon
                             points="${toX(lastTimestamp)},${toY(lastClose)} ${toX(targetTimestamp)},${toY(Math.max(lastClose, forecastTarget))} ${toX(targetTimestamp)},${toY(Math.min(lastClose, forecastTarget))}"
                             fill="url(#${patternId})"
                             stroke="${forecastColor}"
-                            stroke-width="1"
+                            stroke-width="1.3"
                             stroke-dasharray="5 5"
-                            stroke-opacity=".58"
+                            stroke-opacity=".78"
                             stroke-linejoin="round"
                             vector-effect="non-scaling-stroke"
                         ></polygon>
                     `;
+                    const transition = stock.signal_transition;
+                    const transitionTimestamp = Number(transition?.x);
+                    if (Number.isFinite(transitionTimestamp) && transitionTimestamp >= xMin && transitionTimestamp <= xMax) {
+                        const transitionX = toX(transitionTimestamp);
+                        const transitionColor = '#f59e0b';
+                        const transitionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        transitionLine.setAttribute('x1', transitionX);
+                        transitionLine.setAttribute('x2', transitionX);
+                        transitionLine.setAttribute('y1', top);
+                        transitionLine.setAttribute('y2', top + plotHeight);
+                        transitionLine.setAttribute('stroke', transitionColor);
+                        transitionLine.setAttribute('stroke-width', '1.2');
+                        transitionLine.setAttribute('stroke-dasharray', '3 4');
+                        transitionLine.setAttribute('stroke-opacity', '.72');
+                        svg.appendChild(transitionLine);
+
+                        const transitionText = `${transition.from} → ${transition.to}`;
+                        const badgeWidth = Math.max(48, transitionText.length * 4.8 + 10);
+                        const badgeOnLeft = transitionX + 7 + badgeWidth > left + plotWidth;
+                        const badgeX = badgeOnLeft ? transitionX - badgeWidth - 7 : transitionX + 7;
+                        const badgeY = top + 2;
+                        const transitionBadge = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        transitionBadge.setAttribute('x', Math.max(left, badgeX));
+                        transitionBadge.setAttribute('y', badgeY);
+                        transitionBadge.setAttribute('width', badgeWidth);
+                        transitionBadge.setAttribute('height', '14');
+                        transitionBadge.setAttribute('rx', '4');
+                        transitionBadge.setAttribute('fill', transitionColor);
+                        transitionBadge.setAttribute('fill-opacity', '.16');
+                        transitionBadge.setAttribute('stroke', transitionColor);
+                        transitionBadge.setAttribute('stroke-opacity', '.55');
+                        svg.appendChild(transitionBadge);
+
+                        const transitionLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        transitionLabel.setAttribute('x', Math.max(left, badgeX) + badgeWidth / 2);
+                        transitionLabel.setAttribute('y', badgeY + 10);
+                        transitionLabel.setAttribute('fill', transitionColor);
+                        transitionLabel.setAttribute('font-size', '7');
+                        transitionLabel.setAttribute('font-weight', '800');
+                        transitionLabel.setAttribute('text-anchor', 'middle');
+                        transitionLabel.textContent = transitionText;
+                        svg.appendChild(transitionLabel);
+                    }
                     element.appendChild(svg);
                 });
             });

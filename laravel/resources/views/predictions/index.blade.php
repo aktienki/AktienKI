@@ -8,9 +8,9 @@
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">{{ __('Prognosen') }}</h1>
                     <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ __('Historische KI-Prognosen, Modellwerte und Validierungsergebnisse.') }}</p>
-                    <button type="button" data-open-prediction-heatmap class="mt-2 inline-flex h-8 items-center gap-2 rounded-lg border border-teal-500/25 bg-teal-500/10 px-3 text-[10px] font-black uppercase tracking-wide text-teal-700 transition hover:border-teal-500/45 hover:bg-teal-500/15">
+                    <a href="{{ route('predictions.heatmap', request()->query()) }}" class="mt-2 inline-flex h-8 items-center gap-2 rounded-lg border border-teal-500/25 bg-teal-500/10 px-3 text-[10px] font-black uppercase tracking-wide text-teal-700 transition hover:border-teal-500/45 hover:bg-teal-500/15">
                         <x-heroicon-o-squares-2x2 class="h-4 w-4" />{{ __('Historische Erfolgs-Heatmap') }}
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -19,7 +19,7 @@
                     [__('Prognosen'), (int) ($summary->total ?? 0)],
                     [__('Aktien'), (int) ($summary->instruments ?? 0)],
                     [__('Validiert'), (int) ($summary->validated ?? 0)],
-                    [__('Letzter Lauf'), $summary?->latest ? \Illuminate\Support\Carbon::parse($summary->latest)->format('d.m. H:i') : '—'],
+                    [__('Ältestes Training'), $summary?->oldest_training ? \Illuminate\Support\Carbon::parse($summary->oldest_training)->timezone(config('app.timezone'))->format('d.m.Y') : '—'],
                 ] as [$label, $value])
                     <div class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-2 py-2 sm:px-3 xl:min-w-28">
                         <p class="truncate text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)] sm:text-[9px] sm:tracking-[.12em]">{{ $label }}</p>
@@ -34,54 +34,72 @@
                 method="GET"
                 action="{{ route('predictions.index') }}"
                 x-data="{ searchTimer: null, submitSearch() { window.clearTimeout(this.searchTimer); this.searchTimer = window.setTimeout(() => this.$root.requestSubmit(), 450) } }"
-                class="flex shrink-0 flex-nowrap gap-2 overflow-x-auto border-b border-[var(--ak-border)] p-3"
+                class="hidden"
             >
                 <input type="hidden" name="sort" value="{{ $sort }}">
                 <input type="hidden" name="direction" value="{{ $direction }}">
-                <label class="relative min-w-[220px] flex-1">
+                <label class="relative min-w-0">
                     <span class="sr-only">{{ __('Aktie suchen') }}</span>
                     <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ak-muted)]" />
-                    <input name="q" value="{{ request('q') }}" @input="submitSearch()" placeholder="{{ __('Symbol oder Unternehmen') }}" class="ak-input h-10 w-full pl-9 pr-3 text-sm">
+                    <input name="q" value="{{ request('q') }}" @input="submitSearch()" placeholder="{{ __('Aktie suchen') }}" class="ak-input h-10 w-full pl-8 pr-2 text-xs">
                 </label>
-                <select name="ai_type" @change="$root.requestSubmit()" class="ak-input h-10 w-40 shrink-0 text-sm">
-                    <option value="">{{ __('Alle KI-Typen') }}</option>
+                <select name="country" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 truncate px-1.5 text-[11px]" title="{{ __('Land') }}">
+                    <option value="">{{ __('Land') }}</option>
+                    @foreach ($countries as $country)
+                        <option value="{{ $country }}" @selected(strtoupper((string) request('country')) === strtoupper((string) $country))>{{ $country }}</option>
+                    @endforeach
+                </select>
+                <select name="exchange" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 truncate px-1.5 text-[11px]" title="{{ __('Exchange') }}">
+                    <option value="">{{ __('Exchange') }}</option>
+                    @foreach ($exchanges as $exchange)
+                        <option value="{{ $exchange->code }}" @selected(strtoupper((string) request('exchange')) === strtoupper((string) $exchange->code))>{{ $exchange->code }}</option>
+                    @endforeach
+                </select>
+                <select name="sector" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 truncate px-1.5 text-[11px]" title="{{ __('Sektor') }}">
+                    <option value="">{{ __('Sektor') }}</option>
+                    @foreach ($sectors as $sector)
+                        <option value="{{ $sector }}" @selected((string) request('sector') === (string) $sector)>{{ __($sector) }}</option>
+                    @endforeach
+                </select>
+                <select name="ai_type" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 truncate px-1.5 text-[11px]" title="{{ __('KI-Typ') }}">
+                    <option value="">{{ __('KI-Typ') }}</option>
                     @foreach ($aiTypes as $aiType)
                         <option value="{{ $aiType }}" @selected(request('ai_type') === $aiType)>{{ ucfirst((string) $aiType) }} KI</option>
                     @endforeach
                 </select>
-                <select name="model" @change="$root.requestSubmit()" class="ak-input h-10 w-44 shrink-0 text-sm">
-                    <option value="">{{ __('Alle Modelle') }}</option>
+                <select name="model" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 truncate px-1.5 text-[11px]" title="{{ __('Modell') }}">
+                    <option value="">{{ __('Modell') }}</option>
                     @foreach ($models as $model)
                         <option value="{{ $model->id }}" @selected((int) request('model') === (int) $model->id)>{{ $model->public_alias }}</option>
                     @endforeach
                 </select>
-                <select name="quality_tier" @change="$root.requestSubmit()" class="ak-input h-10 w-48 shrink-0 text-sm">
-                    <option value="">{{ __('Alle Modellstufen') }}</option>
+                <select name="quality_tier" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 truncate px-1.5 text-[11px]" title="{{ __('Modellstufe mindestens') }}">
+                    <option value="">{{ __('Modellstufe mindestens') }}</option>
                     @foreach ($qualityTiers as $qualityTier)
                         <option value="{{ $qualityTier->code }}" @selected(request('quality_tier') === $qualityTier->code)>{{ __($qualityTier->name) }}</option>
                     @endforeach
                 </select>
-                <select name="signal" @change="$root.requestSubmit()" class="ak-input h-10 w-40 shrink-0 text-sm">
-                    <option value="">{{ __('Alle Signale') }}</option>
+                <select name="signal" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 truncate px-1.5 text-[11px]" title="{{ __('Signal') }}">
+                    <option value="">{{ __('Signal') }}</option>
                     @foreach (['BUY', 'WATCH', 'HOLD', 'SELL'] as $signal)
                         @continue(! $signals->contains($signal))
                         <option value="{{ $signal }}" @selected(strtoupper((string) request('signal')) === $signal)>{{ $signal }}</option>
                     @endforeach
                 </select>
-                <select name="score_min" @change="$root.requestSubmit()" class="ak-input h-10 w-40 shrink-0 text-sm">
-                    <option value="">{{ __('Alle KI-Scores') }}</option>
+                <select name="score_min" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 truncate px-1.5 text-[11px]" title="{{ __('KI-Score') }}">
+                    <option value="">{{ __('KI-Score') }}</option>
                     @foreach ([8 => '8,0', 7 => '7,0', 6 => '6,0', 5 => '5,0'] as $value => $label)
                         <option value="{{ $value }}" @selected((string) request('score_min') === (string) $value)>{{ __('KI-Score ab') }} {{ $label }}</option>
                     @endforeach
                 </select>
-                <select name="confidence_min" @change="$root.requestSubmit()" class="ak-input h-10 w-44 shrink-0 text-sm">
-                    <option value="">{{ __('Alle Konfidenzen') }}</option>
+                <select name="confidence_min" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 truncate px-1.5 text-[11px]" title="{{ __('Konfidenz') }}">
+                    <option value="">{{ __('Konfidenz') }}</option>
                     @foreach ([90, 80, 70, 60, 50] as $value)
                         <option value="{{ $value }}" @selected((string) request('confidence_min') === (string) $value)>{{ __('Konfidenz ab') }} {{ $value }} %</option>
                     @endforeach
                 </select>
-                <select name="validation" @change="$root.requestSubmit()" class="ak-input h-10 w-40 shrink-0 text-sm">
-                    <option value="">{{ __('Alle Validierungen') }}</option>
+                <select name="validation" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 truncate px-1.5 text-[11px]" title="{{ __('Validierung') }}">
+                    <option value="">{{ __('Validierung') }}</option>
                     @if ($validationStates->contains('validated'))
                         <option value="validated" @selected(request('validation') === 'validated')>{{ __('Validiert') }}</option>
                     @endif
@@ -89,14 +107,18 @@
                         <option value="pending" @selected(request('validation') === 'pending')>{{ __('Ausstehend') }}</option>
                     @endif
                 </select>
-                <div class="flex w-48 shrink-0">
+                <div class="flex min-w-0">
                     <a href="{{ route('predictions.index') }}" class="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] px-3 text-xs font-bold text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:bg-teal-500/10 hover:text-teal-700">
-                        <x-heroicon-o-arrow-path class="h-4 w-4" />{{ __('Filter zurücksetzen') }}
+                        <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" /><span class="truncate">{{ __('Zurücksetzen') }}</span>
                     </a>
                 </div>
             </form>
 
             <div id="predictions-table-scroll" class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+                <form id="prediction-table-filters" method="GET" action="{{ route('predictions.index') }}">
+                    <input type="hidden" name="sort" value="{{ $sort }}">
+                    <input type="hidden" name="direction" value="{{ $direction }}">
+                </form>
                 @php
                     $sortUrl = fn (string $column): string => route('predictions.index', array_merge(
                         request()->except('page'),
@@ -149,6 +171,37 @@
                                     </a>
                                 </th>
                             @endforeach
+                        </tr>
+                        <tr class="bg-[var(--ak-card)]">
+                            <th class="border-b border-[var(--ak-border)] p-1"><a href="{{ route('predictions.index') }}" class="inline-flex h-8 w-full items-center justify-center rounded-[5px] border border-[var(--ak-border)] text-[var(--ak-muted)] hover:bg-teal-500/10 hover:text-teal-500" title="{{ __('Filter zurücksetzen') }}"><x-heroicon-o-arrow-path class="h-4 w-4" /></a></th>
+                            <th class="border-b border-[var(--ak-border)] p-1"></th>
+                            <th class="border-b border-[var(--ak-border)] p-1">
+                                <div class="grid min-w-0 gap-1">
+                                    <label class="relative block min-w-0"><x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ak-muted)]" /><input form="prediction-table-filters" name="q" value="{{ request('q') }}" placeholder="{{ __('Aktie') }}" class="ak-input ak-table-filter h-7 w-full min-w-0 pl-7 pr-1 text-[10px]" oninput="window.clearTimeout(this._filterTimer);this._filterTimer=window.setTimeout(()=>this.form.requestSubmit(),450)"></label>
+                                    <div class="grid min-w-0 grid-cols-3 gap-1">
+                                        <select form="prediction-table-filters" name="country" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-7 w-full min-w-0 text-[9px]" title="{{ __('Land') }}"><option value="">{{ __('Land') }}</option>@foreach ($countries as $country)<option value="{{ $country }}" @selected(strtoupper((string) request('country')) === strtoupper((string) $country))>{{ $country }}</option>@endforeach</select>
+                                        <select form="prediction-table-filters" name="exchange" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-7 w-full min-w-0 text-[9px]" title="{{ __('Exchange') }}"><option value="">{{ __('Börse') }}</option>@foreach ($exchanges as $exchange)<option value="{{ $exchange->code }}" @selected(strtoupper((string) request('exchange')) === strtoupper((string) $exchange->code))>{{ $exchange->code }}</option>@endforeach</select>
+                                        <select form="prediction-table-filters" name="sector" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-7 w-full min-w-0 text-[9px]" title="{{ __('Sektor') }}"><option value="">{{ __('Sektor') }}</option>@foreach ($sectors as $sector)<option value="{{ $sector }}" @selected((string) request('sector') === (string) $sector)>{{ __($sector) }}</option>@endforeach</select>
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="border-b border-[var(--ak-border)] p-1">
+                                <div class="grid min-w-0 gap-1">
+                                    <select form="prediction-table-filters" name="model" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-7 w-full min-w-0 px-1 text-[9px]" title="{{ __('Modell') }}"><option value="">{{ __('Modell') }}</option>@foreach ($models as $model)<option value="{{ $model->id }}" @selected((int) request('model') === (int) $model->id)>{{ $model->public_alias }}</option>@endforeach</select>
+                                    <div class="grid min-w-0 grid-cols-2 gap-1">
+                                        <select form="prediction-table-filters" name="ai_type" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-7 w-full min-w-0 text-[9px]" title="{{ __('KI-Typ') }}"><option value="">{{ __('KI') }}</option>@foreach ($aiTypes as $aiType)<option value="{{ $aiType }}" @selected(request('ai_type') === $aiType)>{{ ucfirst((string) $aiType) }}</option>@endforeach</select>
+                                        <select form="prediction-table-filters" name="quality_tier" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-7 w-full min-w-0 text-[9px]" title="{{ __('Modellstufe mindestens') }}"><option value="">{{ __('Min. Stufe') }}</option>@foreach ($qualityTiers as $qualityTier)<option value="{{ $qualityTier->code }}" @selected(request('quality_tier') === $qualityTier->code)>{{ __($qualityTier->name) }}</option>@endforeach</select>
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="border-b border-[var(--ak-border)] p-1"><select form="prediction-table-filters" name="signal" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 w-full min-w-0 px-1 text-[10px]" title="{{ __('Signal') }}"><option value="">{{ __('Signal') }}</option>@foreach (['BUY', 'WATCH', 'HOLD', 'SELL'] as $signal)@continue(! $signals->contains($signal))<option value="{{ $signal }}" @selected(strtoupper((string) request('signal')) === $signal)>{{ $signal }}</option>@endforeach</select></th>
+                            <th class="border-b border-[var(--ak-border)] p-1"></th>
+                            <th class="border-b border-[var(--ak-border)] p-1"></th>
+                            <th class="border-b border-[var(--ak-border)] p-1"></th>
+                            <th class="border-b border-[var(--ak-border)] p-1"><select form="prediction-table-filters" name="score_min" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 w-full min-w-0 px-1 text-[10px]" title="{{ __('KI-Score') }}"><option value="">{{ __('KI-Score') }}</option>@foreach ([8 => '≥ 8', 7 => '≥ 7', 6 => '≥ 6', 5 => '≥ 5'] as $value => $label)<option value="{{ $value }}" @selected((string) request('score_min') === (string) $value)>{{ $label }}</option>@endforeach</select></th>
+                            <th class="border-b border-[var(--ak-border)] p-1"><select form="prediction-table-filters" name="confidence_min" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 w-full min-w-0 px-1 text-[10px]" title="{{ __('Konfidenz') }}"><option value="">{{ __('Konfidenz') }}</option>@foreach ([90, 80, 70, 60, 50] as $value)<option value="{{ $value }}" @selected((string) request('confidence_min') === (string) $value)>≥ {{ $value }} %</option>@endforeach</select></th>
+                            <th class="border-b border-[var(--ak-border)] p-1"></th>
+                            <th class="border-b border-[var(--ak-border)] p-1"><select form="prediction-table-filters" name="validation" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 w-full min-w-0 px-1 text-[10px]" title="{{ __('Validierung') }}"><option value="">{{ __('Validierung') }}</option>@if ($validationStates->contains('validated'))<option value="validated" @selected(request('validation') === 'validated')>{{ __('Validiert') }}</option>@endif @if ($validationStates->contains('pending'))<option value="pending" @selected(request('validation') === 'pending')>{{ __('Ausstehend') }}</option>@endif</select></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -297,6 +350,61 @@
                     --ak-muted: #64748b;
                 }
 
+                #predictions-page .ak-table-filter {
+                    border-radius: 5px !important;
+                    color: #f8fafc !important;
+                    -webkit-text-fill-color: #f8fafc !important;
+                    opacity: 1 !important;
+                }
+
+                #predictions-page select.ak-table-filter option {
+                    background: #182238;
+                    color: #f8fafc;
+                }
+
+                #predictions-page select.ak-table-filter {
+                    appearance: none !important;
+                    -webkit-appearance: none !important;
+                    padding: 0 13px 0 5px !important;
+                    font-size: 10px !important;
+                    line-height: 28px !important;
+                    background-color: #182238 !important;
+                    background-image:
+                        linear-gradient(45deg, transparent 50%, #cbd5e1 50%),
+                        linear-gradient(135deg, #cbd5e1 50%, transparent 50%) !important;
+                    background-position:
+                        calc(100% - 7px) 50%,
+                        calc(100% - 4px) 50% !important;
+                    background-size: 3px 3px, 3px 3px !important;
+                    background-repeat: no-repeat !important;
+                }
+
+                #predictions-page .ak-table-filter::placeholder {
+                    color: #f8fafc !important;
+                    opacity: 1;
+                }
+
+                :root[data-theme="light"] #predictions-page .ak-table-filter {
+                    color: #0f172a !important;
+                    -webkit-text-fill-color: #0f172a !important;
+                }
+
+                :root[data-theme="light"] #predictions-page select.ak-table-filter option {
+                    background: #f8fafc;
+                    color: #0f172a;
+                }
+
+                :root[data-theme="light"] #predictions-page select.ak-table-filter {
+                    background-color: #f8fafc !important;
+                    background-image:
+                        linear-gradient(45deg, transparent 50%, #475569 50%),
+                        linear-gradient(135deg, #475569 50%, transparent 50%) !important;
+                }
+
+                :root[data-theme="light"] #predictions-page .ak-table-filter::placeholder {
+                    color: #0f172a !important;
+                }
+
                 .ak-prediction-donut {
                     position: relative;
                     display: grid;
@@ -337,75 +445,97 @@
     </div>
 
     <div id="prediction-heatmap-modal" class="fixed inset-0 z-[95] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="prediction-heatmap-title">
-        <section class="flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-violet-400/25 bg-[#171325] shadow-2xl shadow-black/70">
+        <section class="flex max-h-[94dvh] w-full max-w-[1500px] flex-col overflow-hidden rounded-3xl border border-violet-400/25 bg-[#171325] shadow-2xl shadow-black/70">
             <div class="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Historische Validierung') }}</p>
-                    <h2 id="prediction-heatmap-title" class="mt-1 text-xl font-black text-white">{{ __('Erfolg nach KI-Score und Konfidenz') }}</h2>
-                    <p class="mt-1 text-xs text-slate-400">{{ __('Trefferquote validierter Prognosen; aktuelle Modell- und Signalfilter werden berücksichtigt.') }}</p>
+                    <h2 id="prediction-heatmap-title" class="mt-1 text-xl font-black text-white">{{ __('Historische Qualität nach KI-Score und Konfidenz') }}</h2>
+                    <p class="mt-1 text-xs text-slate-400">{{ __('Trefferquote, Profitfaktor, Drawdown und Trades; alle aktuellen Filter werden berücksichtigt.') }}</p>
                 </div>
                 <button type="button" data-close-prediction-heatmap class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-white/5 hover:text-white" aria-label="{{ __('Schließen') }}">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>
 
-            <div class="min-h-0 flex-1 overflow-auto p-5">
-                <div class="mx-auto min-w-[720px] max-w-4xl">
-                    <div class="mb-3 flex items-center justify-between gap-4">
-                        <span class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Y: Konfidenz') }}</span>
-                        <div class="flex items-center gap-3 text-[9px] font-bold text-slate-400">
-                            <span class="inline-flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-sm bg-rose-400/25"></i>&lt; 45 %</span>
-                            <span class="inline-flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-sm bg-amber-300/20"></i>45–54 %</span>
-                            <span class="inline-flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-sm bg-emerald-400/20"></i>≥ 55 %</span>
-                            <span class="inline-flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-sm bg-slate-500/15"></i>{{ __('< 5 Datenpunkte') }}</span>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-[52px_repeat(10,minmax(54px,1fr))] gap-1.5">
-                        @for ($confidenceBucket = 9; $confidenceBucket >= 0; $confidenceBucket--)
-                            <div class="flex items-center justify-end pr-2 text-[10px] font-bold tabular-nums text-slate-500">
-                                {{ $confidenceBucket * 10 }}–{{ ($confidenceBucket + 1) * 10 }} %
+            <div class="min-h-0 flex-1 overflow-auto p-4">
+                @php
+                    $heatmapMetrics = [
+                        ['key' => 'hit_rate', 'label' => __('Hitrate'), 'suffix' => '%'],
+                        ['key' => 'profit_factor', 'label' => __('Profitfaktor'), 'suffix' => ''],
+                        ['key' => 'drawdown', 'label' => __('Drawdown'), 'suffix' => '%'],
+                        ['key' => 'samples', 'label' => __('Trades'), 'suffix' => ''],
+                    ];
+                @endphp
+                <div class="mx-auto grid min-w-[1050px] max-w-[1440px] grid-cols-2 gap-4">
+                    @foreach ($heatmapMetrics as $metric)
+                        <article class="rounded-2xl border border-white/[.08] bg-white/[.025] p-3">
+                            <div class="mb-2 flex items-center justify-between gap-3">
+                                <h3 class="text-sm font-black text-white">{{ $metric['label'] }}</h3>
+                                <span class="text-[9px] font-bold uppercase tracking-wide text-slate-500">{{ __('Y: Konfidenz') }} · {{ __('X: KI-Score') }}</span>
                             </div>
-                            @for ($scoreBucket = 0; $scoreBucket <= 9; $scoreBucket++)
-                                @php
-                                    $cell = $heatmap->get($scoreBucket.'-'.$confidenceBucket);
-                                    $samples = (int) ($cell->samples ?? 0);
-                                    $hitRate = is_numeric($cell?->hit_rate) ? (float) $cell->hit_rate : null;
-                                    $averageReturn = is_numeric($cell?->average_return) ? (float) $cell->average_return : null;
-                                    $cellClass = $samples < 5 || $hitRate === null
-                                        ? 'border-white/[.05] bg-slate-500/[.08] text-slate-600'
-                                        : ($hitRate >= 65
-                                            ? 'border-emerald-300/30 bg-emerald-400/28 text-emerald-100'
-                                            : ($hitRate >= 55
-                                                ? 'border-emerald-400/20 bg-emerald-400/15 text-emerald-200'
-                                                : ($hitRate >= 45
-                                                    ? 'border-amber-300/20 bg-amber-300/12 text-amber-200'
-                                                    : 'border-rose-400/20 bg-rose-400/15 text-rose-200')));
-                                @endphp
-                                <div
-                                    class="group relative flex aspect-square min-h-14 items-center justify-center rounded-lg border {{ $cellClass }} transition hover:z-20 hover:scale-105 hover:border-white/30"
-                                    title="{{ __('Score :scoreFrom–:scoreTo · Konfidenz :confidenceFrom–:confidenceTo % · :samples Prognosen · Trefferquote :hitRate · Ø Rendite :return', [
-                                        'scoreFrom' => $scoreBucket,
-                                        'scoreTo' => $scoreBucket + 1,
-                                        'confidenceFrom' => $confidenceBucket * 10,
-                                        'confidenceTo' => ($confidenceBucket + 1) * 10,
-                                        'samples' => $samples,
-                                        'hitRate' => $hitRate !== null ? number_format($hitRate, 1, ',', '.').' %' : '—',
-                                        'return' => $averageReturn !== null ? ($averageReturn > 0 ? '+' : '').number_format($averageReturn, 2, ',', '.').' %' : '—',
-                                    ]) }}"
-                                >
-                                    <span class="text-xs font-black tabular-nums">{{ $samples >= 5 && $hitRate !== null ? number_format($hitRate, 0, ',', '.').'%' : ($samples ?: '—') }}</span>
-                                </div>
-                            @endfor
-                        @endfor
-                        <div></div>
-                        @for ($scoreBucket = 0; $scoreBucket <= 9; $scoreBucket++)
-                            <div class="pt-1 text-center text-[10px] font-bold tabular-nums text-slate-500">{{ $scoreBucket }}–{{ $scoreBucket + 1 }}</div>
-                        @endfor
-                    </div>
-                    <p class="mt-3 text-center text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('X: KI-Score') }}</p>
-                    <p class="mt-4 text-center text-[10px] text-slate-500">{{ __('Graue Felder enthalten weniger als fünf validierte Prognosen und werden nicht farblich bewertet.') }}</p>
+                            <div class="grid grid-cols-[42px_repeat(10,minmax(34px,1fr))] gap-1">
+                                @for ($confidenceBucket = 9; $confidenceBucket >= 0; $confidenceBucket--)
+                                    <div class="flex items-center justify-end pr-1 text-[8px] font-bold tabular-nums text-slate-500">
+                                        {{ $confidenceBucket * 10 }}–{{ ($confidenceBucket + 1) * 10 }}
+                                    </div>
+                                    @for ($scoreBucket = 0; $scoreBucket <= 9; $scoreBucket++)
+                                        @php
+                                            $cell = $heatmap->get($scoreBucket.'-'.$confidenceBucket);
+                                            $samples = (int) ($cell->samples ?? 0);
+                                            $rawValue = $metric['key'] === 'samples'
+                                                ? $samples
+                                                : (is_numeric(data_get($cell, $metric['key'])) ? (float) data_get($cell, $metric['key']) : null);
+                                            $hasValue = $metric['key'] === 'samples' ? $samples > 0 : ($samples >= 5 && $rawValue !== null);
+                                            $good = match ($metric['key']) {
+                                                'hit_rate' => $rawValue >= 55,
+                                                'profit_factor' => $rawValue >= 1.25,
+                                                'drawdown' => $rawValue <= 25,
+                                                'samples' => $rawValue >= 20,
+                                            };
+                                            $weak = match ($metric['key']) {
+                                                'hit_rate' => $rawValue < 45,
+                                                'profit_factor' => $rawValue < 1,
+                                                'drawdown' => $rawValue > 45,
+                                                'samples' => $rawValue < 5,
+                                            };
+                                            $cellClass = ! $hasValue
+                                                ? 'border-white/[.05] bg-slate-500/[.07] text-slate-600'
+                                                : ($good
+                                                    ? 'border-emerald-300/25 bg-emerald-400/20 text-emerald-100'
+                                                    : ($weak
+                                                        ? 'border-rose-400/20 bg-rose-400/15 text-rose-200'
+                                                        : 'border-amber-300/20 bg-amber-300/12 text-amber-100'));
+                                            $displayValue = ! $hasValue
+                                                ? ($samples ?: '—')
+                                                : ($metric['key'] === 'profit_factor'
+                                                    ? number_format($rawValue, 2, ',', '.')
+                                                    : number_format($rawValue, 0, ',', '.').$metric['suffix']);
+                                        @endphp
+                                        <div
+                                            class="flex min-h-7 items-center justify-center rounded-[5px] border {{ $cellClass }}"
+                                            title="{{ __('Score :scoreFrom–:scoreTo · Konfidenz :confidenceFrom–:confidenceTo % · :metric: :value · :samples Trades', [
+                                                'scoreFrom' => $scoreBucket,
+                                                'scoreTo' => $scoreBucket + 1,
+                                                'confidenceFrom' => $confidenceBucket * 10,
+                                                'confidenceTo' => ($confidenceBucket + 1) * 10,
+                                                'metric' => $metric['label'],
+                                                'value' => $displayValue,
+                                                'samples' => $samples,
+                                            ]) }}"
+                                        >
+                                            <span class="text-[9px] font-black tabular-nums">{{ $displayValue }}</span>
+                                        </div>
+                                    @endfor
+                                @endfor
+                                <div></div>
+                                @for ($scoreBucket = 0; $scoreBucket <= 9; $scoreBucket++)
+                                    <div class="text-center text-[8px] font-bold tabular-nums text-slate-500">{{ $scoreBucket }}–{{ $scoreBucket + 1 }}</div>
+                                @endfor
+                            </div>
+                        </article>
+                    @endforeach
                 </div>
+                <p class="mt-3 text-center text-[10px] text-slate-500">{{ __('Graue Felder enthalten zu wenige validierte Prognosen für eine belastbare Bewertung.') }}</p>
             </div>
         </section>
     </div>

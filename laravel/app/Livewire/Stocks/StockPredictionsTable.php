@@ -291,25 +291,33 @@ final class StockPredictionsTable extends Component
         $latestPredictions = DB::table('predictions')
             ->selectRaw('instrument_id, MAX(id) AS prediction_id')
             ->groupBy('instrument_id');
+        $latestQuotes = DB::table('current_stock_quotes')
+            ->where('status', 'current')
+            ->selectRaw('instrument_id, MAX(id) AS quote_id')
+            ->groupBy('instrument_id');
 
         return DB::table('instruments as instrument')
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
             ->leftJoinSub($latestPredictions, 'latest', fn ($join) =>
                 $join->on('latest.instrument_id', '=', 'instrument.id'))
             ->leftJoin('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
+            ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) =>
+                $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
+            ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
             ->select([
                 'instrument.id', 'instrument.symbol', 'instrument.name', 'instrument.country',
                 'instrument.sector', 'instrument.industry', 'instrument.currency',
-                'prediction.current_price', 'prediction.predicted_price_5d',
+                'prediction.predicted_price_5d',
                 'prediction.prediction_score', 'prediction.confidence',
                 'prediction.prediction_time',
             ])
+            ->selectRaw('COALESCE(current_quote.price, prediction.current_price) AS current_price')
             ->selectRaw('COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) AS risk_score')
             ->selectRaw("{$signalSql} AS signal")
-            ->selectRaw('((prediction.predicted_price_5d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100 AS expected_return_5d');
+            ->selectRaw('((prediction.predicted_price_5d - COALESCE(current_quote.price, prediction.current_price)) / NULLIF(COALESCE(current_quote.price, prediction.current_price), 0)) * 100 AS expected_return_5d');
     }
 
     private function sortableColumns(): array
@@ -319,7 +327,7 @@ final class StockPredictionsTable extends Component
             'name' => 'instrument.name',
             'country' => 'instrument.country',
             'sector' => 'instrument.sector',
-            'current_price' => 'prediction.current_price',
+            'current_price' => 'COALESCE(current_quote.price, prediction.current_price)',
             'predicted_price_5d' => 'prediction.predicted_price_5d',
             'expected_return_5d' => 'expected_return_5d',
             'prediction_score' => '(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END)',
