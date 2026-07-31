@@ -36,6 +36,10 @@
         .model-table th:not(:first-child), .model-table td:not(:first-child) { text-align: right; }
         .model-table td:first-child { font-weight: 800; color: #1f3046; }
         .tier { display: inline-block; min-width: 74px; padding: 2px 5px; border-radius: 4px; background: #dce7ef; color: #314258; font-weight: 800; text-align: center; }
+        .exit-matrix th:not(:first-child), .exit-matrix td:not(:first-child) { text-align: center; }
+        .exit-matrix td:first-child { width: 22%; font-weight: 800; color: #1f3046; }
+        .exit-matrix strong, .exit-matrix span { display: block; }
+        .exit-matrix span { margin-top: 1px; color: #66758a; font-size: 6.3px; }
         .footer { position: fixed; bottom: -20px; left: 0; right: 0; color: #7a8797; font-size: 7px; text-align: center; }
     </style>
 </head>
@@ -212,6 +216,42 @@
                 </tr>
             @empty
                 <tr><td colspan="8">Für diesen Lauf sind keine Modellstatistiken verfügbar.</td></tr>
+            @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Matrix Modell × Exit-Strategie</div>
+        @php
+            $exitStrategies = [
+                'fixed_20d' => '20 Tage',
+                'winner_runner' => 'Winner Runner',
+                'prediction_target' => 'Prognoseziel',
+            ];
+        @endphp
+        <table class="exit-matrix">
+            <thead>
+                <tr><th>Modell</th>@foreach ($exitStrategies as $strategyLabel)<th>{{ $strategyLabel }}</th>@endforeach</tr>
+            </thead>
+            <tbody>
+            @forelse ($modelExitMatrix as $modelName => $strategyRows)
+                <tr>
+                    <td>{{ $modelName }}</td>
+                    @foreach ($exitStrategies as $strategyCode => $strategyLabel)
+                        @php($cell = $strategyRows->firstWhere('strategy', $strategyCode))
+                        <td>
+                            @if ($cell)
+                                <strong class="{{ (float) $cell->average_return >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($cell->average_return) }}</strong>
+                                <span>{{ $formatPercent($cell->hit_rate) }} Hitrate · {{ number_format((int) $cell->trades, 0, ',', '.') }} Trades</span>
+                            @else
+                                <span>Keine Daten</span>
+                            @endif
+                        </td>
+                    @endforeach
+                </tr>
+            @empty
+                <tr><td colspan="4">Für diesen Lauf sind keine Daten zur Exit-Matrix verfügbar.</td></tr>
             @endforelse
             </tbody>
         </table>

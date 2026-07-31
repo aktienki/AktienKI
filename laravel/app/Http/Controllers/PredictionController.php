@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\RunFilteredBacktest;
 use App\Services\PersonalizedSignalService;
+use App\Services\SavedFilterLimitService;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Database\Query\Builder;
@@ -164,6 +165,11 @@ final class PredictionController extends Controller
 
     public function filterSetup(Request $request): View
     {
+        $filterState = collect(SavedPredictionFilterController::FILTER_DEFAULTS)
+            ->mapWithKeys(fn ($default, string $key) => [$key => $request->query($key, $default)])
+            ->all();
+        $request->session()->put('setup_filter_state', $filterState);
+
         $predictionView = $this->index($request);
         $predictionData = $predictionView->getData();
         $data = array_intersect_key($predictionData, array_flip([
@@ -180,6 +186,11 @@ final class PredictionController extends Controller
         ]));
         $data['setupMode'] = true;
         $data['activeBacktestRun'] = $this->requestedUserBacktestRun($request);
+        $data['savedFilters'] = $request->user()->savedPredictionFilters()->orderBy('name')->get();
+        $data['savedFilterLimit'] = app(SavedFilterLimitService::class)->limitFor($request->user());
+        $data['editingSavedFilter'] = $request->integer('saved_filter') > 0
+            ? $request->user()->savedPredictionFilters()->whereKey($request->integer('saved_filter'))->first()
+            : null;
 
         return view('predictions.heatmap', $data);
     }
@@ -489,13 +500,14 @@ final class PredictionController extends Controller
         $result = $this->filteredBacktestResult($request, $publicId)->getData(true);
         $settings = is_string($run->settings) ? (json_decode($run->settings, true) ?: []) : (array) $run->settings;
         $modelStatistics = $this->backtestModelStatistics((int) $run->id);
+        $modelExitMatrix = $this->backtestModelExitMatrix((int) $run->id);
         $chart = $this->reportChart([
             '20 Tage' => ['color' => '#14b8a6', 'points' => $result['strategy']],
             'Winner Runner' => ['color' => '#6366f1', 'points' => $result['winner_runner']],
             'Prognoseziel' => ['color' => '#e11d48', 'points' => $result['prediction_target']],
             'S&P 500' => ['color' => '#d97706', 'points' => $result['benchmark']],
         ]);
-        $html = view('predictions.backtest-report', compact('run', 'result', 'settings', 'chart', 'modelStatistics'))->render();
+        $html = view('predictions.backtest-report', compact('run', 'result', 'settings', 'chart', 'modelStatistics', 'modelExitMatrix'))->render();
         $options = new Options();
         $options->set('isRemoteEnabled', false);
         $options->set('defaultFont', 'DejaVu Sans');
@@ -535,6 +547,25 @@ final class PredictionController extends Controller
             ->selectRaw('MAX(trade.exit_date) AS last_trade')
             ->orderByDesc('trades')
             ->get();
+    }
+
+    private function backtestModelExitMatrix(int $runId)
+    {
+        return DB::table('backtest_strategy_trades as strategy_trade')
+            ->join('backtest_trades as trade', 'trade.id', '=', 'strategy_trade.backtest_trade_id')
+            ->leftJoin('model_definitions as model', 'model.id', '=', 'trade.model_definition_id')
+            ->where('strategy_trade.backtest_run_id', $runId)
+            ->whereIn('strategy_trade.strategy', ['fixed_20d', 'winner_runner', 'prediction_target'])
+            ->groupBy('trade.model_definition_id', 'model.public_alias', 'strategy_trade.strategy')
+            ->selectRaw("COALESCE(NULLIF(model.public_alias, ''), 'Unbekannt') AS model_name")
+            ->addSelect('strategy_trade.strategy')
+            ->selectRaw('COUNT(*) AS trades')
+            ->selectRaw('AVG(CASE WHEN strategy_trade.gross_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
+            ->selectRaw('AVG(strategy_trade.gross_return) * 100 AS average_return')
+            ->orderBy('model_name')
+            ->orderBy('strategy_trade.strategy')
+            ->get()
+            ->groupBy('model_name');
     }
 
     public function index(Request $request): View

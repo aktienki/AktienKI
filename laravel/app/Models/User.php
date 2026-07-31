@@ -57,6 +57,11 @@ class User extends Authenticatable
         return $this->hasMany(Portfolio::class);
     }
 
+    public function savedPredictionFilters(): HasMany
+    {
+        return $this->hasMany(SavedPredictionFilter::class);
+    }
+
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);

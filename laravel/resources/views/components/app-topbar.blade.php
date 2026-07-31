@@ -245,6 +245,10 @@
                                 <x-heroicon-o-funnel class="h-5 w-5 text-teal-500" />
                                 {{ __('Filter') }}
                             </a>
+                            <a href="{{ route('setup.saved-filters.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                                <x-heroicon-o-bookmark-square class="h-5 w-5 text-amber-400" />
+                                {{ __('Filter verwalten') }}
+                            </a>
                         </div>
                     </template>
                 </div>

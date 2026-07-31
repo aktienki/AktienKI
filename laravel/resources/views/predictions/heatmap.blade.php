@@ -128,6 +128,50 @@
         </form>
 
         @if ($setupMode)
+            <section x-data="{ saveOpen: false }" class="mb-3 flex shrink-0 items-center gap-2 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-3 py-2">
+                <div class="flex shrink-0 items-center gap-2 text-[10px] font-black uppercase tracking-[.1em] text-teal-400">
+                    <x-heroicon-o-bookmark class="h-4 w-4" />
+                    {{ __('Gespeicherte Filter') }}
+                    <span class="rounded-md bg-white/[.06] px-1.5 py-0.5 text-[9px] text-[var(--ak-muted)]">{{ $savedFilters->count() }} / {{ $savedFilterLimit }}</span>
+                    @if ($editingSavedFilter)<span class="rounded-md border border-amber-300/20 bg-amber-300/[.08] px-2 py-1 normal-case tracking-normal text-amber-200">{{ __('Bearbeitung: :name', ['name' => $editingSavedFilter->name]) }}</span>@endif
+                </div>
+                <div class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5">
+                    @forelse ($savedFilters as $savedFilter)
+                        <div class="flex shrink-0 items-center overflow-hidden rounded-md border border-white/[.08] bg-white/[.035]">
+                            <a href="{{ route('setup.filter', $savedFilter->filters ?? []) }}" class="px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:bg-teal-400/10 hover:text-teal-300">{{ $savedFilter->name }}</a>
+                            <form method="POST" action="{{ route('setup.filter.saved.destroy', $savedFilter) }}" class="border-l border-white/[.08]">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="flex h-7 w-7 items-center justify-center text-slate-500 hover:bg-rose-400/10 hover:text-rose-300" title="{{ __('Filter löschen') }}"><x-heroicon-o-x-mark class="h-3.5 w-3.5" /></button>
+                            </form>
+                        </div>
+                    @empty
+                        <span class="text-[10px] text-[var(--ak-muted)]">{{ __('Noch kein Filter gespeichert.') }}</span>
+                    @endforelse
+                </div>
+                <button type="button" @click="saveOpen = true" class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-teal-300/25 bg-teal-400/[.08] px-3 text-[10px] font-black text-teal-300 hover:bg-teal-400/15">
+                    @if ($editingSavedFilter)<x-heroicon-o-check class="h-3.5 w-3.5" />{{ __('Änderungen speichern') }}@else<x-heroicon-o-plus class="h-3.5 w-3.5" />{{ __('Filter speichern') }}@endif
+                </button>
+
+                <div x-show="saveOpen" x-cloak class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" @keydown.escape.window="saveOpen = false">
+                    <form method="POST" action="{{ route('setup.filter.saved.store') }}" class="w-full max-w-md rounded-2xl border border-teal-300/20 bg-[#15243a] p-5 shadow-2xl" @click.outside="saveOpen = false">
+                        @csrf
+                        @if ($editingSavedFilter)<input type="hidden" name="saved_filter" value="{{ $editingSavedFilter->id }}">@endif
+                        @foreach (\App\Http\Controllers\SavedPredictionFilterController::FILTER_KEYS as $filterKey)
+                            <input type="hidden" name="{{ $filterKey }}" value="{{ request($filterKey, \App\Http\Controllers\SavedPredictionFilterController::FILTER_DEFAULTS[$filterKey] ?? '') }}">
+                        @endforeach
+                        <div class="flex items-start justify-between gap-4">
+                            <div><p class="text-[10px] font-black uppercase tracking-[.14em] text-teal-400">{{ __('Filter speichern') }}</p><h2 class="mt-1 text-xl font-black text-white">{{ __('Filter benennen') }}</h2></div>
+                            <button type="button" @click="saveOpen = false" class="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white"><x-heroicon-o-x-mark class="h-4 w-4" /></button>
+                        </div>
+                        <label class="mt-5 block text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Name') }}
+                            <input name="name" value="{{ $editingSavedFilter?->name }}" maxlength="80" required autofocus class="ak-input mt-2 h-11 w-full rounded-lg px-3 text-sm font-bold text-white" placeholder="{{ __('z. B. Quality Europa') }}">
+                        </label>
+                        <p class="mt-3 text-[10px] text-slate-400">{{ __('Dein Tarif erlaubt :count gespeicherte Filter.', ['count' => $savedFilterLimit]) }}</p>
+                        <div class="mt-5 flex justify-end gap-2"><button type="button" @click="saveOpen = false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-bold text-slate-300">{{ __('Abbrechen') }}</button><button type="submit" class="h-10 rounded-lg border border-teal-300/30 bg-teal-400/15 px-5 text-xs font-black text-teal-200 hover:bg-teal-400/20">{{ __('Speichern') }}</button></div>
+                    </form>
+                </div>
+            </section>
+            @error('saved_filter')<p class="-mt-2 mb-2 shrink-0 text-xs font-bold text-rose-300">{{ $message }}</p>@enderror
             @php
                 $backtestIsActive = isset($activeBacktestRun) && in_array($activeBacktestRun?->status, ['queued', 'running'], true);
                 $backtestIsComplete = isset($activeBacktestRun) && in_array($activeBacktestRun?->status, ['completed', 'completed_with_errors'], true);
@@ -675,6 +719,12 @@
         #prediction-heatmap-filters .ak-input::placeholder {
             color: #f8fafc !important;
             opacity: 1;
+        }
+
+        #prediction-heatmap-filters input.ak-input:not([type="range"]):not([type="hidden"]) {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            line-height: 30px !important;
         }
 
         #prediction-heatmap-filters .ak-heatmap-range {

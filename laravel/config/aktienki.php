@@ -1,6 +1,12 @@
 <?php
 
 return [
+    'saved_filter_limits' => [
+        'free' => 1,
+        'pro' => 5,
+        'expert' => 20,
+        'default' => 1,
+    ],
     'python_engine' => [
         'path' => env('AKTIENKI_PYTHON_ENGINE_PATH', '/Users/silviotaubert/Downloads/python-engine'),
         'executable' => env('AKTIENKI_PYTHON_EXECUTABLE'),

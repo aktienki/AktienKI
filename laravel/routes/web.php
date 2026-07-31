@@ -23,6 +23,7 @@ use App\Livewire\Stocks\Index as StocksIndex;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LivePriceSubscriptionController;
 use App\Http\Controllers\MarketQuotesController;
+use App\Http\Controllers\SavedPredictionFilterController;
 use Illuminate\Http\Request;
 
 
@@ -184,6 +185,11 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::get('/setup/filter', [PredictionController::class, 'filterSetup'])->name('setup.filter');
+    Route::get('/setup/filters', [SavedPredictionFilterController::class, 'index'])->name('setup.saved-filters.index');
+    Route::post('/setup/filter/saved', [SavedPredictionFilterController::class, 'store'])->name('setup.filter.saved.store');
+    Route::patch('/setup/filter/saved/{savedFilter}', [SavedPredictionFilterController::class, 'update'])->name('setup.filter.saved.update');
+    Route::patch('/setup/filter/saved/{savedFilter}/link', [SavedPredictionFilterController::class, 'link'])->name('setup.filter.saved.link');
+    Route::delete('/setup/filter/saved/{savedFilter}', [SavedPredictionFilterController::class, 'destroy'])->name('setup.filter.saved.destroy');
     Route::post('/setup/filter/backtest', [PredictionController::class, 'startFilteredBacktest'])->name('setup.filter.backtest');
     Route::get('/setup/filter/backtest/{publicId}/result', [PredictionController::class, 'filteredBacktestResult'])->name('setup.filter.backtest.result');
     Route::get('/setup/filter/backtest/{publicId}/status', [PredictionController::class, 'filteredBacktestStatus'])->name('setup.filter.backtest.status');
