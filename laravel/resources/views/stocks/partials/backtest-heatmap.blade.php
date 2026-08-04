@@ -1,4 +1,19 @@
 @php
+    $currentHeatmapScore = $scorePercent ?? \App\Support\AiScore::toPercent(
+        $prediction?->prediction_score ?? $prediction?->ai_score ?? $prediction?->raw_ai_score
+    );
+    $currentHeatmapScore = is_numeric($currentHeatmapScore)
+        ? max(1, min(99, (float) $currentHeatmapScore))
+        : null;
+    $currentHeatmapConfidence = $confidencePercent
+        ?? (is_numeric($prediction?->confidence ?? $prediction?->confidence_score)
+            ? ((float) ($prediction?->confidence ?? $prediction?->confidence_score) <= 1
+                ? (float) ($prediction?->confidence ?? $prediction?->confidence_score) * 100
+                : (float) ($prediction?->confidence ?? $prediction?->confidence_score))
+            : null);
+    $currentHeatmapConfidence = is_numeric($currentHeatmapConfidence)
+        ? max(1, min(99, (float) $currentHeatmapConfidence))
+        : null;
     $stockHeatmapMetrics = [
         ['key' => 'hit_rate', 'label' => __('Hitrate'), 'suffix' => '%'],
         ['key' => 'profit_factor', 'label' => __('Profitfaktor'), 'suffix' => ''],
@@ -39,9 +54,35 @@
                 <article class="flex aspect-square min-h-0 min-w-0 flex-col rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]">
                     <div class="mb-2 flex items-center justify-between gap-2">
                         <h3 class="text-sm font-black text-[var(--ak-text)]">{{ $metric['label'] }}</h3>
-                        <span class="text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Y: Konfidenz') }} · {{ __('X: KI-Score') }}</span>
+                        <div class="flex items-center gap-2">
+                            @if ($currentHeatmapScore !== null)
+                                <span class="text-[8px] font-bold uppercase tracking-wide text-amber-300/60">{{ __('KI') }} {{ number_format($currentHeatmapScore / 10, 1, ',', '.') }}</span>
+                            @endif
+                            @if ($currentHeatmapConfidence !== null)
+                                <span class="text-[8px] font-bold uppercase tracking-wide text-amber-300/60">{{ __('Konf.') }} {{ number_format($currentHeatmapConfidence, 1, ',', '.') }} %</span>
+                            @endif
+                        </div>
                     </div>
-                    <div class="grid min-h-0 flex-1 grid-cols-[34px_repeat(10,minmax(0,1fr))] grid-rows-[repeat(10,minmax(0,1fr))_14px] gap-1">
+                    <div class="grid min-h-0 flex-1 grid-cols-[34px_repeat(10,minmax(0,1fr))] grid-rows-[repeat(10,minmax(0,1fr))_14px] gap-1" style="position: relative;">
+                        @if ($currentHeatmapScore !== null || $currentHeatmapConfidence !== null)
+                            <div
+                                aria-hidden="true"
+                                style="position: absolute; inset: 0 0 18px 38px; z-index: 20; overflow: hidden; pointer-events: none;"
+                            >
+                                @if ($currentHeatmapScore !== null)
+                                    <span
+                                        style="position: absolute; top: 0; bottom: 0; left: {{ $currentHeatmapScore }}%; display: block; width: 1px; background: repeating-linear-gradient(to bottom, rgba(251, 191, 36, .48) 0 4px, transparent 4px 8px);"
+                                        title="{{ __('Aktueller KI-Score') }}: {{ number_format($currentHeatmapScore / 10, 1, ',', '.') }}"
+                                    ></span>
+                                @endif
+                                @if ($currentHeatmapConfidence !== null)
+                                    <span
+                                        style="position: absolute; right: 0; bottom: {{ $currentHeatmapConfidence }}%; left: 0; display: block; height: 1px; background: repeating-linear-gradient(to right, rgba(251, 191, 36, .48) 0 4px, transparent 4px 8px);"
+                                        title="{{ __('Aktuelle Konfidenz') }}: {{ number_format($currentHeatmapConfidence, 1, ',', '.') }} %"
+                                    ></span>
+                                @endif
+                            </div>
+                        @endif
                         @for ($confidenceBucket = 9; $confidenceBucket >= 0; $confidenceBucket--)
                             <div class="flex items-center justify-end pr-1 text-[8px] font-bold tabular-nums text-[var(--ak-muted)]">
                                 {{ $confidenceBucket * 10 }}–{{ ($confidenceBucket + 1) * 10 }}

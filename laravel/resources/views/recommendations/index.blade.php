@@ -1,6 +1,6 @@
 <x-app-layout>
-    <div class="flex h-[calc(100dvh-89px)] min-h-0 flex-col py-4 text-[var(--ak-text)]">
-        <div class="mb-4 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div class="flex h-[calc(100dvh-89px)] min-h-0 flex-col py-3 text-[var(--ak-text)]">
+        <div class="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div class="flex items-center gap-3">
                 <div class="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300 shadow-[0_0_22px_rgba(245,158,11,.08)]">
                     <x-heroicon-o-sparkles class="h-6 w-6" />
@@ -25,10 +25,10 @@
             $hasFilters = $country !== '' || $sector !== '' || $exchangeId > 0;
         @endphp
 
-        <form method="GET" action="{{ route('recommendations.index') }}" class="mb-4 grid shrink-0 gap-2 rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
+        <form method="GET" action="{{ route('recommendations.index') }}" class="mb-3 grid shrink-0 gap-2 rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-2 shadow-[var(--ak-shadow)] sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
             <label class="relative">
                 <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[8px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Land') }}</span>
-                <select name="country" onchange="this.form.submit()" class="ak-input h-11 w-full pb-1 pt-4 text-xs font-bold">
+                <select name="country" onchange="this.form.submit()" class="ak-input h-10 w-full pb-1 pt-4 text-xs font-bold">
                     <option value="">{{ __('Alle Länder') }}</option>
                     @foreach ($countries as $option)
                         <option value="{{ $option }}" @selected($country === $option)>{{ $countryFlags[$option] ?? '🌐' }} {{ $option }}</option>
@@ -38,7 +38,7 @@
 
             <label class="relative">
                 <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[8px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Börsenplatz') }}</span>
-                <select name="exchange" onchange="this.form.submit()" class="ak-input h-11 w-full pb-1 pt-4 text-xs font-bold">
+                <select name="exchange" onchange="this.form.submit()" class="ak-input h-10 w-full pb-1 pt-4 text-xs font-bold">
                     <option value="">{{ __('Alle Börsenplätze') }}</option>
                     @foreach ($exchanges as $option)
                         <option value="{{ $option->id }}" @selected($exchangeId === (int) $option->id)>{{ $countryFlags[$option->country] ?? '🌐' }} {{ $option->name }} · {{ $option->code }} ({{ $option->stocks_count }})</option>
@@ -48,7 +48,7 @@
 
             <label class="relative sm:col-span-2 lg:col-span-1">
                 <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[8px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Sektor') }}</span>
-                <select name="sector" onchange="this.form.submit()" class="ak-input h-11 w-full pb-1 pt-4 text-xs font-bold">
+                <select name="sector" onchange="this.form.submit()" class="ak-input h-10 w-full pb-1 pt-4 text-xs font-bold">
                     <option value="">{{ __('Alle Sektoren') }}</option>
                     @foreach ($sectors as $option)
                         <option value="{{ $option }}" @selected($sector === $option)>{{ $option }}</option>
@@ -56,12 +56,12 @@
                 </select>
             </label>
 
-            <a href="{{ route('recommendations.index') }}" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:bg-teal-500/10 hover:text-teal-700 {{ $hasFilters ? '' : 'pointer-events-none opacity-40' }}">
+            <a href="{{ route('recommendations.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:bg-teal-500/10 hover:text-teal-700 {{ $hasFilters ? '' : 'pointer-events-none opacity-40' }}">
                 <x-heroicon-o-arrow-path class="h-4 w-4" />{{ __('Zurücksetzen') }}
             </a>
         </form>
 
-        <section class="grid min-h-0 flex-1 gap-4 lg:grid-cols-3">
+        <section class="grid min-h-0 flex-1 gap-3 lg:grid-cols-3">
             @forelse ($recommendations as $recommendation)
                 @php
                     $rank = (int) $recommendation->selection_rank;
@@ -121,7 +121,7 @@
                 @endphp
 
                 <article class="flex min-w-0 flex-col overflow-hidden rounded-2xl border {{ $rank === 1 ? 'border-amber-400/35' : 'border-[var(--ak-border)]' }} bg-[var(--ak-card-strong)] shadow-[var(--ak-shadow)] backdrop-blur-xl">
-                    <div class="flex h-[112px] shrink-0 items-start justify-between gap-3 border-b border-[var(--ak-border)] p-3">
+                    <div class="flex h-[98px] shrink-0 items-start justify-between gap-3 border-b border-[var(--ak-border)] p-2.5">
                         <div class="flex min-w-0 items-center gap-3">
                             <div class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--ak-border)] bg-white">
                                 <span class="text-[10px] font-black text-teal-700">{{ strtoupper(substr($recommendation->symbol, 0, 2)) }}</span>
@@ -189,7 +189,7 @@
                         </div>
                     </div>
 
-                    <div class="mt-1 grid h-[84px] shrink-0 grid-cols-3 gap-2 px-3 pb-3 pt-3">
+                    <div class="mt-1 grid h-[72px] shrink-0 grid-cols-3 gap-2 px-3 pb-2 pt-2">
                         <div class="min-h-0 overflow-hidden rounded-xl border border-emerald-400/20 bg-emerald-400/[.06] p-2 text-right">
                             <p class="flex items-center justify-end gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                                 <span data-live-time-symbol="{{ $recommendation->symbol }}">
@@ -213,17 +213,17 @@
                             </p>
                         </div>
                         <div class="min-h-0 overflow-hidden rounded-xl bg-[var(--ak-surface-muted)] p-2 text-right">
-                            <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Rendite Prognose 20 Tage') }}</p>
+                            <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Prognose 20 Tage') }}</p>
                             <p class="mt-0.5 text-lg font-black tabular-nums {{ $recommendation->expected_return_20d >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $recommendation->expected_return_20d >= 0 ? '+' : '' }}{{ number_format($recommendation->expected_return_20d, 2, ',', '.') }} %</p>
                         </div>
                     </div>
 
-                    <div class="mx-3 mb-2 mt-1 flex min-h-[108px] flex-1 flex-col overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
+                    <div class="mx-3 mb-1.5 mt-1 flex min-h-[92px] flex-1 flex-col overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
                         <div class="flex shrink-0 items-center justify-between px-3 py-1.5">
                             <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf · 32 Tage') }}</p>
                             <span class="text-[9px] font-bold text-teal-700">{{ __('Tageskerzen') }}</span>
                         </div>
-                        <div id="recommendation-chart-{{ $recommendation->instrument_id }}" class="relative min-h-[92px] w-full flex-1 border-t border-[var(--ak-border)] bg-[color-mix(in_srgb,var(--ak-card)_72%,transparent)]" aria-label="{{ __('Kurschart für :symbol', ['symbol' => $recommendation->symbol]) }}">
+                        <div id="recommendation-chart-{{ $recommendation->instrument_id }}" class="relative min-h-[72px] w-full flex-1 border-t border-[var(--ak-border)] bg-[color-mix(in_srgb,var(--ak-card)_72%,transparent)]" aria-label="{{ __('Kurschart für :symbol', ['symbol' => $recommendation->symbol]) }}">
                             <span data-chart-placeholder class="absolute inset-0 flex items-center justify-center gap-2 text-[9px] font-bold text-[var(--ak-muted)]">
                                 <span class="h-3 w-3 animate-spin rounded-full border-2 border-teal-500/25 border-t-teal-600"></span>
                                 {{ __('Kursdaten werden geladen') }}
@@ -231,7 +231,7 @@
                         </div>
                     </div>
 
-                    <div class="mx-3 mb-2 flex h-[52px] shrink-0 items-center justify-between gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2">
+                    <div class="mx-3 mb-1.5 flex h-[46px] shrink-0 items-center justify-between gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-1.5">
                         <div class="min-w-0">
                             <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Modellranking') }}</p>
                             <p class="mt-1 truncate text-sm font-black text-[var(--ak-text)]">{{ $recommendation->model_alias ?: '—' }}</p>
@@ -244,7 +244,7 @@
                         </div>
                     </div>
 
-                    <div class="grid h-[68px] shrink-0 grid-cols-3 gap-2 px-3 pb-2">
+                    <div class="grid h-[60px] shrink-0 grid-cols-3 gap-2 px-3 pb-1.5">
                         <div class="h-full min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2 shadow-sm">
                             <div class="mb-1.5 flex items-end justify-between gap-1">
                                 <span class="truncate text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
@@ -269,7 +269,7 @@
                         </div>
                     </div>
 
-                    <div class="mt-auto flex h-[48px] shrink-0 items-center justify-end border-t border-[var(--ak-border)] px-3 py-2">
+                    <div class="mt-auto flex h-[40px] shrink-0 items-center justify-end border-t border-[var(--ak-border)] px-3 py-1">
                         <a href="{{ route('stocks.show', ['symbol' => $recommendation->symbol, 'prediction' => $recommendation->prediction_id, 'return_to' => request()->getRequestUri()]) }}" class="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg bg-teal-700 px-3 text-xs font-black text-white transition hover:bg-teal-600">
                             {{ __('Details') }}<x-heroicon-o-arrow-right class="h-4 w-4" />
                         </a>
@@ -329,7 +329,13 @@
                     const values = Array.isArray(candle?.y) ? candle.y.slice(0, 4).map(Number) : [];
                     if (!Number.isFinite(timestamp) || values.length !== 4 || values.some(value => !Number.isFinite(value))) return;
                     const tradingDay = new Date(timestamp).toISOString().slice(0, 10);
-                    unique.set(tradingDay, { x: timestamp, y: values });
+                    const rising = values[3] >= values[0];
+                    unique.set(tradingDay, {
+                        x: timestamp,
+                        y: values,
+                        fillColor: rising ? '#20c9a0' : '#ee6678',
+                        strokeColor: rising ? '#20c9a0' : '#ee6678',
+                    });
                 });
 
                 return [...unique.values()].sort((left, right) => left.x - right.x);

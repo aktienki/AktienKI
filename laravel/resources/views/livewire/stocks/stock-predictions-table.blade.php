@@ -406,7 +406,7 @@
             aria-modal="true"
             aria-labelledby="watchlist-picker-title"
         >
-            <section class="w-full max-w-sm overflow-hidden rounded-2xl border border-violet-400/25 bg-[#171325] shadow-2xl shadow-black/60">
+            <section class="w-full max-w-sm overflow-hidden rounded-2xl border border-violet-400/25 bg-[#171325]/90 shadow-2xl shadow-black/60">
                 <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-[.16em] text-teal-700">{{ $watchlistPickerInstrument->symbol }}</p>

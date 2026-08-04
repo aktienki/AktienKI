@@ -86,11 +86,11 @@
                             <span class="mt-2 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Orientierung: mittlere Volatilität und historischer beziehungsweise modellierter Drawdown bis etwa 25 %.') }}</span>
                         </label>
 
-                        <label class="group relative cursor-pointer rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-amber-300/35 has-[:checked]:border-amber-300/60 has-[:checked]:bg-amber-300/[.08] has-[:checked]:ring-2 has-[:checked]:ring-amber-300/10">
+                        <label class="group relative cursor-pointer rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-rose-300/35 has-[:checked]:border-rose-300/55 has-[:checked]:bg-rose-400/[.08] has-[:checked]:ring-2 has-[:checked]:ring-rose-300/10">
                             <input class="sr-only" type="radio" name="risk_level" value="opportunity_oriented" @checked($selectedRiskLevel === 'opportunity_oriented')>
                             <span class="flex items-center justify-between gap-3">
-                                <strong class="text-sm text-amber-300">{{ __('Chancenorientiert') }}</strong>
-                                <x-heroicon-o-check-circle class="h-5 w-5 text-amber-300 opacity-0 transition group-has-[:checked]:opacity-100" />
+                                <strong class="text-sm text-rose-300">{{ __('Chancenorientiert') }}</strong>
+                                <x-heroicon-o-check-circle class="h-5 w-5 text-rose-300 opacity-0 transition group-has-[:checked]:opacity-100" />
                             </span>
                             <span class="mt-2 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Orientierung: höhere Volatilität und möglicher historischer beziehungsweise modellierter Drawdown über 25 %.') }}</span>
                         </label>

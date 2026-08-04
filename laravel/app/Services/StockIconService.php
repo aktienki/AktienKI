@@ -100,6 +100,50 @@ class StockIconService
         return null;
     }
 
+    public function refresh(Instrument $instrument): ?string
+    {
+        $directory = public_path('assets/stock-icons');
+        $backups = [];
+
+        foreach (array_unique(self::ALLOWED_TYPES) as $extension) {
+            $path = $directory.'/'.$instrument->id.'.'.$extension;
+
+            if (is_file($path)) {
+                $backup = $path.'.refresh-backup';
+                if (is_file($backup)) {
+                    unlink($backup);
+                }
+                rename($path, $backup);
+                $backups[$path] = $backup;
+            }
+        }
+
+        $missingMarker = $directory.'/'.$instrument->id.'.missing';
+        if (is_file($missingMarker)) {
+            unlink($missingMarker);
+        }
+
+        $downloaded = $this->findOrDownload($instrument);
+
+        if ($downloaded) {
+            foreach ($backups as $backup) {
+                if (is_file($backup)) {
+                    unlink($backup);
+                }
+            }
+
+            return $downloaded;
+        }
+
+        foreach ($backups as $path => $backup) {
+            if (is_file($backup)) {
+                rename($backup, $path);
+            }
+        }
+
+        return null;
+    }
+
     private function download(string $url, string $directory, int $instrumentId): ?string
     {
         $urlHost = parse_url($url, PHP_URL_HOST);

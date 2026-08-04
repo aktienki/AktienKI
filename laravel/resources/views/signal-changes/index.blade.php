@@ -54,7 +54,7 @@
                     @foreach ([90, 80, 70, 60, 50] as $value)<option value="{{ $value }}" @selected((string) request('confidence_min') === (string) $value)>{{ __('Konfidenz ab') }} {{ $value }} %</option>@endforeach
                 </select>
                 <select name="days" @change="$root.requestSubmit()" class="ak-input h-10 w-36 shrink-0 text-sm">
-                    @foreach ([1, 3, 7, 14, 30, 90, 180, 365] as $value)
+                    @foreach ([1, 2, 3, 7, 14, 30, 90, 180, 365] as $value)
                         <option value="{{ $value }}" @selected($days === $value)>{{ $value }} {{ $value === 1 ? __('Tag') : __('Tage') }}</option>
                     @endforeach
                 </select>

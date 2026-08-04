@@ -72,12 +72,17 @@
                     'features' => [__('Begrenzte Aktienauswahl'), __('Basis-KI-Scores'), __('Eine persönliche Watchlist'), __('Tägliche Marktübersicht')],
                 ],
                 [
-                    'name' => __('Pro'), 'price' => '19 €', 'suffix' => __('pro Monat'), 'featured' => true, 'planned' => false,
-                    'description' => __('Für Anleger mit regelmäßigem Analysebedarf.'),
-                    'features' => [__('Erweiterte Aktien- und Indexabdeckung'), __('Detaillierte KI-Analysen'), __('Mehrere Watchlists'), __('Risiko- und Trendsignale'), __('Priorisierte Datenaktualisierung')],
+                    'name' => __('Plus'), 'price' => '9,90 €', 'suffix' => __('pro Monat'), 'featured' => false, 'planned' => false,
+                    'description' => __('Für aktive Anleger und eigene Strategietests.'),
+                    'features' => [__('Größere Aktienauswahl'), __('Strategietester Long und Short'), __('Strategie Manager'), __('Drei gespeicherte Strategien')],
                 ],
                 [
-                    'name' => __('Expert'), 'price' => '49 €', 'suffix' => __('pro Monat'), 'featured' => false, 'planned' => true,
+                    'name' => __('Pro'), 'price' => '19 €', 'suffix' => __('pro Monat'), 'featured' => true, 'planned' => false,
+                    'description' => __('Für Anleger mit regelmäßigem Analysebedarf.'),
+                    'features' => [__('Erweiterte Aktien- und Indexabdeckung'), __('Eigenes Quality Gate'), __('Detaillierte KI-Analysen'), __('Mehrere Watchlists'), __('Risiko- und Trendsignale')],
+                ],
+                [
+                    'name' => __('Premium'), 'price' => '49 €', 'suffix' => __('pro Monat'), 'featured' => false, 'planned' => true,
                     'description' => __('Für intensive Recherche und umfassende Marktbeobachtung.'),
                     'features' => [__('Vollständige Marktabdeckung'), __('Alle KI-Modelle und Scores'), __('Unbegrenzte Watchlists'), __('Historische Modellvergleiche'), __('Erweiterte Exporte und Auswertungen')],
                 ],
@@ -85,7 +90,7 @@
         @endphp
 
         <div class="mt-7 grid items-stretch gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,3fr)_minmax(230px,.9fr)]">
-            <div class="grid items-stretch gap-5 md:grid-cols-3 md:gap-3 lg:min-h-0 lg:gap-4">
+            <div class="grid items-stretch gap-5 md:grid-cols-2 md:gap-3 xl:grid-cols-4 lg:min-h-0 lg:gap-4">
                 @foreach ($plans as $plan)
                     <article class="relative flex flex-col rounded-[1.5rem] border p-5 shadow-[var(--ak-shadow)] backdrop-blur-xl transition lg:min-h-0 {{ $plan['featured'] ? 'pricing-featured' : ($plan['planned'] ? 'pricing-planned' : 'border-[var(--ak-border)] bg-[var(--ak-card-strong)]') }}">
                         @if ($plan['featured'])

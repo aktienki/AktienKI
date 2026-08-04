@@ -47,12 +47,14 @@
 
         @if (session('status') === 'portfolio-created')
             <div class="mb-4 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm font-bold text-emerald-400">{{ __('Depot wurde angelegt.') }}</div>
+        @elseif (session('status'))
+            <div class="mb-4 rounded-xl border border-teal-400/25 bg-teal-400/10 px-4 py-3 text-sm font-bold text-teal-300">{{ session('status') }}</div>
         @endif
         @if ($errors->any())
             <div class="mb-4 rounded-xl border border-rose-400/25 bg-rose-400/10 px-4 py-3 text-sm font-bold text-rose-400">{{ $errors->first() }}</div>
         @endif
 
-        <section class="grid gap-4" :class="['idle', 'fading', 'returning', 'appearing'].includes(phase) ? 'md:grid-cols-2 xl:grid-cols-3' : 'xl:grid-cols-12'">
+        <section class="grid gap-3" :class="['idle', 'fading', 'returning', 'appearing'].includes(phase) ? '{{ $paperMode ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-2 xl:grid-cols-3' }}' : 'xl:grid-cols-12'">
             @foreach ($portfolios as $portfolio)
                 @php
                     $type = match ($portfolio->type) {
@@ -61,63 +63,136 @@
                         default => [__('Hauptdepot'), 'text-teal-600', 'bg-teal-500/10 border-teal-500/25', 'briefcase'],
                     };
                     $performance = (float) $portfolio->performance_percent;
+                    $isStrategyAccount = $paperMode && (bool) data_get($portfolio->meta, 'automation.live_enabled', false);
                 @endphp
-                <article x-show="!selected" x-transition.opacity.duration.1000ms class="flex min-h-72 flex-col overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)] transition hover:-translate-y-0.5 hover:border-teal-500/35">
-                    <div class="flex items-start justify-between gap-3 border-b border-[var(--ak-border)] p-4">
+                <article x-data="{ strategyOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--ak-card)] transition {{ $isStrategyAccount ? 'min-h-[29rem] border-cyan-300/50 shadow-[0_0_0_1px_rgba(34,211,238,.08),0_18px_45px_rgba(8,145,178,.16)] xl:row-span-2' : 'min-h-52 border-[var(--ak-border)] shadow-[var(--ak-shadow)] hover:border-teal-500/35' }}" @if($isStrategyAccount) style="background:linear-gradient(155deg,rgba(8,145,178,.14) 0%,rgba(21,36,58,.96) 34%,rgba(21,36,58,1) 100%);" @endif>
+                    @if($isStrategyAccount)<div class="h-1 w-full shrink-0 bg-gradient-to-r from-cyan-300/25 via-cyan-300 to-sky-400/25 shadow-[0_0_12px_rgba(34,211,238,.45)]"></div>@endif
+                    <div class="flex items-start justify-between gap-3 border-b border-[var(--ak-border)] {{ $isStrategyAccount ? 'p-4' : 'p-3' }}">
                         <div class="flex min-w-0 items-center gap-3">
-                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border {{ $type[2] }} {{ $type[1] }}">
-                                @if ($type[3] === 'beaker')<x-heroicon-o-beaker class="h-5 w-5" />
+                            <span class="flex shrink-0 items-center justify-center rounded-xl border {{ $isStrategyAccount ? 'h-11 w-11 border-cyan-300/35 bg-cyan-400/[.12] text-cyan-200 shadow-[0_0_18px_rgba(34,211,238,.12)]' : 'h-9 w-9 '.$type[2].' '.$type[1] }}">
+                                @if($isStrategyAccount)<x-heroicon-o-bolt class="h-5 w-5" />
+                                @elseif ($type[3] === 'beaker')<x-heroicon-o-beaker class="h-5 w-5" />
                                 @elseif ($type[3] === 'chart-bar-square')<x-heroicon-o-chart-bar-square class="h-5 w-5" />
                                 @else<x-heroicon-o-briefcase class="h-5 w-5" />@endif
                             </span>
                             <div class="min-w-0">
-                                @if ($portfolio->type !== 'strategy')
+                                @if($isStrategyAccount)
+                                    <p class="text-[9px] font-black uppercase tracking-[.14em] text-cyan-300">{{ __('Aktives Strategiedepot') }}</p>
+                                @elseif ($portfolio->type !== 'strategy')
                                     <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $type[0] }}</p>
                                 @endif
-                                <h2 class="{{ $portfolio->type !== 'strategy' ? 'mt-1' : '' }} truncate text-lg font-black">{{ $portfolio->name }}</h2>
+                                <h2 class="{{ $portfolio->type !== 'strategy' ? 'mt-1' : '' }} truncate font-black {{ $isStrategyAccount ? 'text-lg' : 'text-base' }}">{{ $portfolio->name }}</h2>
                             </div>
                         </div>
-                        @if ($portfolio->is_default)
-                            <span class="rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[9px] font-black uppercase text-amber-400">{{ __('Standard') }}</span>
-                        @endif
+                        <div class="flex items-center gap-1.5">
+                            @if(data_get($portfolio->meta, 'automation.live_enabled', false))<span class="inline-flex items-center gap-1.5 rounded-md border border-cyan-200/40 bg-cyan-300/[.16] px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-cyan-100 shadow-[0_0_12px_rgba(34,211,238,.12)]"><span class="h-1.5 w-1.5 rounded-full bg-cyan-200 shadow-[0_0_6px_rgba(165,243,252,.9)]"></span>{{ __('Strategie') }}</span>@endif
+                            @if ($portfolio->is_default)<span class="rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[9px] font-black uppercase text-amber-400">{{ __('Standard') }}</span>@endif
+                        </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2 p-4">
-                        <div class="rounded-xl bg-[var(--ak-surface-muted)] p-3">
+                    <div class="grid grid-cols-2 gap-2 {{ $isStrategyAccount ? 'p-4' : 'p-3' }}">
+                        <div class="rounded-xl bg-[var(--ak-surface-muted)] {{ $isStrategyAccount ? 'p-3' : 'p-2.5' }}">
                             <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Depotwert') }}</p>
-                            <p class="mt-1 text-xl font-black tabular-nums">{{ number_format($portfolio->current_value, 2, ',', '.') }} {{ $portfolio->currency }}</p>
+                            <p class="mt-1 font-black tabular-nums {{ $isStrategyAccount ? 'text-xl' : 'text-base' }}">{{ number_format($portfolio->current_value, 2, ',', '.') }} {{ $portfolio->currency }}</p>
                         </div>
-                        <div class="rounded-xl bg-[var(--ak-surface-muted)] p-3">
-                            <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Performance') }}</p>
-                            <p class="mt-1 text-xl font-black tabular-nums {{ $performance > 0 ? 'text-emerald-400' : ($performance < 0 ? 'text-rose-400' : 'text-[var(--ak-muted)]') }}">{{ $performance > 0 ? '+' : '' }}{{ number_format($performance, 2, ',', '.') }} %</p>
+                        <div class="rounded-xl bg-[var(--ak-surface-muted)] {{ $isStrategyAccount ? 'p-3' : 'p-2.5' }}">
+                            <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kapital') }}</p>
+                            <p class="mt-1 font-black tabular-nums text-amber-300 {{ $isStrategyAccount ? 'text-xl' : 'text-base' }}">{{ number_format((float) $portfolio->initial_capital, 2, ',', '.') }} {{ $portfolio->currency }}</p>
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between px-4 pb-4 text-xs">
+                    @if($portfolio->type === 'paper')
+                        <div class="{{ $isStrategyAccount ? 'px-4 pb-3' : 'px-3 pb-2' }}">
+                            <p class="mb-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Aktive Strategien') }}</p>
+                            @if($portfolio->strategies->isEmpty())
+                                <span class="inline-flex rounded-md border border-amber-300/20 bg-amber-300/[.06] px-2.5 py-1 text-[10px] font-bold text-amber-300">{{ __('Keine Strategie zugeordnet') }}</span>
+                            @else
+                                <div class="flex flex-wrap gap-1.5">
+                                    @foreach($portfolio->strategies as $strategy)
+                                        <span class="inline-flex items-center gap-1.5 rounded-md border border-cyan-300/20 bg-cyan-400/[.07] px-2.5 py-1 text-[10px] font-black text-cyan-200" title="{{ __('Priorität') }} {{ $strategy->pivot->priority }}">
+                                            <span class="h-1.5 w-1.5 rounded-full bg-cyan-300"></span>{{ $strategy->name }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <div class="flex items-center justify-between {{ $isStrategyAccount ? 'px-4 pb-4' : 'px-3 pb-2' }} text-xs">
                         <span class="text-[var(--ak-muted)]">{{ __('Positionen') }}</span>
                         <strong>{{ $portfolio->positions->count() }}</strong>
                     </div>
-                    <div class="mx-4 h-1.5 overflow-hidden rounded-full bg-[var(--ak-surface-muted)]">
+                    <div class="{{ $isStrategyAccount ? 'mx-4 h-1.5' : 'mx-3 h-1' }} overflow-hidden rounded-full bg-[var(--ak-surface-muted)]">
                         <div class="h-full rounded-full bg-teal-600" style="width: {{ min(100, $portfolio->positions->count() * 10) }}%"></div>
                     </div>
 
-                    <div class="mt-auto flex items-center justify-between border-t border-[var(--ak-border)] px-4 py-3">
-                        <p class="max-w-[65%] truncate text-[10px] text-[var(--ak-muted)]">{{ $portfolio->description ?: __('Noch keine Beschreibung hinterlegt.') }}</p>
+                    <div class="mt-auto flex items-center justify-between gap-2 border-t border-[var(--ak-border)] {{ $isStrategyAccount ? 'px-4 py-3' : 'px-3 py-2' }}">
+                        <div class="flex min-w-0 items-center gap-1.5">
+                        @if($portfolio->type === 'paper')
+                            <button type="button" @click="strategyOpen=true" title="{{ __('Strategien verwalten') }}" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-cyan-300/20 bg-cyan-400/[.07] px-2.5 text-[10px] font-black text-cyan-200"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" /><span class="hidden 2xl:inline">{{ __('Strategien') }}</span></button>
+                            <button type="button" @click="capitalOpen=true" title="{{ __('Kapital festlegen') }}" class="inline-flex h-9 items-center justify-center rounded-lg border border-teal-300/20 bg-teal-400/[.07] px-2.5 text-teal-300"><x-heroicon-o-banknotes class="h-4 w-4" /></button>
+                            <button type="button" @click="resetOpen=true" title="{{ __('Depot zurücksetzen') }}" class="inline-flex h-9 items-center justify-center rounded-lg border border-amber-300/20 bg-amber-400/[.07] px-2.5 text-amber-300"><x-heroicon-o-arrow-path class="h-4 w-4" /></button>
+                            <button type="button" @click="deleteOpen=true" title="{{ __('Musterdepot löschen') }}" class="inline-flex h-9 items-center justify-center rounded-lg border border-rose-300/20 bg-rose-400/[.07] px-2.5 text-rose-300"><x-heroicon-o-trash class="h-4 w-4" /></button>
+                        @endif
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                        @if($portfolio->type === 'paper')
+                            <a href="{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => $paperMode ? 'paper' : 'depots', 'test' => 1]) }}" class="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-3 text-xs font-black text-white shadow-lg shadow-amber-950/20">
+                                <x-heroicon-o-play class="h-4 w-4" />{{ __('Depot testen') }}
+                            </a>
+                        @endif
                         <a href="{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => $paperMode ? 'paper' : 'depots']) }}" class="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:text-teal-700">
                             {{ __('Öffnen') }}<x-heroicon-o-arrow-right class="h-4 w-4" />
                         </a>
+                        </div>
                     </div>
+
+                    @if($portfolio->type === 'paper')
+                        <div x-show="strategyOpen" x-cloak class="fixed inset-0 z-[130] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-sm" @keydown.escape.window="strategyOpen=false">
+                            <div class="isolate w-full max-w-xl rounded-2xl border border-cyan-300/25 p-6 shadow-2xl" style="background-color: rgba(22, 37, 58, 0.90);" @click.outside="strategyOpen=false">
+                                <div class="flex items-start justify-between gap-4"><div><p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-300">{{ __('Musterdepot') }}</p><h2 class="mt-1 text-xl font-black text-white">{{ __('Strategien verwalten') }}</h2><p class="mt-2 text-sm text-slate-300">{{ $portfolio->name }}</p></div><button type="button" @click="strategyOpen=false" class="text-slate-400 hover:text-white"><x-heroicon-o-x-mark class="h-6 w-6" /></button></div>
+                                <form id="portfolio-strategies-{{ $portfolio->id }}" method="POST" action="{{ route('depots.strategies.update', $portfolio) }}" class="mt-5 grid gap-2 sm:grid-cols-2">@csrf @method('PUT')
+                                    @forelse($availableStrategies as $strategy)
+                                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-slate-950/25 p-3 text-sm font-bold text-slate-200"><input type="checkbox" name="strategies[]" value="{{ $strategy->id }}" @checked($portfolio->strategies->contains('id', $strategy->id)) class="h-4 w-4 rounded border-slate-500 bg-slate-900 text-teal-500 focus:ring-teal-500/30"><span>{{ $strategy->name }}</span></label>
+                                    @empty
+                                        <p class="sm:col-span-2 rounded-xl border border-amber-300/20 bg-amber-400/[.06] p-4 text-sm text-amber-200">{{ __('Es wurden noch keine Strategien gespeichert.') }}</p>
+                                    @endforelse
+                                </form>
+                                <div class="mt-5 flex justify-end gap-2"><button type="button" @click="strategyOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Abbrechen') }}</button><button type="button" @click="strategyOpen=false; strategyConfirmOpen=true" class="h-10 rounded-lg bg-gradient-to-r from-teal-600 to-cyan-600 px-4 text-xs font-black text-white">{{ __('Auswahl übernehmen') }}</button></div>
+                            </div>
+                        </div>
+
+                        <div x-show="strategyConfirmOpen" x-cloak class="fixed inset-0 z-[131] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-sm" @keydown.escape.window="strategyConfirmOpen=false">
+                            <div class="isolate w-full max-w-lg rounded-2xl border border-cyan-300/25 p-6 shadow-2xl" style="background-color: rgba(22, 37, 58, 0.80);"><x-heroicon-o-adjustments-horizontal class="h-9 w-9 text-cyan-300" /><h2 class="mt-4 text-xl font-black text-white">{{ __('Strategiezuordnung ändern?') }}</h2><p class="mt-3 text-sm leading-6 text-slate-200">{{ __('Hinzugefügte Strategien steuern dieses Depot künftig parallel. Entfernte Strategien lösen keine neuen Transaktionen mehr aus; bestehende Positionen und Historien bleiben erhalten.') }}</p><div class="mt-5 flex justify-end gap-2"><button type="button" @click="strategyConfirmOpen=false; strategyOpen=true" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Zurück') }}</button><button type="submit" form="portfolio-strategies-{{ $portfolio->id }}" class="h-10 rounded-lg bg-gradient-to-r from-teal-600 to-cyan-600 px-4 text-xs font-black text-white">{{ __('Zuordnung speichern') }}</button></div></div>
+                        </div>
+
+                        <div x-show="capitalOpen" x-cloak class="fixed inset-0 z-[132] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-sm" @keydown.escape.window="capitalOpen=false">
+                            <form method="POST" action="{{ route('depots.capital.update', $portfolio) }}" class="isolate w-full max-w-lg rounded-2xl border border-teal-300/25 p-6 shadow-2xl" style="background-color: rgba(22, 37, 58, 0.90);" @click.outside="capitalOpen=false">@csrf @method('PUT')
+                                <x-heroicon-o-banknotes class="h-9 w-9 text-teal-300" />
+                                <h2 class="mt-4 text-xl font-black text-white">{{ __('Kapital festlegen') }}</h2>
+                                <p class="mt-3 text-sm leading-6 text-slate-200">{{ __('Das Startkapital bestimmt die verfügbare Kapitalbasis für Simulationen und automatische Depottransaktionen. Das Verrechnungskonto wird um die Differenz angepasst.') }}</p>
+                                <label class="mt-5 grid gap-2 text-[10px] font-black uppercase tracking-wide text-slate-300">{{ __('Startkapital') }}
+                                    <div class="relative"><input name="initial_capital" type="number" min="1000" max="1000000" step="100" required value="{{ number_format((float) data_get($portfolio->meta, 'automation.initial_capital', 10000), 0, '.', '') }}" class="ak-input h-12 w-full pr-14 text-base font-black tabular-nums"><span class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 font-black text-teal-300">{{ $portfolio->currency }}</span></div>
+                                </label>
+                                <div class="mt-5 flex justify-end gap-2"><button type="button" @click="capitalOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Abbrechen') }}</button><button class="h-10 rounded-lg bg-gradient-to-r from-teal-600 to-cyan-600 px-4 text-xs font-black text-white">{{ __('Kapital speichern') }}</button></div>
+                            </form>
+                        </div>
+
+                        <div x-show="resetOpen" x-cloak class="fixed inset-0 z-[133] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-sm" @keydown.escape.window="resetOpen=false">
+                            <form method="POST" action="{{ route('depots.reset', $portfolio) }}" class="isolate w-full max-w-lg rounded-2xl border border-amber-300/25 p-6 shadow-2xl" style="background-color: rgba(22, 37, 58, 0.80);">@csrf<x-heroicon-o-arrow-path class="h-9 w-9 text-amber-300" /><h2 class="mt-4 text-xl font-black text-white">{{ __('Musterdepot zurücksetzen?') }}</h2><p class="mt-3 text-sm leading-6 text-slate-200">{{ __('Alle Positionen, Transaktionen, Kontobuchungen und Simulationsergebnisse werden endgültig gelöscht. Strategien und das Depot selbst bleiben erhalten; das Konto wird auf das Startkapital zurückgesetzt.') }}</p><label class="mt-4 flex gap-3 rounded-xl border border-amber-300/20 bg-amber-400/[.06] p-3 text-sm font-bold text-amber-100"><input required type="checkbox" name="confirm_reset" value="1" class="mt-0.5 h-4 w-4 rounded bg-slate-950 text-amber-500"><span>{{ __('Ich bestätige das Löschen der gesamten Depothistorie.') }}</span></label><div class="mt-5 flex justify-end gap-2"><button type="button" @click="resetOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Abbrechen') }}</button><button class="h-10 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-4 text-xs font-black text-white">{{ __('Depot zurücksetzen') }}</button></div></form>
+                        </div>
+
+                        <div x-show="deleteOpen" x-cloak class="fixed inset-0 z-[134] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-sm" @keydown.escape.window="deleteOpen=false">
+                            <form method="POST" action="{{ route('depots.destroy', $portfolio) }}" class="isolate w-full max-w-lg rounded-2xl border border-rose-300/30 p-6 shadow-2xl" style="background-color: rgba(22, 37, 58, 0.80);">@csrf @method('DELETE')<x-heroicon-o-trash class="h-9 w-9 text-rose-300" /><h2 class="mt-4 text-xl font-black text-rose-100">{{ __('Musterdepot endgültig löschen?') }}</h2><p class="mt-3 text-sm leading-6 text-slate-200">{{ __('Das Depot, seine Strategiezuordnungen, Positionen, Transaktionen, Kontobuchungen und Berichte werden unwiderruflich gelöscht. Die Strategien selbst bleiben im Strategie Manager erhalten.') }}</p><label class="mt-4 flex gap-3 rounded-xl border border-rose-300/25 bg-rose-400/[.08] p-3 text-sm font-bold text-rose-100"><input required type="checkbox" name="confirm_delete" value="1" class="mt-0.5 h-4 w-4 rounded bg-slate-950 text-rose-500"><span>{{ __('Ich bestätige die endgültige Löschung dieses Musterdepots.') }}</span></label><div class="mt-5 flex justify-end gap-2"><button type="button" @click="deleteOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Abbrechen') }}</button><button class="h-10 rounded-lg bg-gradient-to-r from-rose-600 to-red-700 px-4 text-xs font-black text-white">{{ __('Endgültig löschen') }}</button></div></form>
+                        </div>
+                    @endif
                 </article>
             @endforeach
 
             @if ($portfolios->isEmpty())
                 @php
                     $starterDepots = $paperMode
-                        ? [
-                            ['paper', __('KI-Musterdepot'), __('Teste die aktuell besten KI-Empfehlungen in einem virtuellen Depot.'), 'sparkles', 'EUR', []],
-                            ['paper', __('Chancen-Musterdepot'), __('Beobachte chancenorientierte Aktien mit höherem Renditepotenzial.'), 'chart', 'EUR', []],
-                            ['paper', __('Defensives Musterdepot'), __('Simuliere eine ruhigere Auswahl mit Fokus auf Risiko und Stabilität.'), 'shield', 'EUR', []],
-                        ]
+                        ? []
                         : [
                             ...$strategyTemplates,
                         ];
@@ -135,6 +210,24 @@
                         <x-depot-template-card :type="$type" :name="$name" :description="$description" :icon="$icon" :currency="$currency" :stocks="$stocks" :instrument-ids="$stockInstrumentIds" />
                     </div>
                 @endforeach
+                @if ($paperMode)
+                    <article class="col-span-full mx-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
+                        <div class="flex items-center gap-3 border-b border-[var(--ak-border)] px-5 py-4">
+                            <span class="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-400/10 text-amber-400"><x-heroicon-o-plus class="h-5 w-5" /></span>
+                            <div><p class="text-[9px] font-black uppercase tracking-[.14em] text-amber-400">{{ __('Neues Musterdepot') }}</p><h2 class="mt-1 text-lg font-black">{{ __('Virtuelles Depot einrichten') }}</h2></div>
+                        </div>
+                        <form method="POST" action="{{ route('depots.store') }}" class="grid gap-4 p-5 md:grid-cols-2">
+                            @csrf
+                            <input type="hidden" name="type" value="paper">
+                            <label class="grid gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Name') }}<input name="name" value="{{ old('name') }}" required maxlength="80" placeholder="{{ __('z. B. Momentum Europa') }}" class="ak-input h-11 text-sm normal-case"></label>
+                            <label class="grid gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Währung') }}<select name="currency" class="ak-input h-11 text-sm normal-case"><option>EUR</option><option>USD</option><option>CHF</option><option>GBP</option></select></label>
+                            <label class="grid gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Startkapital') }}<div class="relative"><input name="initial_capital" type="number" min="1000" max="1000000" step="100" value="{{ old('initial_capital', 10000) }}" required class="ak-input h-11 pr-10 text-sm normal-case tabular-nums"><span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-amber-400">&euro;</span></div></label>
+                            <label class="grid gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kosten je Trade') }}<div class="relative"><input name="trade_cost" type="number" min="0" max="1000" step="0.01" value="{{ old('trade_cost', 10) }}" required class="ak-input h-11 pr-10 text-sm normal-case tabular-nums"><span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-amber-400">&euro;</span></div></label>
+                            <label class="grid gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)] md:col-span-2">{{ __('Beschreibung') }}<textarea name="description" maxlength="500" rows="2" placeholder="{{ __('Ziel und Regeln dieses Musterdepots') }}" class="ak-input text-sm font-normal normal-case">{{ old('description') }}</textarea></label>
+                            <div class="md:col-span-2 flex items-center justify-between gap-4 border-t border-[var(--ak-border)] pt-4"><p class="text-[10px] text-[var(--ak-muted)]">{{ __('Das Musterdepot verwendet ausschließlich virtuelles Kapital.') }}</p><button type="submit" class="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-700 px-5 text-xs font-black text-white hover:bg-teal-600"><x-heroicon-o-plus class="h-4 w-4" />{{ __('Musterdepot anlegen') }}</button></div>
+                        </form>
+                    </article>
+                @endif
             @else
                 @unless ($paperMode)
                     @foreach ($strategyTemplates as [$type, $name, $description, $icon, $currency, $stocks])
@@ -152,7 +245,7 @@
                         </div>
                     @endforeach
                 @endunless
-                <div x-data="{ open: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="min-h-72 rounded-2xl border border-dashed border-[var(--ak-border)] bg-[var(--ak-card)] p-5">
+                <div x-data="{ open: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="{{ $paperMode ? 'min-h-52 p-3' : 'min-h-72 p-5' }} rounded-2xl border border-dashed border-[var(--ak-border)] bg-[var(--ak-card)]">
                     <button type="button" @click="open = !open" class="flex h-full w-full flex-col items-center justify-center text-center text-[var(--ak-muted)] transition hover:text-teal-700" x-show="!open">
                         <span class="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]"><x-heroicon-o-plus class="h-6 w-6" /></span>
                         <strong class="mt-4 text-sm">{{ __('Weiteres Depot anlegen') }}</strong>
@@ -166,6 +259,12 @@
                             <select name="type" class="ak-input h-10 text-sm"><option value="strategy">{{ __('Strategiedepot') }}</option><option value="paper">{{ __('Musterdepot') }}</option></select>
                         @endif
                         <select name="currency" class="ak-input h-10 text-sm"><option>EUR</option><option>USD</option><option>CHF</option><option>GBP</option></select>
+                        @if ($paperMode)
+                            <div class="grid grid-cols-2 gap-2">
+                                <input name="initial_capital" type="number" min="1000" max="1000000" step="100" value="10000" required placeholder="{{ __('Startkapital') }}" class="ak-input h-10 text-sm">
+                                <input name="trade_cost" type="number" min="0" max="1000" step="0.01" value="10" required placeholder="{{ __('Kosten') }}" class="ak-input h-10 text-sm">
+                            </div>
+                        @endif
                         <textarea name="description" maxlength="500" rows="3" placeholder="{{ __('Kurze Beschreibung') }}" class="ak-input text-sm"></textarea>
                         <div class="flex gap-2"><button type="button" @click="open = false" class="h-10 flex-1 rounded-xl border border-[var(--ak-border)] text-xs font-bold text-[var(--ak-muted)]">{{ __('Abbrechen') }}</button><button type="submit" class="h-10 flex-1 rounded-xl bg-teal-700 text-xs font-black text-white">{{ __('Anlegen') }}</button></div>
                     </form>

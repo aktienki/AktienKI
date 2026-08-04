@@ -1,9 +1,9 @@
 <x-app-layout>
     <div id="sectors-page" class="ak-body text-[var(--ak-text)]">
         <div id="sectors-page-heading" class="z-30 border-b border-[var(--ak-border)] bg-[var(--ak-bg)]/95 py-4 backdrop-blur-xl">
-            <div class="ak-container flex items-center justify-between gap-4">
+            <div class="ak-container flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-teal-500">{{ __('Marktstruktur') }}</p>
+                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-cyan-500">aKI Sector Intelligence</p>
                     <h1 class="mt-1 text-2xl font-black">{{ __('Sektoren') }}</h1>
                 </div>
                 <span class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-3 py-2 text-xs font-bold text-[var(--ak-muted)]">
@@ -47,7 +47,7 @@
                             <article onclick="window.location.href=@js($cardTarget)" class="flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
                                 <div class="flex min-h-[66px] items-center justify-between gap-2 border-b border-[var(--ak-border)] p-3">
                                     <div class="flex min-w-0 items-center gap-2.5">
-                                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-500/10 text-teal-500">
+                                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-500/10 text-cyan-500">
                                             <x-sector-icon :sector="$sector->sector" class="h-5 w-5" />
                                         </span>
                                         <div class="min-w-0">
@@ -55,7 +55,7 @@
                                             <p class="mt-0.5 truncate text-[9px] font-bold text-[var(--ak-muted)]">{{ $sector->analyzed_count }} {{ __('analysiert') }}</p>
                                         </div>
                                     </div>
-                                    <span class="shrink-0 rounded-md border border-teal-500/20 bg-teal-500/10 px-2 py-1 text-[8px] font-black text-teal-500">{{ $sector->stocks_count }} {{ __('Aktien') }}</span>
+                                    <span class="shrink-0 rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[8px] font-black text-cyan-500">{{ $sector->stocks_count }} {{ __('Aktien') }}</span>
                                 </div>
 
                                 <div class="p-3">
@@ -63,7 +63,7 @@
                                         <span class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
                                         <strong class="text-base font-black {{ $cardScoreClass }}">{{ $cardScore !== null ? number_format($cardScore, 1, ',', '.') : '—' }}<small class="ml-1 text-[8px] text-[var(--ak-muted)]">/10</small></strong>
                                     </div>
-                                    <x-dashboard.score-stripes :percent="$cardScorePercent ?? 0" />
+                                    <x-dashboard.score-stripes :percent="$cardScorePercent ?? 0" palette="cyan" />
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-2 px-3 pb-3">
@@ -90,18 +90,6 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-auto grid grid-cols-4 gap-1 border-t border-[var(--ak-border)] p-2.5">
-                                    @foreach ([
-                                        ['SELL', 'sell_count', 'sell'],
-                                        ['HOLD', 'hold_count', 'hold'],
-                                        ['WATCH', 'watch_count', 'watch'],
-                                        ['BUY', 'buy_count', 'buy'],
-                                    ] as [$signal, $countKey, $tone])
-                                        <a href="{{ route('stocks.index', ['sector' => $sector->sector, 'signal' => $signal]) }}" onclick="event.stopPropagation()" class="ak-sector-card-signal ak-sector-signal-{{ $tone }} {{ (int) $sector->{$countKey} === 0 ? 'pointer-events-none opacity-20' : '' }}">
-                                            <span>{{ __(ucfirst(strtolower($signal))) }}</span><b>{{ $sector->{$countKey} }}</b>
-                                        </a>
-                                    @endforeach
-                                </div>
                             </article>
                         @empty
                             <article class="col-span-full grid min-h-[280px] place-items-center rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] text-sm text-[var(--ak-muted)]">{{ __('Noch keine Sektordaten vorhanden.') }}</article>
@@ -112,14 +100,13 @@
                 <div id="sectors-table-scroll" class="hidden">
                     <table id="sectors-table" class="w-full table-fixed border-separate border-spacing-x-0 border-spacing-y-2 text-left">
                         <colgroup>
-                            <col style="width: 14%">
-                            <col style="width: 7%">
-                            <col style="width: 13%">
-                            <col style="width: 9%">
+                            <col style="width: 21%">
                             <col style="width: 10%">
-                            <col style="width: 9%">
-                            <col style="width: 9%">
-                            <col style="width: 29%">
+                            <col style="width: 18%">
+                            <col style="width: 13%">
+                            <col style="width: 14%">
+                            <col style="width: 12%">
+                            <col style="width: 12%">
                         </colgroup>
                         <thead class="text-[10px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">
                             <tr>
@@ -134,7 +121,6 @@
                                         {{ __('Risiko P75') }} <span>↕</span>
                                     </button>
                                 </th>
-                                <th class="px-4 py-3">{{ __('Signale') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -174,10 +160,10 @@
                                     $target = route('stocks.index', ['sector' => $sector->sector]);
                                 @endphp
                                 <tr onclick="window.location.href=@js($target)" class="cursor-pointer text-sm">
-                                    <td colspan="8" class="p-0">
+                                    <td colspan="7" class="p-0">
                                         <div class="ak-sector-row-grid">
                                             <div data-column="sector" data-value="{{ $sector->sector }}" class="flex min-w-0 items-center gap-3 px-4 py-3">
-                                                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal-500/10 text-teal-500">
+                                                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-500/10 text-cyan-500">
                                                     <x-sector-icon :sector="$sector->sector" class="h-5 w-5" />
                                                 </span>
                                                 <div class="min-w-0">
@@ -189,7 +175,7 @@
                                             <div data-column="score" data-value="{{ $score ?? '' }}" class="flex flex-col justify-center px-4">
                                                 @if ($score !== null)
                                                     <div class="mb-1.5 flex items-baseline justify-between"><strong class="{{ $scoreClass }}">{{ number_format($score, 1, ',', '.') }}</strong><small class="text-[9px] text-[var(--ak-muted)]">/ 10</small></div>
-                                                    <x-dashboard.score-stripes :percent="$scorePercent" />
+                                                    <x-dashboard.score-stripes :percent="$scorePercent" palette="cyan" />
                                                 @else
                                                     <span class="text-center text-[var(--ak-muted)]">—</span>
                                                 @endif
@@ -224,29 +210,11 @@
                                                     </div>
                                                 @else<span class="text-[var(--ak-muted)]">—</span>@endif
                                             </div>
-                                            <div class="flex items-center px-4">
-                                                <div class="ak-sector-signal-grid">
-                                                    @foreach ([
-                                                        ['SELL', 'sell_count', 'sell'],
-                                                        ['HOLD', 'hold_count', 'hold'],
-                                                        ['WATCH', 'watch_count', 'watch'],
-                                                        ['BUY', 'buy_count', 'buy'],
-                                                    ] as [$signal, $countKey, $tone])
-                                                        @if ((int) $sector->{$countKey} > 0)
-                                                            <a href="{{ route('stocks.index', ['sector' => $sector->sector, 'signal' => $signal]) }}" onclick="event.stopPropagation()" class="ak-sector-signal ak-sector-signal-{{ $tone }}">
-                                                                <span>{{ __(ucfirst(strtolower($signal))) }}</span><b>{{ $sector->{$countKey} }}</b>
-                                                            </a>
-                                                        @else
-                                                            <span class="ak-sector-signal ak-sector-signal-{{ $tone }} ak-sector-signal-empty" aria-hidden="true"></span>
-                                                        @endif
-                                                    @endforeach
-                                                </div>
-                                            </div>
                                         </div>
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="8" class="py-16 text-center text-sm text-[var(--ak-muted)]">{{ __('Noch keine Sektordaten vorhanden.') }}</td></tr>
+                                <tr><td colspan="7" class="py-16 text-center text-sm text-[var(--ak-muted)]">{{ __('Noch keine Sektordaten vorhanden.') }}</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -268,11 +236,11 @@
                             <article class="ak-card ak-card-static flex min-h-[172px] flex-col p-4">
                                 <div class="ak-sector-comment-heading flex items-start justify-between gap-3">
                                     <div class="flex min-w-0 items-start gap-2.5">
-                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-teal-500/20 bg-teal-500/10 text-teal-500">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-500/20 bg-cyan-500/10 text-cyan-500">
                                             <x-sector-icon :sector="$comment['sector'] ?? null" class="h-4 w-4" />
                                         </span>
                                         <div class="min-w-0">
-                                            <p class="text-[9px] font-black uppercase tracking-[.16em] text-teal-500">{{ __('Sektorenkommentar') }}</p>
+                                            <p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-500">{{ __('Sektorenkommentar') }}</p>
                                             <h2 class="mt-0.5 truncate text-base font-black text-[var(--ak-text)]">{{ __((string) ($comment['sector'] ?? '—')) }}</h2>
                                         </div>
                                     </div>
@@ -303,18 +271,18 @@
         #sectors-comments-pane .ak-sector-comment-heading{flex:0 0 60px;height:60px;min-height:60px;overflow:visible}
         #sectors-comments-pane .ak-comment-copy{color:color-mix(in srgb,var(--ak-text) 86%,var(--ak-muted) 14%)}
         .ak-sector-tab{display:inline-flex;width:116px;height:34px;align-items:center;justify-content:center;gap:6px;border:1px solid var(--ak-border);border-bottom-width:2px;border-radius:9px 9px 5px 5px;padding:0 10px;font-size:10px;font-weight:900;letter-spacing:.035em;box-shadow:0 4px 10px rgba(3,7,18,.1);transition:none}
-        .ak-sector-tab-active{border-color:color-mix(in srgb,rgb(20 184 166) 38%,var(--ak-border));border-bottom-color:rgb(20 184 166);background:var(--ak-card);color:rgb(20 184 166);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 4px 12px rgba(3,7,18,.14)}
+        .ak-sector-tab-active{border-color:color-mix(in srgb,rgb(6 182 212) 38%,var(--ak-border));border-bottom-color:rgb(6 182 212);background:var(--ak-card);color:rgb(6 182 212);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 4px 12px rgba(3,7,18,.14)}
         .ak-sector-tab-idle{background:color-mix(in srgb,var(--ak-card) 72%,var(--ak-bg) 28%);color:var(--ak-muted)}
         #sectors-table{min-width:1180px}
         #sectors-table thead,#sectors-table thead th{background:var(--ak-surface)!important}
         #sectors-table thead th{position:sticky;top:0;z-index:20;box-shadow:0 1px 0 var(--ak-border),0 8px 16px rgba(3,7,18,.15)}
         #sectors-table tbody td{border:0!important;background:transparent!important}
-        .ak-sector-row-grid{display:grid;grid-template-columns:14% 7% 13% 9% 10% 9% 9% 29%;height:72px;align-items:stretch;overflow:hidden;border:1px solid var(--ak-border);border-radius:16px;background:var(--ak-card);box-shadow:0 5px 14px rgba(5,10,28,.14)}
+        .ak-sector-row-grid{display:grid;grid-template-columns:21% 10% 18% 13% 14% 12% 12%;height:72px;align-items:stretch;overflow:hidden;border:1px solid var(--ak-border);border-radius:16px;background:var(--ak-card);box-shadow:0 5px 14px rgba(5,10,28,.14)}
         #sectors-table tbody tr:nth-child(even) .ak-sector-row-grid{background:var(--ak-card-hover)}
-        #sectors-table tbody tr:hover .ak-sector-row-grid{background:color-mix(in srgb,var(--ak-card-hover) 90%,rgb(45 212 191) 10%)}
+        #sectors-table tbody tr:hover .ak-sector-row-grid{background:color-mix(in srgb,var(--ak-card-hover) 90%,rgb(34 211 238) 10%)}
         .ak-sector-sort{display:flex;align-items:center;gap:.35rem;white-space:nowrap}
         .ak-sector-sort span{font-size:.7rem;opacity:.55}
-        .ak-sector-sort[aria-sort] span{color:rgb(20 184 166);opacity:1}
+        .ak-sector-sort[aria-sort] span{color:rgb(6 182 212);opacity:1}
         .ak-sector-trend{display:inline-flex;width:84px;height:30px;flex:0 0 84px;align-items:center;justify-content:center;gap:6px;border-width:1px;border-radius:8px;padding:0 7px;font-weight:900;white-space:nowrap}
         .ak-sector-donut{position:relative;display:grid;width:48px;height:48px;flex:0 0 48px;place-items:center;border-radius:999px;background:conic-gradient(var(--color) 0 var(--value),rgba(148,163,184,.16) var(--value) 100%);box-shadow:0 0 14px color-mix(in srgb,var(--color) 18%,transparent)}
         .ak-sector-donut:after{position:absolute;inset:5px;border-radius:inherit;background:var(--ak-card);content:''}
@@ -322,16 +290,6 @@
         .ak-sector-donut span{position:relative;z-index:1;display:grid;grid-template-columns:auto auto;place-items:center;font-size:11px;font-weight:900;line-height:1}
         .ak-sector-donut small{margin-left:1px;color:var(--ak-muted);font-size:7px}
         .ak-sector-donut em{grid-column:1/-1;margin-top:2px;color:var(--ak-muted);font-size:6px;font-style:normal;letter-spacing:.08em}
-        .ak-sector-signal-grid{display:grid;grid-template-columns:repeat(4,80px);gap:6px;width:max-content;font-size:10px;font-weight:900}
-        .ak-sector-signal{display:flex;width:80px;height:30px;align-items:center;justify-content:space-between;gap:5px;border:1px solid;border-radius:8px;padding:0 8px;color:#fff;white-space:nowrap}
-        .ak-sector-signal b{min-width:21px;border:0;border-radius:0;background:transparent;padding:0;color:inherit;text-align:center}
-        .ak-sector-signal-sell{border-color:rgba(251,113,133,.72);background:rgba(225,29,72,.58)}
-        .ak-sector-signal-hold{border-color:rgba(252,211,77,.72);background:rgba(217,119,6,.56)}
-        .ak-sector-signal-watch{border-color:rgba(190,242,100,.68);background:rgba(101,163,13,.52)}
-        .ak-sector-signal-buy{border-color:rgba(110,231,183,.82);background:rgba(5,150,105,.72)}
-        .ak-sector-signal-empty{pointer-events:none;opacity:0;user-select:none}
-        .ak-sector-card-signal{display:flex;height:28px;min-width:0;align-items:center;justify-content:center;gap:3px;overflow:hidden;border:1px solid;border-radius:7px;padding:0 3px;color:#fff;font-size:7px;font-weight:900;white-space:nowrap}
-        .ak-sector-card-signal b{font-size:8px}
     </style>
 
     <script>

@@ -73,7 +73,7 @@
                         @foreach ($continentLabels as $continent => $continentLabel)
                             @php $continentMarkets = $marketsByContinent->get($continent, collect()); @endphp
                             @continue($continentMarkets->isEmpty())
-                            <section class="min-w-0 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-2.5 shadow-[var(--ak-shadow)]">
+                            <section class="min-w-0 overflow-hidden rounded-2xl border border-cyan-300/50 bg-[var(--ak-card)] p-2.5 shadow-[0_0_0_1px_rgba(34,211,238,.08),0_18px_45px_rgba(8,145,178,.14)]" style="background:linear-gradient(155deg,rgba(8,145,178,.11),transparent 42%),var(--ak-card);">
                                 <div class="mb-2.5 flex h-10 items-center justify-between border-b border-[var(--ak-border)] px-1 pb-2">
                                     <div class="flex items-center gap-2">
                                         <span class="grid h-8 w-8 place-items-center rounded-lg bg-teal-500/10 text-base">{{ $continentIcons[$continent] }}</span>
@@ -98,7 +98,7 @@
                                             $scoreClass = ($score ?? 0) >= 6.5 ? 'text-emerald-500' : (($score ?? 10) < 4.5 ? 'text-rose-500' : 'text-amber-500');
                                             $target = route('stocks.index', ['exchange' => $exchange->code]);
                                         @endphp
-                                        <article onclick="window.location.href=@js($target)" class="cursor-pointer overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
+                                        <article onclick="window.location.href=@js($target)" class="cursor-pointer overflow-hidden rounded-xl border border-cyan-300/20 bg-[var(--ak-surface-muted)]">
                                             <div class="flex items-start justify-between gap-2 border-b border-[var(--ak-border)] p-2.5">
                                                 <div class="flex min-w-0 items-center gap-2">
                                                     <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-teal-500/20 bg-teal-500/10 text-base">{{ $countryFlag($exchange->country) }}</span>
@@ -131,25 +131,13 @@
                                                     <span class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
                                                     <strong class="text-xs font-black {{ $scoreClass }}">{{ $score !== null ? number_format($score, 1, ',', '.') : '—' }}<small class="ml-1 text-[7px] text-[var(--ak-muted)]">/10</small></strong>
                                                 </div>
-                                                <x-dashboard.score-stripes :percent="$score !== null ? $score * 10 : 0" />
+                                                <x-dashboard.score-stripes :percent="$score !== null ? $score * 10 : 0" palette="teal" />
                                                 <div class="mt-2 grid grid-cols-2 gap-1.5 text-[8px]">
                                                     <div class="flex items-center justify-between rounded-md bg-[var(--ak-card)] px-1.5 py-1"><span class="text-[var(--ak-muted)]">{{ __('Konfidenz') }}</span><b>{{ $confidence !== null ? number_format($confidence, 0, ',', '.').' %' : '—' }}</b></div>
                                                     <div class="flex items-center justify-between rounded-md bg-[var(--ak-card)] px-1.5 py-1"><span class="text-[var(--ak-muted)]">{{ __('Risiko P75') }}</span><b>{{ $risk !== null ? number_format($risk, 0, ',', '.').' %' : '—' }}</b></div>
                                                 </div>
                                             </div>
 
-                                            <div class="grid grid-cols-4 gap-1 border-t border-[var(--ak-border)] p-2.5">
-                                                @foreach ([
-                                                    ['SELL', 'sell_count', 'ak-signal-sell'],
-                                                    ['HOLD', 'hold_count', 'ak-signal-hold'],
-                                                    ['WATCH', 'watch_count', 'ak-signal-watch'],
-                                                    ['BUY', 'buy_count', 'ak-signal-buy'],
-                                                ] as [$signal, $countKey, $signalClass])
-                                                    <a href="{{ route('stocks.index', ['exchange' => $exchange->code, 'signal' => $signal]) }}" onclick="event.stopPropagation()" class="flex h-6 min-w-0 items-center justify-center gap-0.5 rounded-md border px-0.5 text-[7px] font-black {{ $signalClass }} {{ (int) $exchange->{$countKey} === 0 ? 'pointer-events-none opacity-20' : '' }}">
-                                                        {{ __(ucfirst(strtolower($signal))) }} <b>{{ $exchange->{$countKey} }}</b>
-                                                    </a>
-                                                @endforeach
-                                            </div>
                                         </article>
                                     @endforeach
                                 </div>
@@ -161,15 +149,14 @@
                 <div id="markets-exchange-scroll" class="hidden">
                     <table id="exchange-table" class="w-full table-fixed border-separate border-spacing-x-0 border-spacing-y-2 text-left">
                         <colgroup>
-                            <col style="width: 12%">
-                            <col style="width: 12%">
-                            <col style="width: 8%">
+                            <col style="width: 14%">
+                            <col style="width: 15%">
+                            <col style="width: 11%">
+                            <col style="width: 13%">
+                            <col style="width: 16%">
+                            <col style="width: 11%">
                             <col style="width: 10%">
-                            <col style="width: 12%">
-                            <col style="width: 7%">
-                            <col style="width: 6%">
-                            <col style="width: 5%">
-                            <col style="width: 28%">
+                            <col style="width: 10%">
                         </colgroup>
                         <thead class="text-[10px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">
                             <tr>
@@ -185,7 +172,6 @@
                                     </button>
                                 </th>
                                 <th class="px-3 py-3 text-center"><button type="button" data-sort="stocks" data-type="number" class="ak-exchange-sort mx-auto">{{ __('Aktien') }} <span aria-hidden="true">↕</span></button></th>
-                                <th class="px-4 py-3">{{ __('Signale') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -202,7 +188,7 @@
                                     $target = route('stocks.index', ['exchange' => $exchange->code]);
                                 @endphp
                                 <tr onclick="window.location.href=@js($target)" class="group cursor-pointer text-sm text-[var(--ak-text)]">
-                                    <td colspan="9" class="p-0">
+                                    <td colspan="8" class="p-0">
                                         <div class="ak-exchange-row-grid">
                                             <div data-column="exchange" data-value="{{ $exchange->code }}" class="flex items-center gap-3 px-4 py-4">
                                                 <span class="text-xl">{{ $countryFlag($exchange->country) }}</span>
@@ -217,7 +203,7 @@
                                                         <strong class="font-black {{ $scoreClass }}">{{ number_format($score, 1, ',', '.') }}</strong>
                                                         <span class="text-[9px] font-bold text-[var(--ak-muted)]">/ 10</span>
                                                     </div>
-                                                    <x-dashboard.score-stripes :percent="$score * 10" />
+                                                    <x-dashboard.score-stripes :percent="$score * 10" palette="teal" />
                                                 @else
                                                     <span class="block text-center text-[var(--ak-muted)]">—</span>
                                                 @endif
@@ -275,59 +261,11 @@
                                                 @endif
                                             </div>
                                             <div data-column="stocks" data-value="{{ $exchange->instrument_count }}" class="px-4 py-4 text-center font-black">{{ $exchange->instrument_count }}</div>
-                                            <div class="flex items-center px-4 py-4">
-                                                <div class="ak-signal-grid">
-                                            @if ((int) $exchange->sell_count > 0)
-                                            <a
-                                                href="{{ route('stocks.index', ['exchange' => $exchange->code, 'signal' => 'SELL']) }}"
-                                                onclick="event.stopPropagation()"
-                                                class="ak-signal-button ak-signal-sell"
-                                            >
-                                                <span>{{ __('Sell') }}</span><b>{{ $exchange->sell_count }}</b>
-                                            </a>
-                                            @else
-                                                <span class="ak-signal-button ak-signal-sell ak-signal-empty" aria-hidden="true"></span>
-                                            @endif
-                                            @if ((int) $exchange->hold_count > 0)
-                                            <a
-                                                href="{{ route('stocks.index', ['exchange' => $exchange->code, 'signal' => 'HOLD']) }}"
-                                                onclick="event.stopPropagation()"
-                                                class="ak-signal-button ak-signal-hold"
-                                            >
-                                                <span>{{ __('Hold') }}</span><b>{{ $exchange->hold_count }}</b>
-                                            </a>
-                                            @else
-                                                <span class="ak-signal-button ak-signal-hold ak-signal-empty" aria-hidden="true"></span>
-                                            @endif
-                                            @if ((int) $exchange->watch_count > 0)
-                                            <a
-                                                href="{{ route('stocks.index', ['exchange' => $exchange->code, 'signal' => 'WATCH']) }}"
-                                                onclick="event.stopPropagation()"
-                                                class="ak-signal-button ak-signal-watch"
-                                            >
-                                                <span>{{ __('Watch') }}</span><b>{{ $exchange->watch_count }}</b>
-                                            </a>
-                                            @else
-                                                <span class="ak-signal-button ak-signal-watch ak-signal-empty" aria-hidden="true"></span>
-                                            @endif
-                                            @if ((int) $exchange->buy_count > 0)
-                                            <a
-                                                href="{{ route('stocks.index', ['exchange' => $exchange->code, 'signal' => 'BUY']) }}"
-                                                onclick="event.stopPropagation()"
-                                                class="ak-signal-button ak-signal-buy"
-                                            >
-                                                <span>{{ __('Buy') }}</span><b>{{ $exchange->buy_count }}</b>
-                                            </a>
-                                            @else
-                                                <span class="ak-signal-button ak-signal-buy ak-signal-empty" aria-hidden="true"></span>
-                                            @endif
-                                                </div>
-                                            </div>
                                         </div>
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="9" class="px-4 py-16 text-center text-sm text-[var(--ak-muted)]">{{ __('Keine Exchange-Daten vorhanden.') }}</td></tr>
+                                <tr><td colspan="8" class="px-4 py-16 text-center text-sm text-[var(--ak-muted)]">{{ __('Keine Exchange-Daten vorhanden.') }}</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -345,7 +283,7 @@
                         };
                     @endphp
                     <div class="grid items-stretch gap-4 lg:grid-cols-2">
-                        <article class="ak-card ak-card-static flex min-h-[360px] flex-col p-6">
+                        <article class="ak-card ak-card-static flex min-h-[360px] flex-col border-cyan-300/50 p-6 shadow-[0_0_0_1px_rgba(34,211,238,.08),0_18px_45px_rgba(8,145,178,.14)]" style="background:linear-gradient(155deg,rgba(8,145,178,.11),transparent 42%),var(--ak-card);">
                             <div class="ak-market-comment-heading flex flex-wrap items-start justify-between gap-4">
                                 <div class="flex items-start gap-3">
                                     <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-500">
@@ -365,7 +303,7 @@
                             </div>
                         </article>
 
-                        <article class="ak-card ak-card-static flex min-h-[360px] flex-col p-6">
+                        <article class="ak-card ak-card-static flex min-h-[360px] flex-col border-cyan-300/50 p-6 shadow-[0_0_0_1px_rgba(34,211,238,.08),0_18px_45px_rgba(8,145,178,.14)]" style="background:linear-gradient(155deg,rgba(8,145,178,.11),transparent 42%),var(--ak-card);">
                             <div class="ak-market-comment-heading flex items-start gap-3">
                                 <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-500">
                                     <x-heroicon-o-chart-bar-square class="h-5 w-5" />
@@ -495,7 +433,7 @@
 
             .ak-exchange-row-grid {
                 display: grid;
-                grid-template-columns: 12% 12% 8% 10% 12% 7% 6% 5% 28%;
+                grid-template-columns: 14% 15% 11% 13% 16% 11% 10% 10%;
                 align-items: stretch;
                 height: 72px;
                 overflow: hidden;
@@ -619,70 +557,6 @@
                 font-size: 6px;
                 font-style: normal;
                 letter-spacing: .08em;
-            }
-
-            .ak-signal-grid {
-                display: grid;
-                grid-template-columns: repeat(4, 80px);
-                gap: 6px;
-                width: max-content;
-                font-size: 10px;
-                font-weight: 900;
-            }
-
-            .ak-signal-button {
-                display: flex;
-                height: 30px;
-                width: 100%;
-                align-items: center;
-                justify-content: space-between;
-                gap: 5px;
-                border-style: solid;
-                border-width: 1px;
-                border-radius: 8px;
-                padding: 0 8px;
-                color: white;
-                white-space: nowrap;
-            }
-
-            .ak-signal-button b {
-                min-width: 21px;
-                border: 0;
-                border-radius: 0;
-                padding: 0;
-                background: transparent;
-                color: inherit;
-                text-align: center;
-            }
-
-            .ak-signal-empty {
-                pointer-events: none;
-                opacity: 0;
-                user-select: none;
-            }
-
-            .ak-signal-sell {
-                border-color: rgba(251, 113, 133, .72);
-                background: rgba(225, 29, 72, .58);
-                box-shadow: 0 0 12px rgba(244, 63, 94, .13);
-            }
-
-            .ak-signal-hold {
-                border-color: rgba(252, 211, 77, .72);
-                background: rgba(217, 119, 6, .56);
-                box-shadow: 0 0 12px rgba(245, 158, 11, .12);
-            }
-
-            .ak-signal-watch {
-                border-color: rgba(190, 242, 100, .68);
-                background: rgba(101, 163, 13, .52);
-                box-shadow: 0 0 12px rgba(132, 204, 22, .11);
-            }
-
-            .ak-signal-buy {
-                border-color: rgba(110, 231, 183, .82);
-                background: rgba(5, 150, 105, .72);
-                box-shadow: 0 0 14px rgba(16, 185, 129, .20);
             }
 
             .ak-exchange-sort {

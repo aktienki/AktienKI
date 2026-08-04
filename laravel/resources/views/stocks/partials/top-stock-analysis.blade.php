@@ -4,6 +4,11 @@
             @foreach ($topStockFactorRatings as $topFactor)
                 @php
                     $factorRating = $topFactor['rating'];
+                    $factorPalette = [
+                        '#2dd4bf', '#27c1b1', '#22afa3', '#4ca78c', '#7fa071',
+                        '#b39758', '#d68b4d', '#e67855', '#e96868', '#e25569',
+                    ];
+                    $isDrawdownRisk = $topFactor['key'] === 'drawdown_risk';
                     $factorTone = match (true) {
                         $factorRating === null => 'bg-slate-500/15',
                         $factorRating >= 8 => 'bg-emerald-500',
@@ -19,7 +24,18 @@
                     </div>
                     <div class="mt-1 grid grid-cols-10 gap-0.5">
                         @for ($factorStep = 1; $factorStep <= 10; $factorStep++)
-                            <span class="h-1 rounded-sm {{ $factorRating !== null && $factorStep <= $factorRating ? $factorTone : 'bg-slate-500/15' }} {{ $factorRating !== null && $factorStep < $factorRating ? 'opacity-40' : '' }}"></span>
+                            @php
+                                $factorStepActive = $factorRating !== null && $factorStep <= $factorRating;
+                                $factorStepCurrent = $factorStepActive && $factorStep === (int) $factorRating;
+                            @endphp
+                            @if ($isDrawdownRisk)
+                                <span
+                                    class="h-1 rounded-sm"
+                                    style="background-color: {{ $factorStepActive ? $factorPalette[$factorStep - 1] : 'rgba(100,116,139,.15)' }}; opacity: {{ $factorStepCurrent ? '1' : ($factorStepActive ? '.48' : '1') }}"
+                                ></span>
+                            @else
+                                <span class="h-1 rounded-sm {{ $factorStepActive ? $factorTone : 'bg-slate-500/15' }} {{ $factorStepActive && ! $factorStepCurrent ? 'opacity-40' : '' }}"></span>
+                            @endif
                         @endfor
                     </div>
                 </div>

@@ -24,6 +24,10 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LivePriceSubscriptionController;
 use App\Http\Controllers\MarketQuotesController;
 use App\Http\Controllers\SavedPredictionFilterController;
+use App\Http\Controllers\SignalEmailPreviewController;
+use App\Http\Controllers\QualityGateSetupController;
+use App\Http\Controllers\SmartSelectionLabelController;
+use App\Http\Controllers\DashboardController;
 use Illuminate\Http\Request;
 
 
@@ -176,25 +180,35 @@ Route::post('/locale/{locale}', function (Request $request, string $locale) {
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/live-prices/subscribe', LivePriceSubscriptionController::class)->name('live-prices.subscribe');
-    Route::view('/dashboard', 'dashboard')->name('dashboard');
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::view('/maerkte/marktlage', 'markets.situation')->name('markets.situation');
     Route::get('/apple', AppleChartController::class)->name('stocks.apple');
     //Route::get('/stocks', StocksIndex::class)->name('stocks.index');
     //Route::get('/stocks/{symbol}', [StockController::class, 'show'])->name('stocks.show');
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('/email-preview/signal', SignalEmailPreviewController::class)->name('email-preview.signal');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::get('/setup/filter', [PredictionController::class, 'filterSetup'])->name('setup.filter');
-    Route::get('/setup/filters', [SavedPredictionFilterController::class, 'index'])->name('setup.saved-filters.index');
-    Route::post('/setup/filter/saved', [SavedPredictionFilterController::class, 'store'])->name('setup.filter.saved.store');
-    Route::patch('/setup/filter/saved/{savedFilter}', [SavedPredictionFilterController::class, 'update'])->name('setup.filter.saved.update');
-    Route::patch('/setup/filter/saved/{savedFilter}/link', [SavedPredictionFilterController::class, 'link'])->name('setup.filter.saved.link');
-    Route::delete('/setup/filter/saved/{savedFilter}', [SavedPredictionFilterController::class, 'destroy'])->name('setup.filter.saved.destroy');
-    Route::post('/setup/filter/backtest', [PredictionController::class, 'startFilteredBacktest'])->name('setup.filter.backtest');
-    Route::get('/setup/filter/backtest/{publicId}/result', [PredictionController::class, 'filteredBacktestResult'])->name('setup.filter.backtest.result');
-    Route::get('/setup/filter/backtest/{publicId}/status', [PredictionController::class, 'filteredBacktestStatus'])->name('setup.filter.backtest.status');
-    Route::post('/setup/filter/backtest/{publicId}/cancel', [PredictionController::class, 'cancelFilteredBacktest'])->name('setup.filter.backtest.cancel');
-    Route::get('/setup/filter/backtest/{publicId}/report', [PredictionController::class, 'downloadFilteredBacktestReport'])->name('setup.filter.backtest.report');
+    Route::get('/setup/filter', [PredictionController::class, 'filterSetup'])->middleware('plan:pro')->name('setup.filter');
+    Route::get('/setup/quality', [PredictionController::class, 'qualitySetup'])->middleware('plan:plus')->name('setup.quality');
+    Route::post('/setup/quality/labels', [SmartSelectionLabelController::class, 'store'])->middleware('plan:plus')->name('setup.quality.labels.store');
+    Route::get('/setup/short', [PredictionController::class, 'shortStrategySetup'])->middleware('plan:pro')->name('setup.short');
+    Route::get('/setup/quality-gate', [QualityGateSetupController::class, 'edit'])->name('setup.quality-gate.edit');
+    Route::put('/setup/quality-gate', [QualityGateSetupController::class, 'update'])->name('setup.quality-gate.update');
+    Route::put('/setup/quality-gate/backtest', [QualityGateSetupController::class, 'backtest'])->middleware('plan:premium')->name('setup.quality-gate.backtest');
+    Route::get('/setup/filters', [SavedPredictionFilterController::class, 'index'])->middleware('plan:pro')->name('setup.saved-filters.index');
+    Route::post('/setup/filter/saved', [SavedPredictionFilterController::class, 'store'])->middleware('plan:pro')->name('setup.filter.saved.store');
+    Route::patch('/setup/filter/saved/{savedFilter}', [SavedPredictionFilterController::class, 'update'])->middleware('plan:pro')->name('setup.filter.saved.update');
+    Route::patch('/setup/filter/saved/{savedFilter}/link', [SavedPredictionFilterController::class, 'link'])->middleware('plan:pro')->name('setup.filter.saved.link');
+    Route::patch('/setup/filter/saved/{savedFilter}/visibility', [SavedPredictionFilterController::class, 'updateVisibility'])->middleware('plan:pro')->name('setup.filter.saved.visibility');
+    Route::post('/setup/filter/saved/{savedFilter}/import', [SavedPredictionFilterController::class, 'import'])->middleware('plan:pro')->name('setup.filter.saved.import');
+    Route::delete('/setup/filter/saved/{savedFilter}', [SavedPredictionFilterController::class, 'destroy'])->middleware('plan:pro')->name('setup.filter.saved.destroy');
+    Route::post('/setup/filter/backtest', [PredictionController::class, 'startFilteredBacktest'])->middleware('plan:plus')->name('setup.filter.backtest');
+    Route::get('/setup/filter/backtest/{publicId}/result', [PredictionController::class, 'filteredBacktestResult'])->middleware('plan:plus')->name('setup.filter.backtest.result');
+    Route::get('/setup/filter/backtest/{publicId}/status', [PredictionController::class, 'filteredBacktestStatus'])->middleware('plan:plus')->name('setup.filter.backtest.status');
+    Route::post('/setup/filter/backtest/{publicId}/cancel', [PredictionController::class, 'cancelFilteredBacktest'])->middleware('plan:plus')->name('setup.filter.backtest.cancel');
+    Route::get('/setup/filter/backtest/{publicId}/report', [PredictionController::class, 'downloadFilteredBacktestReport'])->middleware('plan:plus')->name('setup.filter.backtest.report');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::get('/stocks', fn (Request $request) =>
@@ -212,7 +226,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/depots', [DepotController::class, 'index'])->name('depots.index');
     Route::get('/musterdepots', [DepotController::class, 'paperIndex'])->name('paper-depots.index');
     Route::post('/depots', [DepotController::class, 'store'])->name('depots.store');
+    Route::post('/depots/{portfolio}/simulation', [DepotController::class, 'startSimulation'])->name('depots.simulation.start');
+    Route::post('/depots/{portfolio}/reset', [DepotController::class, 'reset'])->name('depots.reset');
+    Route::put('/depots/{portfolio}/capital', [DepotController::class, 'updateCapital'])->name('depots.capital.update');
+    Route::delete('/depots/{portfolio}', [DepotController::class, 'destroy'])->name('depots.destroy');
+    Route::get('/depots/{portfolio}/simulation/{publicId}/status', [DepotController::class, 'simulationStatus'])->name('depots.simulation.status');
+    Route::get('/depots/{portfolio}/simulation/{publicId}/report', [DepotController::class, 'simulationReport'])->name('depots.simulation.report');
     Route::get('/depots/{portfolio}', [DepotController::class, 'show'])->name('depots.show');
+    Route::put('/depots/{portfolio}/strategies', [DepotController::class, 'updateStrategies'])->name('depots.strategies.update');
+    Route::put('/depots/{portfolio}/automation', [DepotController::class, 'updateAutomation'])->name('depots.automation.update');
     Route::get('/stocks/compare', StockComparisonController::class)->name('stocks.compare');
     Route::get('/stock-icons/{instrument}', StockIconController::class)->name('stocks.icon');
     Route::get('/stocks/{symbol}/chartanalyse', [StockController::class, 'chartAnalysis'])->name('stocks.chart-analysis');

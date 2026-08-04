@@ -11,6 +11,32 @@ class IndexAiScoreService
     public function countryScores(): array
     {
         return Cache::remember('dashboard_country_ai_scores', now()->addMinutes(2), function (): array {
+        $rankedBars = DB::table('price_bars')
+            ->where('interval', '1d')
+            ->where('bar_time', '>=', now()->subDays(14))
+            ->selectRaw('instrument_id, close, ROW_NUMBER() OVER (PARTITION BY instrument_id ORDER BY bar_time DESC, id DESC) AS row_number');
+        $instrumentMoves = DB::query()
+            ->fromSub($rankedBars, 'ranked_bar')
+            ->where('row_number', '<=', 2)
+            ->groupBy('instrument_id')
+            ->selectRaw('instrument_id')
+            ->selectRaw('MAX(close) FILTER (WHERE row_number = 1) AS latest_close')
+            ->selectRaw('MAX(close) FILTER (WHERE row_number = 2) AS previous_close');
+        $countryMoves = DB::query()
+            ->fromSub($instrumentMoves, 'instrument_move')
+            ->join('instruments as moving_instrument', 'moving_instrument.id', '=', 'instrument_move.instrument_id')
+            ->where('moving_instrument.type', 'stock')
+            ->where('moving_instrument.is_active', true)
+            ->whereNull('moving_instrument.deleted_at')
+            ->whereNotNull('moving_instrument.country')
+            ->where('moving_instrument.country', '<>', '')
+            ->whereNotNull('instrument_move.latest_close')
+            ->whereNotNull('instrument_move.previous_close')
+            ->where('instrument_move.previous_close', '>', 0)
+            ->groupBy('moving_instrument.country')
+            ->selectRaw('moving_instrument.country, AVG(((instrument_move.latest_close - instrument_move.previous_close) / instrument_move.previous_close) * 100) AS daily_change')
+            ->pluck('daily_change', 'country');
+
         $latestPredictions = DB::table('predictions')
             ->selectRaw('instrument_id, MAX(id) AS prediction_id')
             ->groupBy('instrument_id');
@@ -27,12 +53,14 @@ class IndexAiScoreService
             ->groupBy('instrument.country')
             ->selectRaw('instrument.country, AVG(prediction.prediction_score) AS score, COUNT(instrument.id) AS stocks')
             ->get()
-            ->mapWithKeys(function ($row) {
+            ->mapWithKeys(function ($row) use ($countryMoves) {
                 $score = AiScore::toPercent($row->score) ?? 0;
+                $change = $countryMoves->get($row->country);
 
                 return [strtoupper($row->country) => [
                     'score' => round($score, 1),
                     'stocks' => (int) $row->stocks,
+                    'change' => is_numeric($change) ? round((float) $change, 2) : null,
                 ]];
             })
             ->all();

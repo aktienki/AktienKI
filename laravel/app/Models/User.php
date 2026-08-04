@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class User extends Authenticatable
 {
@@ -24,6 +25,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'active' => 'boolean',
+            'is_admin' => 'boolean',
 
             'accepted_terms' => 'boolean',
             'accepted_terms_at' => 'datetime',
@@ -39,6 +41,7 @@ class User extends Authenticatable
 
             'trial_ends_at' => 'datetime',
             'subscription_ends_at' => 'datetime',
+            'tariff_ends_at' => 'datetime',
             'last_login_at' => 'datetime',
 
             'preferences' => 'array',
@@ -60,6 +63,11 @@ class User extends Authenticatable
     public function savedPredictionFilters(): HasMany
     {
         return $this->hasMany(SavedPredictionFilter::class);
+    }
+
+    public function qualityGateProfile(): HasOne
+    {
+        return $this->hasOne(UserQualityGateProfile::class);
     }
 
     public function subscriptions(): HasMany

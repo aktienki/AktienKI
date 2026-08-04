@@ -26,7 +26,7 @@ final class SignalChangeController extends Controller
             ? (string) $request->query('sort')
             : 'time';
         $direction = strtolower((string) $request->query('direction')) === 'asc' ? 'asc' : 'desc';
-        $days = in_array($request->integer('days'), [1, 3, 7, 14, 30, 90, 180, 365], true)
+        $days = in_array($request->integer('days'), [1, 2, 3, 7, 14, 30, 90, 180, 365], true)
             ? $request->integer('days')
             : 30;
         $signalSql = $signals->sql('prediction', $request->user());

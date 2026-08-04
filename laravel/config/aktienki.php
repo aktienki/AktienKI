@@ -3,13 +3,17 @@
 return [
     'saved_filter_limits' => [
         'free' => 1,
-        'pro' => 5,
+        'plus' => 3,
+        'pro' => 10,
+        'ultimate' => 20,
+        'premium' => 20,
         'expert' => 20,
         'default' => 1,
     ],
     'python_engine' => [
         'path' => env('AKTIENKI_PYTHON_ENGINE_PATH', '/Users/silviotaubert/Downloads/python-engine'),
         'executable' => env('AKTIENKI_PYTHON_EXECUTABLE'),
+        'backtests' => (bool) env('PYTHON_ENGINE_BACKTESTS', false),
     ],
     'default_plan' => env('AKTIENKI_DEFAULT_PLAN', 'free'),
 

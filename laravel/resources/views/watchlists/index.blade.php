@@ -42,7 +42,7 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="translate-x-0"
             x-transition:leave-end="translate-x-full"
-            class="fixed bottom-0 right-0 top-[73px] z-[90] w-full max-w-md overflow-y-auto border-l border-[var(--ak-border)] bg-[var(--ak-card)] p-5 shadow-2xl shadow-black/50"
+            class="fixed bottom-0 right-0 top-[73px] z-[90] w-full max-w-md overflow-y-auto border-l border-[var(--ak-border)] bg-[color-mix(in_srgb,var(--ak-card)_90%,transparent)] p-5 shadow-2xl shadow-black/50"
             role="dialog"
             aria-modal="true"
             aria-labelledby="watchlist-setup-title"

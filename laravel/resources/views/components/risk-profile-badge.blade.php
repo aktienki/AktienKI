@@ -22,15 +22,15 @@
             ],
             'opportunity_oriented' => [
                 'label' => __('Chancenorientiert'),
-                'classes' => 'border-amber-300/25 bg-amber-300/10 text-amber-300',
+                'classes' => 'border-rose-400/30 bg-rose-400/10 text-rose-300',
             ],
             'opportunity' => [
                 'label' => __('Chancenorientiert'),
-                'classes' => 'border-amber-300/25 bg-amber-300/10 text-amber-300',
+                'classes' => 'border-rose-400/30 bg-rose-400/10 text-rose-300',
             ],
             'aggressive' => [
                 'label' => __('Chancenorientiert'),
-                'classes' => 'border-amber-300/25 bg-amber-300/10 text-amber-300',
+                'classes' => 'border-rose-400/30 bg-rose-400/10 text-rose-300',
             ],
         ];
         $profile = $profiles[$level] ?? $profiles['normal'];

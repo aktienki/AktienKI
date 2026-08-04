@@ -46,7 +46,12 @@ class AccessService
     public function planIncludesLevel(SubscriptionPlan|string|null $plan, string|null $requiredLevel): bool
     {
         $level = $plan instanceof SubscriptionPlan ? $plan->level : ($plan ?: config('aktienki.default_plan', 'free'));
-        $planLevel = PlanLevel::tryFrom(strtolower((string) $level)) ?? PlanLevel::Free;
+        $normalized = match (strtolower((string) $level)) {
+            'basic', 'basis' => 'plus',
+            'expert', 'ultimate' => 'premium',
+            default => strtolower((string) $level),
+        };
+        $planLevel = PlanLevel::tryFrom($normalized) ?? PlanLevel::Free;
 
         return $planLevel->includes($requiredLevel);
     }

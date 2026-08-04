@@ -153,8 +153,8 @@
                         y: probability,
                         samples: sample.length,
                         fillColor: probability > 55
-                            ? '#22c58b'
-                            : (probability < 45 ? '#e35f72' : '#e5b643'),
+                            ? '#2a9d96'
+                            : (probability < 45 ? '#b86470' : '#b6a15b'),
                     });
                 }
                 element.__aktienkiChart?.destroy?.();
@@ -174,7 +174,7 @@
                         parentHeightOffset: 0,
                         redrawOnParentResize: true,
                     },
-                    colors: ['#e5b643'],
+                    colors: ['#b6a15b'],
                     plotOptions: {
                         bar: {
                             columnWidth: '82%',
@@ -185,7 +185,7 @@
                     stroke: { width: 0 },
                     fill: {
                         type: 'solid',
-                        opacity: 0.78,
+                        opacity: 0.7,
                     },
                     dataLabels: { enabled: false },
                     grid: { borderColor: 'rgba(100,116,139,.14)', strokeDashArray: 3, padding: { top: 6, right: 10, bottom: 8, left: 6 } },

@@ -248,7 +248,39 @@ class StockController extends Controller
             ->orderByDesc('id')
             ->first();
 
-        $fundamentalData = $this->decodeJson($fundamental?->data);
+        $fundamentalData = array_replace(
+            $this->decodeJson($fundamental?->data),
+            array_filter([
+                'marketCap' => $fundamental?->market_cap,
+                'enterpriseValue' => $fundamental?->enterprise_value,
+                'trailingPE' => $fundamental?->trailing_pe,
+                'forwardPE' => $fundamental?->forward_pe,
+                'pegRatio' => $fundamental?->peg_ratio,
+                'priceToBook' => $fundamental?->price_to_book,
+                'priceToSalesTrailing12Months' => $fundamental?->price_to_sales,
+                'dividendRate' => $fundamental?->dividend_rate,
+                'dividendYield' => $fundamental?->dividend_yield,
+                'payoutRatio' => $fundamental?->payout_ratio,
+                'profitMargins' => $fundamental?->profit_margin,
+                'operatingMargins' => $fundamental?->operating_margin,
+                'returnOnAssets' => $fundamental?->return_on_assets,
+                'returnOnEquity' => $fundamental?->return_on_equity,
+                'totalRevenue' => $fundamental?->revenue,
+                'revenueGrowth' => $fundamental?->revenue_growth,
+                'grossProfits' => $fundamental?->gross_profit,
+                'ebitda' => $fundamental?->ebitda,
+                'netIncomeToCommon' => $fundamental?->net_income,
+                'totalCash' => $fundamental?->total_cash,
+                'totalDebt' => $fundamental?->total_debt,
+                'debtToEquity' => $fundamental?->debt_to_equity,
+                'currentRatio' => $fundamental?->current_ratio,
+                'quickRatio' => $fundamental?->quick_ratio,
+                'operatingCashflow' => $fundamental?->operating_cash_flow,
+                'freeCashflow' => $fundamental?->free_cash_flow,
+                'sharesOutstanding' => $fundamental?->shares_outstanding,
+                'floatShares' => $fundamental?->float_shares,
+            ], fn (mixed $value): bool => $value !== null),
+        );
         $instrumentMeta = $this->decodeJson($instrument->meta);
         $predictionExplanation = $this->decodeJson($prediction?->explanation);
         $predictionMetadata = $this->decodeJson($prediction?->metadata);
@@ -364,12 +396,14 @@ class StockController extends Controller
         $stockHeatmapQuery = DB::table('backtest_trades as backtest_trade')
             ->join('backtest_runs as backtest_run', 'backtest_run.id', '=', 'backtest_trade.backtest_run_id')
             ->where('backtest_trade.instrument_id', $instrument->id)
-            ->where('backtest_trade.backtest_run_id', function ($query): void {
-                $query->from('backtest_runs')
+            ->where('backtest_trade.backtest_run_id', function ($query) use ($instrument): void {
+                $query->from('backtest_runs as latest_backtest_run')
+                    ->join('backtest_trades as latest_backtest_trade', 'latest_backtest_trade.backtest_run_id', '=', 'latest_backtest_run.id')
+                    ->where('latest_backtest_trade.instrument_id', $instrument->id)
                     ->whereIn('status', ['completed', 'completed_with_errors'])
-                    ->orderByDesc('id')
+                    ->orderByDesc('latest_backtest_run.id')
                     ->limit(1)
-                    ->select('id');
+                    ->select('latest_backtest_run.id');
             });
         $stockHeatmapSummary = (clone $stockHeatmapQuery)
             ->selectRaw('COUNT(*) AS trades')

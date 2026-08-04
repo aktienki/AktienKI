@@ -7,8 +7,23 @@
                 height: calc(100% - 3rem);
             }
 
-            .stock-overview-grid-with-history {
-                height: calc(100% - 10.5rem);
+        }
+
+        @media (min-width: 900px) {
+            .stock-overview-grid-with-evaluation {
+                grid-template-columns: minmax(320px, .9fr) minmax(0, 1.3fr) minmax(230px, .55fr);
+            }
+
+            .stock-overview-grid-with-evaluation > .stock-overview-chart {
+                order: 2;
+            }
+
+            .stock-overview-grid-with-evaluation > .stock-overview-analysis {
+                order: 1;
+            }
+
+            .stock-overview-grid-with-evaluation > .stock-overview-evaluation {
+                order: 3;
             }
         }
     </style>
@@ -23,7 +38,7 @@
             : null;
         $signal = strtoupper((string) ($prediction?->personalized_signal ?? 'HOLD'));
         $signalClass = $signal === 'BUY'
-            ? 'border-emerald-300/70 bg-emerald-400/25 text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,.25)]'
+            ? 'border-teal-300/70 bg-teal-400/25 text-teal-100 shadow-[0_0_18px_rgba(45,212,191,.22)]'
             : ($signal === 'SELL'
                 ? 'border-rose-400/35 bg-rose-400/10 text-rose-300'
                 : ($signal === 'WATCH'
@@ -36,7 +51,7 @@
             default => __('Neutral'),
         };
         $trendClass = match ($trendValue) {
-            'bullish', 'up', 'uptrend' => 'text-emerald-400',
+            'bullish', 'up', 'uptrend' => 'text-teal-400',
             'bearish', 'down', 'downtrend' => 'text-rose-400',
             default => 'text-amber-300',
         };
@@ -74,7 +89,7 @@
             : null;
         $historicalSignal = $signal;
         $historicalSignalClass = match ($historicalSignal) {
-            'BUY' => 'border-emerald-300/60 bg-emerald-400/20 text-emerald-200',
+            'BUY' => 'border-teal-300/60 bg-teal-400/20 text-teal-200',
             'SELL' => 'border-rose-400/45 bg-rose-400/15 text-rose-300',
             'WATCH' => 'border-lime-300/35 bg-lime-300/10 text-lime-300',
             default => 'border-amber-300/35 bg-amber-300/10 text-amber-300',
@@ -224,71 +239,11 @@
             class="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 pb-3"
             :class="stockTab === 'overview' ? 'lg:overflow-hidden' : ''"
         >
-        @if ($requestedPredictionId > 0 && $prediction)
-            <section x-cloak x-show="stockTab === 'overview'" class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
-                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-300/10 text-amber-300">
-                            <x-heroicon-o-clock class="h-4 w-4" />
-                        </span>
-                        <div>
-                            <h2 class="text-sm font-black text-[var(--ak-text)]">{{ __('Historische Prognoseauswertung') }}</h2>
-                            <p class="text-[10px] text-[var(--ak-muted)]">
-                                {{ __('Prognose vom :date', ['date' => \Illuminate\Support\Carbon::parse($prediction->prediction_time)->format('d.m.Y H:i')]) }}
-                            </p>
-                        </div>
-                    </div>
-                    <span class="text-[10px] font-bold text-[var(--ak-muted)]">{{ __('Entwicklung nach dem Prognosezeitpunkt') }}</span>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-                    <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2.5">
-                        <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gegebenes Signal') }}</p>
-                        <div class="mt-1.5 flex items-center gap-2">
-                            <span class="inline-flex min-w-20 justify-center rounded-md border px-3 py-1 text-xs font-black {{ $historicalSignalClass }}">{{ $historicalSignal }}</span>
-                            <span class="text-[10px] font-bold tabular-nums text-[var(--ak-muted)]">
-                                {{ __('Signalwechsel') }}:
-                                {{ $signalChangedAt?->format('d.m.Y') ?? '—' }}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2.5">
-                        <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kurs bei Prognose') }}</p>
-                        <p class="mt-1 text-base font-black tabular-nums text-[var(--ak-text)]">{{ $historicalStartPrice !== null ? number_format($historicalStartPrice, 2, ',', '.').' '.$currency : '—' }}</p>
-                    </div>
-                    <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2.5">
-                        <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kurs danach') }}</p>
-                        <p class="mt-1 text-base font-black tabular-nums text-[var(--ak-text)]">{{ $historicalEndPrice !== null ? number_format($historicalEndPrice, 2, ',', '.').' '.$currency : '—' }}</p>
-                    </div>
-                    <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2.5">
-                        <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Tatsächliche Entwicklung') }}</p>
-                        <p class="mt-1 text-base font-black tabular-nums {{ $historicalReturn === null ? 'text-[var(--ak-muted)]' : ($historicalReturn >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">
-                            {{ $historicalReturn !== null ? ($historicalReturn > 0 ? '+' : '').number_format($historicalReturn, 2, ',', '.').' %' : '—' }}
-                        </p>
-                    </div>
-                    <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2.5">
-                        <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Ergebnis') }}</p>
-                        @if ($directionCorrect !== null)
-                            <p class="mt-1 inline-flex items-center gap-1.5 text-sm font-black {{ $directionCorrect ? 'text-emerald-400' : 'text-rose-400' }}">
-                                @if ($directionCorrect)
-                                    <x-heroicon-o-check-circle class="h-5 w-5" />{{ __('Richtung korrekt') }}
-                                @else
-                                    <x-heroicon-o-x-circle class="h-5 w-5" />{{ __('Richtung verfehlt') }}
-                                @endif
-                            </p>
-                        @else
-                            <p class="mt-1 text-sm font-black text-[var(--ak-muted)]">{{ __('Noch nicht validiert') }}</p>
-                        @endif
-                    </div>
-                </div>
-            </section>
-        @endif
-
         <section
             x-show="stockTab === 'overview'"
-            class="{{ $requestedPredictionId > 0 ? 'stock-overview-grid-with-history' : 'stock-overview-grid' }} grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]"
+            class="stock-overview-grid {{ $requestedPredictionId > 0 && $prediction ? 'stock-overview-grid-with-evaluation' : 'lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]' }} grid min-h-0 gap-4"
         >
-            <article class="flex min-h-[350px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)] lg:h-full lg:min-h-0">
+            <article class="stock-overview-chart flex min-h-[350px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)] lg:h-full lg:min-h-0">
                 <div class="mb-3 flex shrink-0 items-start justify-between gap-3">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Kurschart') }}</p>
@@ -296,7 +251,7 @@
                         <p class="mt-1 text-xs text-[var(--ak-muted)]">
                             {{ __('Tageskerzen · letzte 100 Handelstage') }}
                         </p>
-                        <div id="stock-indicator-buttons" class="mt-2 flex flex-wrap gap-1.5">
+                        <div id="stock-indicator-buttons" class="mt-2 flex flex-nowrap items-center gap-1.5 whitespace-nowrap">
                             @foreach (['rsi' => 'RSI 14', 'sma20' => 'SMA 20', 'sma50' => 'SMA 50'] as $indicator => $indicatorLabel)
                                 <button
                                     type="button"
@@ -359,7 +314,7 @@
                 @endif
             </article>
 
-            <article x-show="stockTab === 'overview'" class="min-h-0 overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] lg:h-full">
+            <article x-show="stockTab === 'overview'" class="stock-overview-analysis min-h-0 overflow-y-auto rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] lg:h-full">
                 <div class="flex items-start justify-between gap-4">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Aktuelle KI-Analyse') }}</p>
@@ -485,11 +440,22 @@
                             <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
                                 <p class="text-[9px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Aktueller Kurs') }}</p>
                                 <p
+                                    @if($requestedPredictionId === 0)
                                     data-live-symbol="{{ $instrument->provider_symbol ?: $instrument->symbol }}"
                                     data-live-currency="{{ $currency }}"
                                     data-live-decimals="2"
+                                    @endif
                                     class="mt-1 text-base font-black text-[var(--ak-text)]"
                                 >{{ number_format((float) $prediction->current_price, 2, ',', '.') }} {{ $currency }}</p>
+                                @if($requestedPredictionId === 0)
+                                    <p class="mt-0.5 flex items-center gap-1 text-[8px] font-bold uppercase tracking-wide text-teal-400/80">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-teal-400 shadow-[0_0_5px_rgba(45,212,191,.55)]"></span>
+                                        TwelveData ·
+                                        <span data-live-time-symbol="{{ $instrument->provider_symbol ?: $instrument->symbol }}">
+                                            {{ !empty($prediction->current_quote_time) ? \Illuminate\Support\Carbon::parse($prediction->current_quote_time)->timezone('Europe/Berlin')->format('H:i:s') : __('wartet') }}
+                                        </span>
+                                    </p>
+                                @endif
                             </div>
                             <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
                                 <p class="text-[9px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Ziel 5 Tage') }}</p>
@@ -500,7 +466,7 @@
                                 <div class="mt-1 flex items-baseline justify-between gap-2">
                                     <p class="text-base font-black text-violet-300">{{ is_numeric($prediction->predicted_price_20d) ? number_format((float) $prediction->predicted_price_20d, 2, ',', '.').' '.$currency : '—' }}</p>
                                     @if ($outlook20dPercent !== null)
-                                        <span class="text-[10px] font-black {{ $outlook20dPercent >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">
+                                        <span class="text-[10px] font-black {{ $outlook20dPercent >= 0 ? 'text-teal-400' : 'text-rose-400' }}">
                                             {{ $outlook20dPercent > 0 ? '+' : '' }}{{ number_format($outlook20dPercent, 2, ',', '.') }} %
                                         </span>
                                     @endif
@@ -512,6 +478,38 @@
                     <div class="mt-8 rounded-xl border border-dashed border-[var(--ak-border)] p-8 text-center text-sm text-[var(--ak-muted)]">{{ __('Noch keine KI-Analyse vorhanden.') }}</div>
                 @endif
             </article>
+
+            @if ($requestedPredictionId > 0 && $prediction)
+                <aside class="stock-overview-evaluation min-h-0 overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] lg:h-full">
+                    <div class="mb-3 flex items-center gap-2">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-300/10 text-amber-300"><x-heroicon-o-clock class="h-4 w-4" /></span>
+                        <div class="min-w-0">
+                            <h2 class="text-xs font-black leading-tight text-[var(--ak-text)]">{{ __('Historische Prognoseauswertung') }}</h2>
+                            <p class="mt-0.5 text-[9px] text-[var(--ak-muted)]">{{ __('Prognose vom :date', ['date' => \Illuminate\Support\Carbon::parse($prediction->prediction_time)->format('d.m.Y H:i')]) }}</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2">
+                            <span class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Gegebenes Signal') }}</span>
+                            <div class="mt-1 flex items-center justify-between gap-2"><span class="rounded-md border px-2 py-0.5 text-[10px] font-black {{ $historicalSignalClass }}">{{ $historicalSignal }}</span><span class="text-[9px] text-[var(--ak-muted)]">{{ $signalChangedAt?->format('d.m.Y') ?? '—' }}</span></div>
+                        </div>
+                        @foreach ([
+                            [__('Kurs bei Prognose'), $historicalStartPrice !== null ? number_format($historicalStartPrice, 2, ',', '.').' '.$currency : '—', 'text-[var(--ak-text)]'],
+                            [__('Kurs danach'), $historicalEndPrice !== null ? number_format($historicalEndPrice, 2, ',', '.').' '.$currency : '—', 'text-[var(--ak-text)]'],
+                            [__('Tatsächliche Entwicklung'), $historicalReturn !== null ? ($historicalReturn > 0 ? '+' : '').number_format($historicalReturn, 2, ',', '.').' %' : '—', $historicalReturn === null ? 'text-[var(--ak-muted)]' : ($historicalReturn >= 0 ? 'text-teal-400' : 'text-rose-400')],
+                        ] as [$historyLabel, $historyValue, $historyTone])
+                            <div class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2">
+                                <span class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ $historyLabel }}</span>
+                                <span class="mt-1 block text-sm font-black tabular-nums {{ $historyTone }}">{{ $historyValue }}</span>
+                            </div>
+                        @endforeach
+                        <div class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2">
+                            <span class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Ergebnis') }}</span>
+                            <span class="mt-1 block text-[10px] font-black {{ $directionCorrect === null ? 'text-[var(--ak-muted)]' : ($directionCorrect ? 'text-teal-400' : 'text-rose-400') }}">{{ $directionCorrect === null ? __('Noch nicht validiert') : ($directionCorrect ? __('Richtung korrekt') : __('Richtung verfehlt')) }}</span>
+                        </div>
+                    </div>
+                </aside>
+            @endif
         </section>
 
         @php
@@ -531,8 +529,8 @@
                     <span class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                         {{ number_format($indicatorDataPointCount, 0, ',', '.') }} {{ __('Datenpunkte') }}
                     </span>
-                    <div class="w-44"><x-dashboard.score-stripes :percent="$indicatorOverallProbability ?? 0" /></div>
-                    <span class="text-xs font-black tabular-nums {{ ($indicatorOverallProbability ?? 0) >= 50 ? 'text-emerald-500' : 'text-rose-500' }}">
+                    <div class="w-44"><x-dashboard.score-stripes :percent="$indicatorOverallProbability ?? 0" palette="teal" /></div>
+                    <span class="text-xs font-black tabular-nums {{ ($indicatorOverallProbability ?? 0) >= 50 ? 'text-teal-500' : 'text-rose-500' }}">
                         {{ $indicatorOverallProbability !== null ? number_format($indicatorOverallProbability, 1, ',', '.').' %' : '—' }}
                     </span>
                 </div>
@@ -540,8 +538,8 @@
 
             <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 @foreach ($indicatorCards as $index => $card)
-                    <article class="flex h-[260px] min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] shadow-[var(--ak-shadow)]">
-                        <div class="flex h-[58px] shrink-0 items-center justify-between gap-2 border-b border-[var(--ak-border)] px-3 py-2">
+                    <article class="flex h-[210px] min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] shadow-[var(--ak-shadow)]">
+                        <div class="flex h-[50px] shrink-0 items-center justify-between gap-2 border-b border-[var(--ak-border)] px-3 py-1.5">
                             <div class="min-w-0">
                                 <p class="truncate text-xs font-black text-[var(--ak-text)]">{{ $card['label'] }}</p>
                                 <p class="mt-0.5 truncate text-[8px] font-bold text-[var(--ak-muted)]">{{ __('20-Tage-Steigwahrscheinlichkeit') }}</p>
@@ -552,7 +550,7 @@
                                 </p>
                                 @if (is_numeric($card['currentProbability']))
                                     <p class="text-[8px] font-black">
-                                        <span class="text-emerald-500">{{ number_format($card['currentProbability'], 1, ',', '.') }} % ↑</span>
+                                        <span class="text-teal-500">{{ number_format($card['currentProbability'], 1, ',', '.') }} % ↑</span>
                                         <span class="text-[var(--ak-muted)]"> · </span>
                                         <span class="text-rose-500">{{ number_format($card['currentFallProbability'], 1, ',', '.') }} % ↓</span>
                                     </p>
@@ -581,7 +579,7 @@
             @if ($aiAssessment)
                 <div class="mt-4 grid gap-3 md:grid-cols-3">
                     @foreach ([
-                        [__('Chancen'), $aiAssessmentOpportunities, 'text-emerald-500', 'border-emerald-500/15 bg-emerald-500/[.05]'],
+                        [__('Chancen'), $aiAssessmentOpportunities, 'text-teal-500', 'border-teal-500/15 bg-teal-500/[.05]'],
                         [__('Risiken'), $aiAssessmentRisks, 'text-rose-500', 'border-rose-500/15 bg-rose-500/[.05]'],
                         [__('Schlüsselfaktoren'), $aiAssessmentFactors, 'text-amber-500', 'border-amber-500/15 bg-amber-500/[.05]'],
                     ] as [$assessmentTitle, $assessmentItems, $assessmentTone, $assessmentBox])
@@ -616,53 +614,169 @@
         @include('stocks.partials.backtest-heatmap')
 
         <section x-cloak x-show="stockTab === 'fundamentals' || stockTab === 'aki'" class="grid gap-5">
-            <article x-show="stockTab === 'fundamentals'" class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 shadow-[var(--ak-shadow)]">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300"><x-heroicon-o-building-office-2 class="h-5 w-5" /></span>
-                    <div><h2 class="font-black text-[var(--ak-text)]">{{ __('Stammdaten') }}</h2><p class="text-xs text-[var(--ak-muted)]">{{ __('Verfügbare Angaben zum Instrument') }}</p></div>
+            <article x-show="stockTab === 'fundamentals'" class="min-h-0">
+                @php
+                    $fundamentalPercent = static function (mixed $value): ?string {
+                        if (! is_numeric($value)) return null;
+                        $number = (float) $value;
+                        if (abs($number) <= 1) $number *= 100;
+
+                        return number_format($number, 2, ',', '.').' %';
+                    };
+                    $fundamentalGroups = [
+                        [
+                            'title' => __('Instrument'),
+                            'subtitle' => __('Identifikation und Handelswährung'),
+                            'icon' => 'heroicon-o-identification',
+                            'values' => [
+                                ['label' => __('Symbol'), 'value' => $instrument->symbol],
+                                ['label' => 'ISIN', 'value' => $instrument->isin],
+                                ['label' => __('Land'), 'value' => $instrument->country],
+                                ['label' => __('Währung'), 'value' => $instrument->currency],
+                            ],
+                        ],
+                        [
+                            'title' => __('Einordnung'),
+                            'subtitle' => __('Geschäftsbereich und Marktsegment'),
+                            'icon' => 'heroicon-o-squares-2x2',
+                            'values' => [
+                                ['label' => __('Sektor'), 'value' => __($instrument->sector ?: '—')],
+                                ['label' => __('Branche'), 'value' => $instrument->industry],
+                            ],
+                        ],
+                        [
+                            'title' => __('Bewertung'),
+                            'subtitle' => __('Größe und aktuelle Bewertung'),
+                            'icon' => 'heroicon-o-scale',
+                            'values' => [
+                                ['label' => __('Marktkapitalisierung'), 'value' => $fundamentalData['marketCap'] ?? $instrument->market_cap],
+                                [
+                                    'label' => __('KGV'),
+                                    'value' => is_numeric($fundamentalData['trailingPE'] ?? null)
+                                        ? number_format((float) $fundamentalData['trailingPE'], 2, ',', '.')
+                                        : null,
+                                    'ranking' => $sectorRankings['pe'] ?? null,
+                                ],
+                                ['label' => __('Forward-KGV'), 'value' => is_numeric($fundamentalData['forwardPE'] ?? null) ? number_format((float) $fundamentalData['forwardPE'], 2, ',', '.') : null],
+                                ['label' => __('Kurs-Buchwert-Verhältnis'), 'value' => is_numeric($fundamentalData['priceToBook'] ?? null) ? number_format((float) $fundamentalData['priceToBook'], 2, ',', '.') : null],
+                            ],
+                        ],
+                        [
+                            'title' => __('Ausschüttung'),
+                            'subtitle' => __('Dividende und Rendite'),
+                            'icon' => 'heroicon-o-banknotes',
+                            'values' => [
+                                [
+                                    'label' => __('Dividende / Aktie'),
+                                    'value' => is_numeric($fundamentalData['dividendRate'] ?? null)
+                                        ? number_format((float) $fundamentalData['dividendRate'], 2, ',', '.').' '.$currency
+                                        : null,
+                                ],
+                                [
+                                    'label' => __('Dividendenrendite'),
+                                    'value' => $fundamentalPercent($fundamentalData['dividendYield'] ?? null),
+                                    'ranking' => $sectorRankings['dividend'] ?? null,
+                                ],
+                            ],
+                        ],
+                        [
+                            'title' => __('Profitabilität'),
+                            'subtitle' => __('Margen und Kapitalrenditen'),
+                            'icon' => 'heroicon-o-arrow-trending-up',
+                            'values' => [
+                                ['label' => __('Nettomarge'), 'value' => $fundamentalPercent($fundamentalData['profitMargins'] ?? null)],
+                                ['label' => __('Operative Marge'), 'value' => $fundamentalPercent($fundamentalData['operatingMargins'] ?? null)],
+                                ['label' => __('Eigenkapitalrendite'), 'value' => $fundamentalPercent($fundamentalData['returnOnEquity'] ?? null)],
+                                ['label' => __('Gesamtkapitalrendite'), 'value' => $fundamentalPercent($fundamentalData['returnOnAssets'] ?? null)],
+                            ],
+                        ],
+                        [
+                            'title' => __('Ergebnis und Wachstum'),
+                            'subtitle' => __('Umsatz, Ergebnis und Dynamik'),
+                            'icon' => 'heroicon-o-chart-bar-square',
+                            'values' => [
+                                ['label' => __('Umsatz'), 'value' => $fundamentalData['totalRevenue'] ?? null],
+                                ['label' => __('Umsatzwachstum'), 'value' => $fundamentalPercent($fundamentalData['revenueGrowth'] ?? null)],
+                                ['label' => __('Bruttogewinn'), 'value' => $fundamentalData['grossProfits'] ?? null],
+                                ['label' => 'EBITDA', 'value' => $fundamentalData['ebitda'] ?? null],
+                            ],
+                        ],
+                        [
+                            'title' => __('Bilanz und Liquidität'),
+                            'subtitle' => __('Liquidität und Verschuldung'),
+                            'icon' => 'heroicon-o-building-library',
+                            'values' => [
+                                ['label' => __('Liquide Mittel'), 'value' => $fundamentalData['totalCash'] ?? null],
+                                ['label' => __('Gesamtverschuldung'), 'value' => $fundamentalData['totalDebt'] ?? null],
+                                ['label' => __('Verschuldungsgrad'), 'value' => is_numeric($fundamentalData['debtToEquity'] ?? null) ? number_format((float) $fundamentalData['debtToEquity'], 2, ',', '.') : null],
+                                ['label' => __('Liquiditätsgrad'), 'value' => is_numeric($fundamentalData['currentRatio'] ?? null) ? number_format((float) $fundamentalData['currentRatio'], 2, ',', '.') : null],
+                            ],
+                        ],
+                        [
+                            'title' => __('Cashflow'),
+                            'subtitle' => __('Operativer und freier Mittelzufluss'),
+                            'icon' => 'heroicon-o-arrows-right-left',
+                            'values' => [
+                                ['label' => __('Operativer Cashflow'), 'value' => $fundamentalData['operatingCashflow'] ?? null],
+                                ['label' => __('Freier Cashflow'), 'value' => $fundamentalData['freeCashflow'] ?? null],
+                                ['label' => __('Nettogewinn'), 'value' => $fundamentalData['netIncomeToCommon'] ?? null],
+                            ],
+                        ],
+                        [
+                            'title' => __('Handelsstatus'),
+                            'subtitle' => __('Verfügbarkeit in aktienKI.com'),
+                            'icon' => 'heroicon-o-check-badge',
+                            'values' => [
+                                ['label' => __('Handelbar'), 'value' => (bool) $instrument->is_tradeable],
+                                ['label' => __('Aktiv'), 'value' => (bool) $instrument->is_active],
+                            ],
+                        ],
+                    ];
+                @endphp
+
+                <div class="mb-3 flex items-center gap-3">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300"><x-heroicon-o-building-office-2 class="h-5 w-5" /></span>
+                    <div>
+                        <h2 class="font-black text-[var(--ak-text)]">{{ __('Fundamentaldaten') }}</h2>
+                        <p class="text-xs text-[var(--ak-muted)]">{{ __('Thematisch zusammengefasste Unternehmens- und Instrumentendaten') }}</p>
+                    </div>
                 </div>
-                <dl class="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
-                    @foreach ([
-                        __('Symbol') => $instrument->symbol,
-                        'ISIN' => $instrument->isin,
-                        __('Land') => $instrument->country,
-                        __('Währung') => $instrument->currency,
-                        __('Sektor') => __($instrument->sector ?: '—'),
-                        __('Branche') => $instrument->industry,
-                        __('Marktkapitalisierung') => $instrument->market_cap,
-                        __('KGV') => is_numeric($fundamentalData['trailingPE'] ?? null)
-                            ? number_format((float) $fundamentalData['trailingPE'], 2, ',', '.')
-                            : null,
-                        __('Dividende / Aktie') => is_numeric($fundamentalData['dividendRate'] ?? null)
-                            ? number_format((float) $fundamentalData['dividendRate'], 2, ',', '.').' '.$currency
-                            : null,
-                        __('Dividendenrendite') => is_numeric($fundamentalData['dividendYield'] ?? null)
-                            ? number_format((float) $fundamentalData['dividendYield'], 2, ',', '.').' %'
-                            : null,
-                        __('Handelbar') => (bool) $instrument->is_tradeable,
-                        __('Aktiv') => (bool) $instrument->is_active,
-                    ] as $name => $value)
-                        <div class="min-w-0">
-                            <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $name }}</dt>
-                            @php
-                                $sectorRanking = $name === __('KGV')
-                                    ? ($sectorRankings['pe'] ?? null)
-                                    : ($name === __('Dividendenrendite') ? ($sectorRankings['dividend'] ?? null) : null);
-                            @endphp
-                            <dd class="mt-1 flex flex-wrap items-center gap-2">
-                                <span class="break-words text-sm font-bold text-[var(--ak-text)]">{{ $value === null || $value === '' ? '—' : $formatValue((string) $name, $value) }}</span>
-                                @if ($sectorRanking)
-                                    <span class="inline-flex rounded-md border border-violet-400/20 bg-violet-500/10 px-2 py-1 text-[9px] font-bold text-violet-300">
-                                        {{ __('Rang :rank von :total im Sektor', [
-                                            'rank' => $sectorRanking['rank'],
-                                            'total' => $sectorRanking['total'],
-                                        ]) }}
-                                    </span>
-                                @endif
-                            </dd>
-                        </div>
+
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    @foreach ($fundamentalGroups as $group)
+                        <section class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+                            <div class="flex items-center gap-2.5 border-b border-[var(--ak-border)] pb-3">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-400/10 text-amber-300">
+                                    <x-dynamic-component :component="$group['icon']" class="h-4 w-4" />
+                                </span>
+                                <div class="min-w-0">
+                                    <h3 class="text-sm font-black text-[var(--ak-text)]">{{ $group['title'] }}</h3>
+                                    <p class="truncate text-[10px] text-[var(--ak-muted)]">{{ $group['subtitle'] }}</p>
+                                </div>
+                            </div>
+                            <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
+                                @foreach ($group['values'] as $item)
+                                    <div class="min-w-0">
+                                        <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $item['label'] }}</dt>
+                                        <dd class="mt-1 flex flex-wrap items-center gap-1.5">
+                                            <span class="break-words text-sm font-bold text-[var(--ak-text)]">
+                                                {{ $item['value'] === null || $item['value'] === '' ? '—' : $formatValue((string) $item['label'], $item['value']) }}
+                                            </span>
+                                            @if ($item['ranking'] ?? null)
+                                                <span class="inline-flex rounded-md border border-teal-400/20 bg-teal-500/10 px-1.5 py-0.5 text-[9px] font-bold text-teal-300">
+                                                    {{ __('Rang :rank von :total im Sektor', [
+                                                        'rank' => $item['ranking']['rank'],
+                                                        'total' => $item['ranking']['total'],
+                                                    ]) }}
+                                                </span>
+                                            @endif
+                                        </dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+                        </section>
                     @endforeach
-                </dl>
+                </div>
             </article>
 
             <article id="aki-data-panel" x-show="stockTab === 'aki'" class="flex min-h-0 flex-col overflow-hidden">
@@ -719,7 +833,7 @@
                                         <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $label($key) }}</dt>
                                         <dd class="break-words text-[13px] font-bold text-[var(--ak-text)]">
                                             @if ($key === 'quality_gate_passed')
-                                                <span class="ak-model-tier {{ $value === null ? 'border-slate-500/25 bg-slate-500/10 text-slate-400' : ($value ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400' : 'border-rose-500/30 bg-rose-500/15 text-rose-400') }}">
+                                                <span class="ak-model-tier {{ $value === null ? 'border-slate-500/25 bg-slate-500/10 text-slate-400' : ($value ? 'border-teal-500/30 bg-teal-500/15 text-teal-400' : 'border-rose-500/30 bg-rose-500/15 text-rose-400') }}">
                                                     {{ $value === null ? '—' : ($value ? __('Bestanden') : __('Nicht bestanden')) }}
                                             </span>
                                             @elseif ($value === null)
@@ -744,7 +858,7 @@
                                         <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $ensembleLabel }}</dt>
                                         <dd class="break-words text-[13px] font-bold text-[var(--ak-text)]">
                                             @if ($ensembleLabel === __('Ensemble-Veto'))
-                                                <span class="ak-model-tier {{ $ensembleValue === null ? 'border-slate-500/25 bg-slate-500/10 text-slate-400' : ($ensembleValue ? 'border-rose-500/30 bg-rose-500/15 text-rose-400' : 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400') }}">
+                                                <span class="ak-model-tier {{ $ensembleValue === null ? 'border-slate-500/25 bg-slate-500/10 text-slate-400' : ($ensembleValue ? 'border-rose-500/30 bg-rose-500/15 text-rose-400' : 'border-teal-500/30 bg-teal-500/15 text-teal-400') }}">
                                                     {{ $ensembleValue === null ? '—' : ($ensembleValue ? __('Ja') : __('Nein')) }}
                                                 </span>
                                             @elseif ($ensembleValue === null)
@@ -853,7 +967,7 @@
                         histogram.push({
                             x: sample.reduce((sum, point) => sum + point.x, 0) / sample.length,
                             y: probability,
-                            fillColor: probability > 55 ? '#22c58b' : (probability < 45 ? '#e35f72' : '#e5b643'),
+                            fillColor: probability > 55 ? '#2a9d96' : (probability < 45 ? '#b86470' : '#b6a15b'),
                         });
                     }
 
@@ -870,7 +984,7 @@
                             parentHeightOffset: 0,
                         },
                         plotOptions: { bar: { columnWidth: '82%', borderRadius: 2, borderRadiusApplication: 'end' } },
-                        fill: { type: 'solid', opacity: .78 },
+                        fill: { type: 'solid', opacity: .7 },
                         stroke: { width: 0 },
                         dataLabels: { enabled: false },
                         grid: {
@@ -942,6 +1056,7 @@
                 const sectorColor = lightTheme ? '#14b8a6' : @json($sectorColor);
                 const predictedPrice20d = @json(is_numeric($prediction?->predicted_price_20d) ? (float) $prediction->predicted_price_20d : null);
                 const chartFocusAt = @json($chartFocusAt?->getTimestampMs());
+                const liveSourceSymbol = @json($requestedPredictionId === 0 ? ($instrument->provider_symbol ?: $instrument->symbol) : null);
                 const dataUrl = @json($chartDataUrl);
                 const updatedElement = document.querySelector('#stock-chart-updated');
                 const changeElement = document.querySelector('#stock-chart-change');
@@ -1600,6 +1715,40 @@
                 window.addEventListener('aktienki:theme-changed', async () => {
                     renderMainChart();
                     if (rsiChart) await rsiChart.updateOptions(rsiOptions(), false, true);
+                });
+                window.addEventListener('aktienki:live-price', event => {
+                    if (!liveSourceSymbol || String(event.detail?.symbol ?? '').toUpperCase() !== String(liveSourceSymbol).toUpperCase()) return;
+
+                    const price = Number(event.detail?.price);
+                    const timestamp = Number(event.detail?.timestamp) * 1000;
+                    if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestamp)) return;
+
+                    const tradingDay = new Intl.DateTimeFormat('en-CA', {
+                        timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit',
+                    }).format(new Date(timestamp));
+                    const lastCandle = currentCandles.at(-1);
+                    const lastTradingDay = lastCandle ? new Intl.DateTimeFormat('en-CA', {
+                        timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit',
+                    }).format(new Date(lastCandle.x)) : null;
+
+                    if (lastCandle && lastTradingDay === tradingDay) {
+                        const [open, high, low] = lastCandle.y.map(Number);
+                        lastCandle.y = [
+                            Number.isFinite(open) ? open : price,
+                            Number.isFinite(high) ? Math.max(high, price) : price,
+                            Number.isFinite(low) ? Math.min(low, price) : price,
+                            price,
+                        ];
+                    } else {
+                        currentCandles = [...currentCandles, { x: new Date(timestamp).toISOString(), y: [price, price, price, price] }];
+                    }
+
+                    renderMainChart();
+                    if (updatedElement) {
+                        updatedElement.textContent = new Date(timestamp).toLocaleTimeString(document.documentElement.lang, {
+                            hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Berlin',
+                        });
+                    }
                 });
 
                 const refreshChart = async () => {

@@ -88,6 +88,10 @@
                         class="fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
                         :style="`left: ${left}px; top: ${top}px`"
                     >
+                        <a href="{{ route('markets.situation') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                            <x-heroicon-o-globe-europe-africa class="h-5 w-5 text-teal-500" />
+                            {{ __('Marktlage') }}
+                        </a>
                         <a href="{{ route('markets.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                             <x-heroicon-o-building-library class="h-5 w-5 text-teal-500" />
                             {{ __('Märkte') }}
@@ -154,6 +158,21 @@
                 </template>
             </div>
             @auth
+                @php
+                    $strategyDepotAccess = app(\App\Services\PlanAccessService::class)
+                        ->allows(auth()->user(), \App\Enums\PlanLevel::Pro);
+                    $activeStrategyDepot = $strategyDepotAccess
+                        ? \App\Models\Portfolio::query()
+                            ->where('user_id', auth()->id())
+                            ->where('type', 'paper')
+                            ->where('active', true)
+                            ->get(['id', 'meta'])
+                            ->first(fn (\App\Models\Portfolio $portfolio): bool => (bool) data_get($portfolio->meta, 'automation.live_enabled', false))
+                        : null;
+                    $strategyDepotUrl = $activeStrategyDepot
+                        ? route('depots.show', ['portfolio' => $activeStrategyDepot, 'return_to' => 'paper'])
+                        : route('paper-depots.index');
+                @endphp
                 <div
                     x-data="{
                         open: false,
@@ -197,6 +216,19 @@
                                 <x-heroicon-o-beaker class="h-5 w-5 text-amber-500" />
                                 {{ __('Musterdepot') }}
                             </a>
+                            @if($strategyDepotAccess)
+                                <a href="{{ $strategyDepotUrl }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-cyan-500/10 hover:text-cyan-400">
+                                    <x-heroicon-o-bolt class="h-5 w-5 text-cyan-400" />
+                                    <span>{{ __('Strategiedepot') }}</span>
+                                    <span class="ml-auto rounded border border-cyan-300/35 bg-cyan-400/[.12] px-1.5 py-0.5 text-[8px] font-black leading-none tracking-wide text-cyan-300">PRO</span>
+                                </a>
+                            @else
+                                <span class="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-muted)] opacity-40" title="{{ __('Ab Pro verfügbar') }}" aria-disabled="true">
+                                    <x-heroicon-o-bolt class="h-5 w-5 text-cyan-400" />
+                                    <span>{{ __('Strategiedepot') }}</span>
+                                    <span class="ml-auto rounded border border-cyan-300/25 bg-cyan-400/[.08] px-1.5 py-0.5 text-[8px] font-black leading-none tracking-wide text-cyan-300">PRO</span>
+                                </span>
+                            @endif
                             <a href="{{ route('watchlists.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                                 <x-heroicon-o-star class="h-5 w-5 text-amber-500" />
                                 Watchlist
@@ -241,14 +273,45 @@
                             class="fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
                             :style="`left: ${left}px; top: ${top}px`"
                         >
+                            @php
+                                $planAccess = app(\App\Services\PlanAccessService::class);
+                                $canUseStrategies = $planAccess->allows(auth()->user(), \App\Enums\PlanLevel::Pro);
+                                $canUseSmartSelection = $planAccess->allows(auth()->user(), \App\Enums\PlanLevel::Plus);
+                                $lockedMenuClass = 'flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-slate-500 opacity-55';
+                            @endphp
+                            @if($canUseStrategies)
                             <a href="{{ route('setup.filter') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                                 <x-heroicon-o-funnel class="h-5 w-5 text-teal-500" />
-                                {{ __('Filter') }}
+                                {{ __('Strategie') }}
+                                <span class="ml-auto rounded-md border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-cyan-300">PRO</span>
                             </a>
+                            <a href="{{ route('setup.short') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-rose-500/10 hover:text-rose-300">
+                                <x-heroicon-o-arrow-trending-down class="h-5 w-5 text-rose-400" />
+                                {{ __('Short-Strategie') }}
+                                <span class="ml-auto rounded-md border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-cyan-300">PRO</span>
+                            </a>
+                            @else
+                            <span class="{{ $lockedMenuClass }}" title="{{ __('Verfügbar ab Pro') }}" aria-disabled="true"><x-heroicon-o-funnel class="h-5 w-5" />{{ __('Strategie') }}<span class="ml-auto text-[8px] font-black uppercase">PRO</span></span>
+                            <span class="{{ $lockedMenuClass }}" title="{{ __('Verfügbar ab Pro') }}" aria-disabled="true"><x-heroicon-o-arrow-trending-down class="h-5 w-5" />{{ __('Short-Strategie') }}<span class="ml-auto text-[8px] font-black uppercase">PRO</span></span>
+                            @endif
+                            @if($canUseSmartSelection)
+                            <a href="{{ route('setup.quality') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-amber-500/10 hover:text-amber-300">
+                                <x-heroicon-o-shield-check class="h-5 w-5 text-amber-400" />
+                                {{ __('Smart Selection') }}
+                                <span class="ml-auto rounded-md border border-amber-400/25 bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-300">PLUS</span>
+                            </a>
+                            @else
+                            <span class="{{ $lockedMenuClass }}" title="{{ __('Verfügbar ab Plus') }}" aria-disabled="true"><x-heroicon-o-shield-check class="h-5 w-5" />{{ __('Smart Selection') }}<span class="ml-auto text-[8px] font-black uppercase">PLUS</span></span>
+                            @endif
+                            @if($canUseStrategies)
                             <a href="{{ route('setup.saved-filters.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                                 <x-heroicon-o-bookmark-square class="h-5 w-5 text-amber-400" />
-                                {{ __('Filter verwalten') }}
+                                {{ __('Strategie Manager') }}
+                                <span class="ml-auto rounded-md border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-cyan-300">PRO</span>
                             </a>
+                            @else
+                            <span class="{{ $lockedMenuClass }}" title="{{ __('Verfügbar ab Pro') }}" aria-disabled="true"><x-heroicon-o-bookmark-square class="h-5 w-5" />{{ __('Strategie Manager') }}<span class="ml-auto text-[8px] font-black uppercase">PRO</span></span>
+                            @endif
                         </div>
                     </template>
                 </div>
@@ -275,7 +338,6 @@
 
         <div class="ml-auto flex shrink-0 items-center justify-end gap-3">
             <x-preference-controls class="hidden sm:flex" />
-            <x-risk-profile-badge class="hidden lg:flex" />
             @auth
                 <div x-data="{ open:false }" class="relative">
                     <button type="button" @click="open=!open" @click.outside="open=false" class="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white transition hover:bg-violet-500/15">

@@ -5,12 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Instrument;
 
 class Prediction extends Model
 {
     protected $guarded = [];
 
     protected $casts = [
+        'prediction_time' => 'datetime',
         'prediction_date' => 'date',
         'target_date' => 'date',
         'current_price' => 'float',
@@ -50,6 +52,11 @@ class Prediction extends Model
     public function predictionModels(): HasMany
     {
         return $this->models();
+    }
+
+    public function instrument(): BelongsTo
+    {
+        return $this->belongsTo(Instrument::class);
     }
 
     public function getExpectedGainAttribute(): ?float

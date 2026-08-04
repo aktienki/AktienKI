@@ -183,17 +183,18 @@ window.worldMarketMap = (countryScores = {}, stocksUrl = '/stocks') => ({
                     : null;
                 const score = countryData === null ? null : Number(countryData.score);
                 const scoreTen = score === null ? null : (score <= 1 ? score * 10 : (score <= 10 ? score : score / 10));
-                const scorePercent = scoreTen === null ? null : scoreTen * 10;
-                const colorStep = scorePercent === null ? null : Math.min(9, Math.floor(Math.max(0, scorePercent) / 10));
-                const hue = colorStep === null ? null : (colorStep * 120) / 9;
-                const scoreRatio = scorePercent === null ? 0 : Math.max(0, Math.min(100, scorePercent)) / 100;
-                const color = hue === null
-                    ? 'transparent'
-                    : (lightTheme
-                        ? `hsl(174, ${34 + scoreRatio * 24}%, ${84 - scoreRatio * 34}%)`
-                        : `hsl(${hue}, 72%, 52%)`);
+                const change = countryData === null || countryData.change === null
+                    ? null
+                    : Number(countryData.change);
+                const direction = change === null || Math.abs(change) < 0.005 ? 0 : (change > 0 ? 1 : -1);
+                const intensity = change === null ? 0 : Math.min(1, Math.abs(change) / 3);
+                const color = direction === 0
+                    ? (lightTheme ? '#cbd5e1' : '#64748b')
+                    : direction > 0
+                        ? (lightTheme ? `hsl(152, 46%, ${72 - intensity * 30}%)` : `hsl(152, 66%, ${50 + intensity * 5}%)`)
+                        : (lightTheme ? `hsl(352, 52%, ${78 - intensity * 28}%)` : `hsl(352, 68%, ${56 + intensity * 4}%)`);
                 const inactiveStroke = lightTheme ? '#4b5563' : 'currentColor';
-                const activeStroke = lightTheme ? '#0f766e' : color;
+                const activeStroke = color;
                 const restingOpacity = lightTheme ? '0.66' : '0.48';
 
                 path.setAttribute('d', this.geometryPath(feature.geometry));
@@ -224,6 +225,7 @@ window.worldMarketMap = (countryScores = {}, stocksUrl = '/stocks') => ({
                             name: german ? (feature.properties.NAME_DE || feature.properties.NAME) : feature.properties.NAME,
                             score,
                             scoreTen,
+                            change,
                             stocks: Number(countryData.stocks),
                             stocksUrl: `${stocksUrl}?country=${encodeURIComponent(iso)}`,
                         };
@@ -234,7 +236,7 @@ window.worldMarketMap = (countryScores = {}, stocksUrl = '/stocks') => ({
                 const stockLabel = document.documentElement.lang.startsWith('en') ? 'stocks' : 'Aktien';
                 title.textContent = score === null
                     ? feature.properties.NAME
-                    : `${feature.properties.NAME}: ${scoreTen.toFixed(1)} / 10 · ${countryData.stocks} ${stockLabel}`;
+                    : `${feature.properties.NAME}: ${change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(2)} %`} · KI ${scoreTen.toFixed(1)} / 10 · ${countryData.stocks} ${stockLabel}`;
                 path.appendChild(title);
                 this.$refs.map.appendChild(path);
             });

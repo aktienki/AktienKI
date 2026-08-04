@@ -11,7 +11,12 @@ Schedule::command('markets:refresh-indices')
     ->withoutOverlapping(2)
     ->runInBackground();
 
-Schedule::command('queue:work --once --queue=default --timeout=1200 --tries=1')
+Schedule::command('signals:send-emails --since=30')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->runInBackground();
+
+Schedule::command('portfolios:send-trade-emails --limit=100')
     ->everyMinute()
-    ->withoutOverlapping(25)
+    ->withoutOverlapping(10)
     ->runInBackground();

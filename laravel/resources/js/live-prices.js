@@ -72,6 +72,13 @@ if (authenticated) {
                     },
                 );
             });
+            window.dispatchEvent(new CustomEvent('aktienki:live-price', {
+                detail: {
+                    symbol: sourceSymbol,
+                    price: Number(event.price),
+                    timestamp: Number(event.timestamp),
+                },
+            }));
         });
     }
 }

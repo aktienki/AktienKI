@@ -35,15 +35,19 @@
             @if ($analysis)
                 <section class="grid gap-4 md:grid-cols-3">
                     @foreach ([
-                        [__('Chancen'), $analysis->opportunities, 'bg-emerald-500', 'text-emerald-500'],
-                        [__('Risiken'), $analysis->risks, 'bg-rose-500', 'text-rose-500'],
-                        [__('Beobachtungsliste'), $analysis->watchlist, 'bg-amber-500', 'text-amber-500'],
-                    ] as [$title, $items, $dotClass, $titleClass])
+                        [__('Chancen'), $analysis->opportunities, 'bg-emerald-500', 'text-emerald-500', true],
+                        [__('Risiken'), $analysis->risks, 'bg-rose-500', 'text-rose-500', true],
+                        [__('Beobachtungsliste'), $analysis->watchlist, 'bg-amber-500', 'text-amber-500', true],
+                    ] as [$title, $items, $dotClass, $titleClass, $compactCopy])
                         <article class="ak-card ak-card-static min-h-[320px] p-5">
                             <h2 class="text-lg font-black {{ $titleClass }}">{{ $title }}</h2>
                             <ul class="mt-5 grid gap-3">
                                 @forelse ($items as $key => $item)
-                                    <li class="ak-analysis-copy flex gap-2.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3 text-sm leading-6">
+                                    <li @class([
+                                        'ak-analysis-copy flex gap-2.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3',
+                                        'text-xs leading-[1.35]' => $compactCopy,
+                                        'text-sm leading-6' => ! $compactCopy,
+                                    ])>
                                         <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full {{ $dotClass }}"></span>
                                         <span>
                                             @if (!is_numeric($key))<strong class="text-[var(--ak-text)]">{{ __((string) $key) }}: </strong>@endif
