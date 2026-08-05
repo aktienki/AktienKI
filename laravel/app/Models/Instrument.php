@@ -43,4 +43,9 @@ class Instrument extends Model
     {
         return $this->hasMany(InstrumentDividend::class);
     }
+
+    public function exitProfiles(): HasMany
+    {
+        return $this->hasMany(InstrumentExitProfile::class);
+    }
 }

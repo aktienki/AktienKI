@@ -35,14 +35,14 @@
                     <svg viewBox="0 0 48 48" aria-hidden="true">
                         <defs>
                             <linearGradient id="brandGradient" x1="0" x2="1" y1="0" y2="1">
-                                <stop offset="0%" stop-color="#67e8f9"/>
+                                <stop offset="0%" stop-color="#fb923c"/>
                                 <stop offset="55%" stop-color="#38bdf8"/>
                                 <stop offset="100%" stop-color="#a855f7"/>
                             </linearGradient>
                         </defs>
                         <rect x="6" y="6" width="36" height="36" rx="13" fill="url(#brandGradient)" opacity=".18"/>
                         <path d="M14 31V18M14 31H35M18 27L23 21L27 25L34 15" stroke="url(#brandGradient)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                        <circle cx="34" cy="15" r="3" fill="#67e8f9"/>
+                        <circle cx="34" cy="15" r="3" fill="#fb923c"/>
                     </svg>
                 </span>
                 <span>AktienKI</span>
@@ -111,7 +111,7 @@
                                     <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
                                 </linearGradient>
                                 <linearGradient id="lineTeal" x1="0" x2="1">
-                                    <stop offset="0%" stop-color="#22d3ee" stop-opacity="0"/>
+                                    <stop offset="0%" stop-color="#fb923c" stop-opacity="0"/>
                                     <stop offset="50%" stop-color="#2dd4bf" stop-opacity=".85"/>
                                     <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
                                 </linearGradient>
@@ -145,11 +145,11 @@
                                 <defs>
                                     <linearGradient id="dataPipe" x1="0" x2="1">
                                         <stop offset="0" stop-color="#38bdf8" stop-opacity="0"/>
-                                        <stop offset=".5" stop-color="#67e8f9" stop-opacity=".9"/>
+                                        <stop offset=".5" stop-color="#fb923c" stop-opacity=".9"/>
                                         <stop offset="1" stop-color="#a855f7" stop-opacity=".1"/>
                                     </linearGradient>
                                     <radialGradient id="dbGlow">
-                                        <stop offset="0" stop-color="#67e8f9" stop-opacity=".8"/>
+                                        <stop offset="0" stop-color="#fb923c" stop-opacity=".8"/>
                                         <stop offset="1" stop-color="#0f172a" stop-opacity=".15"/>
                                     </radialGradient>
                                 </defs>
@@ -162,10 +162,10 @@
                                 @endfor
 
                                 <g class="ak-database" transform="translate(320 84)">
-                                    <ellipse cx="60" cy="38" rx="86" ry="26" fill="rgba(56,189,248,.18)" stroke="#67e8f9" stroke-width="2"/>
-                                    <path d="M-26 38 V188 C-26 203 12 216 60 216 C108 216 146 203 146 188 V38" fill="rgba(15,23,42,.72)" stroke="#67e8f9" stroke-width="2"/>
-                                    <ellipse cx="60" cy="188" rx="86" ry="26" fill="rgba(56,189,248,.14)" stroke="#67e8f9" stroke-width="2"/>
-                                    <ellipse cx="60" cy="112" rx="86" ry="26" fill="none" stroke="rgba(103,232,249,.38)" stroke-width="2"/>
+                                    <ellipse cx="60" cy="38" rx="86" ry="26" fill="rgba(56,189,248,.18)" stroke="#fb923c" stroke-width="2"/>
+                                    <path d="M-26 38 V188 C-26 203 12 216 60 216 C108 216 146 203 146 188 V38" fill="rgba(15,23,42,.72)" stroke="#fb923c" stroke-width="2"/>
+                                    <ellipse cx="60" cy="188" rx="86" ry="26" fill="rgba(56,189,248,.14)" stroke="#fb923c" stroke-width="2"/>
+                                    <ellipse cx="60" cy="112" rx="86" ry="26" fill="none" stroke="rgba(251,146,60,.38)" stroke-width="2"/>
                                     <circle cx="60" cy="112" r="118" fill="url(#dbGlow)" opacity=".28"/>
                                     <text x="60" y="114" text-anchor="middle" fill="#e0f2fe" font-size="22" font-weight="800">DATA</text>
                                     <text x="60" y="140" text-anchor="middle" fill="#93c5fd" font-size="13">10 Jahre Historie</text>
@@ -201,7 +201,7 @@
                                     <linearGradient id="neuralLine" x1="0" x2="1">
                                         <stop offset="0%" stop-color="#38bdf8" stop-opacity=".25"/>
                                         <stop offset="50%" stop-color="#a855f7" stop-opacity=".85"/>
-                                        <stop offset="100%" stop-color="#67e8f9" stop-opacity=".25"/>
+                                        <stop offset="100%" stop-color="#fb923c" stop-opacity=".25"/>
                                     </linearGradient>
                                 </defs>
                                 @php
@@ -261,7 +261,7 @@
                                     <circle cx="250" cy="180" r="98" fill="url(#planetFill)" stroke="#5eead4" stroke-width="2"/>
                                     <ellipse cx="250" cy="180" rx="170" ry="42" fill="none" stroke="rgba(94,234,212,.45)" stroke-width="2" transform="rotate(-13 250 180)"/>
                                     <ellipse cx="250" cy="180" rx="150" ry="68" fill="none" stroke="rgba(56,189,248,.25)" stroke-width="2" transform="rotate(18 250 180)"/>
-                                    <circle class="ak-orbit-dot" cx="92" cy="142" r="7" fill="#67e8f9"/>
+                                    <circle class="ak-orbit-dot" cx="92" cy="142" r="7" fill="#fb923c"/>
                                     <circle class="ak-orbit-dot delay" cx="390" cy="225" r="7" fill="#22c55e"/>
                                     <text x="250" y="174" text-anchor="middle" fill="#e0f2fe" font-size="22" font-weight="900">MARKT</text>
                                     <text x="250" y="199" text-anchor="middle" fill="#99f6e4" font-size="13">Daily Scan</text>

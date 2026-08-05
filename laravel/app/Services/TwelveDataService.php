@@ -73,27 +73,7 @@ class TwelveDataService
         return Cache::remember(
             'twelve_data_quote_'.sha1(strtoupper($symbol)),
             now()->addMinute(),
-            function () use ($symbol): ?array {
-                $response = $this->request('quote', ['symbol' => $this->symbol($symbol)]);
-                if (! $this->valid($response)) {
-                    return $this->quoteFromDailySeries($symbol);
-                }
-
-                $price = $this->number($response->json('close'));
-                $previous = $this->number($response->json('previous_close'));
-                $changePercent = $this->number($response->json('percent_change'));
-
-                if ($changePercent === null && $price !== null && $previous) {
-                    $changePercent = (($price - $previous) / $previous) * 100;
-                }
-
-                return [
-                    'price' => $price,
-                    'currency' => (string) ($response->json('currency') ?? ''),
-                    'change_percent' => $changePercent,
-                    'timestamp' => $response->json('timestamp'),
-                ];
-            },
+            fn (): ?array => $this->fetchQuote($symbol),
         );
     }
 
@@ -188,6 +168,29 @@ class TwelveDataService
             'currency' => (string) data_get($series, 'meta.currency', ''),
             'change_percent' => $changePercent,
             'timestamp' => $latest['timestamp'],
+        ];
+    }
+
+    private function fetchQuote(string $symbol): ?array
+    {
+        $response = $this->request('quote', ['symbol' => $this->symbol($symbol)]);
+        if (! $this->valid($response)) {
+            return $this->quoteFromDailySeries($symbol);
+        }
+
+        $price = $this->number($response->json('close'));
+        $previous = $this->number($response->json('previous_close'));
+        $changePercent = $this->number($response->json('percent_change'));
+
+        if ($changePercent === null && $price !== null && $previous) {
+            $changePercent = (($price - $previous) / $previous) * 100;
+        }
+
+        return [
+            'price' => $price,
+            'currency' => (string) ($response->json('currency') ?? ''),
+            'change_percent' => $changePercent,
+            'timestamp' => $response->json('timestamp'),
         ];
     }
 

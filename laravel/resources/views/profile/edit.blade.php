@@ -22,6 +22,9 @@
         <form method="POST" action="{{ route('profile.update') }}" class="grid gap-5 lg:grid-cols-[1fr_1fr]">
             @csrf
             @method('patch')
+            @if (old('return_to', request('return_to')))
+                <input type="hidden" name="return_to" value="{{ old('return_to', request('return_to')) }}">
+            @endif
 
             <section class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl">
                 <div class="flex items-center gap-3">
@@ -37,7 +40,7 @@
 
             <section id="darstellung" class="scroll-mt-24 rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl">
                 <div class="flex items-center gap-3">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-300"><x-heroicon-o-language class="h-5 w-5" /></span>
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-4000/10 text-orange-400"><x-heroicon-o-language class="h-5 w-5" /></span>
                     <div><h2 class="font-black text-[var(--ak-text)]">{{ __('Sprache & Darstellung') }}</h2><p class="mt-0.5 text-xs text-[var(--ak-muted)]">{{ __('Passe AktienKI an deine Vorlieben an') }}</p></div>
                 </div>
 
@@ -68,11 +71,11 @@
                 <fieldset class="mt-6">
                     <legend class="sr-only">{{ __('Gewünschtes Risikoprofil') }}</legend>
                     <div class="grid gap-3 md:grid-cols-3">
-                        <label class="group relative cursor-pointer rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-cyan-400/35 has-[:checked]:border-cyan-400/60 has-[:checked]:bg-cyan-400/[.08] has-[:checked]:ring-2 has-[:checked]:ring-cyan-400/10">
+                        <label class="group relative cursor-pointer rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-orange-400/35 has-[:checked]:border-orange-400/60 has-[:checked]:bg-orange-400/[.08] has-[:checked]:ring-2 has-[:checked]:ring-orange-400/10">
                             <input class="sr-only" type="radio" name="risk_level" value="cautious" @checked($selectedRiskLevel === 'cautious')>
                             <span class="flex items-center justify-between gap-3">
-                                <strong class="text-sm text-cyan-300">{{ __('Vorsichtig') }}</strong>
-                                <x-heroicon-o-check-circle class="h-5 w-5 text-cyan-300 opacity-0 transition group-has-[:checked]:opacity-100" />
+                                <strong class="text-sm text-orange-400">{{ __('Vorsichtig') }}</strong>
+                                <x-heroicon-o-check-circle class="h-5 w-5 text-orange-400 opacity-0 transition group-has-[:checked]:opacity-100" />
                             </span>
                             <span class="mt-2 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Orientierung: niedrige Volatilität und historischer beziehungsweise modellierter Drawdown bis etwa 15 %.') }}</span>
                         </label>
@@ -122,7 +125,7 @@
             </section>
 
             <div class="flex items-center justify-end lg:col-span-2">
-                <button class="inline-flex h-11 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-7 text-sm font-bold text-white shadow-lg shadow-violet-950/30 transition hover:-translate-y-0.5 hover:brightness-110" type="submit">{{ __('Einstellungen speichern') }}</button>
+                <button class="inline-flex h-11 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-orange-4000 px-7 text-sm font-bold text-white shadow-lg shadow-violet-950/30 transition hover:-translate-y-0.5 hover:brightness-110" type="submit">{{ __('Einstellungen speichern') }}</button>
             </div>
         </form>
     </div>

@@ -1,5 +1,5 @@
 <x-app-layout>
-    <div class="ak-body ak-dashboard-viewport pb-28 lg:pb-0">
+    <div class="ak-market-situation-page min-h-[calc(100dvh-73px)] overflow-visible pb-28 lg:pb-0">
         <livewire:dashboard.market-data />
     </div>
 

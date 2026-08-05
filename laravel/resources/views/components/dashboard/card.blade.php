@@ -4,7 +4,7 @@
     'title' => '',
 ])
 
-<div class="ak-card">
+<div {{ $attributes->class(['ak-card']) }}>
 
     {{ $slot }}
 

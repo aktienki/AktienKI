@@ -10,7 +10,7 @@
     body {
         background:
             radial-gradient(circle at 73% 34%,rgba(124,58,237,.28),transparent 31%),
-            radial-gradient(circle at 28% 92%,rgba(34,211,238,.12),transparent 32%),
+            radial-gradient(circle at 28% 92%,rgba(251,146,60,.12),transparent 32%),
             linear-gradient(135deg,#020617 0%,#04081c 42%,#090321 100%);
 
         color: #F8FAFC;
@@ -40,7 +40,7 @@
 
         radial-gradient(
             circle at 28% 92%,
-            rgba(34,211,238,.12),
+            rgba(251,146,60,.12),
             transparent 32%
         ),
 

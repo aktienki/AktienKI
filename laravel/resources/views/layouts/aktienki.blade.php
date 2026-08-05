@@ -8,6 +8,8 @@
         <meta name="authenticated-user" content="{{ auth()->id() }}">
     @endauth
     <title>{{ config('app.name', 'AktienKI') }}</title>
+    <link rel="icon" href="{{ asset('brand/generated/bull-icon.png') }}" type="image/png">
+    <link rel="manifest" href="{{ asset('brand/manifest.webmanifest') }}">
     <x-preference-head />
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])

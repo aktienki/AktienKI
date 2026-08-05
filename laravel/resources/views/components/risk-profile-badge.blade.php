@@ -6,11 +6,11 @@
         $profiles = [
             'cautious' => [
                 'label' => __('Vorsichtig'),
-                'classes' => 'border-cyan-400/25 bg-cyan-400/10 text-cyan-300',
+                'classes' => 'border-orange-400/25 bg-orange-400/10 text-orange-400',
             ],
             'conservative' => [
                 'label' => __('Vorsichtig'),
-                'classes' => 'border-cyan-400/25 bg-cyan-400/10 text-cyan-300',
+                'classes' => 'border-orange-400/25 bg-orange-400/10 text-orange-400',
             ],
             'normal' => [
                 'label' => __('Normal'),
@@ -39,7 +39,7 @@
     <a
         href="{{ route('profile.edit') }}"
         title="{{ __('Risikoprofil') }}: {{ $profile['label'] }}"
-        class="{{ $class }} items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-2 text-[11px] font-black transition hover:brightness-125 {{ $profile['classes'] }}"
+        class="ak-light-teal-badge {{ $class }} items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-2 text-[11px] font-black transition hover:brightness-125 {{ $profile['classes'] }}"
     >
         <x-heroicon-o-shield-check class="h-4 w-4 shrink-0" />
         <span><span class="font-semibold opacity-70">{{ __('Risikoprofil') }}:</span> {{ $profile['label'] }}</span>

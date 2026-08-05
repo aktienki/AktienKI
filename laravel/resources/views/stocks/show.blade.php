@@ -69,7 +69,7 @@
             'Energy' => '#fbbf24',
             'Industrials' => '#94a3b8',
             'Basic Materials' => '#fb923c',
-            'Communication Services' => '#22d3ee',
+            'Communication Services' => '#fb923c',
             'Consumer Cyclical' => '#a3e635',
             'Consumer Defensive' => '#4ade80',
             'Real Estate' => '#818cf8',

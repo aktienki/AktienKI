@@ -2,7 +2,7 @@
     <div id="predictions-page" class="flex h-[calc(100dvh-89px)] min-h-0 max-h-[calc(100dvh-89px)] flex-col overflow-hidden py-2 text-[var(--ak-text)]">
         <div class="mb-2 flex shrink-0 flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <div class="flex items-center gap-2.5">
-                <div class="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300 shadow-[0_0_18px_rgba(245,158,11,.07)]">
+                <div class="prediction-page-icon flex h-9 w-9 items-center justify-center rounded-xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300 shadow-[0_0_18px_rgba(245,158,11,.07)]">
                     <x-heroicon-o-chart-bar class="h-5 w-5" />
                 </div>
                 <div>
@@ -111,7 +111,7 @@
                     </label>
                     <label class="ak-heatmap-range">
                         <span>{{ __('Profitfaktor') }} ≥ <b x-text="profitFactor <= 0 ? '{{ __('Alle') }}' : profitFactor.toFixed(1).replace('.', ',')"></b></span>
-                        <input name="profit_factor_min" type="range" min="0" max="3" step="0.1" x-model.number="profitFactor" @change="$root.requestSubmit()">
+                        <input name="profit_factor_min" type="range" min="0" max="10" step="0.1" x-model.number="profitFactor" @change="$root.requestSubmit()">
                     </label>
                     <label class="ak-heatmap-range">
                         <span>{{ __('Trefferquote') }} ≥ <b x-text="hitRate <= 0 ? '{{ __('Alle') }}' : `${hitRate}%`"></b></span>
@@ -258,7 +258,7 @@
                                     ? $prediction->smart_labels
                                     : (json_decode((string) ($prediction->smart_labels ?? '[]'), true) ?: []));
                             @endphp
-                            <tr onclick="window.location='{{ route('stocks.show', ['symbol' => $prediction->symbol, 'prediction' => $prediction->id, 'return_to' => request()->getRequestUri()]) }}'" class="cursor-pointer transition hover:bg-teal-500/[.075]">
+                            <tr onclick="window.location='{{ route('stocks.show', ['symbol' => $prediction->symbol, 'prediction' => $prediction->id, 'return_to' => request()->getRequestUri()]) }}'" class="prediction-row cursor-pointer transition hover:bg-teal-500/[.075]">
                                 <td onclick="event.stopPropagation()" class="relative border-b border-[var(--ak-border)] px-3 py-3 text-center">
                                     @if ($userWatchlists->count() === 1)
                                         @php $singleWatchlist = $userWatchlists->first(); @endphp
@@ -790,7 +790,7 @@
         }
 
         #prediction-filterboard .ak-heatmap-range b {
-            color: #06b6d4;
+            color: #fb923c;
             font-weight: 900;
         }
 
@@ -799,7 +799,7 @@
             height: 12px;
             margin: 0;
             cursor: pointer;
-            accent-color: #06b6d4;
+            accent-color: #fb923c;
         }
 
         @media (max-width: 1100px) {

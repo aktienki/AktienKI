@@ -5,16 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="{{ __('So funktioniert die KI-gestützte Aktienanalyse von AktienKI.') }}">
     <title>{{ __('Features') }} – AktienKI</title>
-    <link rel="icon" href="{{ asset('assets/logo.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ asset('brand/generated/bull-icon.png') }}" type="image/png">
     <x-preference-head :force-dark="true" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
-        .features-bg{background-color:#070b22;background-image:radial-gradient(circle at 72% 20%,rgba(139,92,246,.19),transparent 30%),radial-gradient(circle at 18% 72%,rgba(34,211,238,.1),transparent 27%),linear-gradient(rgba(43,29,93,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(43,29,93,.3) 1px,transparent 1px);background-size:auto,auto,60px 60px,60px 60px}
-        .features-topbar{background:rgba(7,11,34,.82);border-bottom:1px solid rgba(139,92,246,.24);box-shadow:0 12px 45px rgba(0,0,0,.24);backdrop-filter:blur(22px)}
+        .features-bg{--ak-accent:#fb923c;--ak-accent-soft:rgba(251,146,60,.10);--ak-card-strong:rgba(52,65,95,.60);--ak-border:rgba(251,146,60,.24);background-color:#090d22;background-image:radial-gradient(circle at 73% 34%,rgba(124,58,237,.16),transparent 34%),radial-gradient(circle at 28% 92%,rgba(251,146,60,.13),transparent 34%),radial-gradient(circle at 8% 16%,rgba(251,191,36,.04),transparent 22%),linear-gradient(135deg,#090d22 0%,#10162f 48%,#171033 100%)}
+        .features-topbar{background:rgba(11,20,36,.96);border-bottom:1px solid rgba(251,146,60,.14);box-shadow:0 10px 30px rgba(2,6,23,.24),inset 0 -1px 0 rgba(251,146,60,.035);backdrop-filter:blur(18px) saturate(115%)}
+        .feature-dashboard-card{background-color:rgba(52,65,95,.60);border-color:rgba(251,146,60,.30);box-shadow:0 12px 30px rgba(2,132,199,.10),inset 0 1px 0 rgba(251,146,60,.035);backdrop-filter:blur(8px)}
+        @media (min-width:1024px){.feature-card-grid{height:min(27.5rem,calc(100svh - 315px));min-height:25rem}.feature-dashboard-card{min-height:0;overflow:hidden}}
         .feature-icon{color:#fbbf24;border-color:rgba(251,191,36,.34);background:linear-gradient(145deg,rgba(251,191,36,.16),rgba(245,158,11,.05));box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 24px rgba(245,158,11,.09)}
         .feature-icon svg{width:1.35rem;height:1.35rem}
         .feature-stat-icon{color:#fff}
-        [data-theme="light"] .features-bg{background-color:#f8fafc;background-image:radial-gradient(circle at 75% 15%,rgba(139,92,246,.13),transparent 30%),radial-gradient(circle at 15% 80%,rgba(34,211,238,.1),transparent 28%),linear-gradient(rgba(124,58,237,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,.07) 1px,transparent 1px)}
+        [data-theme="light"] .features-bg{background-color:#f8fafc;background-image:radial-gradient(circle at 75% 15%,rgba(139,92,246,.13),transparent 30%),radial-gradient(circle at 15% 80%,rgba(251,146,60,.1),transparent 28%),linear-gradient(rgba(124,58,237,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,.07) 1px,transparent 1px)}
         [data-theme="light"] .features-topbar{background:rgba(255,255,255,.82);border-color:rgba(124,58,237,.16)}
         [data-theme="light"] .feature-icon{color:#b45309;border-color:rgba(217,119,6,.3);background:rgba(245,158,11,.11)}
     </style>
@@ -23,7 +25,6 @@
     <header class="ak-public-topbar features-topbar sticky top-0 z-30 h-[73px]">
         <div class="mx-auto flex h-full max-w-screen-2xl items-center justify-between px-3 sm:px-8 lg:px-12 xl:px-16">
             <a href="{{ route('welcome') }}" class="flex items-center gap-3" aria-label="{{ __('AktienKI Startseite') }}">
-                <span class="flex h-10 w-[4.5rem] items-center justify-center"><img src="{{ asset('assets/logo.svg') }}" alt="" class="h-9 w-16"></span>
                 <x-brand-wordmark />
             </a>
             <div class="flex items-center gap-1.5 sm:gap-3">
@@ -37,10 +38,10 @@
                 <a href="{{ route('reviews.index') }}" class="hidden h-10 w-10 items-center justify-center rounded-xl text-[var(--ak-muted)] transition hover:bg-[var(--ak-surface-muted)] hover:text-[var(--ak-text)] lg:flex" title="{{ __('Bewertungen') }}" aria-label="{{ __('Bewertungen') }}"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke-linejoin="round"/></svg></a>
                 <x-preference-controls />
                 @auth
-                    <a href="{{ route('dashboard') }}" class="hidden w-36 justify-center rounded-xl bg-white px-3 py-2.5 text-sm font-semibold leading-5 text-slate-950 sm:inline-flex">{{ __('Zum Dashboard') }}</a>
+                    <a href="{{ route('dashboard') }}" class="hidden w-36 justify-center rounded-lg border border-orange-400/25 bg-orange-400/15 px-3 py-2.5 text-sm font-semibold leading-5 text-orange-400 sm:inline-flex">{{ __('Zum Dashboard') }}</a>
                 @else
                     <a href="{{ route('login') }}" class="hidden w-24 justify-center rounded-xl px-3 py-2.5 text-sm font-semibold leading-5 text-[var(--ak-muted)] hover:text-[var(--ak-text)] sm:inline-flex">{{ __('Anmelden') }}</a>
-                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-xl border border-cyan-300/25 bg-gradient-to-r from-violet-600 to-cyan-500 px-3 py-2.5 text-sm font-bold leading-5 text-white shadow-lg shadow-violet-950/40 transition hover:-translate-y-0.5 hover:brightness-110 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
+                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/30 bg-orange-400/20 px-3 py-2.5 text-sm font-bold leading-5 text-orange-400 shadow-lg shadow-orange-400/20 transition hover:bg-orange-400/30 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
                 @endauth
                 <x-public-mobile-menu />
             </div>
@@ -49,21 +50,21 @@
 
     <main class="mx-auto flex max-w-7xl flex-col px-5 py-10 sm:px-8 lg:h-[calc(100svh-73px)] lg:min-h-0 lg:overflow-hidden lg:px-10 lg:py-5">
         <section class="mx-auto max-w-3xl text-center">
-            <p class="text-xs font-black uppercase tracking-[.22em] text-[var(--ak-accent)]">{{ __('So funktioniert AktienKI') }}</p>
+            <p class="text-xs font-black uppercase tracking-[.22em] text-orange-400">{{ __('So funktioniert AktienKI') }}</p>
             <h1 class="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{{ __('Von Marktdaten zu verständlichen Erkenntnissen.') }}</h1>
             <p class="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[var(--ak-muted)]">{{ __('AktienKI verbindet strukturierte Finanzdaten mit künstlicher Intelligenz und bereitet komplexe Zusammenhänge nachvollziehbar auf.') }}</p>
         </section>
 
-        <section class="relative mt-6 grid gap-4 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:grid-cols-4" aria-label="{{ __('Analyseprozess') }}">
+        <section class="feature-card-grid relative mt-5 grid gap-4 md:grid-cols-2 lg:flex-none lg:grid-cols-4" aria-label="{{ __('Analyseprozess') }}">
             @foreach ([
                 ['01', __('Daten zusammenführen'), __('Historische Kurse, Fundamentaldaten, Volumen und weitere Marktsignale werden gesammelt, geprüft und für die Analyse vorbereitet.'), 'database'],
                 ['02', __('Machine Learning'), __('Mehrere KI-Modelle analysieren Trends, Zusammenhänge und Abweichungen parallel. Ihre Prognosen konkurrieren miteinander, werden laufend verglichen und nach ihrer Qualität gewichtet.'), 'brain'],
                 ['03', __('Research neu gedacht'), __('Scores, Signale und Risikohinweise verdichten die Auswertung zu einer klaren Grundlage für deine eigene Recherche.'), 'insights'],
                 ['04', __('Trading-Erfolg im Fokus'), __('Auch KI schafft keine Gewissheit. Sie erkennt Muster und unterstützt strukturierte Entscheidungen, doch Prognosen können falsch sein. Eigene Recherche und konsequentes Risikomanagement bleiben unverzichtbar.'), 'success'],
             ] as [$number, $title, $copy, $icon])
-                <article class="relative rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-5 shadow-[var(--ak-shadow)] backdrop-blur-xl">
+                <article class="feature-dashboard-card relative rounded-2xl border p-4">
                     <div class="flex items-center justify-between">
-                        <span class="feature-icon flex h-11 w-11 items-center justify-center rounded-xl border" aria-hidden="true">
+                        <span class="feature-icon flex h-10 w-10 items-center justify-center rounded-xl border" aria-hidden="true">
                             @if ($icon === 'database')
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="7.5" ry="3"/><path d="M4.5 5v6c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3V5M4.5 11v6c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3v-6"/></svg>
                             @elseif ($icon === 'brain')
@@ -76,17 +77,17 @@
                         </span>
                         <span class="text-xs font-black tracking-[.2em] text-amber-400">{{ $number }}</span>
                     </div>
-                    <h2 class="mt-3 whitespace-nowrap text-base font-black xl:text-lg">{{ $title }}</h2>
+                    <h2 class="mt-2 whitespace-nowrap text-base font-black xl:text-lg">{{ $title }}</h2>
                     @if ($number === '01')
                         <p class="mt-2 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Unsere Datenbasis wächst kontinuierlich und verbindet Märkte aus aller Welt:') }}</p>
-                        <ul class="mt-3 grid gap-2 text-xs" aria-label="{{ __('Aktueller Datenbestand') }}">
+                        <ul class="mt-2 grid gap-1.5 text-xs" aria-label="{{ __('Aktueller Datenbestand') }}">
                             @foreach ([
                                 [__('Länder'), $featureStats['countries'], 'countries'],
                                 [__('Sektoren'), $featureStats['sectors'], 'sectors'],
                                 [__('Aktien'), $featureStats['stocks'], 'stocks'],
                                 [__('Indizes'), $featureStats['indices'], 'indices'],
                             ] as [$label, $value, $statIcon])
-                                <li class="flex items-center gap-2 rounded-lg bg-amber-400/[.035] px-3 py-1.5">
+                                <li class="flex items-center gap-2 rounded-lg bg-amber-400/[.035] px-3 py-1">
                                     <span class="flex w-32 shrink-0 items-center gap-2.5 text-white">
                                         <span class="feature-icon feature-stat-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0">
                                             @if ($statIcon === 'countries')
@@ -108,14 +109,14 @@
                     @elseif ($number === '02')
                         <div class="flex flex-col">
                         <p class="order-1 mt-2 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Aktive Modelle analysieren Indikatoren und Makrodaten parallel und konkurrieren anhand ihrer Prognosequalität:') }}</p>
-                        <div class="order-3 mt-4 grid grid-cols-2 gap-4 text-[11px] text-white">
+                        <div class="order-3 mt-2.5 grid grid-cols-2 gap-3 text-[11px] text-white">
                             @foreach ([
                                 [__('Horizon KI'), $featureStats['horizon_models']],
                                 [__('Pulse KI'), $featureStats['pulse_models']],
                             ] as [$groupTitle, $models])
                                 <div class="min-w-0">
-                                    <h3 class="mb-2 font-black uppercase tracking-[.12em] text-amber-400">{{ $groupTitle }}</h3>
-                                    <ul class="grid gap-1.5" aria-label="{{ $groupTitle }}">
+                                    <h3 class="mb-1 font-black uppercase tracking-[.12em] text-amber-400">{{ $groupTitle }}</h3>
+                                    <ul class="grid gap-1" aria-label="{{ $groupTitle }}">
                                         @foreach ($models as $model)
                                             <li class="flex min-w-0 items-center gap-1.5">
                                                 @switch(\Illuminate\Support\Str::afterLast($model, ' '))
@@ -150,12 +151,12 @@
                                 </div>
                             @endforeach
                         </div>
-                        <div class="order-2 mt-3 border-b border-amber-400/10 pb-2.5 text-[9px] font-black uppercase tracking-[.08em] text-white">
+                        <div class="order-2 mt-2 border-b border-amber-400/10 pb-1.5 text-[9px] font-black uppercase tracking-[.08em] text-white">
                             <div class="flex items-center gap-1.5 text-amber-400">
                                 <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12h2M3 12h2M12 3v2M12 19v2M17 7l1.5-1.5M5.5 18.5 7 17M17 17l1.5 1.5M5.5 5.5 7 7"/></svg>
                                 <span>{{ __('Champion-Challenger-System') }}</span>
                             </div>
-                            <div class="mt-2 grid gap-1.5 pl-1">
+                            <div class="mt-1 grid gap-1 pl-1">
                                 <span class="flex items-center gap-1.5">
                                     <svg class="h-4 w-4 shrink-0 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 4h8v3a4 4 0 0 1-8 0V4Z"/><path d="M8 6H4v1a4 4 0 0 0 4 4M16 6h4v1a4 4 0 0 1-4 4M12 11v5M8 20h8M9 16h6"/></svg>
                                     <span>{{ __('Champion') }}</span>
@@ -169,7 +170,7 @@
                         </div>
                     @elseif ($number === '03')
                         <p class="mt-2 text-xs leading-5 text-[var(--ak-muted)]">{{ $copy }}</p>
-                        <ul class="mt-4 grid gap-3 text-xs font-semibold text-white" aria-label="{{ __('Research-Funktionen') }}">
+                        <ul class="mt-2.5 grid gap-2 text-xs font-semibold text-white" aria-label="{{ __('Research-Funktionen') }}">
                             @foreach ([
                                 [__('KI-Score'), 'score'],
                                 [__('Kursprognose'), 'forecast'],
@@ -201,21 +202,21 @@
                         </ul>
                     @elseif ($number === '04')
                         <p class="mt-2 text-[11px] font-semibold leading-4 text-white"><strong class="text-amber-300">71 %</strong> {{ __('der aktiv gemanagten, auf Euro lautenden Global-Equity-Fonds blieben im Gesamtjahr 2025 hinter dem S&P World zurück.') }} <a href="https://www.spglobal.com/spdji/en/documents/spiva/spiva-europe-year-end-2025.pdf" target="_blank" rel="noopener noreferrer" class="whitespace-nowrap text-amber-300/80 hover:text-amber-200">{{ __('Quelle: S&P') }}</a></p>
-                        <p class="mt-3 text-xs leading-5 text-[var(--ak-muted)]">{{ $copy }}</p>
-                        <ul class="mt-3 rounded-xl bg-amber-400/[.06] px-3 py-1 text-[10px] font-semibold leading-4 text-white">
-                            <li class="flex items-start gap-2 border-b border-amber-400/10 py-1.5">
+                        <p class="mt-2 text-xs leading-4 text-[var(--ak-muted)]">{{ $copy }}</p>
+                        <ul class="mt-2 rounded-xl bg-amber-400/[.06] px-3 py-0.5 text-[10px] font-semibold leading-[14px] text-white">
+                            <li class="flex items-start gap-2 border-b border-amber-400/10 py-1">
                                 <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M8 1.5 13 3.7v3.7c0 3.1-2.1 5.6-5 7.1-2.9-1.5-5-4-5-7.1V3.7L8 1.5Z"/><path d="m5.5 8 1.6 1.6 3.6-3.7"/></svg>
                                 <span>{{ __('Ein strenger Qualitätsfilter entscheidet, ob eine Aktie für eine Prognose zugelassen wird.') }}</span>
                             </li>
-                            <li class="flex items-start gap-2 border-b border-amber-400/10 py-1.5">
+                            <li class="flex items-start gap-2 border-b border-amber-400/10 py-1">
                                 <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.4 10.4 3.2 3.2M4.8 7h4.4M7 4.8v4.4"/></svg>
                                 <span>{{ __('Alle Modelle werden streng auf sogenanntes Overfitting geprüft.') }}</span>
                             </li>
-                            <li class="flex items-start gap-2 border-b border-amber-400/10 py-1.5">
+                            <li class="flex items-start gap-2 border-b border-amber-400/10 py-1">
                                 <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M8.8 2H3.5A1.5 1.5 0 0 0 2 3.5v5.3l5.2 5.2 6.8-6.8L8.8 2Z"/><circle cx="5.2" cy="5.2" r=".8"/><path d="M10.5 5.5v3M10.5 10.8h.01"/></svg>
                                 <span>{{ __('Aktien, die den Qualitätsfilter nicht erfüllen, werden eindeutig gekennzeichnet.') }}</span>
                             </li>
-                            <li class="flex items-start gap-2 py-1.5">
+                            <li class="flex items-start gap-2 py-1">
                                 <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M8 1.5 13 3.7v3.7c0 3.1-2.1 5.6-5 7.1-2.9-1.5-5-4-5-7.1V3.7L8 1.5Z"/><path d="M5 8h5.5M8.5 5.8 10.7 8l-2.2 2.2"/></svg>
                                 <span>{{ __('Wir entwickeln eine komplexe Exit-Strategie, die Verlustrisiken begrenzen und dein Kapital bestmöglich schützen soll.') }}</span>
                             </li>

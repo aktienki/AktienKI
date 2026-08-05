@@ -18,9 +18,9 @@ final class SmartSelectionLabelController extends Controller
             'backtest_run' => ['nullable', 'uuid'],
             'score_min' => ['nullable', 'numeric', 'between:0,10'],
             'confidence_min' => ['nullable', 'numeric', 'between:0,100'],
-            'drawdown_max' => ['nullable', 'numeric', 'between:0,50'],
-            'profit_factor_min' => ['nullable', 'numeric', 'between:0,3'],
-            'volatility_max' => ['nullable', 'numeric', 'between:0,100'],
+            'drawdown_max' => ['nullable', 'numeric', 'between:0,100'],
+            'profit_factor_min' => ['nullable', 'numeric', 'between:0,10'],
+            'volatility_max' => ['nullable', 'numeric', 'between:0,1000000'],
             'predicted_return_min' => ['nullable', 'numeric', 'between:-50,100'],
         ]);
 

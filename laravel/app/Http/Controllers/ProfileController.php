@@ -70,6 +70,21 @@ class ProfileController extends Controller
         // especially important after changing identity fields such as e-mail.
         Auth::guard('web')->login($user->fresh(), Auth::guard('web')->viaRemember());
 
+        $returnTo = $validated['return_to'] ?? null;
+
+        if (is_string($returnTo) && $returnTo !== '') {
+            $returnHost = parse_url($returnTo, PHP_URL_HOST);
+            $returnScheme = parse_url($returnTo, PHP_URL_SCHEME);
+            $isLocalPath = str_starts_with($returnTo, '/') && ! str_starts_with($returnTo, '//');
+            $isSameOriginUrl = in_array($returnScheme, ['http', 'https'], true)
+                && $returnHost !== null
+                && strcasecmp($returnHost, $request->getHost()) === 0;
+
+            if ($isLocalPath || $isSameOriginUrl) {
+                return Redirect::to($returnTo)->with('status', 'profile-updated');
+            }
+        }
+
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 

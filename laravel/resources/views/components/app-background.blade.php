@@ -1,10 +1,10 @@
 <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
 
-    <div class="absolute inset-0 bg-cyan-700"></div>
+    <div class="absolute inset-0 bg-orange-400"></div>
 
     <div class="absolute inset-2 bg-gradient-to-br
         radial-gradient(circle at 73% 34%,rgba(124,58,237,.28),transparent 31%),
-        radial-gradient(circle at 28% 92%,rgba(34,211,238,.12),transparent 32%),
+        radial-gradient(circle at 28% 92%,rgba(251,146,60,.12),transparent 32%),
         linear-gradient(135deg,#020617 0%,#04081c 42%,#090321 100%);">
     </div>
 

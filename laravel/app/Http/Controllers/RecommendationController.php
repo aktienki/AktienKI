@@ -18,6 +18,25 @@ final class RecommendationController extends Controller
         $exchangeId = max(0, $request->integer('exchange'));
         $selectionDate = DB::table('daily_top_stock_selections')
             ->max('selection_date');
+        $latestPredictions = DB::table('predictions as latest_prediction')
+            ->selectRaw('DISTINCT ON (latest_prediction.instrument_id)
+                latest_prediction.id,
+                latest_prediction.instrument_id,
+                latest_prediction.trained_model_id,
+                latest_prediction.prediction_time,
+                latest_prediction.predicted_price_5d,
+                latest_prediction.predicted_price_20d,
+                latest_prediction.economic_edge_return,
+                latest_prediction.prediction_score,
+                latest_prediction.confidence,
+                latest_prediction.risk_score,
+                latest_prediction.drawdown_risk_factor,
+                latest_prediction.current_price,
+                latest_prediction.recommendation_class,
+                latest_prediction.signal')
+            ->orderBy('latest_prediction.instrument_id')
+            ->orderByDesc('latest_prediction.prediction_time')
+            ->orderByDesc('latest_prediction.id');
         $latestQualityRankings = DB::table('model_quality_rankings')
             ->selectRaw('trained_model_id, MAX(id) AS ranking_id')
             ->groupBy('trained_model_id');
@@ -25,6 +44,19 @@ final class RecommendationController extends Controller
             ->where('status', 'current')
             ->selectRaw('instrument_id, MAX(id) AS quote_id')
             ->groupBy('instrument_id');
+        $backtestRunId = (int) DB::table('backtest_runs')
+            ->whereIn('status', ['completed', 'completed_with_errors'])
+            ->whereRaw("COALESCE(settings->>'run_type', 'system') <> 'user_filter'")
+            ->orderByDesc('id')
+            ->value('id');
+        $backtestRiskStats = DB::table('backtest_trades')
+            ->where('backtest_run_id', $backtestRunId)
+            ->whereNotNull('trained_model_id')
+            ->whereNotNull('max_drawdown')
+            ->select(['instrument_id', 'trained_model_id'])
+            ->selectRaw('COUNT(*) AS backtest_trade_count')
+            ->selectRaw('PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY ABS(max_drawdown)) * 100 AS backtest_drawdown_p90')
+            ->groupBy('instrument_id', 'trained_model_id');
         $recommendations = DB::table('predictions as prediction')
             ->join('daily_top_stock_selections as daily_selection', function ($join) use ($selectionDate): void {
                 $join->on('daily_selection.prediction_id', '=', 'prediction.id')
@@ -38,6 +70,9 @@ final class RecommendationController extends Controller
                 $join->on('latest_quality.trained_model_id', '=', 'trained_model.id'))
             ->leftJoin('model_quality_rankings as model_quality', 'model_quality.id', '=', 'latest_quality.ranking_id')
             ->leftJoin('model_quality_tiers as model_tier', 'model_tier.id', '=', 'model_quality.tier_id')
+            ->leftJoinSub($backtestRiskStats, 'backtest_risk', fn ($join) => $join
+                ->on('backtest_risk.instrument_id', '=', 'prediction.instrument_id')
+                ->on('backtest_risk.trained_model_id', '=', 'prediction.trained_model_id'))
             ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) =>
                 $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
             ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
@@ -78,6 +113,8 @@ final class RecommendationController extends Controller
                 'model_quality.eligible as model_quality_eligible',
                 'model_tier.code as model_tier_code',
                 'model_tier.name as model_tier_name',
+                'backtest_risk.backtest_trade_count',
+                'backtest_risk.backtest_drawdown_p90',
             ])
             ->selectRaw('COALESCE(current_quote.price, prediction.current_price) AS current_price')
             ->addSelect('current_quote.quote_time as current_quote_time')
@@ -87,6 +124,84 @@ final class RecommendationController extends Controller
             ->sortBy('selection_rank')
             ->take(3)
             ->values();
+
+        $recommendations->each(fn (object $recommendation) => $recommendation->is_test_candidate = false);
+
+        if ($recommendations->count() < 3) {
+            $missing = 3 - $recommendations->count();
+            $fallbacks = DB::query()
+                ->fromSub($latestPredictions, 'prediction')
+                ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+                ->leftJoin('exchanges as instrument_exchange', 'instrument_exchange.id', '=', 'instrument.exchange_id')
+                ->leftJoin('trained_models as trained_model', 'trained_model.id', '=', 'prediction.trained_model_id')
+                ->leftJoin('model_definitions as model_definition', 'model_definition.id', '=', 'trained_model.model_definition_id')
+                ->leftJoinSub($latestQualityRankings, 'latest_quality', fn ($join) =>
+                    $join->on('latest_quality.trained_model_id', '=', 'trained_model.id'))
+                ->leftJoin('model_quality_rankings as model_quality', 'model_quality.id', '=', 'latest_quality.ranking_id')
+                ->leftJoin('model_quality_tiers as model_tier', 'model_tier.id', '=', 'model_quality.tier_id')
+                ->leftJoinSub($backtestRiskStats, 'backtest_risk', fn ($join) => $join
+                    ->on('backtest_risk.instrument_id', '=', 'prediction.instrument_id')
+                    ->on('backtest_risk.trained_model_id', '=', 'prediction.trained_model_id'))
+                ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) =>
+                    $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
+                ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
+                ->where('instrument.type', 'stock')
+                ->where('instrument.is_active', true)
+                ->whereNull('instrument.deleted_at')
+                ->whereNotNull('prediction.prediction_score')
+                ->whereNotNull('prediction.confidence')
+                ->whereRaw('COALESCE(current_quote.price, prediction.current_price) > 0')
+                ->when($recommendations->isNotEmpty(), fn ($query) =>
+                    $query->whereNotIn('prediction.instrument_id', $recommendations->pluck('instrument_id')))
+                ->when($country !== '', fn ($query) => $query->where('instrument.country', $country))
+                ->when($sector !== '', fn ($query) => $query->where('instrument.sector', $sector))
+                ->when($exchangeId > 0, fn ($query) => $query->where('instrument.exchange_id', $exchangeId))
+                ->select([
+                    'prediction.id as prediction_id',
+                    'prediction.instrument_id',
+                    'prediction.prediction_time',
+                    'prediction.predicted_price_5d',
+                    'prediction.predicted_price_20d',
+                    'prediction.economic_edge_return',
+                    'prediction.prediction_score',
+                    'prediction.confidence',
+                    'prediction.risk_score',
+                    'prediction.drawdown_risk_factor',
+                    'instrument.symbol',
+                    'instrument.name',
+                    'instrument.country',
+                    'instrument.sector',
+                    'instrument.currency',
+                    'instrument_exchange.code as exchange_code',
+                    'instrument_exchange.name as exchange_name',
+                    'model_definition.public_alias as model_alias',
+                    'model_quality.quality_score as model_quality_score',
+                    'model_quality.eligible as model_quality_eligible',
+                    'model_tier.code as model_tier_code',
+                    'model_tier.name as model_tier_name',
+                    'backtest_risk.backtest_trade_count',
+                    'backtest_risk.backtest_drawdown_p90',
+                ])
+                ->selectRaw('NULL::date AS selection_date')
+                ->selectRaw('NULL::numeric AS stored_recommendation_score')
+                ->selectRaw('NULL::numeric AS stored_risk_percent')
+                ->selectRaw('COALESCE(current_quote.price, prediction.current_price) AS current_price')
+                ->addSelect('current_quote.quote_time as current_quote_time')
+                ->selectRaw("{$signalSql} AS personalized_signal")
+                ->get()
+                ->map(fn (object $row): object => $this->score($row))
+                ->sortByDesc('recommendation_score')
+                ->take($missing)
+                ->values()
+                ->map(function (object $row, int $index) use ($recommendations): object {
+                    $row->selection_rank = $recommendations->count() + $index + 1;
+                    $row->is_test_candidate = true;
+
+                    return $row;
+                });
+
+            $recommendations = $recommendations->concat($fallbacks)->values();
+        }
 
         $recommendations = $recommendations
             ->map(function (object $recommendation) use ($signalSql): object {
@@ -212,9 +327,18 @@ final class RecommendationController extends Controller
     {
         $scorePercent = AiScore::toPercent($row->prediction_score) ?? 0.0;
         $confidencePercent = $this->percentage($row->confidence) ?? 0.0;
-        $riskPercent = is_numeric($row->stored_risk_percent ?? null)
-            ? max(0.0, min(100.0, (float) $row->stored_risk_percent))
+        $rawRiskPercent = is_numeric($row->stored_risk_percent ?? null)
+            ? (float) $row->stored_risk_percent
             : ($this->percentage($row->risk_score ?? $row->drawdown_risk_factor) ?? 50.0);
+
+        $backtestTradeCount = (int) ($row->backtest_trade_count ?? 0);
+        $backtestRiskPercent = $backtestTradeCount >= 10 && is_numeric($row->backtest_drawdown_p90 ?? null)
+            ? max(0.0, min(100.0, (float) $row->backtest_drawdown_p90))
+            : null;
+
+        // Conservative hybrid: never understate either the model estimate or
+        // a sufficiently supported out-of-sample backtest drawdown.
+        $riskPercent = min(100.0, max(20.0, $rawRiskPercent, $backtestRiskPercent ?? 0.0));
         $expectedReturn = match (true) {
             (float) $row->current_price !== 0.0 && is_numeric($row->predicted_price_20d) =>
                 (((float) $row->predicted_price_20d - (float) $row->current_price) / (float) $row->current_price) * 100,
@@ -230,6 +354,11 @@ final class RecommendationController extends Controller
         $row->score_10 = $scorePercent / 10;
         $row->confidence_percent = $confidencePercent;
         $row->risk_percent = $riskPercent;
+        $row->backtest_risk_percent = $backtestRiskPercent;
+        $row->backtest_trade_count = $backtestTradeCount;
+        $row->risk_source = $backtestRiskPercent !== null && $backtestRiskPercent >= max(20.0, $rawRiskPercent)
+            ? 'backtest'
+            : ($rawRiskPercent >= 20.0 ? 'model' : 'minimum');
         $row->expected_return_20d = $expectedReturn;
         $calculatedScore = round(
             ($scorePercent * 0.40)

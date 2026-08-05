@@ -118,7 +118,7 @@
                                     $cellClass = ! $hasValue
                                         ? 'border-white/[.05] bg-slate-500/[.07] text-slate-500'
                                         : ($metric['key'] === 'samples'
-                                            ? ($rawValue >= 15 ? 'border-cyan-300/30 bg-cyan-400/20 text-cyan-50' : 'border-cyan-400/15 bg-cyan-400/[.08] text-cyan-200')
+                                            ? ($rawValue >= 15 ? 'border-orange-400/30 bg-orange-400/20 text-orange-400' : 'border-orange-400/15 bg-orange-400/[.08] text-orange-400')
                                             : ($metric['key'] === 'drawdown'
                                                 ? $drawdownClass
                                                 : ($good

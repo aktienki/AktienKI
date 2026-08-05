@@ -5,25 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="{{ __('AktienKI macht komplexe Marktdaten mit künstlicher Intelligenz verständlich.') }}">
     <title>{{ __('AktienKI – Märkte klarer sehen') }}</title>
-    <link rel="icon" href="{{ asset('brand/favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ asset('brand/generated/bull-icon.png') }}" type="image/png">
     <x-preference-head :force-dark="true" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         .welcome-background {
-            background-color: #070b22;
+            background-color: #07101e;
             background-image:
-                radial-gradient(circle at 72% 20%, rgba(139, 92, 246, .19), transparent 30%),
-                radial-gradient(circle at 18% 72%, rgba(34, 211, 238, .10), transparent 27%),
-                linear-gradient(rgba(43, 29, 93, .30) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(43, 29, 93, .30) 1px, transparent 1px);
-            background-size: auto, auto, 60px 60px, 60px 60px;
+                radial-gradient(circle at 76% 20%, rgba(251,146,60, .085), transparent 31%),
+                radial-gradient(circle at 18% 86%, rgba(251,146,60, .10), transparent 32%),
+                radial-gradient(circle at 9% 14%, rgba(251, 191, 36, .025), transparent 20%),
+                linear-gradient(135deg, #07101e 0%, #0b1628 50%, #101a30 100%);
         }
         .welcome-topbar {
-            background: rgba(7, 11, 34, .82);
-            border-bottom: 1px solid rgba(139, 92, 246, .24);
-            box-shadow: 0 12px 45px rgba(0, 0, 0, .24), 0 1px 0 rgba(34, 211, 238, .04) inset;
-            backdrop-filter: blur(22px);
+            background: rgba(11, 20, 36, .96);
+            border-bottom: 1px solid rgba(251,146,60, .14);
+            box-shadow: 0 10px 30px rgba(2, 6, 23, .24), inset 0 -1px 0 rgba(251,146,60, .035);
+            backdrop-filter: blur(18px) saturate(115%);
         }
+        .welcome-dashboard-card {
+            background-color: rgba(52, 65, 95, .60);
+            border-color: rgba(251,146,60, .32);
+            box-shadow: 0 12px 30px rgba(2, 132, 199, .10), inset 0 1px 0 rgba(251,146,60, .035);
+            backdrop-filter: blur(8px);
+        }
+        .welcome-top-link { color:#cbd5e1; border:1px solid transparent; background:transparent; }
+        .welcome-top-link:hover { color:#fb923c; border-color:rgba(251,146,60,.16); background:rgba(251,146,60,.075); }
+        .welcome-top-link-active { position:relative; color:#fb923c; border:1px solid rgba(251,146,60,.22); background:rgba(251,146,60,.10); }
+        .welcome-top-link-active::after { content:""; position:absolute; right:.7rem; bottom:-.38rem; left:.7rem; height:2px; border-radius:999px; background:#fb923c; box-shadow:0 0 12px rgba(251,146,60,.4); }
         .welcome-scene { opacity: 0; filter:saturate(.74) brightness(.95) contrast(.97); transform: translateX(1.25rem) scale(1.025); transition: opacity .65s ease, transform .65s ease; pointer-events: none; }
         .welcome-scene.is-active { opacity: 1; transform: translateX(0) scale(1); pointer-events: auto; }
         @media (prefers-reduced-motion: reduce) { .welcome-scene { transition: none; } }
@@ -31,22 +40,19 @@
 </head>
 <body class="welcome-background min-h-screen text-white antialiased lg:h-full lg:min-h-0 lg:overflow-hidden">
     <div class="relative min-h-screen overflow-hidden lg:h-full lg:min-h-0">
-        <div class="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent_55%,#070b22_92%)]" aria-hidden="true"></div>
+        <div class="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent_58%,rgba(9,13,34,.72)_94%)]" aria-hidden="true"></div>
 
         <header class="ak-public-topbar welcome-topbar sticky top-0 z-30 h-[73px]">
           <div class="mx-auto flex h-full max-w-screen-2xl items-center justify-between px-3 sm:px-8 lg:px-12 xl:px-16">
             <a href="{{ route('welcome') }}" class="flex items-center gap-3" aria-label="{{ __('AktienKI Startseite') }}">
-                <span class="flex h-10 w-[4.5rem] items-center justify-center">
-                    <img src="{{ asset('assets/logo.svg') }}" alt="" class="h-9 w-16">
-                </span>
                 <x-brand-wordmark />
             </a>
 
             <div class="flex items-center gap-1.5 sm:gap-3">
-                <a href="{{ route('welcome') }}" class="hidden w-24 justify-center rounded-xl border border-violet-300/15 bg-[linear-gradient(135deg,rgba(96,70,155,.28),rgba(56,91,150,.22))] px-3 py-2 text-sm font-bold text-violet-100 sm:inline-flex">{{ __('Startseite') }}</a>
-                <a href="{{ route('features') }}" class="hidden w-24 justify-center rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/[.05] hover:text-white lg:inline-flex">{{ __('Features') }}</a>
-                <a href="{{ route('roadmap') }}" class="hidden w-24 justify-center rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/[.05] hover:text-white lg:inline-flex">{{ __('Roadmap') }}</a>
-                <a href="{{ route('pricing') }}" class="hidden w-20 justify-center rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/[.05] hover:text-white sm:inline-flex">{{ __('Preise') }}</a>
+                <a href="{{ route('welcome') }}" class="welcome-top-link-active hidden w-24 justify-center rounded-lg px-3 py-2 text-sm font-bold sm:inline-flex">{{ __('Startseite') }}</a>
+                <a href="{{ route('features') }}" class="welcome-top-link hidden w-24 justify-center rounded-lg px-3 py-2 text-sm font-semibold transition lg:inline-flex">{{ __('Features') }}</a>
+                <a href="{{ route('roadmap') }}" class="welcome-top-link hidden w-24 justify-center rounded-lg px-3 py-2 text-sm font-semibold transition lg:inline-flex">{{ __('Roadmap') }}</a>
+                <a href="{{ route('pricing') }}" class="welcome-top-link hidden w-20 justify-center rounded-lg px-3 py-2 text-sm font-semibold transition sm:inline-flex">{{ __('Preise') }}</a>
                 @auth
                 <a href="{{ route('contact') }}" class="hidden h-10 w-10 items-center justify-center rounded-xl text-slate-300 transition hover:bg-white/[.05] hover:text-white lg:flex" title="{{ __('Kontakt') }}" aria-label="{{ __('Kontakt') }}"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></a>
                 @endauth
@@ -54,10 +60,10 @@
                 <x-preference-controls />
                 @auth
                     <x-risk-profile-badge class="hidden xl:flex" />
-                    <a href="{{ route('dashboard') }}" class="hidden w-36 justify-center rounded-xl border border-violet-300/20 bg-[linear-gradient(135deg,rgba(96,70,155,.74),rgba(56,91,150,.68))] px-3 py-2.5 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(24,38,88,.18)] transition hover:border-violet-200/30 hover:brightness-110 sm:inline-flex">{{ __('Zum Dashboard') }}</a>
+                    <a href="{{ route('dashboard') }}" class="hidden w-36 justify-center rounded-lg border border-orange-400/25 bg-orange-400/15 px-3 py-2.5 text-sm font-semibold text-orange-400 shadow-[0_8px_22px_rgba(251,146,60,.12)] transition hover:border-orange-400/40 hover:bg-orange-400/25 sm:inline-flex">{{ __('Zum Dashboard') }}</a>
                 @else
                     <a href="{{ route('login') }}" class="hidden w-24 justify-center rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-300 transition hover:text-white sm:inline-flex">{{ __('Anmelden') }}</a>
-                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-xl border border-violet-300/20 bg-[linear-gradient(135deg,rgba(96,70,155,.78),rgba(56,91,150,.72))] px-3 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(24,38,88,.20)] transition hover:-translate-y-0.5 hover:border-violet-200/30 hover:brightness-110 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
+                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/30 bg-orange-400/20 px-3 py-2.5 text-sm font-bold text-orange-400 shadow-[0_8px_24px_rgba(251,146,60,.14)] transition hover:border-orange-400/50 hover:bg-orange-400/30 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
                 @endauth
                 <x-public-mobile-menu />
             </div>
@@ -65,8 +71,8 @@
         </header>
 
         <main class="relative z-10 lg:grid lg:h-[calc(100svh-73px)] lg:min-h-0 lg:grid-rows-[minmax(0,1fr)_auto] lg:overflow-hidden">
-            <section class="grid items-center gap-8 px-5 py-8 sm:px-8 md:grid-cols-2 md:gap-6 lg:min-h-0 lg:overflow-hidden lg:grid-cols-[42%_58%] lg:gap-0 lg:px-0 lg:py-0">
-                <div class="mx-auto max-w-xl lg:-mt-2 lg:mx-0 lg:max-w-none lg:self-start lg:px-[clamp(3rem,6vw,7rem)] lg:pt-0">
+            <section class="grid items-stretch gap-4 px-5 py-5 sm:px-8 md:grid-cols-2 lg:min-h-0 lg:overflow-hidden lg:grid-cols-[41%_59%] lg:px-8 lg:py-4 xl:px-10">
+                <div class="welcome-dashboard-card mx-auto flex max-w-xl flex-col justify-start rounded-2xl border p-5 lg:mx-0 lg:min-h-0 lg:max-w-none lg:p-6">
                     @if ($showBetaNotice ?? false)
                         @php
                             $betaTesterLimit = $betaTesterLimit ?? 50;
@@ -74,60 +80,61 @@
                             $betaOfferAvailable = $betaTesterCount < $betaTesterLimit;
                             $betaProgress = $betaTesterLimit > 0 ? ($betaTesterCount / $betaTesterLimit) * 100 : 100;
                         @endphp
-                        <aside class="mb-8 max-w-lg rounded-2xl border border-amber-300/30 bg-[linear-gradient(135deg,rgba(245,158,11,.16),rgba(139,92,246,.12))] p-4 shadow-[0_16px_45px_rgba(0,0,0,.22)] backdrop-blur-xl lg:mt-10 xl:mt-14">
-                            <div class="flex items-start gap-3">
-                                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-300/30 bg-amber-300/10 text-amber-300">
-                                    <x-heroicon-o-beaker class="h-5 w-5" />
+                        <aside class="mb-6 w-full rounded-xl border border-amber-300/30 bg-amber-300/[.07] p-3 shadow-[0_12px_30px_rgba(2,6,23,.14)]">
+                            <div class="flex items-start gap-2.5">
+                                <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-amber-300/30 bg-amber-300/10 text-amber-300">
+                                    <x-heroicon-o-beaker class="h-4 w-4" />
                                 </span>
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <span class="rounded-full bg-amber-300/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-[.14em] text-amber-300">{{ __('Beta-Phase') }}</span>
+                                        <span class="rounded-md bg-amber-300/15 px-2 py-0.5 text-[8px] font-black uppercase tracking-[.14em] text-amber-300">{{ __('Beta-Phase') }}</span>
                                         @if ($betaOfferAvailable)
-                                            <span class="text-[10px] font-bold uppercase tracking-wide text-violet-200">{{ __('Tester gesucht') }}</span>
+                                            <span class="text-[10px] font-bold uppercase tracking-wide text-orange-400">{{ __('Tester gesucht') }}</span>
                                         @endif
                                     </div>
                                     @if ($betaOfferAvailable)
-                                        <h2 class="mt-2 text-sm font-black text-white">{{ __('Unterstütze uns – werde Tester.') }}</h2>
-                                        <p class="mt-1 text-xs leading-5 text-slate-300">{{ __('AktienKI wird laufend weiterentwickelt.') }}</p>
-                                        <p class="mt-1 text-xs font-semibold leading-5 text-amber-100">{{ __('Die ersten 50 registrierten Tester erhalten dauerhaft kostenlosen Zugang zum Pro-Modell.') }}</p>
-                                        <div class="mt-3">
-                                            <div class="mb-1.5 flex items-center justify-between gap-3 text-[10px] font-bold">
+                                        <h2 class="mt-1.5 text-[13px] font-black text-white">{{ __('Unterstütze uns – werde Tester.') }}</h2>
+                                        <p class="mt-0.5 text-[11px] leading-4 text-slate-300">{{ __('AktienKI wird laufend weiterentwickelt.') }}</p>
+                                        <p class="mt-0.5 text-[11px] font-semibold leading-4 text-amber-100">{{ __('Die ersten 50 registrierten Tester erhalten dauerhaft kostenlosen Zugang zum Pro-Modell.') }}</p>
+                                        <div class="mt-2">
+                                            <div class="mb-1 flex items-center justify-between gap-3 text-[9px] font-bold">
                                                 <span class="text-slate-300">{{ __('Registrierte Tester') }}</span>
                                                 <span class="text-amber-200">{{ $betaTesterCount }} / {{ $betaTesterLimit }}</span>
                                             </div>
-                                            <div class="h-1.5 overflow-hidden rounded-full bg-white/10">
-                                                <div class="h-full rounded-full bg-gradient-to-r from-violet-500 to-amber-300 transition-all duration-500" style="width: {{ $betaProgress }}%"></div>
+                                            <div class="h-1 overflow-hidden rounded-full bg-white/10">
+                                                <div class="h-full rounded-full bg-gradient-to-r from-orange-400 to-amber-300 transition-all duration-500" style="width: {{ $betaProgress }}%"></div>
                                             </div>
                                         </div>
                                     @else
-                                        <h2 class="mt-2 text-sm font-black text-white">{{ __('AktienKI befindet sich in der Testphase.') }}</h2>
-                                        <p class="mt-1 text-xs leading-5 text-slate-300">{{ __('Das Projekt wird laufend weiterentwickelt und gemeinsam mit unseren Testern verbessert.') }}</p>
+                                        <h2 class="mt-1.5 text-[13px] font-black text-white">{{ __('AktienKI befindet sich in der Testphase.') }}</h2>
+                                        <p class="mt-0.5 text-[11px] leading-4 text-slate-300">{{ __('Das Projekt wird laufend weiterentwickelt und gemeinsam mit unseren Testern verbessert.') }}</p>
                                     @endif
                                 </div>
                             </div>
                         </aside>
                     @endif
-                    <p class="mb-5 flex items-baseline whitespace-nowrap leading-none" aria-label="aktienKI.com">
-                        <span class="font-bold tracking-[.02em] text-white" style="font-size: 24px">aktien</span>
-                        <span class="ml-0.5 font-black tracking-[-.04em] text-violet-400" style="font-size: 36px; color: #8b5cf6">KI</span>
-                        <span class="font-bold tracking-[-.02em] text-white" style="font-size: 24px">.com</span>
-                    </p>
-                    <h1 class="whitespace-nowrap text-[2rem] font-bold leading-[1.06] tracking-[-0.04em] text-white min-[380px]:text-4xl md:text-[2.35rem] xl:text-[3.05rem] 2xl:text-[3.5rem]">
-                        <span class="block text-slate-100">{{ __('Aktienanalyse.') }}</span>
-                        <span class="mt-2 inline-flex items-center gap-2.5 rounded-xl border border-violet-300/15 bg-[linear-gradient(135deg,rgba(96,70,155,.18),rgba(56,91,150,.13))] px-3.5 py-2 text-[.62em] font-semibold tracking-[-0.025em] text-violet-100 shadow-[0_10px_28px_rgba(12,18,48,.14)]">
-                            <i class="h-6 w-1 rounded-full bg-amber-300/70 shadow-[0_0_8px_rgba(214,168,79,.18)]"></i>
-                            {{ __('Gestützt durch KI.') }}
-                        </span>
-                    </h1>
+                    <div class="mb-5">
+                        <p class="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.2em] text-orange-400">
+                            <i class="h-px w-8 bg-orange-400/70"></i>
+                            {{ __('aKI Market Intelligence') }}
+                        </p>
+                        <h1 class="mt-3 max-w-[12ch] text-[2.15rem] font-black leading-[1.04] tracking-[-0.045em] text-slate-100 min-[420px]:text-[2.55rem] xl:text-[3rem] 2xl:text-[3.35rem]">
+                            {{ __('Aktienanalyse mit KI.') }}
+                        </h1>
+                        <div class="mt-4 flex items-center gap-2.5 text-xs font-bold uppercase tracking-[.12em] text-slate-400">
+                            <i class="h-5 w-1 rounded-full bg-amber-300/75"></i>
+                            {{ __('Research · Intelligence · Decisions') }}
+                        </div>
+                    </div>
                     <p class="mt-6 text-[15px] leading-7 text-slate-300 sm:text-[17px]">
                         {{ __('AktienKI unterstützt dich bei der Analyse von Aktien. Dafür werden historische Kursdaten, Fundamentaldaten und weitere Marktsignale zusammengeführt und mithilfe künstlicher Intelligenz ausgewertet.') }}
                     </p>
-                    <p class="mt-4 text-[15px] leading-7 text-slate-400 sm:text-[17px]">
+                    <p class="mb-5 mt-4 text-[15px] leading-7 text-slate-400 sm:text-[17px] lg:mb-7">
                         {{ __('Das Ergebnis sind strukturierte, verständliche Einschätzungen zu Trends, Chancen und Risiken – als fundierte Grundlage für deine eigene Recherche.') }}
                     </p>
                 </div>
 
-                <div id="produkt" class="relative mx-auto aspect-[980/620] h-full max-h-full w-full overflow-hidden rounded-3xl border border-violet-300/15 bg-[#070b22] shadow-[-18px_0_64px_rgba(76,29,149,.13)] lg:mx-0 lg:aspect-auto lg:rounded-none lg:border-y-0 lg:border-r-0" data-scene-player>
+                <div id="produkt" class="welcome-dashboard-card relative mx-auto aspect-[980/620] h-full max-h-full w-full overflow-hidden rounded-2xl border bg-[#0b1424]/55 lg:mx-0 lg:aspect-auto" data-scene-player>
                     <img src="{{ route('scenes.localized', ['scene' => 'traders', 'locale' => app()->getLocale(), 'v' => filemtime(public_path('assets/scene-traders.svg'))]) }}" alt="{{ __('Von Tradern für Trader') }}" class="welcome-scene is-active absolute inset-0 h-full w-full object-contain" data-scene>
                     <div
                         class="welcome-scene absolute inset-0 flex h-full w-full flex-col justify-center px-[8%] pb-[9%] pt-[7%]"
@@ -136,15 +143,15 @@
                     >
                         <div class="mb-3 flex items-end justify-between gap-4">
                             <div>
-                                <p class="text-[clamp(.65rem,1vw,.9rem)] font-black uppercase tracking-[.2em] text-violet-300">{{ __('Globales Aktienuniversum') }}</p>
+                                <p class="text-[clamp(.65rem,1vw,.9rem)] font-black uppercase tracking-[.2em] text-orange-400">{{ __('Globales Aktienuniversum') }}</p>
                                 <h2 class="mt-1 text-[clamp(1.2rem,2.2vw,2rem)] font-black tracking-tight text-white">{{ __('Aktienmärkte weltweit') }}</h2>
                                 <p class="mt-1 text-[clamp(.65rem,1vw,.85rem)] text-slate-400">{{ __('Länder mit verfügbaren Aktien im AktienKI-Universum') }}</p>
                             </div>
-                            <span class="shrink-0 rounded-full border border-violet-400/25 bg-violet-500/10 px-3 py-1.5 text-[clamp(.6rem,.9vw,.75rem)] font-bold text-violet-200">
+                            <span class="shrink-0 rounded-lg border border-orange-400/25 bg-orange-400/10 px-3 py-1.5 text-[clamp(.6rem,.9vw,.75rem)] font-bold text-orange-400">
                                 {{ count($welcomeCountries ?? []) }} {{ __('Länder') }}
                             </span>
                         </div>
-                        <div class="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-violet-300/15 bg-violet-950/10 p-2">
+                        <div class="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-orange-400/15 bg-orange-400/10 p-2">
                             <svg
                                 x-ref="map"
                                 class="h-full w-full text-slate-500"
@@ -153,7 +160,7 @@
                                 role="img"
                                 aria-label="{{ __('Weltkarte der Länder mit verfügbaren Aktien') }}"
                             >
-                                <rect x="0.5" y="0.5" width="999" height="499" rx="10" fill="none" stroke="currentColor" stroke-opacity=".15" />
+                                <rect x="0.5" y="0.5" width="999" height="499" rx="10" fill="none" stroke="currentColor" stroke-opacity=".24" shape-rendering="geometricPrecision" />
                             </svg>
                             <p x-show="error" x-cloak class="absolute inset-0 grid place-items-center text-sm text-rose-300">{{ __('Kartendaten konnten nicht geladen werden.') }}</p>
                         </div>
@@ -166,11 +173,11 @@
                     <img src="{{ route('scenes.localized', ['scene' => 'machine-learning', 'locale' => app()->getLocale(), 'v' => filemtime(public_path('assets/scene-machine-learning.svg'))]) }}" alt="{{ __('Machine-Learning-Analyse') }}" class="welcome-scene absolute inset-0 h-full w-full object-contain" data-scene>
                     <img src="{{ route('scenes.localized', ['scene' => 'stock-chat', 'locale' => app()->getLocale(), 'v' => filemtime(public_path('assets/scene-stock-chat.svg'))]) }}" alt="{{ __('Aktie auswählen und mit KI chatten') }}" class="welcome-scene absolute inset-0 h-full w-full object-contain" data-scene data-restart-scene>
 
-                    <button type="button" data-scene-previous aria-label="{{ __('Vorherige Animation') }}" class="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-slate-950/60 text-2xl text-white/70 backdrop-blur transition hover:border-violet-300/25 hover:bg-[linear-gradient(135deg,rgba(96,70,155,.62),rgba(56,91,150,.58))] hover:text-white lg:left-6">‹</button>
-                    <button type="button" data-scene-next aria-label="{{ __('Nächste Animation') }}" class="absolute right-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-slate-950/60 text-2xl text-white/70 backdrop-blur transition hover:border-violet-300/25 hover:bg-[linear-gradient(135deg,rgba(96,70,155,.62),rgba(56,91,150,.58))] hover:text-white lg:right-6">›</button>
+                    <button type="button" data-scene-previous aria-label="{{ __('Vorherige Animation') }}" class="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg border border-orange-400/15 bg-[#0b1424]/75 text-2xl text-slate-300 backdrop-blur transition hover:border-orange-400/35 hover:bg-orange-400/15 hover:text-orange-400 lg:left-6">‹</button>
+                    <button type="button" data-scene-next aria-label="{{ __('Nächste Animation') }}" class="absolute right-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg border border-orange-400/15 bg-[#0b1424]/75 text-2xl text-slate-300 backdrop-blur transition hover:border-orange-400/35 hover:bg-orange-400/15 hover:text-orange-400 lg:right-6">›</button>
 
-                    <div class="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 gap-2 rounded-full border border-white/10 bg-slate-950/50 px-4 py-3 backdrop-blur" role="tablist" aria-label="{{ __('Animationsschritte') }}">
-                        <button type="button" data-scene-dot="0" aria-label="{{ __('Von Tradern für Trader') }}" aria-selected="true" class="h-1.5 w-8 rounded-full bg-violet-400 transition-all duration-300"></button>
+                    <div class="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 gap-2 rounded-lg border border-orange-400/15 bg-[#0b1424]/75 px-4 py-3 backdrop-blur" role="tablist" aria-label="{{ __('Animationsschritte') }}">
+                        <button type="button" data-scene-dot="0" aria-label="{{ __('Von Tradern für Trader') }}" aria-selected="true" class="h-1.5 w-8 rounded-full bg-orange-400 transition-all duration-300"></button>
                         <button type="button" data-scene-dot="1" aria-label="{{ __('Aktienmärkte weltweit') }}" aria-selected="false" class="h-1.5 w-2 rounded-full bg-slate-600 transition-all duration-300 hover:bg-slate-400"></button>
                         <button type="button" data-scene-dot="2" aria-label="Machine Learning" aria-selected="false" class="h-1.5 w-2 rounded-full bg-slate-600 transition-all duration-300 hover:bg-slate-400"></button>
                         <button type="button" data-scene-dot="3" aria-label="{{ __('Aktie auswählen und mit KI chatten') }}" aria-selected="false" class="h-1.5 w-2 rounded-full bg-slate-600 transition-all duration-300 hover:bg-slate-400"></button>
@@ -178,7 +185,7 @@
                 </div>
             </section>
 
-            <aside class="border-t border-violet-300/20 bg-[#090f2a]/90 px-5 py-3 backdrop-blur-xl sm:px-8 lg:px-12" aria-label="AktienKI Statistiken">
+            <aside class="border-t border-orange-400/15 bg-[#0b1424]/82 px-5 py-3 backdrop-blur-xl sm:px-8 lg:px-10" aria-label="AktienKI Statistiken">
                 <div class="mx-auto grid max-w-screen-2xl grid-cols-1 gap-2.5 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:gap-3">
                     @foreach ([
                         ['stocks', __('Aktien'), __('Analysierte Unternehmen')],
@@ -187,7 +194,7 @@
                         ['forecasts', __('Prognosen'), __('Erstellte KI-Signale')],
                         ['data-points', __('Datenpunkte'), __('Verarbeitete Marktdaten')],
                     ] as [$key, $title, $description])
-                        <article class="group flex min-w-0 items-center gap-3 rounded-xl border border-white/[.07] bg-white/[.035] px-3.5 py-3 transition hover:border-amber-300/20 hover:bg-amber-400/[.04]">
+                        <article class="welcome-dashboard-card group flex min-w-0 items-center gap-3 rounded-xl border px-3.5 py-3">
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-300/20 bg-amber-300/[.07] text-amber-300 shadow-[0_0_18px_rgba(245,158,11,.07)]">
                                 @if ($key === 'stocks')
                                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M3 19h18"/><path d="m5 8 4-4 5 5 6-6"/></svg>
@@ -240,7 +247,7 @@
                     const selected = i === active;
                     dot.setAttribute('aria-selected', selected ? 'true' : 'false');
                     dot.classList.toggle('w-8', selected);
-                    dot.classList.toggle('bg-violet-400', selected);
+                    dot.classList.toggle('bg-orange-400', selected);
                     dot.classList.toggle('w-2', !selected);
                     dot.classList.toggle('bg-slate-600', !selected);
                 });

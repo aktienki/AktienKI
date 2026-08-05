@@ -1,5 +1,5 @@
 <header
-    class="ak-app-topbar sticky top-0 z-40 h-[73px] border-b border-[var(--ak-border)] bg-[var(--ak-card-strong)] backdrop-blur-xl"
+    class="ak-app-topbar sticky top-0 z-[110] h-[73px] border-b border-[var(--ak-border)] bg-[var(--ak-card-strong)] backdrop-blur-xl"
     x-data="{
         navOverflow: false,
         canScrollLeft: false,
@@ -22,9 +22,11 @@
     })"
 >
     <div class="ak-container flex h-full items-center gap-2 sm:gap-4 lg:gap-5">
-        <a href="{{ route('dashboard') }}" class="flex w-14 shrink-0 items-center overflow-hidden sm:w-auto">
-            <img src="{{ asset('brand/logo.svg') }}?v={{ filemtime(public_path('brand/logo.svg')) }}" alt="aktienKI.com" class="ak-brand-logo ak-brand-logo-dark h-11 max-w-none transition duration-300 hover:scale-105">
-            <img src="{{ asset('brand/logo-light.svg') }}?v={{ filemtime(public_path('brand/logo-light.svg')) }}" alt="aktienKI.com" class="ak-brand-logo ak-brand-logo-light hidden h-11 max-w-none transition duration-300 hover:scale-105">
+        <a href="{{ route('dashboard') }}" class="ak-brand-link relative flex w-14 shrink-0 items-center overflow-hidden sm:w-auto">
+            <img src="{{ asset('brand/generated/bull-logo-dark.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-dark.png')) }}" alt="aktienKI.com" class="ak-brand-logo ak-brand-logo-dark h-14 max-w-none transition duration-300">
+            <img src="{{ asset('brand/generated/bull-logo-light-clean.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-light-clean.png')) }}" alt="aktienKI.com" class="ak-brand-logo ak-brand-logo-light hidden h-14 max-w-none transition duration-300">
+            <img src="{{ asset('brand/generated/bull-logo-light-clean.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-light-clean.png')) }}" alt="" aria-hidden="true" class="ak-brand-logo ak-brand-logo-light-accent pointer-events-none absolute inset-0 hidden h-14 max-w-none transition duration-300">
+            <img src="{{ asset('brand/generated/bull-logo-light-clean.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-light-clean.png')) }}" alt="" aria-hidden="true" class="ak-brand-logo ak-brand-logo-light-ki pointer-events-none absolute inset-0 hidden h-14 max-w-none transition duration-300">
         </a>
 
         <button
@@ -33,7 +35,7 @@
             type="button"
             @click="scrollNavigation(-1)"
             :disabled="!canScrollLeft"
-            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-300/20 bg-white/[.07] text-violet-200 shadow-lg transition hover:border-violet-300/40 hover:bg-violet-500/20 disabled:cursor-default disabled:opacity-25"
+            class="ak-nav-scroll-button inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-300/20 bg-white/[.07] text-violet-200 shadow-lg transition hover:border-violet-300/40 hover:bg-violet-500/20 disabled:cursor-default disabled:opacity-25"
             aria-label="{{ __('Vorherige Menüpunkte anzeigen') }}"
             title="{{ __('Vorherige Menüpunkte anzeigen') }}"
         >
@@ -53,6 +55,11 @@
             <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'ak-top-link-active' : 'ak-top-link' }}">
                 <x-heroicon-o-squares-2x2 /><span>Dashboard</span>
             </a>
+            @auth
+                <a href="{{ route('community.index') }}" class="{{ request()->routeIs('community.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
+                    <x-heroicon-o-user-group /><span>{{ __('Community') }}</span>
+                </a>
+            @endauth
             <div
                 x-data="{
                     open: false,
@@ -85,7 +92,7 @@
                         x-show="open"
                         @keydown.escape.window="open = false"
                         x-transition.origin.top.left
-                        class="fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
+                        class="ak-topbar-menu fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
                         :style="`left: ${left}px; top: ${top}px`"
                     >
                         <a href="{{ route('markets.situation') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
@@ -94,11 +101,11 @@
                         </a>
                         <a href="{{ route('markets.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                             <x-heroicon-o-building-library class="h-5 w-5 text-teal-500" />
-                            {{ __('Märkte') }}
+                            {{ __('Marktübersicht') }}
                         </a>
                         <a href="{{ route('sectors.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                             <x-heroicon-o-building-office-2 class="h-5 w-5 text-teal-500" />
-                            {{ __('Sektoren') }}
+                            {{ __('Sektorübersicht') }}
                         </a>
                         <a href="{{ route('daily-market-analysis') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                             <x-heroicon-o-scale class="h-5 w-5 text-amber-500" />
@@ -139,7 +146,7 @@
                         x-show="open"
                         @keydown.escape.window="open = false"
                         x-transition.origin.top.left
-                        class="fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
+                        class="ak-topbar-menu fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
                         :style="`left: ${left}px; top: ${top}px`"
                     >
                         <a href="{{ route('recommendations.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
@@ -205,7 +212,7 @@
                             x-show="open"
                             @keydown.escape.window="open = false"
                             x-transition.origin.top.left
-                            class="fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
+                            class="ak-topbar-menu fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
                             :style="`left: ${left}px; top: ${top}px`"
                         >
                             <a href="{{ route('depots.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
@@ -217,16 +224,16 @@
                                 {{ __('Musterdepot') }}
                             </a>
                             @if($strategyDepotAccess)
-                                <a href="{{ $strategyDepotUrl }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-cyan-500/10 hover:text-cyan-400">
-                                    <x-heroicon-o-bolt class="h-5 w-5 text-cyan-400" />
+                                <a href="{{ $strategyDepotUrl }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-orange-4000/10 hover:text-orange-400">
+                                    <x-heroicon-o-bolt class="h-5 w-5 text-orange-400" />
                                     <span>{{ __('Strategiedepot') }}</span>
-                                    <span class="ml-auto rounded border border-cyan-300/35 bg-cyan-400/[.12] px-1.5 py-0.5 text-[8px] font-black leading-none tracking-wide text-cyan-300">PRO</span>
+                                    <span class="ml-auto rounded border border-orange-400/35 bg-orange-400/[.12] px-1.5 py-0.5 text-[8px] font-black leading-none tracking-wide text-orange-400">PRO</span>
                                 </a>
                             @else
                                 <span class="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-muted)] opacity-40" title="{{ __('Ab Pro verfügbar') }}" aria-disabled="true">
-                                    <x-heroicon-o-bolt class="h-5 w-5 text-cyan-400" />
+                                    <x-heroicon-o-bolt class="h-5 w-5 text-orange-400" />
                                     <span>{{ __('Strategiedepot') }}</span>
-                                    <span class="ml-auto rounded border border-cyan-300/25 bg-cyan-400/[.08] px-1.5 py-0.5 text-[8px] font-black leading-none tracking-wide text-cyan-300">PRO</span>
+                                    <span class="ml-auto rounded border border-orange-400/25 bg-orange-400/[.08] px-1.5 py-0.5 text-[8px] font-black leading-none tracking-wide text-orange-400">PRO</span>
                                 </span>
                             @endif
                             <a href="{{ route('watchlists.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
@@ -270,7 +277,7 @@
                             x-show="open"
                             @keydown.escape.window="open = false"
                             x-transition.origin.top.left
-                            class="fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
+                            class="ak-topbar-menu fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
                             :style="`left: ${left}px; top: ${top}px`"
                         >
                             @php
@@ -283,12 +290,12 @@
                             <a href="{{ route('setup.filter') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                                 <x-heroicon-o-funnel class="h-5 w-5 text-teal-500" />
                                 {{ __('Strategie') }}
-                                <span class="ml-auto rounded-md border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-cyan-300">PRO</span>
+                                <span class="ml-auto rounded-md border border-orange-400/25 bg-orange-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-orange-400">PRO</span>
                             </a>
                             <a href="{{ route('setup.short') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-rose-500/10 hover:text-rose-300">
                                 <x-heroicon-o-arrow-trending-down class="h-5 w-5 text-rose-400" />
                                 {{ __('Short-Strategie') }}
-                                <span class="ml-auto rounded-md border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-cyan-300">PRO</span>
+                                <span class="ml-auto rounded-md border border-orange-400/25 bg-orange-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-orange-400">PRO</span>
                             </a>
                             @else
                             <span class="{{ $lockedMenuClass }}" title="{{ __('Verfügbar ab Pro') }}" aria-disabled="true"><x-heroicon-o-funnel class="h-5 w-5" />{{ __('Strategie') }}<span class="ml-auto text-[8px] font-black uppercase">PRO</span></span>
@@ -307,7 +314,7 @@
                             <a href="{{ route('setup.saved-filters.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                                 <x-heroicon-o-bookmark-square class="h-5 w-5 text-amber-400" />
                                 {{ __('Strategie Manager') }}
-                                <span class="ml-auto rounded-md border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-cyan-300">PRO</span>
+                                <span class="ml-auto rounded-md border border-orange-400/25 bg-orange-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-orange-400">PRO</span>
                             </a>
                             @else
                             <span class="{{ $lockedMenuClass }}" title="{{ __('Verfügbar ab Pro') }}" aria-disabled="true"><x-heroicon-o-bookmark-square class="h-5 w-5" />{{ __('Strategie Manager') }}<span class="ml-auto text-[8px] font-black uppercase">PRO</span></span>
@@ -329,7 +336,7 @@
             type="button"
             @click="scrollNavigation(1)"
             :disabled="!canScrollRight"
-            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-300/20 bg-white/[.07] text-violet-200 shadow-lg transition hover:border-violet-300/40 hover:bg-violet-500/20 disabled:cursor-default disabled:opacity-25"
+            class="ak-nav-scroll-button inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-300/20 bg-white/[.07] text-violet-200 shadow-lg transition hover:border-violet-300/40 hover:bg-violet-500/20 disabled:cursor-default disabled:opacity-25"
             aria-label="{{ __('Weitere Menüpunkte anzeigen') }}"
             title="{{ __('Weitere Menüpunkte anzeigen') }}"
         >
@@ -340,21 +347,21 @@
             <x-preference-controls class="hidden sm:flex" />
             @auth
                 <div x-data="{ open:false }" class="relative">
-                    <button type="button" @click="open=!open" @click.outside="open=false" class="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white transition hover:bg-violet-500/15">
+                    <button type="button" @click="open=!open" @click.outside="open=false" class="ak-profile-trigger flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white transition hover:bg-violet-500/15">
                         <x-heroicon-o-user-circle class="h-6 w-6 text-violet-300" />
                         <span class="hidden max-w-24 truncate md:inline">{{ auth()->user()->name }}</span>
                         <x-heroicon-o-chevron-down class="h-4 w-4 text-slate-400 transition" x-bind:class="{ 'rotate-180': open }" />
                     </button>
-                    <div x-cloak x-show="open" x-transition.origin.top.right class="absolute right-0 mt-3 w-60 overflow-hidden rounded-3xl border border-white/10 bg-[#171325]/95 shadow-2xl shadow-black/40 backdrop-blur-xl">
+                    <div x-cloak x-show="open" x-transition.origin.top.right class="ak-topbar-menu absolute right-0 mt-3 w-60 overflow-hidden rounded-3xl border border-white/10 bg-[#171325]/95 shadow-2xl shadow-black/40 backdrop-blur-xl">
                         <div class="border-b border-white/10 px-5 py-4">
                             <p class="truncate text-sm font-semibold text-white">{{ auth()->user()->name }}</p>
                             <p class="mt-1 text-xs text-slate-400">Benutzerkonto</p>
                         </div>
                         <div class="p-2">
                             @if(Route::has('profile.edit'))
-                                <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-violet-500/15 hover:text-white"><x-heroicon-o-user class="h-5 w-5 text-violet-300" />Profil</a>
+                                <a href="{{ route('profile.edit', ['return_to' => request()->fullUrl()]) }}" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-violet-500/15 hover:text-white"><x-heroicon-o-user class="h-5 w-5 text-violet-300" />Profil</a>
                             @endif
-                            <a href="{{ route('profile.edit') }}#darstellung" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-violet-500/15 hover:text-white"><x-heroicon-o-cog-6-tooth class="h-5 w-5 text-violet-300" />{{ __('Einstellungen') }}</a>
+                            <a href="{{ route('profile.edit', ['return_to' => request()->fullUrl()]) }}#darstellung" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-violet-500/15 hover:text-white"><x-heroicon-o-cog-6-tooth class="h-5 w-5 text-violet-300" />{{ __('Einstellungen') }}</a>
                             <a href="#" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-violet-500/15 hover:text-white"><x-heroicon-o-credit-card class="h-5 w-5 text-violet-300" />Mein Abo</a>
                         </div>
                         <div class="border-t border-white/10 p-2">

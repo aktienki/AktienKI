@@ -12,7 +12,10 @@ use Illuminate\Support\Facades\DB;
 
 final class AutomatedPortfolioService
 {
-    public function __construct(private readonly PersonalizedSignalService $signals) {}
+    public function __construct(
+        private readonly PersonalizedSignalService $signals,
+        private readonly VariableExitStrategyService $exitStrategies,
+    ) {}
 
     public function scan(): array
     {
@@ -221,6 +224,7 @@ final class AutomatedPortfolioService
 
         $price = (float) ($candidate->quote_price ?: $candidate->current_price);
         if ($price <= 0) return false;
+        $exitStrategy = $this->exitStrategies->resolve((int) $candidate->instrument_id);
         $allocated = min($cash - $tradeCost, $baseCapital * $factor);
         $quantity = floor($allocated / $price);
         if ($quantity < 1) return false;
@@ -235,6 +239,10 @@ final class AutomatedPortfolioService
         $positionMeta = (array) $position->meta;
         data_set($positionMeta, 'automation.position_factor', max(1, (int) data_get($positionMeta, 'automation.position_factor', 0)) + ($position->exists ? $factor : $factor - 1));
         data_set($positionMeta, 'automation.strategy_id', $strategy->id);
+        data_set($positionMeta, 'automation.exit_strategy', 'variable_instrument_horizon');
+        data_set($positionMeta, 'automation.exit_holding_days', $exitStrategy['holding_days']);
+        data_set($positionMeta, 'automation.exit_profile_id', $exitStrategy['profile_id']);
+        data_set($positionMeta, 'automation.exit_model_signature', $exitStrategy['model_signature']);
         $position->fill([
             'quantity' => $newQuantity,
             'average_buy_price' => $newQuantity > 0
@@ -258,6 +266,10 @@ final class AutomatedPortfolioService
                 'source' => 'strategy_automation', 'strategy_id' => $strategy->id,
                 'prediction_id' => $candidate->prediction_id, 'sector' => $candidate->sector,
                 'sector_average_score' => round($sectorAverage, 4), 'position_factor' => $factor,
+                'exit_strategy' => 'variable_instrument_horizon',
+                'exit_holding_days' => $exitStrategy['holding_days'],
+                'exit_profile_id' => $exitStrategy['profile_id'],
+                'exit_profile_source' => $exitStrategy['source'],
             ],
         ]);
 
@@ -294,7 +306,13 @@ final class AutomatedPortfolioService
             'sector_average_score' => $sectorAverage,
             'position_factor' => $factor,
             'allocated_capital' => $allocated,
-            'details' => json_encode(['symbol' => $candidate->symbol, 'score' => $candidate->score_10, 'confidence' => $candidate->confidence_percent], JSON_THROW_ON_ERROR),
+            'details' => json_encode([
+                'symbol' => $candidate->symbol,
+                'score' => $candidate->score_10,
+                'confidence' => $candidate->confidence_percent,
+                'exit_holding_days' => $exitStrategy['holding_days'],
+                'exit_profile_id' => $exitStrategy['profile_id'],
+            ], JSON_THROW_ON_ERROR),
             'created_at' => now(), 'updated_at' => now(),
         ]);
 

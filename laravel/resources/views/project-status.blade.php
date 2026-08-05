@@ -28,9 +28,6 @@
     <header class="ak-public-topbar status-topbar sticky top-0 z-40 h-[73px]">
         <div class="mx-auto flex h-full max-w-screen-2xl items-center justify-between px-3 sm:px-8 lg:px-12 xl:px-16">
             <a href="{{ route('welcome') }}" class="flex items-center gap-3" aria-label="{{ __('AktienKI Startseite') }}">
-                <span class="flex h-10 w-[4.5rem] items-center justify-center">
-                    <img src="{{ asset('assets/logo.svg') }}" alt="" class="h-9 w-16">
-                </span>
                 <x-brand-wordmark />
             </a>
             <div class="flex items-center gap-1.5 sm:gap-3">

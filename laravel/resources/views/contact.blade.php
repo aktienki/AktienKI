@@ -9,9 +9,9 @@
     <x-preference-head :force-dark="auth()->guest()" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
-        .contact-bg{background-color:#070b22;background-image:radial-gradient(circle at 72% 20%,rgba(139,92,246,.19),transparent 30%),radial-gradient(circle at 18% 72%,rgba(34,211,238,.1),transparent 27%),linear-gradient(rgba(43,29,93,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(43,29,93,.3) 1px,transparent 1px);background-size:auto,auto,60px 60px,60px 60px}
+        .contact-bg{background-color:#070b22;background-image:radial-gradient(circle at 72% 20%,rgba(139,92,246,.19),transparent 30%),radial-gradient(circle at 18% 72%,rgba(251,146,60,.1),transparent 27%),linear-gradient(rgba(43,29,93,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(43,29,93,.3) 1px,transparent 1px);background-size:auto,auto,60px 60px,60px 60px}
         .contact-topbar{background:rgba(7,11,34,.82);border-bottom:1px solid rgba(139,92,246,.24);box-shadow:0 12px 45px rgba(0,0,0,.24);backdrop-filter:blur(22px)}
-        [data-theme="light"] .contact-bg{background-color:#f8fafc;background-image:radial-gradient(circle at 75% 15%,rgba(139,92,246,.13),transparent 30%),radial-gradient(circle at 15% 80%,rgba(34,211,238,.1),transparent 28%),linear-gradient(rgba(124,58,237,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,.07) 1px,transparent 1px)}
+        [data-theme="light"] .contact-bg{background-color:#f8fafc;background-image:radial-gradient(circle at 75% 15%,rgba(139,92,246,.13),transparent 30%),radial-gradient(circle at 15% 80%,rgba(251,146,60,.1),transparent 28%),linear-gradient(rgba(124,58,237,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,.07) 1px,transparent 1px)}
         [data-theme="light"] .contact-topbar{background:rgba(255,255,255,.82);border-color:rgba(124,58,237,.16)}
     </style>
 </head>
@@ -19,9 +19,6 @@
     <header class="ak-public-topbar contact-topbar sticky top-0 z-30 h-[73px]">
         <div class="mx-auto flex h-full max-w-screen-2xl items-center justify-between px-3 sm:px-8 lg:px-12 xl:px-16">
             <a href="{{ route('welcome') }}" class="flex items-center gap-3" aria-label="{{ __('AktienKI Startseite') }}">
-                <span class="flex h-10 w-[4.5rem] items-center justify-center">
-                    <img src="{{ asset('assets/logo.svg') }}" alt="" class="h-9 w-16">
-                </span>
                 <x-brand-wordmark />
             </a>
             <div class="flex items-center gap-1.5 sm:gap-3">
@@ -37,7 +34,7 @@
                     <a href="{{ route('dashboard') }}" class="hidden w-36 justify-center rounded-xl bg-white px-3 py-2.5 text-sm font-semibold leading-5 text-slate-950 sm:inline-flex">{{ __('Zum Dashboard') }}</a>
                 @else
                     <a href="{{ route('login') }}" class="hidden w-24 justify-center rounded-xl px-3 py-2.5 text-sm font-semibold leading-5 text-[var(--ak-muted)] hover:text-[var(--ak-text)] sm:inline-flex">{{ __('Anmelden') }}</a>
-                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-xl border border-cyan-300/25 bg-gradient-to-r from-violet-600 to-cyan-500 px-3 py-2.5 text-sm font-bold leading-5 text-white shadow-lg shadow-violet-950/40 transition hover:-translate-y-0.5 hover:brightness-110 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
+                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-xl border border-orange-400/25 bg-gradient-to-r from-violet-600 to-orange-4000 px-3 py-2.5 text-sm font-bold leading-5 text-white shadow-lg shadow-violet-950/40 transition hover:-translate-y-0.5 hover:brightness-110 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
                 @endauth
                 <x-public-mobile-menu />
             </div>
@@ -49,13 +46,13 @@
             <div class="relative flex flex-col justify-center overflow-hidden border-b border-[var(--ak-border)] bg-[#070b22] p-7 text-white md:border-b-0 md:border-r lg:p-10">
                 <div class="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-violet-600/20 blur-3xl"></div>
                 <div class="relative">
-                    <p class="text-xs font-black uppercase tracking-[.22em] text-cyan-300">{{ __('Kontakt') }}</p>
+                    <p class="text-xs font-black uppercase tracking-[.22em] text-orange-400">{{ __('Kontakt') }}</p>
                     <h1 class="mt-4 text-4xl font-black leading-tight tracking-tight">{{ __('Wir freuen uns auf deine Nachricht.') }}</h1>
                     <p class="mt-5 text-sm leading-6 text-slate-400">{{ __('Du hast Fragen zu AktienKI, unseren Funktionen oder Tarifen? Schreib uns – wir melden uns so schnell wie möglich zurück.') }}</p>
                     <div class="mt-8 space-y-3 text-xs leading-5 text-slate-400">
-                        <p class="flex gap-3"><span class="text-cyan-300">✓</span>{{ __('Fragen zu Funktionen und Tarifen') }}</p>
-                        <p class="flex gap-3"><span class="text-cyan-300">✓</span>{{ __('Technische Unterstützung') }}</p>
-                        <p class="flex gap-3"><span class="text-cyan-300">✓</span>{{ __('Allgemeines Feedback') }}</p>
+                        <p class="flex gap-3"><span class="text-orange-400">✓</span>{{ __('Fragen zu Funktionen und Tarifen') }}</p>
+                        <p class="flex gap-3"><span class="text-orange-400">✓</span>{{ __('Technische Unterstützung') }}</p>
+                        <p class="flex gap-3"><span class="text-orange-400">✓</span>{{ __('Allgemeines Feedback') }}</p>
                     </div>
                 </div>
             </div>
@@ -71,7 +68,7 @@
                     <div><label for="email" class="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-[var(--ak-accent)]">{{ __('E-Mail-Adresse') }}</label><input id="email" name="email" type="email" value="{{ old('email', auth()->user()?->email) }}" required class="h-11 w-full rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10">@error('email')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror</div>
                     <div class="sm:col-span-2"><label for="subject" class="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-[var(--ak-accent)]">{{ __('Betreff') }}</label><input id="subject" name="subject" type="text" value="{{ old('subject') }}" required class="h-11 w-full rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10">@error('subject')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror</div>
                     <div class="sm:col-span-2"><label for="message" class="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-[var(--ak-accent)]">{{ __('Nachricht') }}</label><textarea id="message" name="message" rows="5" required class="w-full resize-none rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 py-3 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10">{{ old('message') }}</textarea>@error('message')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror</div>
-                    <div class="flex flex-col items-stretch justify-between gap-3 sm:col-span-2 sm:flex-row sm:items-center sm:gap-4"><p class="text-[10px] leading-4 text-[var(--ak-muted)]">{{ __('Mit dem Absenden stimmst du der Verarbeitung deiner Angaben zur Bearbeitung der Anfrage zu.') }}</p><button type="submit" class="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-6 text-sm font-bold text-white shadow-lg shadow-violet-950/30 transition hover:-translate-y-0.5 hover:brightness-110">{{ __('Nachricht senden') }} <span>→</span></button></div>
+                    <div class="flex flex-col items-stretch justify-between gap-3 sm:col-span-2 sm:flex-row sm:items-center sm:gap-4"><p class="text-[10px] leading-4 text-[var(--ak-muted)]">{{ __('Mit dem Absenden stimmst du der Verarbeitung deiner Angaben zur Bearbeitung der Anfrage zu.') }}</p><button type="submit" class="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-orange-4000 px-6 text-sm font-bold text-white shadow-lg shadow-violet-950/30 transition hover:-translate-y-0.5 hover:brightness-110">{{ __('Nachricht senden') }} <span>→</span></button></div>
                 </form>
             </div>
         </section>

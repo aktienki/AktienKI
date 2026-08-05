@@ -3,8 +3,8 @@
 <desc id="desc">Animierte SVG Szene mit zentraler KI Engine, Datenströmen, Modellkarten und Output-Bereich ohne unteren Statusbalken.</desc>
 
 <style>
-    .bg { fill:#070b22; }
-    .grid { stroke:#2b1d5d; stroke-width:1; opacity:.30; }
+    .bg { fill:#0b1424; }
+    .grid { stroke:#fb923c; stroke-width:1; opacity:.075; }
 
     .text {
         fill:#ffffff;
@@ -17,28 +17,31 @@
     }
 
     .label {
-        fill:#aaa0c4;
+        fill:#fb923c;
         font-family: Inter, Arial, sans-serif;
         font-weight:800;
         letter-spacing:.06em;
     }
 
     .panel {
-        fill:#090f2a;
-        stroke:#66568f;
-        stroke-opacity:.28;
+        fill:#263653;
+        fill-opacity:.72;
+        stroke:#fb923c;
+        stroke-opacity:.30;
         stroke-width:1.4;
     }
 
     .panel-soft {
-        fill:#0d1433;
-        stroke:#66568f;
-        stroke-opacity:.20;
+        fill:#344360;
+        fill-opacity:.68;
+        stroke:#fb923c;
+        stroke-opacity:.15;
         stroke-width:1.2;
     }
 
     .output-card {
-        fill:#241d14;
+        fill:#3b3425;
+        fill-opacity:.62;
         stroke:#c99a45;
         stroke-opacity:.30;
     }
@@ -50,25 +53,25 @@
 
     .engine-chip {
         transform-origin: 490px 315px;
-        filter:url(#purpleGlow);
+        filter:url(#lineGlow);
     }
 
     .chip-layer-1 {
-        fill:#15103a;
-        stroke:#857ba1;
+        fill:#10283a;
+        stroke:#fb923c;
         stroke-width:2.4;
     }
 
     .chip-layer-2 {
-        fill:#1b1450;
-        stroke:#a79dbe;
+        fill:#12384a;
+        stroke:#fb923c;
         stroke-width:1.8;
         opacity:.92;
     }
 
     .chip-core {
-        fill:#23136a;
-        stroke:#d8cff0;
+        fill:#075985;
+        stroke:#fb923c;
         stroke-width:2;
     }
 
@@ -95,7 +98,7 @@
 
     .circuit {
         fill:none;
-        stroke:#57417f;
+        stroke:#fb923c;
         stroke-width:1.1;
         opacity:.42;
         stroke-dasharray:8 10;
@@ -103,17 +106,17 @@
     }
 
     .node {
-        fill:#aaa0c4;
+        fill:#fb923c;
         stroke:#ffffff;
         stroke-opacity:.75;
         stroke-width:1.3;
         filter:url(#nodeGlow);
     }
 
-    .node.cyan, .node.green { fill:#8275a8; }
+    .node.cyan, .node.green { fill:#fb923c; }
 
     .data-dot {
-        fill:#8275a8;
+        fill:#fb923c;
         filter:url(#nodeGlow);
         display:none;
     }
@@ -123,23 +126,23 @@
     }
 
     .model-check {
-        fill:#8275a8;
+        fill:#fb923c;
         filter:url(#nodeGlow);
     }
 
     .spark {
-        stroke:#8275a8;
+        stroke:#fb923c;
         stroke-width:2;
         stroke-linecap:round;
     }
 
     .brain-path {
         fill:none;
-        stroke:#cfc6df;
+        stroke:#fb923c;
         stroke-width:5;
         stroke-linecap:round;
         stroke-linejoin:round;
-        filter:url(#purpleGlow);
+        filter:url(#lineGlow);
     }
 
     @keyframes dashMove {
@@ -152,21 +155,21 @@
 
 <defs>
     <radialGradient id="bgGlow" cx="50%" cy="50%" r="60%">
-        <stop offset="0%" stop-color="#5c4c83" stop-opacity=".16"/>
-        <stop offset="55%" stop-color="#111636" stop-opacity=".25"/>
-        <stop offset="100%" stop-color="#070b22" stop-opacity="0"/>
+        <stop offset="0%" stop-color="#fb923c" stop-opacity=".08"/>
+        <stop offset="55%" stop-color="#172844" stop-opacity=".20"/>
+        <stop offset="100%" stop-color="#0b1424" stop-opacity="0"/>
     </radialGradient>
 
     <linearGradient id="flowGradient" x1="0" x2="1">
-        <stop offset="0%" stop-color="#66568f" stop-opacity="0"/>
-        <stop offset="45%" stop-color="#857ba1" stop-opacity=".72"/>
-        <stop offset="100%" stop-color="#6670b8" stop-opacity=".20"/>
+        <stop offset="0%" stop-color="#fb923c" stop-opacity="0"/>
+        <stop offset="45%" stop-color="#fb923c" stop-opacity=".72"/>
+        <stop offset="100%" stop-color="#fb923c" stop-opacity=".20"/>
     </linearGradient>
 
     <linearGradient id="flowGradientAlt" x1="0" x2="1">
-        <stop offset="0%" stop-color="#6670b8" stop-opacity=".08"/>
-        <stop offset="55%" stop-color="#685b91" stop-opacity=".72"/>
-        <stop offset="100%" stop-color="#7385a8" stop-opacity=".14"/>
+        <stop offset="0%" stop-color="#fb923c" stop-opacity=".08"/>
+        <stop offset="55%" stop-color="#fb923c" stop-opacity=".72"/>
+        <stop offset="100%" stop-color="#fb923c" stop-opacity=".14"/>
     </linearGradient>
 
     <linearGradient id="amberFlow" x1="0" x2="1">
@@ -177,7 +180,6 @@
 
     <filter id="purpleGlow" x="-40%" y="-40%" width="180%" height="180%">
         <feGaussianBlur stdDeviation="4" result="blur"/>
-        <feColorMatrix in="blur" type="matrix" values="0.65 0 0 0 0.45  0 0.25 0 0 0.15  0 0 1 0 0.95  0 0 0 .7 0"/>
         <feMerge>
             <feMergeNode/>
             <feMergeNode in="SourceGraphic"/>
@@ -290,10 +292,10 @@
         <path class="chip-core" d="M490 270 L535 294 L535 340 L490 364 L445 340 L445 294 Z"/>
 
         <g opacity=".82">
-            <path d="M385 286 H360M385 306 H360M385 326 H360M385 346 H360" stroke="#8275a8" stroke-width="3" stroke-linecap="round"/>
-            <path d="M595 286 H620M595 306 H620M595 326 H620M595 346 H620" stroke="#8275a8" stroke-width="3" stroke-linecap="round"/>
-            <path d="M438 248 V225M464 234 V211M516 234 V211M542 248 V225" stroke="#8275a8" stroke-width="3" stroke-linecap="round"/>
-            <path d="M438 382 V405M464 396 V419M516 396 V419M542 382 V405" stroke="#8275a8" stroke-width="3" stroke-linecap="round"/>
+            <path d="M385 286 H360M385 306 H360M385 326 H360M385 346 H360" stroke="#fb923c" stroke-width="3" stroke-linecap="round"/>
+            <path d="M595 286 H620M595 306 H620M595 326 H620M595 346 H620" stroke="#fb923c" stroke-width="3" stroke-linecap="round"/>
+            <path d="M438 248 V225M464 234 V211M516 234 V211M542 248 V225" stroke="#fb923c" stroke-width="3" stroke-linecap="round"/>
+            <path d="M438 382 V405M464 396 V419M516 396 V419M542 382 V405" stroke="#fb923c" stroke-width="3" stroke-linecap="round"/>
         </g>
 
         <path class="brain-path" d="M472 303c-10-13-31-5-30 12-13 3-13 23 1 26 3 14 23 14 29 3"/>

@@ -97,7 +97,7 @@ final class RunFilteredBacktest implements ShouldQueue
                 ->when($profitFactorMinimum > 0, fn (Builder $query) =>
                     $query->havingRaw(
                         'COALESCE(SUM(CASE WHEN eligible_trade.net_return > 0 THEN eligible_trade.net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN eligible_trade.net_return < 0 THEN eligible_trade.net_return ELSE 0 END)), 0), 999999) >= ?',
-                        [min(3, $profitFactorMinimum)],
+                        [$profitFactorMinimum],
                     ))
                 ->when($hitRateMinimum > 0, fn (Builder $query) =>
                     $query->havingRaw(

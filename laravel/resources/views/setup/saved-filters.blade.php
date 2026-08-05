@@ -42,7 +42,7 @@
                             $isPublicTemplate = $savedFilter->visibility === 'pro_public';
                         @endphp
                         <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0"><div class="flex items-center gap-2"><h2 class="truncate text-base font-black text-white">{{ $savedFilter->name }}</h2>@if($isPublicTemplate)<span class="shrink-0 rounded-md border border-amber-300/25 bg-amber-300/[.09] px-2 py-1 text-[8px] font-black uppercase text-amber-300">{{ __('Pro Public') }}</span>@else<span class="shrink-0 rounded-md border border-slate-400/15 px-2 py-1 text-[8px] font-black uppercase text-slate-500">{{ __('Privat') }}</span>@endif @unless($isOwner)<span class="shrink-0 text-[8px] font-black uppercase text-cyan-300">{{ __('Vorlage') }}</span>@endunless</div><p class="mt-1 text-[9px] text-[var(--ak-muted)]">{{ __('Aktualisiert') }} {{ $savedFilter->updated_at->timezone('Europe/Berlin')->format('d.m.Y H:i') }}</p></div>
+                            <div class="min-w-0"><div class="flex items-center gap-2"><h2 class="truncate text-base font-black text-white">{{ $savedFilter->name }}</h2>@if($isPublicTemplate)<span class="shrink-0 rounded-md border border-amber-300/25 bg-amber-300/[.09] px-2 py-1 text-[8px] font-black uppercase text-amber-300">{{ __('Pro Public') }}</span>@else<span class="shrink-0 rounded-md border border-slate-400/15 px-2 py-1 text-[8px] font-black uppercase text-slate-500">{{ __('Privat') }}</span>@endif @unless($isOwner)<span class="shrink-0 text-[8px] font-black uppercase text-orange-400">{{ __('Vorlage') }}</span>@endunless</div><p class="mt-1 text-[9px] text-[var(--ak-muted)]">{{ __('Aktualisiert') }} {{ $savedFilter->updated_at->timezone('Europe/Berlin')->format('d.m.Y H:i') }}</p></div>
                             <div class="flex shrink-0 items-center gap-1">
                                 @if($isOwner)
                                 <form method="POST" action="{{ route('setup.filter.saved.visibility', $savedFilter) }}">@csrf @method('PATCH')<input type="hidden" name="visibility" value="{{ $isPublicTemplate ? 'private' : 'pro_public' }}"><button type="submit" class="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[10px] font-black {{ $isPublicTemplate ? 'border-slate-300/15 text-slate-400' : 'border-amber-300/25 bg-amber-300/[.08] text-amber-200' }}" title="{{ $isPublicTemplate ? __('Auf privat stellen') : __('Für Pro freigeben') }}">@if($isPublicTemplate)<x-heroicon-o-lock-closed class="h-3.5 w-3.5" />@else<x-heroicon-o-globe-alt class="h-3.5 w-3.5" />@endif<span class="hidden 2xl:inline">{{ $isPublicTemplate ? __('Privat') : __('Freigeben') }}</span></button></form>
@@ -61,10 +61,10 @@
                         </div>
                         @if($savedFilter->description)<p class="mt-3 rounded-lg border border-white/[.07] bg-slate-950/20 px-3 py-2 text-[10px] leading-4 text-slate-300">{{ $savedFilter->description }}</p>@endif
                         @if($isAssignedToPortfolio)
-                            <div class="mt-3 flex items-center gap-2 rounded-lg border border-cyan-300/18 bg-cyan-400/[.06] px-3 py-2">
-                                <x-heroicon-o-briefcase class="h-4 w-4 shrink-0 text-cyan-300" />
+                            <div class="mt-3 flex items-center gap-2 rounded-lg border border-orange-400/18 bg-orange-400/[.06] px-3 py-2">
+                                <x-heroicon-o-briefcase class="h-4 w-4 shrink-0 text-orange-400" />
                                 <span class="text-[9px] font-black uppercase tracking-wide text-slate-500">{{ __('Depotzuordnung') }}</span>
-                                <span class="min-w-0 truncate text-[10px] font-black text-cyan-200">{{ $assignedPortfolios->pluck('name')->join(' · ') }}</span>
+                                <span class="min-w-0 truncate text-[10px] font-black text-orange-400">{{ $assignedPortfolios->pluck('name')->join(' · ') }}</span>
                                 <span class="ml-auto text-[9px] text-slate-500">{{ __('Änderung im Musterdepot') }}</span>
                             </div>
                         @endif

@@ -9,7 +9,7 @@
     <x-preference-head :force-dark="auth()->guest()" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
-        .reviews-bg{background-color:#070b22;background-image:radial-gradient(circle at 78% 18%,rgba(139,92,246,.2),transparent 30%),radial-gradient(circle at 14% 82%,rgba(34,211,238,.1),transparent 28%),linear-gradient(rgba(43,29,93,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(43,29,93,.3) 1px,transparent 1px);background-size:auto,auto,60px 60px,60px 60px}.reviews-topbar{background:rgba(7,11,34,.82);border-bottom:1px solid rgba(139,92,246,.24);backdrop-filter:blur(22px)}[data-theme="light"] .reviews-bg{background-color:#f8fafc;background-image:radial-gradient(circle at 75% 15%,rgba(139,92,246,.13),transparent 30%),radial-gradient(circle at 15% 80%,rgba(34,211,238,.1),transparent 28%)}[data-theme="light"] .reviews-topbar{background:rgba(255,255,255,.82);border-color:rgba(124,58,237,.16)}
+        .reviews-bg{background-color:#070b22;background-image:radial-gradient(circle at 78% 18%,rgba(139,92,246,.2),transparent 30%),radial-gradient(circle at 14% 82%,rgba(251,146,60,.1),transparent 28%),linear-gradient(rgba(43,29,93,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(43,29,93,.3) 1px,transparent 1px);background-size:auto,auto,60px 60px,60px 60px}.reviews-topbar{background:rgba(7,11,34,.82);border-bottom:1px solid rgba(139,92,246,.24);backdrop-filter:blur(22px)}[data-theme="light"] .reviews-bg{background-color:#f8fafc;background-image:radial-gradient(circle at 75% 15%,rgba(139,92,246,.13),transparent 30%),radial-gradient(circle at 15% 80%,rgba(251,146,60,.1),transparent 28%)}[data-theme="light"] .reviews-topbar{background:rgba(255,255,255,.82);border-color:rgba(124,58,237,.16)}
         .star-choice{display:flex;flex-direction:row-reverse;justify-content:flex-end}.star-choice input{position:absolute;opacity:0}.star-choice label{cursor:pointer;color:#475569;font-size:1.75rem;line-height:1;transition:.15s}.star-choice label:hover,.star-choice label:hover~label,.star-choice input:checked~label{color:#a78bfa}
     </style>
 </head>
@@ -17,9 +17,6 @@
     <header class="ak-public-topbar reviews-topbar sticky top-0 z-30 h-[73px]">
         <div class="mx-auto flex h-full max-w-screen-2xl items-center justify-between px-3 sm:px-8 lg:px-12 xl:px-16">
             <a href="{{ route('welcome') }}" class="flex items-center gap-3" aria-label="{{ __('AktienKI Startseite') }}">
-                <span class="flex h-10 w-[4.5rem] items-center justify-center">
-                    <img src="{{ asset('assets/logo.svg') }}" alt="" class="h-9 w-16">
-                </span>
                 <x-brand-wordmark />
             </a>
             <div class="flex items-center gap-1.5 sm:gap-3">
@@ -36,7 +33,7 @@
                     <a href="{{ route('dashboard') }}" class="hidden w-36 justify-center rounded-xl bg-white px-3 py-2.5 text-sm font-semibold leading-5 text-slate-950 sm:inline-flex">{{ __('Zum Dashboard') }}</a>
                 @else
                     <a href="{{ route('login') }}" class="hidden w-24 justify-center rounded-xl px-3 py-2.5 text-sm font-semibold leading-5 text-[var(--ak-muted)] hover:text-[var(--ak-text)] sm:inline-flex">{{ __('Anmelden') }}</a>
-                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-xl border border-cyan-300/25 bg-gradient-to-r from-violet-600 to-cyan-500 px-3 py-2.5 text-sm font-bold leading-5 text-white shadow-lg shadow-violet-950/40 transition hover:-translate-y-0.5 hover:brightness-110 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
+                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-xl border border-orange-400/25 bg-gradient-to-r from-violet-600 to-orange-4000 px-3 py-2.5 text-sm font-bold leading-5 text-white shadow-lg shadow-violet-950/40 transition hover:-translate-y-0.5 hover:brightness-110 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
                 @endauth
                 <x-public-mobile-menu />
             </div>
@@ -77,12 +74,12 @@
                     <fieldset><legend class="ak-label">{{ __('Bewertung') }}</legend><div class="star-choice mt-2">@for ($star = 5; $star >= 1; $star--)<input id="rating-{{ $star }}" name="rating" type="radio" value="{{ $star }}" required @checked((int) old('rating') === $star)><label for="rating-{{ $star }}" title="{{ $star }} {{ __('Sterne') }}">★</label>@endfor</div>@error('rating')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror</fieldset>
                     <div><label class="ak-label" for="review-title">{{ __('Titel') }} <span class="normal-case text-[var(--ak-muted)]">({{ __('optional') }})</span></label><input id="review-title" name="title" value="{{ old('title') }}" maxlength="100" class="ak-input mt-2">@error('title')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror</div>
                     <div><label class="ak-label" for="review-comment">{{ __('Deine Erfahrung') }}</label><textarea id="review-comment" name="comment" rows="5" required maxlength="1500" class="ak-input mt-2 h-auto resize-none py-3">{{ old('comment') }}</textarea>@error('comment')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror</div>
-                    <button class="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 text-sm font-bold text-white shadow-lg shadow-violet-950/30 transition hover:brightness-110">{{ __('Bewertung veröffentlichen') }}</button>
+                    <button class="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-orange-4000 text-sm font-bold text-white shadow-lg shadow-violet-950/30 transition hover:brightness-110">{{ __('Bewertung veröffentlichen') }}</button>
                 </form>
             @else
                 <div class="mt-5 rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-5 text-center">
                     <p class="text-sm leading-6 text-[var(--ak-muted)]">{{ __('Nur registrierte Nutzer können eine Bewertung abgeben.') }}</p>
-                    <a href="{{ route('login') }}" class="mt-4 flex h-11 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 text-sm font-bold text-white">{{ __('Jetzt anmelden') }}</a>
+                    <a href="{{ route('login') }}" class="mt-4 flex h-11 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-orange-4000 text-sm font-bold text-white">{{ __('Jetzt anmelden') }}</a>
                     <a href="{{ route('register') }}" class="mt-2 block text-xs font-bold text-[var(--ak-accent)]">{{ __('Noch kein Konto? Jetzt registrieren') }}</a>
                 </div>
             @endauth

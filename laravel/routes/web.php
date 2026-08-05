@@ -28,6 +28,7 @@ use App\Http\Controllers\SignalEmailPreviewController;
 use App\Http\Controllers\QualityGateSetupController;
 use App\Http\Controllers\SmartSelectionLabelController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\CommunityController;
 use Illuminate\Http\Request;
 
 
@@ -188,6 +189,10 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('/community', [CommunityController::class, 'index'])->name('community.index');
+    Route::patch('/community/alias', [CommunityController::class, 'updateAlias'])->name('community.alias.update');
+    Route::post('/community/posts', [CommunityController::class, 'store'])->middleware('throttle:5,1')->name('community.posts.store');
+    Route::delete('/community/posts/{post}', [CommunityController::class, 'destroy'])->name('community.posts.destroy');
     Route::get('/email-preview/signal', SignalEmailPreviewController::class)->name('email-preview.signal');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::get('/setup/filter', [PredictionController::class, 'filterSetup'])->middleware('plan:pro')->name('setup.filter');

@@ -3,8 +3,8 @@
     <div class="absolute inset-0 bg-[#2B2353]"></div>
 
     <div class="absolute inset-0 bg-gradient-to-br
-        from-cyan-900
-        via-cyan-600
+        from-orange-400
+        via-orange-400
         to-cyan-750">
     </div>
 

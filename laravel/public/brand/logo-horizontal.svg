@@ -1,32 +1,12 @@
-<svg width="238" height="54" viewBox="0 0 238 54" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="akA" x1="11" y1="8" x2="64" y2="47" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#E9D5FF"/>
-      <stop offset="0.48" stop-color="#A78BFA"/>
-      <stop offset="1" stop-color="#7C3AED"/>
-    </linearGradient>
-    <linearGradient id="akText" x1="161" y1="17" x2="198" y2="39" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#E9D5FF"/>
-      <stop offset="1" stop-color="#8B5CF6"/>
-    </linearGradient>
-    <filter id="akSoftGlow" x="-20%" y="-35%" width="140%" height="170%" color-interpolation-filters="sRGB">
-      <feGaussianBlur stdDeviation="1.6" result="blur"/>
-      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.55 0 0 0 0 0.32 0 0 0 0 1 0 0 0 0.55 0"/>
-      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-  </defs>
-  <g filter="url(#akSoftGlow)">
-    <path d="M15 41.5C25.8 25.2 40.6 15.2 57.4 13.2" stroke="url(#akA)" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>
-    <path d="M17.5 42.3C32.4 49.2 57 39.7 70.5 20.2" stroke="url(#akA)" stroke-width="2.2" stroke-linecap="round" opacity="0.75"/>
-    <circle cx="70.5" cy="20.2" r="2.2" fill="#E9D5FF"/>
-    <path d="M27.2 43.5L43.9 9.8C44.7 8.2 47 8.2 47.8 9.8L64.6 43.5" stroke="url(#akA)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M35.8 32.8H56.2" stroke="#C4B5FD" stroke-width="3" stroke-linecap="round" opacity="0.92"/>
-    <rect x="39.3" y="26.8" width="2.2" height="9.6" rx="1.1" fill="#DDD6FE"/>
-    <rect x="45.0" y="22.7" width="2.2" height="13.7" rx="1.1" fill="#A78BFA"/>
-    <rect x="50.7" y="18.4" width="2.2" height="18" rx="1.1" fill="#F5F3FF"/>
-    <path d="M51.8 15.2V18.4M51.8 36.4V39.4" stroke="#F5F3FF" stroke-width="1.2" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="300" viewBox="0 0 1400 300" role="img" aria-labelledby="title desc">
+  <title id="title">aktienKI.com horizontal logo</title>
+  <desc id="desc">Compact geometric bull and upward chart beside the aktienKI.com wordmark.</desc>
+  <g transform="translate(26 23) scale(.85)">
+    <path d="M93 79C65 77 33 66 13 35c3 35 22 61 58 70M167 79c28-2 60-13 80-44-3 35-22 61-58 70" fill="none" stroke="#72798A" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M78 84c14-22 32-33 52-33s38 11 52 33l14 66c5 27-7 51-29 66l-37 25-37-25c-22-15-34-39-29-66z" fill="none" stroke="#72798A" stroke-width="16" stroke-linejoin="round"/>
+    <path d="m83 139 31-11m63 11-31-11M104 187c17 11 35 11 52 0l-7 27c-12 8-26 8-38 0z" fill="none" stroke="#72798A" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M92 142l28-27 25 21 52-55M172 80h26v26" fill="none" stroke="#7C3AED" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="100" cy="151" r="8" fill="#7C3AED"/><circle cx="160" cy="151" r="8" fill="#7C3AED"/>
   </g>
-  <text x="86" y="36" fill="#FFFFFF" font-size="27" font-weight="650" letter-spacing="-1.1" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">aktien</text>
-  <text x="164" y="36" fill="url(#akText)" font-size="27" font-weight="800" letter-spacing="-1.1" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">KI</text>
-  <text x="196" y="36" fill="#CBD5E1" font-size="20" font-weight="520" letter-spacing="-0.3" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">.com</text>
+  <text x="275" y="178" fill="#202332" font-family="Inter, Montserrat, Arial, sans-serif" font-size="108" font-weight="700" letter-spacing="-4">aktien<tspan fill="#7C3AED">KI</tspan><tspan fill="#72798A" font-size="53" font-weight="500" letter-spacing="-1">.com</tspan></text>
 </svg>

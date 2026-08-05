@@ -260,7 +260,10 @@
                         <td class="px-3 py-2">
                             <div class="flex h-full flex-col justify-center">
                                 @if ($score !== null)
-                                    <div class="mb-1.5 flex items-baseline justify-between"><strong class="text-sm font-black">{{ number_format($score, 1, ',', '.') }}</strong><small class="text-[8px] text-[var(--ak-muted)]">/ 10</small></div>
+                                    <div class="mb-1.5 flex items-baseline justify-between">
+                                        <strong class="text-sm font-black">{{ number_format($score, 1, ',', '.') }}</strong>
+                                        <small class="text-[8px] text-[var(--ak-muted)]">/ 10</small>
+                                    </div>
                                     <x-dashboard.score-stripes :percent="$scorePercent" />
                                 @else<span class="text-center text-[var(--ak-muted)]">—</span>@endif
                             </div>

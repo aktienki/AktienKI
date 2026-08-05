@@ -16,6 +16,7 @@ class StreamTwelveDataPrices extends Command
     public function handle(): int
     {
         $lastBroadcast = [];
+
         while (true) {
             foreach ($this->requestedInstrumentIds() as $instrumentId) {
                 $quote = DB::table('current_stock_quotes as quote')
@@ -30,11 +31,15 @@ class StreamTwelveDataPrices extends Command
                     continue;
                 }
 
-                MarketPriceUpdated::dispatch(
-                    (string) $quote->symbol,
-                    (float) $quote->price,
-                    \Illuminate\Support\Carbon::parse($quote->quote_time)->timestamp,
-                );
+                try {
+                    MarketPriceUpdated::dispatch(
+                        (string) $quote->symbol,
+                        (float) $quote->price,
+                        \Illuminate\Support\Carbon::parse($quote->quote_time)->timestamp,
+                    );
+                } catch (\Throwable) {
+                    // Persisting the quote must continue if Reverb is briefly unavailable.
+                }
                 $lastBroadcast[$instrumentId] = (int) $quote->id;
             }
 

@@ -12,6 +12,27 @@
             height: 226px;
             min-height: 226px;
         }
+        .aki-indicator-card {
+            border-width:1.5px !important;
+            border-color: rgba(251,146,60,.52) !important;
+            background:
+                radial-gradient(circle at 0 0,rgba(251,146,60,.18),transparent 38%),
+                radial-gradient(circle at 100% 0,rgba(253,186,116,.10),transparent 34%),
+                linear-gradient(150deg,rgba(251,146,60,.075),rgba(52,65,95,.18) 48%,transparent),
+                color-mix(in srgb,var(--ak-card) 92%,#fb923c 8%) !important;
+            box-shadow:
+                0 0 0 1px rgba(253,186,116,.10) inset,
+                0 14px 30px rgba(154,52,18,.14),
+                0 0 22px rgba(251,146,60,.09),
+                inset 0 1px 0 rgba(255,237,213,.10) !important;
+        }
+        .aki-indicator-card__header {
+            border-color:rgba(251,146,60,.42) !important;
+            background:
+                linear-gradient(105deg,rgba(124,45,18,.52),rgba(194,65,12,.15)),
+                rgba(30,35,61,.88);
+            box-shadow:inset 0 -1px 0 rgba(253,186,116,.08);
+        }
         @media (min-width: 1024px) {
             .aki-indicator-grid {
                 --aki-card-height: clamp(270px, 30vh, 320px);
@@ -42,14 +63,14 @@
     @endphp
 
     <div class="mx-auto flex h-[calc(100dvh-89px)] min-h-0 w-full max-w-screen-2xl flex-col py-4 text-[var(--ak-text)]">
-        <header class="mb-3 flex shrink-0 flex-col gap-3 border-b border-[var(--ak-border)] pb-3 lg:flex-row lg:items-end lg:justify-between">
+        <header class="mb-3 flex shrink-0 flex-col gap-3 border-b border-orange-400/30 pb-3 lg:flex-row lg:items-end lg:justify-between">
             <div class="flex min-w-0 items-center gap-4">
-                <span class="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-teal-500/25 bg-teal-500/10 text-sm font-black text-teal-600">
+                <span class="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-orange-400/25 bg-orange-400/10 text-sm font-black text-orange-400">
                     {{ strtoupper(substr($instrument->symbol, 0, 2)) }}
                     <img src="{{ route('stocks.icon', $instrument->id) }}" alt="" class="absolute inset-2 h-10 w-10 object-contain" onerror="this.remove()">
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[10px] font-black uppercase tracking-[.18em] text-teal-600">{{ __('Indikatoren und 20-Tage-Wahrscheinlichkeit') }}</p>
+                    <p class="text-[10px] font-black uppercase tracking-[.18em] text-orange-400">{{ __('Indikatoren und 20-Tage-Wahrscheinlichkeit') }}</p>
                     <div class="mt-1 flex flex-wrap items-center gap-2">
                         <h1 class="truncate text-2xl font-black">{{ $instrument->name }}</h1>
                         <span class="rounded-lg border border-amber-400/25 bg-amber-400/10 px-2 py-1 text-xs font-black text-amber-500">{{ $instrument->symbol }}</span>
@@ -68,11 +89,11 @@
                     <p class="mt-1 text-xs font-bold text-[var(--ak-muted)]">
                         {{ $countryFlags[$instrument->country] ?? '🌐' }} {{ $instrument->country ?: '—' }}
                         · {{ $exchange?->code ?: __('Keine Exchange') }}
-                        · <span class="inline-flex items-center gap-1"><x-sector-icon :sector="$instrument->sector" class="h-3.5 w-3.5 text-teal-500" />{{ $instrument->sector ?: '—' }}</span>
+                        · <span class="inline-flex items-center gap-1"><x-sector-icon :sector="$instrument->sector" class="h-3.5 w-3.5" style="--ak-sector-icon-color:#fb923c;stroke-width:1.4!important" />{{ $instrument->sector ?: '—' }}</span>
                     </p>
                 </div>
             </div>
-            <a href="{{ route('stocks.show', $instrument->symbol) }}" class="inline-flex h-10 items-center gap-2 self-start rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:text-teal-600 lg:self-auto">
+            <a href="{{ route('stocks.show', $instrument->symbol) }}" class="inline-flex h-10 items-center gap-2 self-start rounded-lg border border-orange-400/20 bg-orange-400/[.06] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-orange-400/35 hover:text-orange-400 lg:self-auto">
                 <x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Zur Aktiendetailseite') }}
             </a>
         </header>

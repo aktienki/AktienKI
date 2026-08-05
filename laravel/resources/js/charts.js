@@ -298,24 +298,7 @@ window.welcomeStockMap = (countryStocks = {}) => ({
                 amberFill.appendChild(stop);
             });
 
-            const amberGlow = document.createElementNS(namespace, 'filter');
-            amberGlow.setAttribute('id', 'welcome-amber-country-glow');
-            amberGlow.setAttribute('x', '-35%');
-            amberGlow.setAttribute('y', '-35%');
-            amberGlow.setAttribute('width', '170%');
-            amberGlow.setAttribute('height', '170%');
-            const blur = document.createElementNS(namespace, 'feGaussianBlur');
-            blur.setAttribute('in', 'SourceGraphic');
-            blur.setAttribute('stdDeviation', '1.15');
-            blur.setAttribute('result', 'softGlow');
-            const merge = document.createElementNS(namespace, 'feMerge');
-            ['softGlow', 'SourceGraphic'].forEach((source) => {
-                const node = document.createElementNS(namespace, 'feMergeNode');
-                node.setAttribute('in', source);
-                merge.appendChild(node);
-            });
-            amberGlow.append(blur, merge);
-            defs.append(amberFill, amberGlow);
+            defs.append(amberFill);
             this.$refs.map.prepend(defs);
 
             geojson.features.forEach((feature) => {
@@ -328,24 +311,25 @@ window.welcomeStockMap = (countryStocks = {}) => ({
                 path.setAttribute('d', this.geometryPath(feature.geometry));
                 path.setAttribute('fill', stocks > 0 ? 'url(#welcome-amber-country-fill)' : 'transparent');
                 path.setAttribute('fill-opacity', stocks > 0 ? '0.72' : '0');
-                path.setAttribute('stroke', stocks > 0 ? '#d6a84f' : '#8793aa');
-                path.setAttribute('stroke-opacity', stocks > 0 ? '0.76' : '0.46');
-                path.setAttribute('stroke-width', stocks > 0 ? '1.35' : '0.78');
+                path.setAttribute('stroke', stocks > 0 ? '#d6a84f' : '#a8b4c8');
+                path.setAttribute('stroke-opacity', stocks > 0 ? '0.90' : '0.62');
+                path.setAttribute('stroke-width', stocks > 0 ? '1.15' : '0.88');
                 path.setAttribute('vector-effect', 'non-scaling-stroke');
                 path.setAttribute('stroke-linejoin', 'round');
+                path.setAttribute('stroke-linecap', 'round');
+                path.setAttribute('shape-rendering', 'geometricPrecision');
 
                 if (stocks > 0) {
-                    path.setAttribute('filter', 'url(#welcome-amber-country-glow)');
                     path.style.transition = 'fill-opacity 180ms ease, stroke-opacity 180ms ease, stroke-width 180ms ease';
                     path.addEventListener('mouseenter', () => {
                         path.setAttribute('fill-opacity', '0.94');
                         path.setAttribute('stroke-opacity', '1');
-                        path.setAttribute('stroke-width', '2');
+                        path.setAttribute('stroke-width', '1.65');
                     });
                     path.addEventListener('mouseleave', () => {
                         path.setAttribute('fill-opacity', '0.72');
                         path.setAttribute('stroke-opacity', '0.76');
-                        path.setAttribute('stroke-width', '1.35');
+                        path.setAttribute('stroke-width', '1.15');
                     });
                 }
 
@@ -385,8 +369,13 @@ window.dailyAiScoreChart = (series = []) => ({
 
     init() {
         const lightTheme = document.documentElement.dataset.theme === 'light';
-        const accent = lightTheme ? 'rgba(13, 148, 136, .68)' : 'rgba(45, 212, 191, .52)';
-        const marker = lightTheme ? 'rgba(15, 118, 110, .78)' : 'rgba(94, 234, 212, .68)';
+        const accent = lightTheme ? '#0891b2' : '#fb923c';
+        const accentSoft = lightTheme ? '#22d3ee' : '#fdba74';
+        const gridColor = lightTheme ? 'rgba(15,118,110,.10)' : 'rgba(251,146,60,.10)';
+        const axisColor = lightTheme ? '#64748b' : '#94a3b8';
+        const labelBackground = lightTheme ? '#ecfeff' : '#172033';
+        const labelText = lightTheme ? '#0e7490' : '#fed7aa';
+        const lastPointIndex = Math.max(0, series.length - 1);
 
         this.chart = new ApexCharts(this.$refs.chart, {
             chart: {
@@ -395,27 +384,84 @@ window.dailyAiScoreChart = (series = []) => ({
                 background: 'transparent',
                 toolbar: { show: false },
                 zoom: { enabled: false },
-                animations: { enabled: true, speed: 450 },
+                animations: { enabled: true, speed: 520, easing: 'easeinout' },
             },
             series: [{ name: 'KI-Score', data: series }],
             colors: [accent],
-            stroke: { width: 2, curve: 'smooth' },
+            stroke: { width: 3, curve: 'smooth', lineCap: 'round' },
             markers: {
-                size: 2,
-                colors: [marker],
-                strokeColors: '#ffffff',
-                strokeWidth: 1,
-                hover: { size: 5 },
+                size: 0,
+                strokeWidth: 0,
+                hover: { size: 5, sizeOffset: 1 },
+                discrete: [{
+                    seriesIndex: 0,
+                    dataPointIndex: lastPointIndex,
+                    fillColor: accent,
+                    strokeColor: lightTheme ? '#ffffff' : '#172033',
+                    size: 5,
+                    strokeWidth: 3,
+                }],
             },
             fill: {
                 type: 'gradient',
-                gradient: { opacityFrom: 0.16, opacityTo: 0.01, stops: [0, 95] },
+                gradient: {
+                    shade: lightTheme ? 'light' : 'dark',
+                    type: 'vertical',
+                    gradientToColors: [accentSoft],
+                    opacityFrom: lightTheme ? 0.28 : 0.24,
+                    opacityTo: 0.015,
+                    stops: [0, 72, 100],
+                },
             },
-            dataLabels: { enabled: false },
-            grid: { borderColor: 'rgba(148, 163, 184, .12)', strokeDashArray: 4 },
+            dataLabels: {
+                enabled: true,
+                formatter: (value, options) => {
+                    const points = options.w.config.series[options.seriesIndex].data;
+                    const isLast = options.dataPointIndex === points.length - 1;
+                    return isLast ? value.toFixed(1) : '';
+                },
+                offsetX: -7,
+                offsetY: -12,
+                style: {
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    colors: [labelText],
+                },
+                background: {
+                    enabled: true,
+                    foreColor: labelText,
+                    borderRadius: 6,
+                    padding: 4,
+                    opacity: 1,
+                    borderWidth: 1,
+                    borderColor: lightTheme ? 'rgba(8,145,178,.24)' : 'rgba(251,146,60,.30)',
+                    backgroundColor: labelBackground,
+                },
+            },
+            annotations: {
+                yaxis: [{
+                    y: 5,
+                    borderColor: lightTheme ? 'rgba(15,118,110,.24)' : 'rgba(148,163,184,.20)',
+                    strokeDashArray: 5,
+                    borderWidth: 1,
+                }],
+            },
+            grid: {
+                borderColor: gridColor,
+                strokeDashArray: 3,
+                xaxis: { lines: { show: false } },
+                yaxis: { lines: { show: true } },
+                padding: { top: 10, right: 10, bottom: 0, left: 2 },
+            },
             xaxis: {
                 type: 'datetime',
-                labels: { style: { colors: '#64748b', fontSize: '9px' }, datetimeUTC: false },
+                tickAmount: 4,
+                labels: {
+                    style: { colors: axisColor, fontSize: '9px', fontWeight: 600 },
+                    datetimeUTC: false,
+                    format: 'dd.MM.',
+                    hideOverlappingLabels: true,
+                },
                 axisBorder: { show: false },
                 axisTicks: { show: false },
             },
@@ -423,7 +469,11 @@ window.dailyAiScoreChart = (series = []) => ({
                 min: 0,
                 max: 10,
                 tickAmount: 5,
-                labels: { style: { colors: '#64748b', fontSize: '9px' }, formatter: (value) => value.toFixed(0) },
+                labels: {
+                    minWidth: 14,
+                    style: { colors: axisColor, fontSize: '9px', fontWeight: 600 },
+                    formatter: (value) => value.toFixed(0),
+                },
             },
             tooltip: {
                 theme: lightTheme ? 'light' : 'dark',

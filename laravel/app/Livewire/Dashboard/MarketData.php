@@ -26,6 +26,8 @@ class MarketData extends Component
 
     public array $marketAnalysis = [];
 
+    public array $signalTransitionStats = [];
+
     protected array $symbols = [
 
         'DAX'        => '^GDAXI',
@@ -94,7 +96,7 @@ class MarketData extends Component
             ))
             ->all();
 
-        $this->dailyAiScores = $indexAiScores->dailyAverages();
+        $this->dailyAiScores = $indexAiScores->dailyAverages(20);
         $this->countryAiScores = $indexAiScores->countryScores();
 
         $riskLevel = data_get(auth()->user()?->meta, 'risk_profile.level', 'normal');
@@ -125,6 +127,7 @@ class MarketData extends Component
         ] : [];
 
         $this->sentiment = $marketService->sentiment($this->markets);
+        $this->signalTransitionStats = $this->loadSignalTransitionStats();
     }
 
     public function render()
@@ -139,8 +142,94 @@ class MarketData extends Component
                 'countryAiScores' => $this->countryAiScores,
                 'marketComment' => $this->marketComment,
                 'marketAnalysis' => $this->marketAnalysis,
+                'signalTransitionStats' => $this->signalTransitionStats,
             ]
         );
+    }
+
+    private function loadSignalTransitionStats(): array
+    {
+        return Cache::remember('markets.signal-transition-stats.5d.v2', now()->addMinutes(2), function (): array {
+            $history = DB::table('predictions as prediction')
+                ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+                ->where('instrument.type', 'stock')
+                ->where('instrument.is_active', true)
+                ->whereNull('instrument.deleted_at')
+                ->where('prediction.prediction_time', '>=', now()->subDays(14))
+                ->whereIn(DB::raw('UPPER(prediction.signal)'), ['SELL', 'HOLD', 'WATCH', 'BUY'])
+                ->select([
+                    'prediction.id', 'prediction.instrument_id',
+                    'prediction.trained_model_id', 'prediction.prediction_time',
+                ])
+                ->selectRaw("CASE UPPER(prediction.signal)
+                    WHEN 'SELL' THEN 0 WHEN 'HOLD' THEN 1
+                    WHEN 'WATCH' THEN 2 WHEN 'BUY' THEN 3
+                END AS signal_rank");
+
+            $sequenced = DB::query()
+                ->fromSub($history, 'signal_history')
+                ->select('signal_history.*')
+                ->selectRaw('LAG(signal_history.signal_rank) OVER (
+                    PARTITION BY signal_history.instrument_id, COALESCE(signal_history.trained_model_id, 0)
+                    ORDER BY signal_history.prediction_time, signal_history.id
+                ) AS previous_rank');
+
+            $transitions = DB::query()
+                ->fromSub($sequenced, 'signal_transition')
+                ->whereNotNull('previous_rank')
+                ->whereColumn('previous_rank', '<>', 'signal_rank')
+                ->where('prediction_time', '>=', now()->subDays(5));
+
+            $stats = (clone $transitions)
+                ->selectRaw('COUNT(*) AS transition_count')
+                ->selectRaw('SUM(CASE WHEN signal_rank > previous_rank THEN 1 ELSE 0 END) AS positive_count')
+                ->selectRaw('SUM(CASE WHEN signal_rank < previous_rank THEN 1 ELSE 0 END) AS negative_count')
+                ->selectRaw('AVG(CASE WHEN signal_rank > previous_rank THEN 1.0 ELSE -1.0 END) AS average_direction')
+                ->first();
+
+            $matrix = (clone $transitions)
+                ->groupBy('previous_rank', 'signal_rank')
+                ->get([
+                    'previous_rank', 'signal_rank', DB::raw('COUNT(*) AS transition_count'),
+                ])
+                ->mapWithKeys(fn (object $transition): array => [
+                    $transition->previous_rank.'-'.$transition->signal_rank => (int) $transition->transition_count,
+                ])
+                ->all();
+
+            $latestSignals = DB::table('predictions as current_prediction')
+                ->join('instruments as current_instrument', 'current_instrument.id', '=', 'current_prediction.instrument_id')
+                ->where('current_instrument.type', 'stock')
+                ->where('current_instrument.is_active', true)
+                ->whereNull('current_instrument.deleted_at')
+                ->whereIn(DB::raw('UPPER(current_prediction.signal)'), ['SELL', 'HOLD', 'WATCH', 'BUY'])
+                ->selectRaw('DISTINCT ON (current_prediction.instrument_id) current_prediction.instrument_id')
+                ->selectRaw("UPPER(current_prediction.signal) AS signal")
+                ->orderBy('current_prediction.instrument_id')
+                ->orderByDesc('current_prediction.prediction_time')
+                ->orderByDesc('current_prediction.id');
+            $distribution = DB::query()
+                ->fromSub($latestSignals, 'latest_signal')
+                ->groupBy('signal')
+                ->get(['signal', DB::raw('COUNT(*) AS signal_count')])
+                ->mapWithKeys(fn (object $row): array => [(string) $row->signal => (int) $row->signal_count])
+                ->all();
+            $distribution = collect(['SELL', 'HOLD', 'WATCH', 'BUY'])
+                ->mapWithKeys(fn (string $signal): array => [$signal => (int) ($distribution[$signal] ?? 0)])
+                ->all();
+
+            return [
+                'transition_count' => (int) ($stats?->transition_count ?? 0),
+                'positive_count' => (int) ($stats?->positive_count ?? 0),
+                'negative_count' => (int) ($stats?->negative_count ?? 0),
+                'average' => round((float) ($stats?->average_direction ?? 0), 2),
+                'matrix' => $matrix,
+                'max_count' => max([0, ...array_values($matrix)]),
+                'distribution' => $distribution,
+                'distribution_total' => array_sum($distribution),
+                'distribution_max' => max([0, ...array_values($distribution)]),
+            ];
+        });
     }
 
     private function decodeJson(mixed $value): array

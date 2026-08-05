@@ -62,6 +62,30 @@ class ProfileTest extends TestCase
         $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
+    public function test_profile_update_returns_to_the_page_that_opened_the_settings(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->patch('/profile', [
+            'name' => $user->name,
+            'email' => $user->email,
+            'return_to' => '/predictions/heatmap?profit_factor_min=2',
+        ])->assertSessionHasNoErrors()
+            ->assertRedirect('/predictions/heatmap?profit_factor_min=2');
+    }
+
+    public function test_profile_update_does_not_redirect_to_an_external_site(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->patch('/profile', [
+            'name' => $user->name,
+            'email' => $user->email,
+            'return_to' => 'https://example.com/phishing',
+        ])->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+    }
+
     public function test_user_can_update_language_and_email_preferences(): void
     {
         $user = User::factory()->create();

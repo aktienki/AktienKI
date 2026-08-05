@@ -16,7 +16,7 @@
             <a href="{{ route('dashboard') }}" class="block rounded-xl bg-[var(--ak-accent-soft)] px-4 py-3 text-sm font-bold text-[var(--ak-accent)]">{{ __('Dashboard') }}</a>
         @else
             <a href="{{ route('login') }}" class="block rounded-xl px-4 py-3 text-sm text-[var(--ak-text)] hover:bg-[var(--ak-accent-soft)]">{{ __('Anmelden') }}</a>
-            <a href="{{ route('register') }}" class="mt-1 block rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-4 py-3 text-center text-sm font-bold text-white">{{ __('Registrieren') }}</a>
+            <a href="{{ route('register') }}" class="mt-1 block rounded-xl bg-gradient-to-r from-violet-600 to-orange-4000 px-4 py-3 text-center text-sm font-bold text-white">{{ __('Registrieren') }}</a>
         @endauth
     </nav>
 </div>

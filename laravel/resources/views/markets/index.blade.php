@@ -15,130 +15,190 @@
             'ZAR' => 'R',
             default => (string) $currency,
         };
-        $continentFor = function (?string $country): string {
-            $country = strtoupper(trim((string) $country));
-
-            return match (true) {
-                in_array($country, ['US', 'USA', 'UNITED STATES', 'CA', 'CAN', 'CANADA'], true) => 'north-america',
-                in_array($country, ['JP', 'JPN', 'JAPAN', 'CN', 'CHN', 'CHINA', 'HK', 'HKG', 'HONG KONG', 'AU', 'AUS', 'AUSTRALIA'], true) => 'asia-pacific',
-                in_array($country, ['ZA', 'ZAF', 'SOUTH AFRICA'], true) => 'africa',
-                default => 'europe',
-            };
-        };
-        $continentLabels = [
-            'europe' => __('Europa'),
-            'north-america' => __('Nordamerika'),
-            'asia-pacific' => __('Asien-Pazifik'),
-            'africa' => __('Afrika'),
-        ];
-        $continentIcons = [
-            'europe' => '🌍',
-            'north-america' => '🌎',
-            'asia-pacific' => '🌏',
-            'africa' => '◉',
-        ];
-        $marketsByContinent = $exchanges
-            ->groupBy(fn ($exchange) => $continentFor($exchange->country))
-            ->sortBy(fn ($items, $continent) => array_search($continent, array_keys($continentLabels), true));
+        $preferredMarketOrder = ['GER' => 0, 'BTS' => 1, 'XNYS' => 2, 'XNAS' => 3];
+        $orderedMarkets = $exchanges
+            ->sortBy(fn ($exchange) => [
+                $preferredMarketOrder[$exchange->code] ?? 100,
+                -((int) $exchange->instrument_count),
+                $exchange->reference_name ?: $exchange->name,
+            ])
+            ->values();
+        $continentLabels = ['all' => ''];
+        $marketsByContinent = collect(['all' => $orderedMarkets]);
     @endphp
 
-    <div id="markets-page" class="ak-body">
-        <div id="markets-page-heading" class="z-30 border-b border-[var(--ak-border)] bg-[var(--ak-bg)]/95 py-4 backdrop-blur-xl">
+    <div id="markets-page">
+        <div id="markets-page-heading" class="z-30 border-b border-[var(--ak-border)] bg-[var(--ak-bg)]/95 py-2.5 backdrop-blur-xl">
             <div class="ak-container flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-teal-500">aKI Market Intelligence</p>
+                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-orange-400">aKI Market Intelligence</p>
                     <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)]">{{ __('Märkte') }}</h1>
                 </div>
-                <span class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-3 py-2 text-xs font-bold text-[var(--ak-muted)]">
-                    {{ $exchanges->count() }} {{ __('Exchanges') }}
-                </span>
+                <div class="flex flex-wrap items-center justify-end gap-3">
+                    <div class="flex items-center gap-2 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]" aria-label="{{ __('Legende der Signalanteile') }}">
+                        <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-rose-500"></i>{{ __('Sell') }}</span>
+                        <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-yellow-400"></i>{{ __('Hold') }}</span>
+                        <span class="inline-flex items-center gap-1"><i class="ak-watch-swatch h-2 w-2 rounded-full"></i>{{ __('Watch') }}</span>
+                        <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-teal-500"></i>{{ __('Buy') }}</span>
+                    </div>
+                    <span class="rounded-xl border border-orange-400/30 bg-orange-400/[.07] px-3 py-2 text-xs font-bold text-[var(--ak-muted)] shadow-[0_8px_24px_rgba(251,146,60,.08)]">
+                        {{ $exchanges->count() }} {{ __('Exchanges') }}
+                    </span>
+                </div>
             </div>
         </div>
 
-        <main id="markets-page-content" class="ak-container mt-5 pb-4" x-data="{ active: 'exchanges' }">
-            <div id="markets-tabs" class="mb-2 inline-flex items-end gap-1.5">
-                <button type="button" @click="active = 'exchanges'" class="ak-market-tab" :class="active === 'exchanges' ? 'ak-market-tab-active' : 'ak-market-tab-idle'">
-                    <x-heroicon-o-building-library class="h-3.5 w-3.5" />
-                    {{ __('Exchanges') }}
-                </button>
-                <button type="button" @click="active = 'comments'" class="ak-market-tab" :class="active === 'comments' ? 'ak-market-tab-active' : 'ak-market-tab-idle'">
-                    <x-heroicon-o-chat-bubble-left-right class="h-3.5 w-3.5" />
-                    {{ __('Analyse') }}
-                </button>
-            </div>
-
-            <section id="markets-exchange-pane" x-show="active === 'exchanges'" class="rounded-2xl">
+        <main id="markets-page-content" class="ak-container mt-2 pb-2">
+            <section id="markets-exchange-pane" class="rounded-2xl">
                 <div id="markets-continent-scroll" class="h-full overflow-auto pr-1">
-                    <div class="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
                         @foreach ($continentLabels as $continent => $continentLabel)
                             @php $continentMarkets = $marketsByContinent->get($continent, collect()); @endphp
                             @continue($continentMarkets->isEmpty())
-                            <section class="min-w-0 overflow-hidden rounded-2xl border border-cyan-300/50 bg-[var(--ak-card)] p-2.5 shadow-[0_0_0_1px_rgba(34,211,238,.08),0_18px_45px_rgba(8,145,178,.14)]" style="background:linear-gradient(155deg,rgba(8,145,178,.11),transparent 42%),var(--ak-card);">
-                                <div class="mb-2.5 flex h-10 items-center justify-between border-b border-[var(--ak-border)] px-1 pb-2">
-                                    <div class="flex items-center gap-2">
-                                        <span class="grid h-8 w-8 place-items-center rounded-lg bg-teal-500/10 text-base">{{ $continentIcons[$continent] }}</span>
-                                        <div>
-                                            <h2 class="text-sm font-black text-[var(--ak-text)]">{{ $continentLabel }}</h2>
-                                            <p class="text-[8px] font-black uppercase tracking-wider text-[var(--ak-muted)]">{{ __('Referenzindizes') }}</p>
-                                        </div>
-                                    </div>
-                                    <span class="rounded-md bg-[var(--ak-surface-muted)] px-2 py-1 text-[9px] font-black text-[var(--ak-muted)]">{{ $continentMarkets->count() }} {{ __('Indizes') }}</span>
-                                </div>
-
-                                <div class="grid gap-2">
+                            <section class="min-w-0">
+                                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
                                     @foreach ($continentMarkets as $exchange)
                                         @php
-                                            $score = \App\Support\AiScore::toTen($exchange->average_score);
-                                            $confidence = is_numeric($exchange->average_confidence)
-                                                ? min(100, max(0, (float) $exchange->average_confidence <= 1 ? (float) $exchange->average_confidence * 100 : (float) $exchange->average_confidence))
-                                                : null;
-                                            $risk = is_numeric($exchange->risk_p75)
-                                                ? min(100, max(0, (float) $exchange->risk_p75 <= 1 ? (float) $exchange->risk_p75 * 100 : (float) $exchange->risk_p75))
-                                                : null;
-                                            $scoreClass = ($score ?? 0) >= 6.5 ? 'text-emerald-500' : (($score ?? 10) < 4.5 ? 'text-rose-500' : 'text-amber-500');
+                                            $signalCounts = [
+                                                'SELL' => (int) ($exchange->sell_count ?? 0),
+                                                'HOLD' => (int) ($exchange->hold_count ?? 0),
+                                                'WATCH' => (int) ($exchange->watch_count ?? 0),
+                                                'BUY' => (int) ($exchange->buy_count ?? 0),
+                                            ];
+                                            $signalTotal = array_sum($signalCounts);
+                                            $sellAngle = $signalTotal > 0 ? ($signalCounts['SELL'] / $signalTotal) * 360 : 0;
+                                            $holdAngle = $sellAngle + ($signalTotal > 0 ? ($signalCounts['HOLD'] / $signalTotal) * 360 : 0);
+                                            $watchAngle = $holdAngle + ($signalTotal > 0 ? ($signalCounts['WATCH'] / $signalTotal) * 360 : 0);
+                                            $signalPieStyle = $signalTotal > 0
+                                                ? 'background:conic-gradient(#f43f5e 0deg '.number_format($sellAngle, 2, '.', '').'deg,#facc15 '.number_format($sellAngle, 2, '.', '').'deg '.number_format($holdAngle, 2, '.', '').'deg,var(--ak-watch-surface) '.number_format($holdAngle, 2, '.', '').'deg '.number_format($watchAngle, 2, '.', '').'deg,#14b8a6 '.number_format($watchAngle, 2, '.', '').'deg 360deg)'
+                                                : 'background:#cbd5e1';
+                                            $indexAnalysis = $exchange->index_analysis ?? null;
+                                            $indexOutlook = strtoupper((string) ($indexAnalysis['outlook'] ?? 'NEUTRAL'));
+                                            $indexOutlookClass = match ($indexOutlook) {
+                                                'BULLISH' => 'border-emerald-500/30 bg-emerald-500/12 text-emerald-500',
+                                                'BEARISH' => 'border-rose-500/30 bg-rose-500/12 text-rose-500',
+                                                default => 'border-yellow-500/30 bg-yellow-500/12 text-yellow-600',
+                                            };
                                             $target = route('stocks.index', ['exchange' => $exchange->code]);
                                         @endphp
-                                        <article onclick="window.location.href=@js($target)" class="cursor-pointer overflow-hidden rounded-xl border border-cyan-300/20 bg-[var(--ak-surface-muted)]">
-                                            <div class="flex items-start justify-between gap-2 border-b border-[var(--ak-border)] p-2.5">
+                                        <x-dashboard.card onclick="window.location.href=@js($target)" class="ak-card-static ak-dashboard-card ak-cyan-dashboard-card ak-market-card-prominent min-h-[168px] cursor-pointer overflow-hidden p-0">
+                                            <div class="ak-market-card-head flex items-center justify-between gap-1.5 border-b border-orange-200/30 px-2 py-1.5">
                                                 <div class="flex min-w-0 items-center gap-2">
-                                                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-teal-500/20 bg-teal-500/10 text-base">{{ $countryFlag($exchange->country) }}</span>
+                                                    <span class="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-orange-200/25 bg-orange-200/10 text-sm">{{ $countryFlag($exchange->country) }}</span>
                                                     <div class="min-w-0">
-                                                        <h3 class="truncate text-sm font-black text-[var(--ak-text)]">{{ $exchange->reference_name ?: $exchange->code }}</h3>
-                                                        <p class="truncate text-[9px] font-bold text-[var(--ak-muted)]">{{ $exchange->code }} · {{ $exchange->name }}</p>
+                                                        <h3 class="truncate text-[13px] font-black text-[var(--ak-text)]">{{ $exchange->reference_name ?: $exchange->code }}</h3>
+                                                        <p class="truncate text-[8px] font-bold text-[var(--ak-muted)]">{{ $exchange->code }} · {{ $exchange->name }}</p>
                                                     </div>
                                                 </div>
-                                                <span class="shrink-0 rounded-md border border-teal-500/20 bg-teal-500/10 px-1.5 py-1 text-[8px] font-black text-teal-500">{{ $exchange->instrument_count }} {{ __('Aktien') }}</span>
+                                                <span class="shrink-0 rounded border border-orange-200/25 bg-orange-200/10 px-1.5 py-0.5 text-[7px] font-black text-orange-200">{{ $exchange->instrument_count }} {{ __('Aktien') }}</span>
                                             </div>
 
-                                            <div class="grid grid-cols-2 gap-1.5 p-2.5">
-                                                <div class="rounded-lg bg-[var(--ak-card)] p-2">
-                                                    <p class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Indexstand') }}</p>
-                                                    <p data-market-price="{{ $exchange->code }}" class="mt-0.5 truncate text-sm font-black tabular-nums text-[var(--ak-text)]">
-                                                        <span>{{ is_numeric($exchange->market_price) ? number_format($exchange->market_price, 2, ',', '.') : '—' }}</span>
-                                                        <small class="text-[8px] text-[var(--ak-muted)]">{{ $currencySymbol($exchange->market_currency) }}</small>
-                                                    </p>
-                                                </div>
-                                                <div class="rounded-lg bg-[var(--ak-card)] p-2">
-                                                    <p class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Performance 1T') }}</p>
-                                                    <p data-market-change="{{ $exchange->code }}" class="mt-0.5 text-sm font-black tabular-nums {{ ($exchange->market_change ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">
-                                                        {{ is_numeric($exchange->market_change) ? (($exchange->market_change > 0 ? '+' : '').number_format($exchange->market_change, 2, ',', '.').' %') : '—' }}
-                                                    </p>
-                                                </div>
+                                            <div class="mx-2 mb-1.5 mt-1.5 grid grid-cols-3 gap-1 text-center">
+                                                <span class="min-w-0 rounded px-1 py-0.5 {{ is_numeric($exchange->market_change) && (float) $exchange->market_change > 0 ? 'bg-emerald-400/[.10] shadow-[inset_0_0_0_1px_rgba(110,231,183,.10)]' : '' }}">
+                                                    <small class="block truncate text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Indexstand') }}</small>
+                                                    <b data-market-price="{{ $exchange->code }}" class="block truncate text-xs font-black tabular-nums text-[var(--ak-text)]"><span>{{ is_numeric($exchange->market_price) ? number_format($exchange->market_price, 2, ',', '.') : '—' }}</span> <small class="text-[6px] text-[var(--ak-muted)]">{{ $currencySymbol($exchange->market_currency) }}</small></b>
+                                                </span>
+                                                <span class="min-w-0 border-x border-orange-200/25">
+                                                    <small class="block truncate text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Performance 1T') }}</small>
+                                                    <b data-market-change="{{ $exchange->code }}" class="block truncate text-xs font-black tabular-nums {{ ($exchange->market_change ?? 0) >= 0 ? 'text-emerald-300' : 'text-rose-300' }}">{{ is_numeric($exchange->market_change) ? (($exchange->market_change > 0 ? '+' : '').number_format($exchange->market_change, 2, ',', '.').' %') : '—' }}</b>
+                                                </span>
+                                                <span class="min-w-0">
+                                                    <small class="block truncate text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Signalanteil') }}</small>
+                                                    <span
+                                                        class="ak-market-signal-pie mx-auto mt-0.5"
+                                                        style="{{ $signalPieStyle }}"
+                                                        role="img"
+                                                        aria-label="{{ __('Signalanteile') }}: SELL {{ $signalCounts['SELL'] }}, HOLD {{ $signalCounts['HOLD'] }}, WATCH {{ $signalCounts['WATCH'] }}, BUY {{ $signalCounts['BUY'] }}"
+                                                        title="SELL {{ $signalCounts['SELL'] }} · HOLD {{ $signalCounts['HOLD'] }} · WATCH {{ $signalCounts['WATCH'] }} · BUY {{ $signalCounts['BUY'] }}"
+                                                    ></span>
+                                                </span>
                                             </div>
 
-                                            <div class="px-2.5 pb-2.5">
-                                                <div class="mb-1.5 flex items-center justify-between">
-                                                    <span class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
-                                                    <strong class="text-xs font-black {{ $scoreClass }}">{{ $score !== null ? number_format($score, 1, ',', '.') : '—' }}<small class="ml-1 text-[7px] text-[var(--ak-muted)]">/10</small></strong>
-                                                </div>
-                                                <x-dashboard.score-stripes :percent="$score !== null ? $score * 10 : 0" palette="teal" />
-                                                <div class="mt-2 grid grid-cols-2 gap-1.5 text-[8px]">
-                                                    <div class="flex items-center justify-between rounded-md bg-[var(--ak-card)] px-1.5 py-1"><span class="text-[var(--ak-muted)]">{{ __('Konfidenz') }}</span><b>{{ $confidence !== null ? number_format($confidence, 0, ',', '.').' %' : '—' }}</b></div>
-                                                    <div class="flex items-center justify-between rounded-md bg-[var(--ak-card)] px-1.5 py-1"><span class="text-[var(--ak-muted)]">{{ __('Risiko P75') }}</span><b>{{ $risk !== null ? number_format($risk, 0, ',', '.').' %' : '—' }}</b></div>
-                                                </div>
+                                            <div class="mx-2 mb-1.5 grid gap-0.5 border-t border-orange-200/20 pt-1.5">
+                                                @foreach ([
+                                                    ['stock' => $exchange->highest_score_stock, 'label' => __('Höchster KI-Score'), 'icon' => '↗', 'color' => 'text-emerald-300'],
+                                                ] as $scoreStock)
+                                                    @php
+                                                        $stock = $scoreStock['stock'];
+                                                        $stockScore = $stock ? \App\Support\AiScore::toTen($stock->ai_score) : null;
+                                                        $stockPrice = $stock && is_numeric($stock->live_price)
+                                                            ? (float) $stock->live_price
+                                                            : ($stock && is_numeric($stock->prediction_price) ? (float) $stock->prediction_price : null);
+                                                        $stockRisk = $stock && is_numeric($stock->risk_score)
+                                                            ? min(100, max(0, (float) $stock->risk_score <= 1 ? (float) $stock->risk_score * 100 : (float) $stock->risk_score))
+                                                            : null;
+                                                        $stockScoreHue = $stockScore !== null
+                                                            ? round(min(120, max(0, (($stockScore - 3) / 4) * 120)))
+                                                            : 0;
+                                                        $stockScoreDonutStyle = $stockScore !== null
+                                                            ? '--ak-score-angle:'.number_format(($stockScore / 10) * 360, 2, '.', '').'deg;--ak-score-color:hsl('.$stockScoreHue.' 68% 43%)'
+                                                            : '--ak-score-angle:0deg;--ak-score-color:#94a3b8';
+                                                        $stockRiskColor = match (true) {
+                                                            $stockRisk === null => '#94a3b8',
+                                                            $stockRisk < 10 => '#10b981',
+                                                            $stockRisk < 20 => '#84cc16',
+                                                            $stockRisk < 30 => '#eab308',
+                                                            $stockRisk < 40 => '#f97316',
+                                                            default => '#ef4444',
+                                                        };
+                                                        $stockRiskDonutStyle = '--ak-score-angle:'.number_format(($stockRisk ?? 0) * 3.6, 2, '.', '').'deg;--ak-score-color:'.$stockRiskColor;
+                                                        $stockSignal = strtoupper((string) ($stock?->personalized_signal ?: 'HOLD'));
+                                                        $stockSignalClass = match ($stockSignal) {
+                                                            'BUY' => 'border-[#14b8a6] bg-[#14b8a6] text-white',
+                                                            'WATCH' => 'border-[#b9c3b7] bg-[#b9c3b7] text-slate-800',
+                                                            'SELL' => 'border-[#f43f5e] bg-[#f43f5e] text-white',
+                                                            default => 'border-[#facc15] bg-[#facc15] text-slate-900',
+                                                        };
+                                                    @endphp
+                                                    <div class="min-w-0 rounded bg-black/10 px-1.5 py-0.5">
+                                                        <span class="min-w-0">
+                                                            <small class="block truncate text-[7px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $scoreStock['label'] }}</small>
+                                                            <span class="relative flex min-w-0 items-center gap-2">
+                                                                <span class="min-w-0 flex-1">
+                                                                    <b class="block min-w-0 truncate text-[11px] font-black leading-tight text-[var(--ak-text)]" title="{{ $stock?->name }}">{{ $stock?->name ?: '—' }} <small class="font-bold text-orange-200">{{ $stock?->symbol }}</small></b>
+                                                                    <span class="mt-0.5 flex min-w-0 items-center">
+                                                                        <small
+                                                                            @if($stock) data-live-symbol="{{ $stock->symbol }}" data-live-decimals="2" data-live-currency="{{ $currencySymbol($stock->currency) }}" @endif
+                                                                            title="TwelveData{{ $stock?->quote_time ? ' · '.\Illuminate\Support\Carbon::parse($stock->quote_time)->timezone('Europe/Berlin')->format('d.m.Y H:i:s') : '' }}"
+                                                                            class="block whitespace-nowrap text-[12px] font-black leading-none tabular-nums text-[var(--ak-text)]"
+                                                                        >{{ $stockPrice !== null ? number_format($stockPrice, 2, ',', '.').' '.$currencySymbol($stock?->currency) : '—' }}</small>
+                                                                    </span>
+                                                                    <em
+                                                                        class="block whitespace-nowrap font-medium not-italic tracking-[-.01em] text-orange-200/40"
+                                                                        style="width:111%; font-size:8px !important; line-height:8px !important; transform:scale(.9); transform-origin:left top;"
+                                                                    >{{ __('ca. 1 Min. verzögert') }}</em>
+                                                                </span>
+                                                                <strong class="absolute left-1/2 top-[78%] z-10 inline-flex h-5 min-w-[44px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded border px-1.5 text-[8px] font-black {{ $stockSignalClass }}">{{ $stockSignal }}</strong>
+                                                                <span class="ml-auto flex shrink-0 items-center justify-end gap-1.5">
+                                                                    <span class="ak-market-score-donut" style="{{ $stockScoreDonutStyle }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $stockScore !== null ? number_format($stockScore, 1, '.', '') : 0 }}">
+                                                                        <b>{{ $stockScore !== null ? number_format($stockScore, 1, ',', '.') : '—' }}</b>
+                                                                    </span>
+                                                                    <span class="ak-market-score-donut" style="{{ $stockRiskDonutStyle }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $stockRisk !== null ? round($stockRisk) : 0 }}">
+                                                                        <b>{{ $stockRisk !== null ? number_format($stockRisk, 0, ',', '.').'%' : '—' }}</b>
+                                                                    </span>
+                                                                </span>
+                                                            </span>
+                                                        </span>
+                                                    </div>
+                                                @endforeach
                                             </div>
 
-                                        </article>
+                                            <div class="ak-market-card-analysis mx-2 mb-2 min-h-0 border-t border-[var(--ak-border)] pt-1.5">
+                                                <div class="mb-1 flex items-center justify-between gap-2">
+                                                    <small class="truncate text-[7px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Indexeinschätzung') }}</small>
+                                                    @if ($indexAnalysis)
+                                                        <span class="shrink-0 rounded border px-1.5 py-0.5 text-[6px] font-black uppercase {{ $indexOutlookClass }}">{{ __($indexOutlook) }}</span>
+                                                    @endif
+                                                </div>
+                                                <p class="text-[8px] font-medium leading-[1.4] text-[var(--ak-muted)]" title="{{ $indexAnalysis['summary'] ?? __('Noch keine Indexeinschätzung verfügbar.') }}">
+                                                    {{ $indexAnalysis['summary'] ?? __('Noch keine Indexeinschätzung verfügbar.') }}
+                                                </p>
+                                                @if ($indexAnalysis && $marketAnalysis?->analysis_date)
+                                                    <p class="mt-0.5 text-right text-[6px] font-bold text-[var(--ak-muted)] opacity-70">{{ \Carbon\Carbon::parse($marketAnalysis->analysis_date)->format('d.m.Y') }}</p>
+                                                @endif
+                                            </div>
+
+                                        </x-dashboard.card>
                                     @endforeach
                                 </div>
                             </section>
@@ -203,7 +263,7 @@
                                                         <strong class="font-black {{ $scoreClass }}">{{ number_format($score, 1, ',', '.') }}</strong>
                                                         <span class="text-[9px] font-bold text-[var(--ak-muted)]">/ 10</span>
                                                     </div>
-                                                    <x-dashboard.score-stripes :percent="$score * 10" palette="teal" />
+                                                    <x-dashboard.score-stripes :percent="$score * 10" palette="cyan" />
                                                 @else
                                                     <span class="block text-center text-[var(--ak-muted)]">—</span>
                                                 @endif
@@ -272,7 +332,7 @@
                 </div>
             </section>
 
-            <section id="markets-comments-pane" x-cloak x-show="active === 'comments'">
+            <section id="markets-comments-pane" class="hidden">
                 @if ($marketAnalysis)
                     @php
                         $marketOutlook = strtoupper((string) $marketAnalysis->market_outlook);
@@ -283,37 +343,37 @@
                         };
                     @endphp
                     <div class="grid items-stretch gap-4 lg:grid-cols-2">
-                        <article class="ak-card ak-card-static flex min-h-[360px] flex-col border-cyan-300/50 p-6 shadow-[0_0_0_1px_rgba(34,211,238,.08),0_18px_45px_rgba(8,145,178,.14)]" style="background:linear-gradient(155deg,rgba(8,145,178,.11),transparent 42%),var(--ak-card);">
+                        <article class="ak-card ak-card-static ak-market-dashboard-card flex min-h-[360px] flex-col p-6">
                             <div class="ak-market-comment-heading flex flex-wrap items-start justify-between gap-4">
                                 <div class="flex items-start gap-3">
-                                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-500">
+                                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-orange-400/25 bg-orange-400/10 text-orange-400">
                                         <x-heroicon-o-sparkles class="h-5 w-5" />
                                     </span>
                                     <div>
-                                        <p class="text-[9px] font-black uppercase tracking-[.16em] text-teal-500">{{ __('Zusammenfassung') }}</p>
-                                        <h2 class="mt-1 text-lg font-black leading-6 text-[var(--ak-text)]">{{ $marketAnalysis->headline }}</h2>
+                                        <p class="text-[9px] font-black uppercase tracking-[.16em] text-orange-400">{{ __('Zusammenfassung') }}</p>
+                                        <h2 class="mt-1 text-base font-black leading-5 text-[var(--ak-text)]">{{ $marketAnalysis->headline }}</h2>
                                     </div>
                                 </div>
                                 <span class="rounded-lg border px-3 py-2 text-xs font-black {{ $marketOutlookClass }}">{{ __($marketOutlook) }}</span>
                             </div>
-                            <p class="ak-comment-copy mt-5 flex-1 border-t border-[var(--ak-border)] pt-5 text-sm leading-7">{{ $marketAnalysis->executive_summary }}</p>
+                            <p class="ak-comment-copy mt-5 flex-1 border-t border-[var(--ak-border)] pt-5 text-xs leading-5">{{ $marketAnalysis->executive_summary }}</p>
                             <div class="mt-5 flex items-center justify-between border-t border-[var(--ak-border)] pt-4 text-[10px] font-bold text-[var(--ak-muted)]">
                                 <span>{{ \Carbon\Carbon::parse($marketAnalysis->analysis_date)->format('d.m.Y') }}</span>
                                 <span>{{ __('Konfidenz') }} {{ $marketAnalysis->confidence }} %</span>
                             </div>
                         </article>
 
-                        <article class="ak-card ak-card-static flex min-h-[360px] flex-col border-cyan-300/50 p-6 shadow-[0_0_0_1px_rgba(34,211,238,.08),0_18px_45px_rgba(8,145,178,.14)]" style="background:linear-gradient(155deg,rgba(8,145,178,.11),transparent 42%),var(--ak-card);">
+                        <article class="ak-card ak-card-static ak-market-dashboard-card flex min-h-[360px] flex-col p-6">
                             <div class="ak-market-comment-heading flex items-start gap-3">
-                                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-500">
+                                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-orange-400/25 bg-orange-400/10 text-orange-400">
                                     <x-heroicon-o-chart-bar-square class="h-5 w-5" />
                                 </span>
                                 <div>
-                                    <p class="text-[9px] font-black uppercase tracking-[.16em] text-teal-500">{{ __('Analyse') }}</p>
-                                    <h2 class="mt-1 text-lg font-black leading-6 text-[var(--ak-text)]">{{ __('Ausführliche Marktanalyse') }}</h2>
+                                    <p class="text-[9px] font-black uppercase tracking-[.16em] text-orange-400">{{ __('Analyse') }}</p>
+                                    <h2 class="mt-1 text-base font-black leading-5 text-[var(--ak-text)]">{{ __('Ausführliche Marktanalyse') }}</h2>
                                 </div>
                             </div>
-                            <p class="ak-comment-copy mt-5 flex-1 border-t border-[var(--ak-border)] pt-5 text-sm leading-7">{{ $marketAnalysis->breadth_analysis }}</p>
+                            <p class="ak-comment-copy mt-5 flex-1 border-t border-[var(--ak-border)] pt-5 text-xs leading-5">{{ $marketAnalysis->breadth_analysis }}</p>
                             <div class="mt-5 flex items-center justify-between border-t border-[var(--ak-border)] pt-4 text-[10px] font-bold text-[var(--ak-muted)]">
                                 <span>{{ __('Marktbreite') }}</span>
                                 <span>{{ \Carbon\Carbon::parse($marketAnalysis->analysis_date)->format('d.m.Y') }}</span>
@@ -374,6 +434,48 @@
                 color: color-mix(in srgb, var(--ak-text) 86%, var(--ak-muted) 14%);
             }
 
+            .ak-market-dashboard-card {
+                border-color: color-mix(in srgb, #fb923c 36%, transparent) !important;
+                background:
+                    linear-gradient(155deg, rgba(251, 146, 60, .075), transparent 42%),
+                    color-mix(in srgb, var(--ak-card) 60%, transparent) !important;
+                box-shadow: 0 12px 30px rgba(2, 132, 199, .10), inset 0 1px 0 rgba(253, 186, 116, .035) !important;
+                backdrop-filter: blur(8px);
+            }
+
+            #markets-page .ak-market-card-prominent {
+                height: auto !important;
+                min-height: 258px !important;
+                border-color: rgba(254, 215, 170, .22) !important;
+                background:
+                    radial-gradient(circle at 0 0, rgba(254, 215, 170, .26), transparent 40%),
+                    radial-gradient(circle at 100% 0, rgba(254, 215, 170, .17), transparent 38%),
+                    linear-gradient(150deg, rgba(254, 215, 170, .12), rgba(124, 45, 18, .22) 52%, transparent),
+                    rgba(68, 82, 113, .98) !important;
+                box-shadow:
+                    0 0 0 1px rgba(253, 186, 116, .08) inset,
+                    0 0 16px rgba(254, 215, 170, .09),
+                    0 10px 24px rgba(154, 52, 18, .12),
+                    inset 0 1px 0 rgba(255, 237, 213, .10) !important;
+            }
+
+            #markets-page .ak-market-card-head {
+                background:
+                    linear-gradient(105deg, rgba(254, 215, 170, .22), rgba(254, 215, 170, .08)),
+                    rgba(54, 66, 93, .96);
+                box-shadow:
+                    inset 0 -1px 0 rgba(254, 215, 170, .24),
+                    inset 0 1px 0 rgba(255, 247, 237, .06);
+            }
+
+            #markets-page .ak-market-card-prominent:hover {
+                border-color: rgba(253, 186, 116, .34) !important;
+                box-shadow:
+                    0 0 0 1px rgba(255, 237, 213, .11) inset,
+                    0 0 20px rgba(254, 215, 170, .12),
+                    0 12px 27px rgba(154, 52, 18, .14) !important;
+            }
+
             .ak-market-tab {
                 display: inline-flex;
                 width: 116px;
@@ -393,10 +495,10 @@
             }
 
             .ak-market-tab-active {
-                border-color: color-mix(in srgb, rgb(20 184 166) 38%, var(--ak-border));
-                border-bottom-color: rgb(20 184 166);
+                border-color: color-mix(in srgb, rgb(251 146 60) 42%, var(--ak-border));
+                border-bottom-color: rgb(251 146 60);
                 background: var(--ak-card);
-                color: rgb(20 184 166);
+                color: rgb(251 146 60);
                 box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 4px 12px rgba(3, 7, 18, .14);
             }
 
@@ -574,7 +676,7 @@
 
             .ak-exchange-sort[aria-sort="ascending"] span,
             .ak-exchange-sort[aria-sort="descending"] span {
-                color: rgb(20 184 166);
+                color: rgb(251 146 60);
                 opacity: 1;
             }
         </style>

@@ -9,6 +9,7 @@ use App\Services\PlanAccessService;
 use App\Services\PersonalizedSignalService;
 use App\Services\SavedFilterLimitService;
 use App\Services\UserQualityGateService;
+use App\Services\YahooIndexService;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Database\Query\Builder;
@@ -30,9 +31,6 @@ final class PredictionController extends Controller
         $isUserBacktestResult = $selectedUserBacktest !== null
             && in_array($selectedUserBacktest->status, ['completed', 'completed_with_errors'], true);
         $backtestRunId = $this->selectedBacktestRunId($request);
-        $eligibleInstruments = $isUserBacktestResult
-            ? null
-            : $this->eligibleBacktestInstruments($backtestRunId, $request);
         $scoreBucket = max(0, min(9, $request->integer('score_bucket')));
         $confidenceBucket = max(0, min(9, $request->integer('confidence_bucket')));
         $sortColumns = [
@@ -166,6 +164,7 @@ final class PredictionController extends Controller
             'qualityTiers',
             'signals',
             'validationStates',
+            'rangeMaxima',
         ])));
     }
 
@@ -195,6 +194,7 @@ final class PredictionController extends Controller
             'qualityTiers',
             'signals',
             'validationStates',
+            'rangeMaxima',
         ]));
         $data['setupMode'] = true;
         $data['activeBacktestRun'] = $this->requestedUserBacktestRun($request);
@@ -230,6 +230,7 @@ final class PredictionController extends Controller
         $data = array_intersect_key($predictionData, array_flip([
             'heatmap', 'heatmapSummary', 'summary', 'countries', 'exchanges', 'sectors',
             'aiTypes', 'models', 'qualityTiers', 'signals', 'validationStates',
+            'rangeMaxima',
         ]));
         $data['setupMode'] = true;
         $data['shortMode'] = true;
@@ -256,13 +257,13 @@ final class PredictionController extends Controller
             'signal' => ['nullable', 'in:BUY,WATCH,HOLD,SELL'],
             'score_min' => ['nullable', 'numeric', 'between:0,10'],
             'confidence_min' => ['nullable', 'numeric', 'between:0,100'],
-            'drawdown_max' => ['nullable', 'numeric', 'between:0,50'],
-            'profit_factor_min' => ['nullable', 'numeric', 'between:0,3'],
-            'volatility_max' => ['nullable', 'numeric', 'between:0,100'],
-            'pe_max' => ['nullable', 'numeric', 'between:0,100'],
-            'dividend_yield_min' => ['nullable', 'numeric', 'between:0,10'],
-            'market_cap_min' => ['nullable', 'numeric', 'between:0,3000'],
-            'revenue_growth_min' => ['nullable', 'numeric', 'between:-50,100'],
+            'drawdown_max' => ['nullable', 'numeric', 'between:0,100'],
+            'profit_factor_min' => ['nullable', 'numeric', 'between:0,10'],
+            'volatility_max' => ['nullable', 'numeric', 'between:0,1000000'],
+            'pe_max' => ['nullable', 'numeric', 'between:0,1000000'],
+            'dividend_yield_min' => ['nullable', 'numeric', 'between:0,1000000'],
+            'market_cap_min' => ['nullable', 'numeric', 'between:0,1000000000'],
+            'revenue_growth_min' => ['nullable', 'numeric', 'between:-1000000,1000000'],
             'hit_rate_min' => ['nullable', 'numeric', 'between:0,100'],
             'risk_max' => ['nullable', 'numeric', 'between:0,100'],
             'predicted_return_min' => ['nullable', 'numeric', 'between:-50,100'],
@@ -375,7 +376,7 @@ final class PredictionController extends Controller
             'risk_max' => $rules['risk_max'] ?? 100,
             'predicted_return_min' => $rules['predicted_return_min'] ?? -50,
             'drawdown_max' => min(50, (float) ($rules['drawdown_max'] ?? 50)),
-            'profit_factor_min' => min(3, (float) ($rules['profit_factor_min'] ?? 0)),
+            'profit_factor_min' => min(10, (float) ($rules['profit_factor_min'] ?? 0)),
             'hit_rate_min' => $rules['hit_rate_min'] ?? 0,
             'minimum_trades' => $rules['minimum_trades'] ?? 1,
             'positive_prediction_required' => ($rules['positive_prediction_required'] ?? false) ? 1 : 0,
@@ -383,7 +384,7 @@ final class PredictionController extends Controller
         ]);
     }
 
-    public function filteredBacktestResult(Request $request, string $publicId): JsonResponse
+    public function filteredBacktestResult(Request $request, string $publicId, YahooIndexService $indices): JsonResponse
     {
         $run = DB::table('backtest_runs')
             ->where('public_id', $publicId)
@@ -532,7 +533,20 @@ final class PredictionController extends Controller
             ->get();
         $benchmarkCoversStart = $benchmarkBars->isNotEmpty()
             && strtotime((string) $benchmarkBars->first()->bar_time) <= strtotime((string) $period->starts_at.' +10 days');
-        $benchmarkStart = $benchmarkCoversStart ? (float) $benchmarkBars->first()->close : 0.0;
+        if (! $benchmarkCoversStart) {
+            $remoteBenchmarkBars = collect($indices->dailyHistory('^GSPC', $lookbackYears.'y'))
+                ->filter(fn (array $bar): bool => $bar['timestamp'] >= strtotime((string) $period->starts_at)
+                    && $bar['timestamp'] <= strtotime((string) $period->ends_at.' 23:59:59'))
+                ->map(fn (array $bar): object => (object) [
+                    'bar_time' => \Illuminate\Support\Carbon::createFromTimestampUTC($bar['timestamp']),
+                    'close' => $bar['adjusted_close'] ?? $bar['close'],
+                ])
+                ->values();
+            if ($remoteBenchmarkBars->isNotEmpty()) {
+                $benchmarkBars = $remoteBenchmarkBars;
+            }
+        }
+        $benchmarkStart = $benchmarkBars->isNotEmpty() ? (float) $benchmarkBars->first()->close : 0.0;
         $benchmark = $benchmarkStart > 0
             ? $benchmarkBars->map(fn (object $bar): array => [
                 'x' => strtotime((string) $bar->bar_time) * 1000,
@@ -741,7 +755,7 @@ final class PredictionController extends Controller
             ->with('status', __('Der Backtest wurde abgebrochen.'));
     }
 
-    public function downloadFilteredBacktestReport(Request $request, string $publicId): Response
+    public function downloadFilteredBacktestReport(Request $request, string $publicId, YahooIndexService $indices): Response
     {
         $run = DB::table('backtest_runs')
             ->where('public_id', $publicId)
@@ -750,7 +764,7 @@ final class PredictionController extends Controller
             ->whereIn('status', ['completed', 'completed_with_errors'])
             ->first();
         abort_if($run === null, 404);
-        $result = $this->filteredBacktestResult($request, $publicId)->getData(true);
+        $result = $this->filteredBacktestResult($request, $publicId, $indices)->getData(true);
         $settings = is_string($run->settings) ? (json_decode($run->settings, true) ?: []) : (array) $run->settings;
         $modelStatistics = collect($result['model_statistics'] ?? [])->map(fn (array $model): object => (object) $model);
         $modelExitMatrix = $this->backtestModelExitMatrix((int) $run->id);
@@ -1026,7 +1040,7 @@ final class PredictionController extends Controller
             'test' => ['top', 'strong', 'solid', 'test'],
         ];
 
-        $applyFilters = function (Builder $query, ?string $excluded = null) use ($request, $signalSql, $scoreSql, $confidenceSql, $predictedReturnSql, $minimumQualityTiers, $modelIds): Builder {
+        $applyFilters = function (Builder $query, ?string $excluded = null, bool $includeNumericFilters = true) use ($request, $signalSql, $scoreSql, $confidenceSql, $predictedReturnSql, $minimumQualityTiers, $modelIds): Builder {
             $qualityTier = (string) $request->query('quality_tier');
 
             return $query
@@ -1056,19 +1070,19 @@ final class PredictionController extends Controller
                 $query->whereNotNull('prediction.validated_at'))
             ->when($excluded !== 'validation' && $request->query('validation') === 'pending', fn (Builder $query) =>
                 $query->whereNull('prediction.validated_at'))
-            ->when($excluded !== 'score' && $request->filled('score_min') && is_numeric($request->query('score_min')), fn (Builder $query) =>
+            ->when($includeNumericFilters && $excluded !== 'score' && $request->filled('score_min') && is_numeric($request->query('score_min')), fn (Builder $query) =>
                 $query->whereRaw("{$scoreSql} >= ?", [max(0, min(10, (float) $request->query('score_min')))]))
-            ->when($excluded !== 'confidence' && $request->filled('confidence_min') && is_numeric($request->query('confidence_min')), fn (Builder $query) =>
+            ->when($includeNumericFilters && $excluded !== 'confidence' && $request->filled('confidence_min') && is_numeric($request->query('confidence_min')), fn (Builder $query) =>
                 $query->whereRaw("{$confidenceSql} >= ?", [max(0, min(100, (float) $request->query('confidence_min')))]))
-            ->when($request->filled('drawdown_max') && is_numeric($request->query('drawdown_max')) && (float) $request->query('drawdown_max') < 50, fn (Builder $query) =>
+            ->when($includeNumericFilters && $request->filled('drawdown_max') && is_numeric($request->query('drawdown_max')) && (float) $request->query('drawdown_max') < 50, fn (Builder $query) =>
                 $query->where('backtest_stat.drawdown_percent', '<=', max(0, min(50, (float) $request->query('drawdown_max')))))
-            ->when($request->filled('profit_factor_min') && is_numeric($request->query('profit_factor_min')) && (float) $request->query('profit_factor_min') > 0, fn (Builder $query) =>
-                $query->where('backtest_stat.profit_factor', '>=', max(0, min(3, (float) $request->query('profit_factor_min')))))
-            ->when($request->filled('hit_rate_min') && is_numeric($request->query('hit_rate_min')) && (float) $request->query('hit_rate_min') > 0, fn (Builder $query) =>
+            ->when($includeNumericFilters && $request->filled('profit_factor_min') && is_numeric($request->query('profit_factor_min')) && (float) $request->query('profit_factor_min') > 0, fn (Builder $query) =>
+                $query->where('backtest_stat.profit_factor', '>=', max(0, min(10, (float) $request->query('profit_factor_min')))))
+            ->when($includeNumericFilters && $request->filled('hit_rate_min') && is_numeric($request->query('hit_rate_min')) && (float) $request->query('hit_rate_min') > 0, fn (Builder $query) =>
                 $query->where('backtest_stat.hit_rate', '>=', max(0, min(100, (float) $request->query('hit_rate_min')))))
-            ->when($request->filled('volatility_max') && is_numeric($request->query('volatility_max')) && (float) $request->query('volatility_max') < 100, fn (Builder $query) =>
+            ->when($includeNumericFilters && $request->filled('volatility_max') && is_numeric($request->query('volatility_max')) && (float) $request->query('volatility_max') < 100, fn (Builder $query) =>
                 $query->whereRaw('technical.volatility_20 * 100 <= ?', [max(0, min(100, (float) $request->query('volatility_max')))]))
-            ->when($request->filled('predicted_return_min') && is_numeric($request->query('predicted_return_min')), fn (Builder $query) =>
+            ->when($includeNumericFilters && $request->filled('predicted_return_min') && is_numeric($request->query('predicted_return_min')), fn (Builder $query) =>
                 $query->whereRaw("{$predictedReturnSql} >= ?", [max(-50, min(100, (float) $request->query('predicted_return_min')))]));
         };
 
@@ -1195,13 +1209,13 @@ final class PredictionController extends Controller
             $summary->validated = $predictions->whereNotNull('validated_at')->count();
         }
 
-        $aiTypes = $applyFilters($baseQuery(), 'ai_type')
+        $aiTypes = $applyFilters($baseQuery(), 'ai_type', false)
             ->whereNotNull('prediction.ai_type')
             ->distinct()
             ->orderBy('prediction.ai_type')
             ->pluck('prediction.ai_type');
 
-        $models = $applyFilters($baseQuery(), 'model')
+        $models = $applyFilters($baseQuery(), 'model', false)
             ->whereNotNull('model_definition.public_alias')
             ->where('model_definition.public_alias', '<>', '')
             ->select('model_definition.id', 'model_definition.public_alias')
@@ -1209,7 +1223,7 @@ final class PredictionController extends Controller
             ->orderBy('model_definition.public_alias')
             ->get();
 
-        $qualityTiers = $applyFilters($baseQuery(), 'quality_tier')
+        $qualityTiers = $applyFilters($baseQuery(), 'quality_tier', false)
             ->selectRaw("COALESCE(quality_tier.code, 'unqualified') AS code")
             ->selectRaw("COALESCE(quality_tier.name, 'Nicht qualifiziert') AS name")
             ->distinct()
@@ -1217,7 +1231,7 @@ final class PredictionController extends Controller
             ->sortBy(fn (object $tier): int => array_search($tier->code, ['top', 'strong', 'solid', 'test', 'unqualified'], true))
             ->values();
 
-        $signals = $applyFilters($baseQuery(), 'signal')
+        $signals = $applyFilters($baseQuery(), 'signal', false)
             ->selectRaw("({$signalSql}) AS available_signal")
             ->distinct()
             ->orderBy('available_signal')
@@ -1225,25 +1239,25 @@ final class PredictionController extends Controller
             ->map(fn ($signal) => strtoupper((string) $signal))
             ->filter(fn (string $signal) => in_array($signal, ['SELL', 'HOLD', 'WATCH', 'BUY'], true));
 
-        $validationStates = $applyFilters($baseQuery(), 'validation')
+        $validationStates = $applyFilters($baseQuery(), 'validation', false)
             ->selectRaw("CASE WHEN prediction.validated_at IS NULL THEN 'pending' ELSE 'validated' END AS validation_state")
             ->distinct()
             ->orderBy('validation_state')
             ->pluck('validation_state');
 
-        $countries = $applyFilters($baseQuery(), 'country')
+        $countries = $applyFilters($baseQuery(), 'country', false)
             ->whereNotNull('instrument.country')
             ->where('instrument.country', '<>', '')
             ->distinct()
             ->orderBy('instrument.country')
             ->pluck('instrument.country');
-        $sectors = $applyFilters($baseQuery(), 'sector')
+        $sectors = $applyFilters($baseQuery(), 'sector', false)
             ->whereNotNull('instrument.sector')
             ->where('instrument.sector', '<>', '')
             ->distinct()
             ->orderBy('instrument.sector')
             ->pluck('instrument.sector');
-        $exchanges = $applyFilters($baseQuery(), 'exchange')
+        $exchanges = $applyFilters($baseQuery(), 'exchange', false)
             ->whereNotNull('exchange.code')
             ->where('exchange.code', '<>', '')
             ->select('exchange.code', 'exchange.name')
@@ -1266,9 +1280,60 @@ final class PredictionController extends Controller
         $isUserBacktestResult = $selectedUserBacktest !== null
             && in_array($selectedUserBacktest->status, ['completed', 'completed_with_errors'], true);
         $backtestRunId = $this->selectedBacktestRunId($request);
+        $rangeSource = DB::table('backtest_trades as range_trade')
+            ->join('instruments as range_instrument', 'range_instrument.id', '=', 'range_trade.instrument_id')
+            ->leftJoinSub($latestFundamentalIds, 'range_latest_fundamental', fn ($join) =>
+                $join->on('range_latest_fundamental.instrument_id', '=', 'range_instrument.id'))
+            ->leftJoin('instrument_fundamentals as range_fundamental', 'range_fundamental.id', '=', 'range_latest_fundamental.fundamental_id')
+            ->leftJoinSub($latestTechnicalIds, 'range_latest_technical', fn ($join) =>
+                $join->on('range_latest_technical.instrument_id', '=', 'range_instrument.id'))
+            ->leftJoin('technical_indicators as range_technical', 'range_technical.id', '=', 'range_latest_technical.technical_id')
+            ->where('range_trade.backtest_run_id', $backtestRunId)
+            ->where('range_instrument.is_active', true)
+            ->whereNull('range_instrument.deleted_at');
+        $rangeFundamentalNumber = static fn (string $key): string =>
+            "(CASE WHEN NULLIF(range_fundamental.data::jsonb->>'{$key}', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (range_fundamental.data::jsonb->>'{$key}')::numeric END)";
+        $rangeValues = (clone $rangeSource)
+            ->selectRaw('MAX(range_trade.ki_score) AS score')
+            ->selectRaw('MAX(range_trade.confidence) AS confidence')
+            ->selectRaw('MAX(ABS(range_trade.max_drawdown)) * 100 AS drawdown')
+            ->selectRaw('MAX(range_trade.predicted_return) * 100 AS predicted_return')
+            ->selectRaw('MAX(range_technical.volatility_20) * 100 AS volatility')
+            ->selectRaw('MAX('.$rangeFundamentalNumber('trailingPE').') AS pe')
+            ->selectRaw('MAX('.$rangeFundamentalNumber('dividendYield').') AS dividend_yield')
+            ->selectRaw('MAX('.$rangeFundamentalNumber('marketCap').') / 1000000000 AS market_cap')
+            ->selectRaw('MAX('.$rangeFundamentalNumber('revenueGrowth').') * 100 AS revenue_growth')
+            ->first();
+        $instrumentRangeStats = DB::table('backtest_trades as range_stat_trade')
+            ->join('instruments as range_stat_instrument', 'range_stat_instrument.id', '=', 'range_stat_trade.instrument_id')
+            ->where('range_stat_trade.backtest_run_id', $backtestRunId)
+            ->where('range_stat_instrument.is_active', true)
+            ->whereNull('range_stat_instrument.deleted_at')
+            ->groupBy('range_stat_trade.instrument_id')
+            ->selectRaw('AVG(CASE WHEN range_stat_trade.net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
+            ->selectRaw('SUM(CASE WHEN range_stat_trade.net_return > 0 THEN range_stat_trade.net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN range_stat_trade.net_return < 0 THEN range_stat_trade.net_return ELSE 0 END)), 0) AS profit_factor');
+        $instrumentRangeValues = DB::query()->fromSub($instrumentRangeStats, 'range_stats')
+            ->selectRaw('MAX(hit_rate) AS hit_rate, MAX(profit_factor) AS profit_factor')
+            ->first();
+        $ceilTo = static fn (mixed $value, float $step, float $fallback): float => is_numeric($value)
+            ? max($step, ceil((float) $value / $step) * $step)
+            : $fallback;
+        $rangeMaxima = [
+            'score' => $ceilTo($rangeValues?->score, .5, 10),
+            'confidence' => $ceilTo($rangeValues?->confidence, 5, 100),
+            'drawdown' => $ceilTo($rangeValues?->drawdown, 5, 50),
+            'profit_factor' => 10.0,
+            'volatility' => $ceilTo($rangeValues?->volatility, 5, 100),
+            'predicted_return' => $ceilTo($rangeValues?->predicted_return, .5, 20),
+            'pe' => $ceilTo($rangeValues?->pe, 1, 100),
+            'dividend_yield' => $ceilTo($rangeValues?->dividend_yield, .1, 10),
+            'market_cap' => $ceilTo($rangeValues?->market_cap, 25, 3000),
+            'revenue_growth' => $ceilTo($rangeValues?->revenue_growth, 1, 100),
+            'hit_rate' => $ceilTo($instrumentRangeValues?->hit_rate, 5, 100),
+        ];
         $eligibleInstruments = $isUserBacktestResult
             ? null
-            : $this->eligibleBacktestInstruments($backtestRunId, $request);
+            : $this->eligibleBacktestInstruments($backtestRunId, $request, $rangeMaxima);
         $heatmapQuery = DB::table('backtest_trades as backtest_trade')
             ->join('backtest_runs as backtest_run', 'backtest_run.id', '=', 'backtest_trade.backtest_run_id')
             ->join('instruments as instrument', 'instrument.id', '=', 'backtest_trade.instrument_id')
@@ -1312,9 +1377,9 @@ final class PredictionController extends Controller
                 $query->whereNull('quality_tier.code'))
             ->when(in_array(strtoupper((string) $request->query('signal')), ['SELL', 'HOLD', 'WATCH', 'BUY'], true), fn (Builder $query) =>
                 $query->where('backtest_trade.signal', strtoupper((string) $request->query('signal'))))
-            ->when($request->filled('volatility_max') && is_numeric($request->query('volatility_max')) && (float) $request->query('volatility_max') < 100, fn (Builder $query) =>
+            ->when($request->filled('volatility_max') && is_numeric($request->query('volatility_max')) && (float) $request->query('volatility_max') < $rangeMaxima['volatility'], fn (Builder $query) =>
                 $query->where('technical.volatility_20', '<=', max(0, (float) $request->query('volatility_max')) / 100))
-            ->when($request->filled('pe_max') && is_numeric($request->query('pe_max')) && (float) $request->query('pe_max') < 100, fn (Builder $query) =>
+            ->when($request->filled('pe_max') && is_numeric($request->query('pe_max')) && (float) $request->query('pe_max') < $rangeMaxima['pe'], fn (Builder $query) =>
                 $query->whereRaw($fundamentalNumber('trailingPE').' <= ?', [(float) $request->query('pe_max')]))
             ->when($request->filled('dividend_yield_min') && is_numeric($request->query('dividend_yield_min')) && (float) $request->query('dividend_yield_min') > 0, fn (Builder $query) =>
                 $query->whereRaw($fundamentalNumber('dividendYield').' >= ?', [(float) $request->query('dividend_yield_min')]))
@@ -1388,6 +1453,7 @@ final class PredictionController extends Controller
             'exchanges',
             'heatmap',
             'heatmapSummary',
+            'rangeMaxima',
             'userWatchlists',
             'watchlistMemberships',
             'sort',
@@ -1436,18 +1502,18 @@ final class PredictionController extends Controller
             ->all();
     }
 
-    private function eligibleBacktestInstruments(int $runId, Request $request): ?Builder
+    private function eligibleBacktestInstruments(int $runId, Request $request, array $rangeMaxima = []): ?Builder
     {
         $drawdownMaximum = $request->filled('drawdown_max') && is_numeric($request->query('drawdown_max'))
             ? (float) $request->query('drawdown_max')
-            : 50.0;
+            : (float) ($rangeMaxima['drawdown'] ?? 50.0);
         $profitFactorMinimum = $request->filled('profit_factor_min') && is_numeric($request->query('profit_factor_min'))
             ? (float) $request->query('profit_factor_min')
             : 0.0;
         $hitRateMinimum = $request->filled('hit_rate_min') && is_numeric($request->query('hit_rate_min'))
             ? (float) $request->query('hit_rate_min')
             : 0.0;
-        if ($drawdownMaximum >= 50 && $profitFactorMinimum <= 0 && $hitRateMinimum <= 0) {
+        if ($drawdownMaximum >= (float) ($rangeMaxima['drawdown'] ?? 50.0) && $profitFactorMinimum <= 0 && $hitRateMinimum <= 0) {
             return null;
         }
 
@@ -1456,12 +1522,12 @@ final class PredictionController extends Controller
             ->where('eligibility_trade.entry_date', '>=', now()->subYears(3)->toDateString())
             ->groupBy('eligibility_trade.instrument_id')
             ->select('eligibility_trade.instrument_id')
-            ->when($drawdownMaximum < 50, fn (Builder $query) =>
+            ->when($drawdownMaximum < (float) ($rangeMaxima['drawdown'] ?? 50.0), fn (Builder $query) =>
                 $query->havingRaw('MAX(ABS(eligibility_trade.max_drawdown)) <= ?', [max(0, $drawdownMaximum) / 100]))
             ->when($profitFactorMinimum > 0, fn (Builder $query) =>
                 $query->havingRaw(
                     'COALESCE(SUM(CASE WHEN eligibility_trade.net_return > 0 THEN eligibility_trade.net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN eligibility_trade.net_return < 0 THEN eligibility_trade.net_return ELSE 0 END)), 0), 999999) >= ?',
-                    [min(3, $profitFactorMinimum)],
+                    [$profitFactorMinimum],
                 ))
             ->when($hitRateMinimum > 0, fn (Builder $query) =>
                 $query->havingRaw(

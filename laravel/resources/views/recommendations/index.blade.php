@@ -1,5 +1,9 @@
 <x-app-layout>
-    <div class="flex h-[calc(100dvh-89px)] min-h-0 flex-col py-3 text-[var(--ak-text)]">
+    @php
+        $qualifiedCount = $recommendations->filter(fn ($item) => ! ($item->is_test_candidate ?? false))->count();
+        $previewCount = $recommendations->count() - $qualifiedCount;
+    @endphp
+    <div class="ak-top3-page flex min-h-[calc(100dvh-89px)] flex-col py-3 text-[var(--ak-text)] xl:h-[calc(100dvh-89px)] xl:min-h-0">
         <div class="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div class="flex items-center gap-3">
                 <div class="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300 shadow-[0_0_22px_rgba(245,158,11,.08)]">
@@ -7,8 +11,13 @@
                 </div>
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-[.18em] text-teal-700">{{ __('Datenbasierte Auswahl') }}</p>
-                    <h1 class="mt-1 text-2xl font-black tracking-tight">{{ __('Top 3') }}</h1>
-                    <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ __('Die drei aktuell stärksten Aktien mit bestandenem Quality Gate – gewichtet nach KI-Score, Modellqualität, Risiko und Renditepotenzial.') }}</p>
+                    <h1 class="ak-top3-title mt-1 font-black tracking-tight">{{ __('Top 3') }}</h1>
+                    <p class="ak-top3-intro mt-1 text-[var(--ak-muted)]">
+                        {{ __('Die stärksten verfügbaren Aktien – gewichtet nach KI-Score, Modellqualität, Risiko und Renditepotenzial.') }}
+                        @if ($previewCount > 0)
+                            <span class="font-bold text-teal-700">{{ trans_choice(':count zusätzlicher Testkandidat|:count zusätzliche Testkandidaten', $previewCount, ['count' => $previewCount]) }}</span>
+                        @endif
+                    </p>
                 </div>
             </div>
 
@@ -61,10 +70,11 @@
             </a>
         </form>
 
-        <section class="grid min-h-0 flex-1 gap-3 lg:grid-cols-3">
+        <section class="grid gap-4 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-3 xl:gap-3">
             @forelse ($recommendations as $recommendation)
                 @php
                     $rank = (int) $recommendation->selection_rank;
+                    $isTestCandidate = (bool) ($recommendation->is_test_candidate ?? false);
                     $signal = strtoupper((string) ($recommendation->personalized_signal ?: 'HOLD'));
                     $signalClass = match ($signal) {
                         'BUY' => 'border-[#2b8f7b] bg-[#197864] text-white',
@@ -74,11 +84,18 @@
                     };
                     $rankClass = match ($rank) {
                         1 => 'border-amber-300/45 bg-amber-300/15 text-amber-300',
-                        2 => 'border-slate-300/30 bg-slate-300/10 text-slate-300',
-                        default => 'border-orange-300/30 bg-orange-300/10 text-orange-300',
+                        2 => 'border-slate-400/35 bg-slate-400/10 text-slate-600',
+                        default => 'border-cyan-500/30 bg-cyan-500/[.08] text-cyan-700',
                     };
                     $recommendationWatchlistIds = $watchlistMemberships->get((int) $recommendation->instrument_id, collect());
                     $isWatched = $recommendationWatchlistIds->isNotEmpty();
+                    $scoreColor = match (true) {
+                        $recommendation->score_percent < 40 => '#e35f72',
+                        $recommendation->score_percent < 55 => '#f28a45',
+                        $recommendation->score_percent < 70 => '#e5b643',
+                        $recommendation->score_percent < 82 => '#84cc16',
+                        default => '#22c58b',
+                    };
                     $modelQualityColor = match (true) {
                         $recommendation->confidence_percent < 40 => '#e35f72',
                         $recommendation->confidence_percent < 60 => '#f28a45',
@@ -93,13 +110,18 @@
                         $recommendation->risk_percent < 40 => '#f28a45',
                         default => '#e35f72',
                     };
+                    $riskTitle = match ($recommendation->risk_source ?? 'minimum') {
+                        'backtest' => __('Risiko aus dem 90-%-Drawdown-Quantil von :count Backtest-Trades', ['count' => $recommendation->backtest_trade_count]),
+                        'model' => __('Risikowert der aktuellen Modellprognose'),
+                        default => __('Konservative Mindestannahme für Aktien'),
+                    };
                     $exchangeTone = match (strtoupper((string) $recommendation->exchange_code)) {
                         'XETRA', 'XETR', 'FRA', 'FWB' => 'border-amber-400/25 bg-amber-400/10 text-amber-400',
                         'NASDAQ', 'NMS', 'NGM', 'NCM' => 'border-sky-400/25 bg-sky-400/10 text-sky-400',
                         'NYSE', 'NYQ', 'ASE' => 'border-blue-400/25 bg-blue-400/10 text-blue-400',
                         'LSE', 'LON' => 'border-violet-400/25 bg-violet-400/10 text-violet-400',
                         'SIX', 'SWX' => 'border-rose-400/25 bg-rose-400/10 text-rose-400',
-                        'EURONEXT', 'PAR', 'AMS', 'BRU' => 'border-cyan-400/25 bg-cyan-400/10 text-cyan-400',
+                        'EURONEXT', 'PAR', 'AMS', 'BRU' => 'border-orange-400/25 bg-orange-400/10 text-orange-400',
                         'TSX', 'TOR' => 'border-red-400/25 bg-red-400/10 text-red-400',
                         'ASX', 'ASX.AX' => 'border-orange-400/25 bg-orange-400/10 text-orange-400',
                         'TSE', 'TYO' => 'border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-400',
@@ -120,7 +142,7 @@
                         : null;
                 @endphp
 
-                <article class="flex min-w-0 flex-col overflow-hidden rounded-2xl border {{ $rank === 1 ? 'border-amber-400/35' : 'border-[var(--ak-border)]' }} bg-[var(--ak-card-strong)] shadow-[var(--ak-shadow)] backdrop-blur-xl">
+                <article class="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border {{ $rank === 1 ? 'border-amber-400/35' : ($isTestCandidate ? 'border-dashed border-teal-500/35' : 'border-[var(--ak-border)]') }} bg-[var(--ak-card-strong)] shadow-[var(--ak-shadow)] backdrop-blur-xl">
                     <div class="flex h-[98px] shrink-0 items-start justify-between gap-3 border-b border-[var(--ak-border)] p-2.5">
                         <div class="flex min-w-0 items-center gap-3">
                             <div class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--ak-border)] bg-white">
@@ -129,10 +151,13 @@
                             </div>
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2">
-                                    <h2 class="truncate text-lg font-black text-teal-700">{{ $recommendation->symbol }}</h2>
-                                    <span class="inline-flex h-7 items-center rounded-md border px-2 text-[9px] font-black {{ $signalClass }}">{{ $signal }}</span>
+                                    <h2 class="ak-top3-symbol truncate font-black text-teal-700">{{ $recommendation->symbol }}</h2>
+                                    <span class="ak-top3-signal inline-flex h-7 items-center rounded-md border px-2 font-black {{ $signalClass }}">{{ $signal }}</span>
+                                    @if ($isTestCandidate)
+                                        <span class="inline-flex h-7 items-center rounded-md border border-teal-600/25 bg-teal-500/[.08] px-2 text-[8px] font-black uppercase tracking-wide text-teal-700">{{ __('Test') }}</span>
+                                    @endif
                                 </div>
-                                <p class="mt-0.5 truncate text-xs font-bold text-[var(--ak-text)]">{{ $recommendation->name }}</p>
+                                <p class="ak-top3-company mt-0.5 truncate font-bold text-[var(--ak-text)]">{{ $recommendation->name }}</p>
                                 <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[9px] font-bold text-[var(--ak-muted)]">
                                     <span class="inline-flex items-center gap-1 rounded-md border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-1.5 py-0.5" title="{{ __('Land') }}">
                                         <span>{{ $countryFlags[$recommendation->country] ?? '🌐' }}</span>
@@ -203,18 +228,18 @@
                                 data-live-symbol="{{ $recommendation->symbol }}"
                                 data-live-currency="{{ $recommendation->currency ?: 'EUR' }}"
                                 data-live-decimals="2"
-                                class="mt-0.5 truncate text-lg font-black tabular-nums text-[var(--ak-text)]"
+                                class="ak-top3-metric-value mt-0.5 truncate font-black tabular-nums text-[var(--ak-text)]"
                             >{{ is_numeric($recommendation->current_price) ? number_format((float) $recommendation->current_price, 2, ',', '.').' '.($recommendation->currency ?: 'EUR') : '—' }}</p>
                         </div>
                         <div class="min-h-0 overflow-hidden rounded-xl bg-[var(--ak-surface-muted)] p-2 text-right">
                             <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Zielkurs 20 Tage') }}</p>
-                            <p class="mt-0.5 truncate text-lg font-black tabular-nums text-[var(--ak-text)]">
+                            <p class="ak-top3-metric-value mt-0.5 truncate font-black tabular-nums text-[var(--ak-text)]">
                                 {{ is_numeric($recommendation->predicted_price_20d) ? number_format((float) $recommendation->predicted_price_20d, 2, ',', '.').' '.($recommendation->currency ?: 'EUR') : '—' }}
                             </p>
                         </div>
                         <div class="min-h-0 overflow-hidden rounded-xl bg-[var(--ak-surface-muted)] p-2 text-right">
                             <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Prognose 20 Tage') }}</p>
-                            <p class="mt-0.5 text-lg font-black tabular-nums {{ $recommendation->expected_return_20d >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $recommendation->expected_return_20d >= 0 ? '+' : '' }}{{ number_format($recommendation->expected_return_20d, 2, ',', '.') }} %</p>
+                            <p class="ak-top3-metric-value mt-0.5 whitespace-nowrap font-black tabular-nums {{ $recommendation->expected_return_20d >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $recommendation->expected_return_20d >= 0 ? '+' : '' }}{{ number_format($recommendation->expected_return_20d, 2, ',', '.') }} %</p>
                         </div>
                     </div>
 
@@ -223,7 +248,7 @@
                             <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf · 32 Tage') }}</p>
                             <span class="text-[9px] font-bold text-teal-700">{{ __('Tageskerzen') }}</span>
                         </div>
-                        <div id="recommendation-chart-{{ $recommendation->instrument_id }}" class="relative min-h-[72px] w-full flex-1 border-t border-[var(--ak-border)] bg-[color-mix(in_srgb,var(--ak-card)_72%,transparent)]" aria-label="{{ __('Kurschart für :symbol', ['symbol' => $recommendation->symbol]) }}">
+                        <div id="recommendation-chart-{{ $recommendation->instrument_id }}" class="ak-top3-chart relative min-h-[72px] w-full flex-1 border-t border-[var(--ak-border)] bg-[color-mix(in_srgb,var(--ak-card)_72%,transparent)]" aria-label="{{ __('Kurschart für :symbol', ['symbol' => $recommendation->symbol]) }}">
                             <span data-chart-placeholder class="absolute inset-0 flex items-center justify-center gap-2 text-[9px] font-bold text-[var(--ak-muted)]">
                                 <span class="h-3 w-3 animate-spin rounded-full border-2 border-teal-500/25 border-t-teal-600"></span>
                                 {{ __('Kursdaten werden geladen') }}
@@ -245,12 +270,11 @@
                     </div>
 
                     <div class="grid h-[60px] shrink-0 grid-cols-3 gap-2 px-3 pb-1.5">
-                        <div class="h-full min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2 shadow-sm">
-                            <div class="mb-1.5 flex items-end justify-between gap-1">
-                                <span class="truncate text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
-                                <span class="shrink-0 text-[10px] font-black tabular-nums">{{ number_format($recommendation->score_10, 1, ',', '.') }}<small class="ml-0.5 text-[7px] text-[var(--ak-muted)]">/10</small></span>
+                        <div class="flex h-full min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2 shadow-sm">
+                            <span class="min-w-0 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
+                            <div class="ak-prediction-donut" style="--value: {{ $recommendation->score_percent }}%; --color: {{ $scoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $recommendation->score_10 }}">
+                                <span>{{ number_format($recommendation->score_10, 1, ',', '.') }}<small>/10</small></span>
                             </div>
-                            <x-dashboard.score-stripes :percent="$recommendation->score_percent" />
                         </div>
                         <div class="flex h-full min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2 shadow-sm">
                             <span class="min-w-0 text-[9px] font-black uppercase leading-[1.15] tracking-wide text-[var(--ak-muted)]">
@@ -263,7 +287,7 @@
                         </div>
                         <div class="flex h-full min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2 shadow-sm">
                             <span class="min-w-0 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Risiko') }}</span>
-                            <div class="ak-prediction-donut" style="--value: {{ $recommendation->risk_percent }}%; --color: {{ $riskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($recommendation->risk_percent) }}">
+                            <div class="ak-prediction-donut" style="--value: {{ $recommendation->risk_percent }}%; --color: {{ $riskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($recommendation->risk_percent) }}" title="{{ $riskTitle }}">
                                 <span>{{ number_format($recommendation->risk_percent, 0, ',', '.') }}<small>%</small></span>
                             </div>
                         </div>
@@ -397,7 +421,7 @@
                 const miniChart = new ApexCharts(element, {
                     chart: {
                         type: 'candlestick',
-                        height: element.clientHeight || 180,
+                        height: Math.max(element.clientHeight, window.innerWidth >= 768 && window.innerWidth < 1280 ? 136 : 92),
                         background: 'transparent',
                         toolbar: { show: false },
                         zoom: { enabled: false, allowMouseWheelZoom: false },
@@ -416,7 +440,7 @@
                             wick: { useFillColor: false },
                         },
                     },
-                    stroke: { width: 1 },
+                    stroke: { width: window.innerWidth >= 768 && window.innerWidth < 1280 ? 1.5 : 1 },
                     fill: { opacity: 1 },
                     dataLabels: { enabled: false },
                     states: {
@@ -482,8 +506,18 @@
                     const patternId = `recommendation-forecast-${instrumentId}`;
 
                     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+                    svg.setAttribute('preserveAspectRatio', 'none');
                     svg.setAttribute('aria-hidden', 'true');
-                    svg.classList.add('pointer-events-none', 'absolute', 'inset-0', 'z-10', 'h-full', 'w-full');
+                    svg.classList.add('ak-top3-forecast-overlay');
+                    Object.assign(svg.style, {
+                        position: 'absolute',
+                        inset: '0',
+                        zIndex: '30',
+                        width: '100%',
+                        height: '100%',
+                        pointerEvents: 'none',
+                        overflow: 'visible',
+                    });
                     svg.innerHTML = `
                         <defs>
                             <pattern id="${patternId}" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
@@ -494,9 +528,9 @@
                             points="${toX(lastTimestamp)},${toY(lastClose)} ${toX(targetTimestamp)},${toY(Math.max(lastClose, forecastTarget))} ${toX(targetTimestamp)},${toY(Math.min(lastClose, forecastTarget))}"
                             fill="url(#${patternId})"
                             stroke="${forecastColor}"
-                            stroke-width="1.3"
+                            stroke-width="1.6"
                             stroke-dasharray="5 5"
-                            stroke-opacity=".78"
+                            stroke-opacity=".92"
                             stroke-linejoin="round"
                             vector-effect="non-scaling-stroke"
                         ></polygon>
