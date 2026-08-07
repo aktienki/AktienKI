@@ -23,9 +23,11 @@ class LivePriceSubscriptionController extends Controller
             ->whereIn(DB::raw('UPPER(symbol)'), $requestedSymbols)
             ->where('is_active', true)
             ->whereNull('deleted_at')
-            ->get(['id', 'symbol']);
+            ->get(['id', 'symbol', 'provider_symbol']);
         $mapping = $instruments->mapWithKeys(
-            fn (object $instrument): array => [$instrument->symbol => $instrument->symbol]
+            fn (object $instrument): array => [
+                $instrument->symbol => $instrument->provider_symbol ?: $instrument->symbol,
+            ]
         )->all();
 
         $requests = Cache::get('current_stock_quote_requests', []);

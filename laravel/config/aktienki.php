@@ -1,6 +1,12 @@
 <?php
 
 return [
+    'beta' => [
+        'enabled' => (bool) env('AKTIENKI_BETA_ENABLED', true),
+        'phase_ended' => (bool) env('AKTIENKI_BETA_PHASE_ENDED', false),
+        'contact_email' => env('AKTIENKI_BETA_CONTACT_EMAIL', env('MAIL_FROM_ADDRESS', 'info@aktienki.com')),
+    ],
+
     'saved_filter_limits' => [
         'free' => 1,
         'plus' => 3,

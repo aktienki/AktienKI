@@ -170,17 +170,16 @@
                             <i class="h-2.5 w-8 rounded-full border border-amber-300/70 bg-gradient-to-r from-amber-200/10 to-amber-300/35 shadow-[0_0_9px_rgba(214,168,79,.20)]"></i>
                         </div>
                     </div>
-                    <img src="{{ route('scenes.localized', ['scene' => 'machine-learning', 'locale' => app()->getLocale(), 'v' => filemtime(public_path('assets/scene-machine-learning.svg'))]) }}" alt="{{ __('Machine-Learning-Analyse') }}" class="welcome-scene absolute inset-0 h-full w-full object-contain" data-scene>
-                    <img src="{{ route('scenes.localized', ['scene' => 'stock-chat', 'locale' => app()->getLocale(), 'v' => filemtime(public_path('assets/scene-stock-chat.svg'))]) }}" alt="{{ __('Aktie auswählen und mit KI chatten') }}" class="welcome-scene absolute inset-0 h-full w-full object-contain" data-scene data-restart-scene>
-
+                    <div class="welcome-scene absolute inset-0 h-full w-full" data-scene data-restart-css-scene>
+                        <x-welcome.strategy-tester-animation />
+                    </div>
                     <button type="button" data-scene-previous aria-label="{{ __('Vorherige Animation') }}" class="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg border border-orange-400/15 bg-[#0b1424]/75 text-2xl text-slate-300 backdrop-blur transition hover:border-orange-400/35 hover:bg-orange-400/15 hover:text-orange-400 lg:left-6">‹</button>
                     <button type="button" data-scene-next aria-label="{{ __('Nächste Animation') }}" class="absolute right-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg border border-orange-400/15 bg-[#0b1424]/75 text-2xl text-slate-300 backdrop-blur transition hover:border-orange-400/35 hover:bg-orange-400/15 hover:text-orange-400 lg:right-6">›</button>
 
                     <div class="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 gap-2 rounded-lg border border-orange-400/15 bg-[#0b1424]/75 px-4 py-3 backdrop-blur" role="tablist" aria-label="{{ __('Animationsschritte') }}">
                         <button type="button" data-scene-dot="0" aria-label="{{ __('Von Tradern für Trader') }}" aria-selected="true" class="h-1.5 w-8 rounded-full bg-orange-400 transition-all duration-300"></button>
                         <button type="button" data-scene-dot="1" aria-label="{{ __('Aktienmärkte weltweit') }}" aria-selected="false" class="h-1.5 w-2 rounded-full bg-slate-600 transition-all duration-300 hover:bg-slate-400"></button>
-                        <button type="button" data-scene-dot="2" aria-label="Machine Learning" aria-selected="false" class="h-1.5 w-2 rounded-full bg-slate-600 transition-all duration-300 hover:bg-slate-400"></button>
-                        <button type="button" data-scene-dot="3" aria-label="{{ __('Aktie auswählen und mit KI chatten') }}" aria-selected="false" class="h-1.5 w-2 rounded-full bg-slate-600 transition-all duration-300 hover:bg-slate-400"></button>
+                        <button type="button" data-scene-dot="2" aria-label="{{ __('Strategietester') }}" aria-selected="false" class="h-1.5 w-2 rounded-full bg-slate-600 transition-all duration-300 hover:bg-slate-400"></button>
                     </div>
                 </div>
             </section>
@@ -238,6 +237,10 @@
                 active = (index + scenes.length) % scenes.length;
                 scenes.forEach((scene, i) => scene.classList.toggle('is-active', i === active));
                 const activeScene = scenes[active];
+                if (activeScene?.hasAttribute('data-restart-css-scene')) {
+                    const animatedContent = activeScene.firstElementChild;
+                    if (animatedContent) animatedContent.replaceWith(animatedContent.cloneNode(true));
+                }
                 if (activeScene?.hasAttribute('data-restart-scene')) {
                     const source = new URL(activeScene.src, window.location.href);
                     source.searchParams.set('play', Date.now().toString());

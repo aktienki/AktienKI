@@ -6,8 +6,8 @@
     $displayScore = $assessment['score'] ?? $latestScore;
 @endphp
 
-<x-dashboard.card class="ak-card-static ak-dashboard-card ak-dashboard-market-card flex min-h-[260px] flex-col border-orange-400/25 lg:min-h-0">
-    <div class="flex items-start justify-between gap-4">
+<x-dashboard.card class="ak-standard-card ak-card-static ak-dashboard-card ak-dashboard-market-card flex min-h-[260px] flex-col lg:min-h-0">
+    <div class="ak-standard-card-head flex items-start justify-between gap-4">
         <div>
             <p class="flex items-center gap-2 text-xs font-black uppercase tracking-[.18em] text-orange-400">
                 <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-orange-400/25 bg-orange-400/10">
@@ -18,7 +18,7 @@
             <p class="mt-1 text-xs text-slate-400">{{ __('Entwicklung des aggregierten KI-Scores · 20 Tage') }}</p>
         </div>
         <div class="text-right">
-            <p class="text-2xl font-black text-white">{{ $displayScore !== null ? number_format($displayScore, 1, ',', '.') : '—' }}</p>
+            <p class="text-2xl font-black text-[var(--ak-text)]">{{ $displayScore !== null ? number_format($displayScore, 1, ',', '.') : '—' }}</p>
             <p class="text-[10px] font-semibold text-slate-500">/ 10</p>
         </div>
     </div>

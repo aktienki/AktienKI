@@ -3,13 +3,62 @@
 namespace App\Http\Controllers;
 
 use App\Services\PersonalizedSignalService;
+use App\Services\TwelveDataService;
 use App\Support\AiScore;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
+use Throwable;
 
 final class RecommendationController extends Controller
 {
+    public function liveQuotes(Request $request, TwelveDataService $marketData): JsonResponse
+    {
+        $symbols = collect(explode(',', (string) $request->query('symbols')))
+            ->map(fn (string $symbol): string => strtoupper(trim($symbol)))
+            ->filter()
+            ->unique()
+            ->take(3);
+
+        $instruments = DB::table('instruments')
+            ->whereIn(DB::raw('UPPER(symbol)'), $symbols)
+            ->where('type', 'stock')
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->get(['symbol', 'provider_symbol', 'currency']);
+
+        $quotes = $instruments->mapWithKeys(function (object $instrument) use ($marketData): array {
+            $streamQuote = Cache::get('twelve_data_stream_quote_'.sha1(strtoupper((string) $instrument->symbol)));
+            try {
+                $referenceQuote = $marketData->quote((string) ($instrument->provider_symbol ?: $instrument->symbol));
+                $quote = is_numeric($streamQuote['price'] ?? null)
+                    ? [...($referenceQuote ?? []), ...$streamQuote]
+                    : $marketData->liveQuote((string) ($instrument->provider_symbol ?: $instrument->symbol));
+            } catch (Throwable) {
+                $quote = null;
+            }
+
+            if (! is_numeric($quote['price'] ?? null)) {
+                return [];
+            }
+
+            return [(string) $instrument->symbol => [
+                'price' => (float) $quote['price'],
+                'currency' => (string) (($quote['currency'] ?? null) ?: $instrument->currency ?: ''),
+                'change_percent' => is_numeric($quote['change_percent'] ?? null)
+                    ? (float) $quote['change_percent']
+                    : null,
+                'timestamp' => is_numeric($quote['timestamp'] ?? null)
+                    ? (int) $quote['timestamp']
+                    : now()->timestamp,
+            ]];
+        });
+
+        return response()->json(['quotes' => $quotes]);
+    }
+
     public function __invoke(Request $request): View
     {
         $signalSql = app(PersonalizedSignalService::class)->sql('prediction', $request->user());
@@ -102,6 +151,7 @@ final class RecommendationController extends Controller
                 'prediction.risk_score',
                 'prediction.drawdown_risk_factor',
                 'instrument.symbol',
+                'instrument.provider_symbol',
                 'instrument.name',
                 'instrument.country',
                 'instrument.sector',
@@ -168,6 +218,7 @@ final class RecommendationController extends Controller
                     'prediction.risk_score',
                     'prediction.drawdown_risk_factor',
                     'instrument.symbol',
+                    'instrument.provider_symbol',
                     'instrument.name',
                     'instrument.country',
                     'instrument.sector',

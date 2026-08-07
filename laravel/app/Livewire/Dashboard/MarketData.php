@@ -6,6 +6,7 @@ namespace App\Livewire\Dashboard;
 
 use App\Services\MarketService;
 use App\Services\IndexAiScoreService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -27,6 +28,8 @@ class MarketData extends Component
     public array $marketAnalysis = [];
 
     public array $signalTransitionStats = [];
+
+    public array $macroCards = [];
 
     protected array $symbols = [
 
@@ -128,6 +131,7 @@ class MarketData extends Component
 
         $this->sentiment = $marketService->sentiment($this->markets);
         $this->signalTransitionStats = $this->loadSignalTransitionStats();
+        $this->macroCards = $this->loadMacroCards();
     }
 
     public function render()
@@ -143,8 +147,77 @@ class MarketData extends Component
                 'marketComment' => $this->marketComment,
                 'marketAnalysis' => $this->marketAnalysis,
                 'signalTransitionStats' => $this->signalTransitionStats,
+                'macroCards' => $this->macroCards,
             ]
         );
+    }
+
+    private function loadMacroCards(): array
+    {
+        $bars = DB::table('instruments as instrument')
+            ->join('price_bars as bar', 'bar.instrument_id', '=', 'instrument.id')
+            ->where('instrument.symbol', 'AGG')
+            ->whereIn('bar.interval', ['1d', '1h'])
+            ->where('bar.bar_time', '>=', now()->subYears(3))
+            ->orderByDesc('bar.bar_time')->orderByDesc('bar.id')->limit(3000)
+            ->get(['instrument.symbol', 'bar.close', 'bar.bar_time'])
+            ->groupBy('symbol')->map(fn ($rows) => $rows->sortBy('bar_time')->values());
+        $series = static fn ($rows): array => collect($rows ?? [])->map(fn (object $row): array => [
+            'label' => Carbon::parse($row->bar_time)->format('d.m.'),
+            'value' => is_numeric($row->close) ? (float) $row->close : null,
+        ])->filter(fn (array $point): bool => $point['value'] !== null)->values()->all();
+        $agg = $series($bars->get('AGG', collect()));
+        $daxLevels = DB::table('instruments as instrument')
+            ->join('price_bars as bar', 'bar.instrument_id', '=', 'instrument.id')
+            ->where('instrument.symbol', '^GDAXI')->where('bar.interval', '1d')
+            ->where('bar.bar_time', '>=', now()->subYear())
+            ->orderBy('bar.bar_time')->get(['bar.close', 'bar.bar_time']);
+        $daxSeries = $series($daxLevels);
+        $aiSeries = DB::table('backtest_trades as trade')
+            ->join('backtest_runs as run', 'run.id', '=', 'trade.backtest_run_id')
+            ->whereNotNull('trade.ki_score')->where('trade.entry_date', '>=', now()->subYear()->toDateString())
+            ->whereIn('run.status', ['completed', 'completed_with_errors'])
+            ->selectRaw('trade.entry_date AS day, AVG(trade.ki_score) AS score')
+            ->groupBy('trade.entry_date')->orderBy('trade.entry_date')->get()
+            ->map(fn (object $point): array => ['label' => Carbon::parse($point->day)->format('d.m.'), 'value' => (float) $point->score])
+            ->values();
+        // Seven-point trailing median removes single-day backtest noise while
+        // keeping the direction and timing of the KI-score visible.
+        $aiSeries = $aiSeries->map(function (array $point, int $index) use ($aiSeries): array {
+            $window = $aiSeries->slice(max(0, $index - 6), 7)->pluck('value')->filter(fn ($value) => is_numeric($value));
+            return ['label' => $point['label'], 'value' => round((float) ($window->median() ?? $point['value']), 2)];
+        })->values()->all();
+        $daxCompareSeries = count($aiSeries) > 0 ? array_slice($daxSeries, -count($aiSeries)) : [];
+        $volatility = DB::table('market_snapshots')->whereNotNull('volatility')->orderByDesc('snapshot_time')->limit(30)->get(['snapshot_time', 'volatility'])->sortBy('snapshot_time')->map(fn (object $row): array => [
+            'label' => Carbon::parse($row->snapshot_time)->format('d.m.'), 'value' => (float) $row->volatility,
+        ])->values()->all();
+        if ($volatility === []) {
+            $daxId = DB::table('instruments as instrument')
+                ->where('instrument.symbol', '^GDAXI')
+                ->whereExists(fn ($query) => $query->selectRaw('1')->from('price_bars as available_bar')->whereColumn('available_bar.instrument_id', 'instrument.id')->where('available_bar.interval', '1d'))
+                ->value('instrument.id')
+                ?: DB::table('instruments')->where('symbol', '^GSPC')->value('id');
+            $dax = $daxId ? DB::table('price_bars')->where('instrument_id', $daxId)->where('interval', '1d')->where('bar_time', '>=', now()->subYear())->orderByDesc('bar_time')->limit(320)->get(['close', 'bar_time'])->sortBy('bar_time')->values() : collect();
+            $prices = $dax->map(fn (object $row): ?float => is_numeric($row->close) ? (float) $row->close : null)->filter(fn ($value) => $value !== null)->values();
+            $returns = collect();
+            for ($index = 1; $index < $prices->count(); $index++) $returns->push($prices[$index - 1] > 0 ? ($prices[$index] / $prices[$index - 1]) - 1 : null);
+            for ($index = 20; $index < $returns->count(); $index++) {
+                $window = $returns->slice($index - 20, 20)->filter(fn ($value) => $value !== null)->values();
+                $mean = $window->avg();
+                $variance = $window->map(fn (float $value): float => ($value - $mean) ** 2)->avg() ?? 0.0;
+                $volatility[] = ['label' => Carbon::parse($dax[$index + 1]->bar_time)->format('d.m.'), 'value' => sqrt($variance) * sqrt(252) * 100];
+            }
+            // Keep the chart responsive while retaining the full three-year window.
+            if (count($volatility) > 260) {
+                $step = max(1, (int) floor(count($volatility) / 260));
+                $volatility = collect($volatility)->filter(fn (array $_, int $index): bool => $index % $step === 0)->values()->all();
+            }
+        }
+        return [
+            ['key' => 'ai-dax', 'title' => __('KI-Score vs. DAX'), 'subtitle' => __('letzte 1 Jahr · Median-KI-Score und DAX-Kurs'), 'unit' => '', 'series' => [['name' => __('Median KI-Score'), 'color' => '#22d3ee', 'points' => $aiSeries], ['name' => __('DAX Kurs'), 'color' => '#fbbf24', 'points' => $daxCompareSeries]]],
+            ['key' => 'vdax', 'title' => __('VDAX'), 'subtitle' => __('letzte 1 Jahr · DAX links · VDAX Sekundärachse rechts'), 'unit' => '%', 'series' => [['name' => __('VDAX'), 'color' => '#fb7185', 'points' => $volatility], ['name' => __('DAX Kurs'), 'color' => '#fbbf24', 'points' => $daxSeries]]],
+            ['key' => 'bonds', 'title' => __('Anleihen'), 'subtitle' => __('Tageswerte · letzte 3 Jahre · AGG Bond-Index-Proxy'), 'unit' => '$', 'series' => [['name' => 'AGG', 'color' => '#34d399', 'points' => $agg]]],
+        ];
     }
 
     private function loadSignalTransitionStats(): array

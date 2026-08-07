@@ -88,6 +88,17 @@ class ProfileController extends Controller
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
+    public function updateTheme(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate(['theme' => ['required', 'in:light,dark']]);
+        $user = $request->user();
+        $preferences = $user->preferences ?? [];
+        $preferences['theme'] = $validated['theme'];
+        $user->forceFill(['preferences' => $preferences])->save();
+
+        return response()->json(['theme' => $validated['theme']]);
+    }
+
     /**
      * Delete the user's account.
      */

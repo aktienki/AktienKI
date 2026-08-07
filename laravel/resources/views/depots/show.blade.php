@@ -1,6 +1,7 @@
 <x-app-layout>
-    <div x-data="{ simulationOpen: {{ request()->boolean('test') && !$liveSimulationEnabled ? 'true' : 'false' }}, simulationSubmitting: false, automationOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false }" class="flex min-h-[calc(100dvh-89px)] flex-col py-4 text-[var(--ak-text)]">
-        <div class="mb-4 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <x-detail-page-theme />
+    <div id="strategy-depot-page" x-data="{ simulationOpen: {{ request()->boolean('test') && !$liveSimulationEnabled ? 'true' : 'false' }}, simulationSubmitting: false, automationOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false }" class="ak-detail-design flex min-h-[calc(100dvh-89px)] flex-col py-4 text-[var(--ak-text)]">
+        <div class="ak-depot-detail-hero ak-detail-hero mb-4 flex shrink-0 flex-col gap-3 rounded-2xl border border-[var(--ak-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 items-center gap-3">
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300">
                     <x-heroicon-o-briefcase class="h-6 w-6" />
@@ -12,7 +13,7 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center justify-end gap-2">
             @if($portfolio->type === 'paper')<button type="button" @if($canActivateStrategyAccount) @click="automationOpen=true" @endif @disabled(!$canActivateStrategyAccount) title="{{ $canActivateStrategyAccount ? '' : __('Ab Pro verfügbar') }}" class="inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40 {{ $liveSimulationEnabled ? 'border-orange-400/30 bg-orange-400/[.1] text-orange-400' : 'border-[var(--ak-border)] bg-[var(--ak-card)] text-[var(--ak-muted)]' }}"><x-heroicon-o-bolt class="h-4 w-4" />{{ $liveSimulationEnabled ? __('Mitlaufend aktiv') : __('Konto aktivieren') }}</button>@endif
             @if($portfolio->type === 'paper')<button type="button" @if(!$liveSimulationEnabled) @click="simulationOpen=true" @endif @disabled($liveSimulationEnabled) title="{{ $liveSimulationEnabled ? __('Während das Strategiedepot mitläuft, ist keine historische Simulation möglich.') : __('Simulation starten') }}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/[.09] px-4 text-xs font-black text-amber-200 shadow-sm shadow-amber-950/15 disabled:cursor-not-allowed disabled:border-slate-500/20 disabled:bg-slate-500/[.06] disabled:text-slate-500 disabled:shadow-none"><x-heroicon-o-play class="h-4 w-4" />{{ __('Simulation') }}</button>@endif
             @if($portfolio->type === 'paper')<button type="button" @click="capitalOpen=true" class="inline-flex h-10 items-center gap-2 rounded-xl border border-teal-300/20 bg-teal-400/[.07] px-3 text-xs font-black text-teal-200"><x-heroicon-o-banknotes class="h-4 w-4" />{{ __('Kapital') }}</button>@endif
@@ -48,8 +49,9 @@
         @endif
         @if($errors->any())<div class="mb-4 rounded-xl border border-rose-300/25 bg-rose-400/[.08] px-4 py-3 text-sm font-bold text-rose-200">{{ $errors->first() }}</div>@endif
 
-        <section class="mb-1 grid min-h-[420px] flex-1 items-stretch gap-3" style="grid-template-columns: minmax(340px, 0.72fr) minmax(0, 1.28fr);">
-            <div class="h-full overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]">
+        <section class="mb-1 grid items-start gap-3 xl:grid-cols-[minmax(380px,.8fr)_minmax(0,1.2fr)]">
+            <div class="ak-depot-detail-card ak-detail-panel relative overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+                <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-500/30 via-cyan-400 to-amber-400/45"></div>
                 <div class="mb-2 flex items-center justify-between"><div><p class="text-[8px] font-black uppercase tracking-[.16em] text-teal-300">{{ __('Depotdaten') }}</p><h2 class="mt-0.5 text-sm font-black">{{ __('Kapital und Bestand') }}</h2></div><x-heroicon-o-banknotes class="h-5 w-5 text-teal-300" /></div>
                 <div class="grid grid-cols-2 gap-x-4 xl:grid-cols-3">
                     @foreach ([
@@ -70,7 +72,7 @@
                         @php
                             [$label, $value, $valueClass, $metricId] = array_pad($metric, 4, null);
                         @endphp
-                        <div class="min-w-0 border-t border-[var(--ak-border)] py-2">
+                        <div class="ak-depot-metric min-w-0 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2">
                             <p class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $label }}</p>
                             <p class="mt-0.5 truncate text-sm font-black tabular-nums {{ $valueClass }}" @if($metricId) id="{{ $metricId }}" @endif>{{ $value }}</p>
                         </div>
@@ -87,20 +89,20 @@
                             fn ($strategy) => max(0.0, (float) ($strategy->pivot->capital_weight ?? 1))
                         ));
                     @endphp
-                    <div class="mt-1 border-t border-[var(--ak-border)] pt-2">
+                    <div class="mt-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3">
                         <p class="mb-1.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Strategieanteile') }}</p>
                         <div class="flex flex-wrap gap-1.5">
                             @foreach($portfolio->strategies as $strategy)
                                 @php
                                     $strategyShare = max(0.0, (float) ($strategy->pivot->capital_weight ?? 1)) / $strategyWeightTotal * 100;
                                 @endphp
-                                <span class="inline-flex items-center gap-1.5 rounded-md border border-orange-400/20 bg-orange-400/[.07] px-2 py-1 text-[9px] font-black text-orange-400"><span class="max-w-28 truncate">{{ $strategy->name }}</span><strong class="tabular-nums text-white">{{ number_format($strategyShare, 0, ',', '.') }} %</strong></span>
+                                <span class="inline-flex items-center gap-1.5 rounded-md border border-teal-500/25 bg-teal-500/[.09] px-2 py-1 text-[9px] font-black text-teal-500"><span class="max-w-28 truncate">{{ $strategy->name }}</span><strong class="tabular-nums text-[var(--ak-text)]">{{ number_format($strategyShare, 0, ',', '.') }} %</strong></span>
                             @endforeach
                         </div>
                     </div>
                 @endif
                 @if($portfolio->type === 'paper')
-                    <form id="portfolio-strategy-form" method="POST" action="{{ route('depots.strategies.update', $portfolio) }}" class="mt-2 border-t border-[var(--ak-border)] pt-2">
+                    <form id="portfolio-strategy-form" method="POST" action="{{ route('depots.strategies.update', $portfolio) }}" class="mt-3 rounded-xl border border-teal-500/20 bg-teal-500/[.045] p-3">
                         @csrf
                         @method('PUT')
                         <div class="mb-1.5 flex items-center justify-between gap-2"><p class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Strategien verwalten') }}</p><button type="button" @click="strategyConfirmOpen=true" class="inline-flex h-7 items-center gap-1 rounded-md bg-gradient-to-r from-teal-600 to-orange-400 px-2.5 text-[9px] font-black text-white"><x-heroicon-o-check class="h-3.5 w-3.5" />{{ __('Speichern') }}</button></div>
@@ -114,12 +116,22 @@
                     </form>
                 @endif
             </div>
-            <div class="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]">
+            <div class="ak-depot-detail-card ak-detail-panel relative flex min-h-[420px] min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+                <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400/35 via-cyan-400 to-teal-500/30"></div>
                 <div class="mb-1 flex items-center justify-between gap-3"><div><p class="text-[8px] font-black uppercase tracking-[.16em] text-orange-400">{{ __('Depotentwicklung') }}</p><h2 class="mt-0.5 text-sm font-black">{{ $simulationRun?->simulation_start_date && $simulationRun?->simulation_end_date ? $simulationRun->simulation_start_date.' – '.$simulationRun->simulation_end_date : __('Noch keine Simulation vorhanden') }}</h2></div>@if($simulationRun?->status === 'completed')<a href="{{ route('depots.simulation.report', [$portfolio, $simulationRun->public_id]) }}" title="{{ __('Bericht laden') }}" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-orange-400/25 bg-orange-400/10 px-2.5 text-[10px] font-black text-orange-400"><x-heroicon-o-arrow-down-tray class="h-4 w-4" />{{ __('Bericht') }}</a>@else<x-heroicon-o-chart-bar-square class="h-5 w-5 text-orange-400" />@endif</div>
                 @if($simulationRun?->status === 'completed' && !empty($simulationSummary['equity_curve']))
                     <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-[var(--ak-surface-muted)]"><div id="portfolio-simulation-chart" class="ak-portfolio-line-chart min-h-[260px] flex-1"></div><div id="portfolio-profit-bars" class="relative mx-10 h-24 shrink-0 border-t border-slate-400/15"></div></div>
                 @else
-                    <div class="grid h-56 place-items-center rounded-xl border border-dashed border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-xs font-bold text-[var(--ak-muted)]">{{ __('Nach einer Simulation erscheint hier die Depotentwicklung.') }}</div>
+                    <div class="grid flex-1 place-items-center rounded-xl border border-dashed border-teal-500/25 bg-[linear-gradient(145deg,color-mix(in_srgb,var(--ak-surface-muted)_94%,#14b8a6_6%),var(--ak-surface-muted))] p-8 text-center">
+                        <div class="max-w-md">
+                            <span class="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-teal-500/25 bg-teal-500/10 text-teal-500"><x-heroicon-o-chart-bar-square class="h-7 w-7" /></span>
+                            <h3 class="mt-4 text-base font-black text-[var(--ak-text)]">{{ __('Depotentwicklung berechnen') }}</h3>
+                            <p class="mt-2 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Starte eine historische Simulation, um Performance, Drawdown, Trefferquote und die Entwicklung des Depotwerts auszuwerten.') }}</p>
+                            @if($portfolio->type === 'paper' && !$liveSimulationEnabled)
+                                <button type="button" @click="simulationOpen=true" class="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-teal-700 px-4 text-xs font-black text-white shadow-lg shadow-teal-950/20 hover:bg-teal-600"><x-heroicon-o-play class="h-4 w-4" />{{ __('Simulation starten') }}</button>
+                            @endif
+                        </div>
+                    </div>
                 @endif
             </div>
         </section>
@@ -147,8 +159,8 @@
         </div>
 
         @if(false)
-        <section class="overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
-            <div class="flex items-center justify-between border-b border-[var(--ak-border)] px-4 py-3">
+        <section class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
+            <div class="ak-detail-card-head flex items-center justify-between border-b border-[var(--ak-border)] px-4 py-3">
                 <div>
                     <h2 class="font-black">{{ __('Depotpositionen') }}</h2>
                     <p class="mt-0.5 text-xs text-[var(--ak-muted)]">{{ __('Aktien, Einstiegskurse und aktuelle Entwicklung.') }}</p>
@@ -181,7 +193,7 @@
                                     $positionPerformance = $entry > 0 ? (($current - $entry) / $entry) * 100 : 0;
                                 @endphp
                                 <tr>
-                                    <td class="px-4 py-3"><a href="{{ route('stocks.show', $position->instrument->symbol) }}" class="font-black text-teal-700">{{ $position->instrument->symbol }}</a><p class="mt-0.5 text-[10px] text-[var(--ak-muted)]">{{ $position->instrument->name }}</p></td>
+                                    <td class="px-4 py-3"><a href="{{ route('stocks.show', ['symbol' => $position->instrument->symbol, 'prediction' => $latestPredictionIds->get($position->instrument_id), 'return_to' => request()->getRequestUri()]) }}" class="font-black text-teal-700">{{ $position->instrument->symbol }}</a><p class="mt-0.5 text-[10px] text-[var(--ak-muted)]">{{ $position->instrument->name }}</p></td>
                                     <td class="px-4 py-3 font-bold tabular-nums">{{ number_format($position->quantity, 4, ',', '.') }}</td>
                                     <td class="px-4 py-3 font-bold tabular-nums">{{ number_format($entry, 2, ',', '.') }} {{ $portfolio->currency }}</td>
                                     <td class="px-4 py-3 font-bold tabular-nums">{{ number_format($current, 2, ',', '.') }} {{ $portfolio->currency }}</td>
@@ -195,8 +207,8 @@
             @endif
         </section>
 
-        <section class="mt-4 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
-            <div class="flex items-center justify-between border-b border-[var(--ak-border)] px-4 py-3">
+        <section class="ak-detail-panel mt-4 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
+            <div class="ak-detail-card-head flex items-center justify-between border-b border-[var(--ak-border)] px-4 py-3">
                 <div>
                     <h2 class="font-black">{{ __('Transaktionshistorie') }}</h2>
                     <p class="mt-0.5 text-xs text-[var(--ak-muted)]">{{ __('Alle simulierten Käufe, Verkäufe und Gebühren in chronologischer Reihenfolge.') }}</p>
@@ -227,7 +239,14 @@
                                 <tr>
                                     <td class="px-4 py-3 tabular-nums text-[var(--ak-muted)]">{{ $transaction->transaction_date?->format('d.m.Y') }}</td>
                                     <td class="px-4 py-3"><span class="inline-flex min-w-20 justify-center rounded-md border px-2.5 py-1 text-[10px] font-black {{ $isSale ? 'border-rose-300/35 bg-rose-400/10 text-rose-300' : 'border-teal-300/35 bg-teal-400/10 text-teal-300' }}">{{ $isSale ? __('VERKAUF') : __('KAUF') }}</span>@if($simulated)<span class="ml-2 text-[9px] font-black uppercase tracking-wide text-amber-300">{{ __('Simulation') }}</span>@endif @if($triggerStrategyIds->isNotEmpty())<p class="mt-1 text-[9px] font-bold text-orange-400">{{ $triggerStrategyIds->map(fn($id) => $strategyNames->get((int)$id))->filter()->join(' · ') }}</p>@endif</td>
-                                    <td class="px-4 py-3"><span class="font-black text-teal-300">{{ $transaction->instrument?->symbol }}</span><p class="mt-0.5 text-[10px] text-[var(--ak-muted)]">{{ $transaction->instrument?->name }}</p></td>
+                                    <td class="px-4 py-3">
+                                        @if($transaction->instrument)
+                                            <a href="{{ route('stocks.show', ['symbol' => $transaction->instrument->symbol, 'prediction' => $latestPredictionIds->get($transaction->instrument_id), 'return_to' => request()->getRequestUri()]) }}" class="font-black text-teal-300 hover:text-teal-200">{{ $transaction->instrument->symbol }}</a>
+                                        @else
+                                            <span class="font-black text-[var(--ak-muted)]">—</span>
+                                        @endif
+                                        <p class="mt-0.5 text-[10px] text-[var(--ak-muted)]">{{ $transaction->instrument?->name }}</p>
+                                    </td>
                                     <td class="px-4 py-3 font-bold tabular-nums">{{ number_format(round($transaction->quantity),0,',','.') }}</td>
                                     <td class="px-4 py-3 font-bold tabular-nums">{{ number_format($transaction->price,2,',','.') }} {{ $transaction->currency }}</td>
                                     <td class="px-4 py-3 tabular-nums text-[var(--ak-muted)]">{{ number_format($transaction->fees,2,',','.') }} {{ $portfolio->currency }}</td>
@@ -288,6 +307,27 @@
             </form>
         </div>
     </div>
+
+    <style>
+      #strategy-depot-page .ak-depot-detail-hero{
+        background:
+          radial-gradient(circle at 82% 0%,color-mix(in srgb,#14b8a6 10%,transparent),transparent 34%),
+          linear-gradient(135deg,color-mix(in srgb,var(--ak-card) 95%,#0d9488 5%),var(--ak-card));
+        box-shadow:var(--ak-shadow);
+      }
+      #strategy-depot-page .ak-depot-detail-card{
+        background:linear-gradient(155deg,color-mix(in srgb,var(--ak-card) 96%,#14b8a6 4%),var(--ak-card) 42%);
+      }
+      #strategy-depot-page .ak-depot-metric{
+        transition:border-color .18s ease,background-color .18s ease;
+      }
+      #strategy-depot-page .ak-depot-metric:hover{
+        border-color:color-mix(in srgb,#14b8a6 30%,var(--ak-border));
+      }
+      @media(max-width:1279px){
+        #strategy-depot-page .ak-depot-detail-hero>div:last-child{justify-content:flex-start}
+      }
+    </style>
 
     @if($simulationRun)
     <style>

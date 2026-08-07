@@ -345,6 +345,17 @@ final class DepotController extends Controller
             fn ($position) => (float) $position->quantity * (float) $position->average_buy_price
         );
         $positionInstrumentIds = $portfolio->positions->pluck('instrument_id')->filter()->unique()->values();
+        $detailInstrumentIds = $positionInstrumentIds
+            ->merge($portfolio->transactions->pluck('instrument_id')->filter())
+            ->unique()
+            ->values();
+        $latestPredictionIds = $detailInstrumentIds->isEmpty()
+            ? collect()
+            : DB::table('predictions')
+                ->whereIn('instrument_id', $detailInstrumentIds)
+                ->selectRaw('instrument_id, MAX(id) AS prediction_id')
+                ->groupBy('instrument_id')
+                ->pluck('prediction_id', 'instrument_id');
         $latestPositionQuoteIds = DB::table('current_stock_quotes')
             ->whereIn('instrument_id', $positionInstrumentIds)
             ->where('status', 'current')
@@ -466,6 +477,7 @@ final class DepotController extends Controller
             'liveSimulationEnabled', 'transactionEmailsEnabled',
             'canActivateStrategyAccount',
             'livePortfolioPositions',
+            'latestPredictionIds',
             'performance', 'backUrl', 'backLabel', 'availableStrategies', 'strategyNames', 'strategyPerformance',
             'simulationRun', 'simulationSummary', 'chartTrades'
         ));

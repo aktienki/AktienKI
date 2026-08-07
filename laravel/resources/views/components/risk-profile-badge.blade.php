@@ -14,11 +14,11 @@
             ],
             'normal' => [
                 'label' => __('Normal'),
-                'classes' => 'border-violet-400/25 bg-violet-500/10 text-violet-300',
+                'classes' => 'border-teal-400/25 bg-teal-500/10 text-teal-500',
             ],
             'balanced' => [
                 'label' => __('Normal'),
-                'classes' => 'border-violet-400/25 bg-violet-500/10 text-violet-300',
+                'classes' => 'border-teal-400/25 bg-teal-500/10 text-teal-500',
             ],
             'opportunity_oriented' => [
                 'label' => __('Chancenorientiert'),

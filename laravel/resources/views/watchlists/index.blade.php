@@ -1,12 +1,13 @@
 @extends('layouts.aktienki')
 
 @section('content')
+    <x-detail-page-theme />
     <div
         x-data="{ setupOpen: @js($errors->any()) }"
         @keydown.escape.window="setupOpen = false"
-        class="mx-auto w-full max-w-screen-2xl space-y-5 py-5"
+        class="ak-detail-design mx-auto w-full max-w-screen-2xl space-y-5 py-5"
     >
-        <header class="sticky top-[73px] z-40 -mx-2 flex flex-col justify-between gap-4 border-b border-[var(--ak-border)] bg-[var(--ak-bg-1)] px-2 py-3 shadow-[0_12px_24px_rgba(0,0,0,.12)] sm:flex-row sm:items-end">
+        <header class="ak-detail-hero sticky top-[73px] z-40 flex flex-col justify-between gap-4 rounded-2xl border border-[var(--ak-border)] px-4 py-3 sm:flex-row sm:items-end">
             <div>
                 <p class="text-xs font-black uppercase tracking-[.2em] text-violet-300">{{ __('Persönliche Auswahl') }}</p>
                 <h1 class="mt-2 text-3xl font-black text-[var(--ak-text)]">{{ __('Watchlists') }}</h1>
@@ -86,7 +87,7 @@
                         id="watchlist-{{ $watchlist->id }}"
                         data-watchlist-dropzone
                         data-watchlist-id="{{ $watchlist->id }}"
-                        class="scroll-mt-24 rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 shadow-[var(--ak-shadow)] transition duration-200"
+                        class="ak-detail-panel scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 shadow-[var(--ak-shadow)] transition duration-200"
                     >
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div>
@@ -170,7 +171,7 @@
                                                     >
                                                 </span>
                                             </span>
-                                            <a href="{{ route('stocks.show', ['symbol' => $item->instrument->symbol, 'return_to' => request()->getRequestUri()]) }}" class="min-w-0 flex-1 px-1 py-0.5">
+                                            <a href="{{ route('stocks.show', ['symbol' => $item->instrument->symbol, 'prediction' => $latestPredictionIds->get($item->instrument_id), 'return_to' => request()->getRequestUri()]) }}" class="min-w-0 flex-1 px-1 py-0.5">
                                                 <span class="flex items-center justify-between gap-2">
                                                     <strong class="block text-sm text-violet-300">{{ $item->instrument->symbol }}</strong>
                                                     <strong class="text-xs {{ ($itemPerformance ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">
@@ -230,7 +231,7 @@
                         @endif
                     </article>
                 @empty
-                    <div class="rounded-[1.5rem] border border-dashed border-[var(--ak-border)] bg-[var(--ak-card)] px-6 py-16 text-center">
+                    <div class="ak-detail-panel overflow-hidden rounded-[1.5rem] border border-dashed border-[var(--ak-border)] bg-[var(--ak-card)] px-6 py-16 text-center">
                         <x-heroicon-o-star class="mx-auto h-10 w-10 text-violet-300/50" />
                         <h2 class="mt-4 font-black text-[var(--ak-text)]">{{ __('Noch keine Watchlist vorhanden') }}</h2>
                         <p class="mt-2 text-sm text-[var(--ak-muted)]">{{ __('Erstelle links deine erste Watchlist. Sie wird automatisch als Standard verwendet.') }}</p>

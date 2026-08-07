@@ -6,8 +6,8 @@
     $maxCount = max(1, (int) ($stats['max_count'] ?? 0));
 @endphp
 
-<x-dashboard.card class="ak-transition-matrix-card ak-card-static ak-dashboard-card flex min-h-[240px] w-full flex-col border-orange-400/25 px-4 py-2.5 lg:min-h-[255px]">
-    <div class="flex items-start justify-between gap-3">
+<x-dashboard.card class="ak-standard-card ak-transition-matrix-card ak-card-static ak-dashboard-card flex min-h-[240px] w-full flex-col p-4 lg:min-h-[255px]">
+    <div class="ak-standard-card-head flex items-start justify-between gap-3">
         <div class="flex min-w-0 items-center gap-2.5">
             <span class="ak-transition-icon grid h-9 w-9 shrink-0 place-items-center rounded-xl border">
                 <x-heroicon-o-arrows-right-left class="h-4.5 w-4.5" />

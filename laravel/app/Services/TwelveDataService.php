@@ -77,6 +77,15 @@ class TwelveDataService
         );
     }
 
+    public function liveQuote(string $symbol): ?array
+    {
+        return Cache::remember(
+            'twelve_data_live_quote_'.sha1(strtoupper($symbol)),
+            now()->addSeconds(15),
+            fn (): ?array => $this->fetchQuote($symbol),
+        );
+    }
+
     public function sparkline(string $symbol): array
     {
         return Cache::remember(

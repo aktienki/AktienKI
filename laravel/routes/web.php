@@ -3,7 +3,6 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectStatusController;
 use App\Http\Controllers\PredictionController;
-use App\Http\Controllers\SignalChangeController;
 use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\DepotController;
 use App\Http\Controllers\StockController;
@@ -16,6 +15,7 @@ use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SectorController;
 use App\Http\Controllers\WelcomeController;
 use App\Http\Controllers\WatchlistController;
+use App\Http\Controllers\TradingIntegrationController;
 use App\Http\Controllers\MarketAssessmentController;
 use App\Http\Controllers\DailyMarketAnalysisController;
 use App\Http\Controllers\MarketOverviewController;
@@ -29,6 +29,7 @@ use App\Http\Controllers\QualityGateSetupController;
 use App\Http\Controllers\SmartSelectionLabelController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CommunityController;
+use App\Http\Controllers\AkiChatController;
 use Illuminate\Http\Request;
 
 
@@ -179,7 +180,8 @@ Route::post('/locale/{locale}', function (Request $request, string $locale) {
     return back();
 })->name('locale.update');
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'verified', 'beta'])->group(function () {
+    Route::post('/aki/chat', AkiChatController::class)->middleware('throttle:10,1')->name('aki.chat');
     Route::post('/live-prices/subscribe', LivePriceSubscriptionController::class)->name('live-prices.subscribe');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::view('/maerkte/marktlage', 'markets.situation')->name('markets.situation');
@@ -188,7 +190,7 @@ Route::middleware(['auth'])->group(function () {
     //Route::get('/stocks/{symbol}', [StockController::class, 'show'])->name('stocks.show');
 });
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::get('/community', [CommunityController::class, 'index'])->name('community.index');
     Route::patch('/community/alias', [CommunityController::class, 'updateAlias'])->name('community.alias.update');
     Route::post('/community/posts', [CommunityController::class, 'store'])->middleware('throttle:5,1')->name('community.posts.store');
@@ -197,7 +199,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::get('/setup/filter', [PredictionController::class, 'filterSetup'])->middleware('plan:pro')->name('setup.filter');
     Route::get('/setup/quality', [PredictionController::class, 'qualitySetup'])->middleware('plan:plus')->name('setup.quality');
+    Route::get('/setup/labels', [SmartSelectionLabelController::class, 'index'])->middleware('plan:plus')->name('setup.labels.index');
     Route::post('/setup/quality/labels', [SmartSelectionLabelController::class, 'store'])->middleware('plan:plus')->name('setup.quality.labels.store');
+    Route::patch('/setup/labels/{label}', [SmartSelectionLabelController::class, 'update'])->middleware('plan:plus')->name('setup.labels.update');
+    Route::delete('/setup/labels/{label}', [SmartSelectionLabelController::class, 'destroy'])->middleware('plan:plus')->name('setup.labels.destroy');
     Route::get('/setup/short', [PredictionController::class, 'shortStrategySetup'])->middleware('plan:pro')->name('setup.short');
     Route::get('/setup/quality-gate', [QualityGateSetupController::class, 'edit'])->name('setup.quality-gate.edit');
     Route::put('/setup/quality-gate', [QualityGateSetupController::class, 'update'])->name('setup.quality-gate.update');
@@ -215,14 +220,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/setup/filter/backtest/{publicId}/cancel', [PredictionController::class, 'cancelFilteredBacktest'])->middleware('plan:plus')->name('setup.filter.backtest.cancel');
     Route::get('/setup/filter/backtest/{publicId}/report', [PredictionController::class, 'downloadFilteredBacktestReport'])->middleware('plan:plus')->name('setup.filter.backtest.report');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::get('/stocks', fn (Request $request) =>
         redirect()->route('predictions.index', $request->query())
     )->name('stocks.index');
     Route::get('/predictions', [PredictionController::class, 'index'])->name('predictions.index');
+    Route::post('/predictions/filters', [PredictionController::class, 'storeTableFilter'])->name('predictions.filters.store');
     Route::get('/predictions/heatmap', [PredictionController::class, 'heatmap'])->name('predictions.heatmap');
     Route::get('/predictions/heatmap/trades', [PredictionController::class, 'backtestTrades'])->name('predictions.heatmap.trades');
-    Route::get('/signal-changes', SignalChangeController::class)->name('signal-changes.index');
+    Route::get('/recommendations/live-quotes', [RecommendationController::class, 'liveQuotes'])->name('recommendations.live-quotes');
     Route::get('/recommendations', RecommendationController::class)->name('recommendations.index');
     Route::get('/markteinschaetzung', MarketAssessmentController::class)->name('market-assessment');
     Route::get('/taegliche-marktanalyse', DailyMarketAnalysisController::class)->name('daily-market-analysis');
@@ -244,6 +251,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/stock-icons/{instrument}', StockIconController::class)->name('stocks.icon');
     Route::get('/stocks/{symbol}/chartanalyse', [StockController::class, 'chartAnalysis'])->name('stocks.chart-analysis');
     Route::get('/stocks/{symbol}/chart-data', [StockController::class, 'chartData'])->name('stocks.chart-data');
+    Route::get('/stocks/{symbol}/live-quote', [StockController::class, 'liveQuote'])->name('stocks.live-quote');
     Route::get('/stocks/{symbol}', [StockController::class, 'show'])->name('stocks.show');
     Route::get('/sektoren', [SectorController::class, 'index'])->name('sectors.index');
     Route::get('/watchlists', [WatchlistController::class, 'index'])->name('watchlists.index');
@@ -254,6 +262,17 @@ Route::middleware('auth')->group(function () {
     Route::patch('/watchlists/{watchlist}/items/{instrument}/move', [WatchlistController::class, 'moveItem'])->name('watchlists.items.move');
     Route::delete('/watchlists/{watchlist}', [WatchlistController::class, 'destroy'])->name('watchlists.destroy');
     Route::delete('/watchlists/{watchlist}/items/{instrument}', [WatchlistController::class, 'destroyItem'])->name('watchlists.items.destroy');
+    Route::get('/integrationen', [TradingIntegrationController::class, 'index'])->name('integrations.index');
+    Route::get('/konten', [TradingIntegrationController::class, 'accounts'])->name('accounts.index');
+    Route::get('/konten/{connection}/positionen', [TradingIntegrationController::class, 'accountPositions'])->middleware('throttle:30,1')->name('accounts.positions');
+    Route::post('/integrationen/broker', [TradingIntegrationController::class, 'storeBroker'])->name('integrations.broker.store');
+    Route::delete('/integrationen/broker/{connection}', [TradingIntegrationController::class, 'destroyBroker'])->name('integrations.broker.destroy');
+    Route::post('/integrationen/broker/{connection}/test', [TradingIntegrationController::class, 'testBroker'])->name('integrations.broker.test');
+    Route::get('/integrationen/ctrader/{connection}/authorize', [TradingIntegrationController::class, 'ctraderAuthorize'])->name('integrations.ctrader.authorize');
+    Route::get('/integrationen/ctrader/callback', [TradingIntegrationController::class, 'ctraderCallback'])->name('integrations.ctrader.callback');
+    Route::post('/integrationen/broker/{connection}/orders', [TradingIntegrationController::class, 'placeOrder'])->middleware('throttle:10,1')->name('integrations.orders.store');
+    Route::post('/integrationen/whatsapp', [TradingIntegrationController::class, 'storeWhatsApp'])->name('integrations.whatsapp.store');
+    Route::post('/integrationen/whatsapp/test', [TradingIntegrationController::class, 'testWhatsApp'])->middleware('throttle:3,1')->name('integrations.whatsapp.test');
     });
 
 require __DIR__.'/auth.php';

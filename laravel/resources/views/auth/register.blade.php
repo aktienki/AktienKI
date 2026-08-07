@@ -47,6 +47,14 @@
             <div class="p-6 sm:p-8 lg:p-8">
                 <h1 class="text-2xl font-bold tracking-tight">{{ __('Konto erstellen') }}</h1>
                 <p class="mt-1 text-sm text-slate-400">{{ __('Starte mit KI-gestützten Aktienanalysen.') }}</p>
+                @if (config('aktienki.beta.enabled', true))
+                    <div class="mt-4 flex items-start gap-3 rounded-xl border border-amber-300/35 bg-amber-300/[.09] px-3 py-2.5 text-amber-100">
+                        <span class="mt-0.5 shrink-0 rounded-md border border-amber-300/50 bg-amber-300/20 px-2 py-1 text-[9px] font-black uppercase tracking-[.16em] text-amber-200">{{ __('Beta') }}</span>
+                        <p class="text-[11px] leading-4"><strong class="font-bold text-amber-200">{{ __('Beta-Zugang mit E-Mail-Bestätigung') }}</strong><br>{{ __('Nach der Registrierung erhältst du einen persönlichen Freischaltcode per E-Mail.') }}
+                            <a class="ml-1 font-bold text-amber-200 underline underline-offset-2 hover:text-white" href="mailto:{{ config('aktienki.beta.contact_email') }}?subject={{ rawurlencode(__('Frage zur AktienKI-Beta')) }}">{{ __('Frage zum Zugang?') }}</a>
+                        </p>
+                    </div>
+                @endif
 
                 <form id="registration-form" method="POST" action="{{ route('register') }}" class="mt-5">
                     @csrf

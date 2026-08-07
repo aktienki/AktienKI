@@ -27,6 +27,11 @@ class DashboardController extends Controller
                 ->where('is_active', true)
                 ->count(),
         ];
+        $communityOverview = [
+            'posts' => \App\Models\CommunityPost::query()->where('is_published', true)->count(),
+            'members' => \App\Models\CommunityPost::query()->where('is_published', true)->distinct('user_id')->count('user_id'),
+            'recent' => \App\Models\CommunityPost::query()->where('is_published', true)->where('created_at', '>=', now()->subDays(7))->count(),
+        ];
         $marketSituation = Cache::remember('dashboard.personal.market-situation', now()->addMinutes(2), fn () =>
             DB::table('daily_market_ai_analyses')
                 ->orderByDesc('analysis_date')
@@ -41,6 +46,7 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'riskProfile', 'strategyPortfolio', 'overview', 'marketSituation', 'continentPredictions',
             'recentSignalOverview',
+            'communityOverview',
         ));
     }
 
@@ -131,7 +137,7 @@ class DashboardController extends Controller
 
     private function recentSignalOverview(): array
     {
-        return Cache::remember('dashboard.personal.recent-signal-overview-v2', now()->addMinutes(2), function (): array {
+        return Cache::remember('dashboard.personal.recent-signal-overview-v3', now()->addMinutes(2), function (): array {
             $latestIds = DB::table('predictions')
                 ->selectRaw('instrument_id, MAX(id) AS prediction_id')
                 ->groupBy('instrument_id');
@@ -143,7 +149,7 @@ class DashboardController extends Controller
                 ->where('instrument.is_active', true)
                 ->whereNull('instrument.deleted_at')
                 ->where('prediction.prediction_time', '>=', now()->subHours(48))
-                ->whereIn(DB::raw('UPPER(prediction.signal)'), ['BUY', 'WATCH'])
+                ->whereIn(DB::raw('UPPER(prediction.signal)'), ['BUY', 'SELL'])
                 ->orderByDesc('prediction.prediction_time')
                 ->get(['instrument.symbol', 'prediction.signal', 'prediction.prediction_time']);
 
@@ -178,8 +184,9 @@ class DashboardController extends Controller
 
             return [
                 'buy_count' => $recommendations->where('signal', 'BUY')->count(),
-                'watch_count' => $recommendations->where('signal', 'WATCH')->count(),
+                'sell_count' => $recommendations->where('signal', 'SELL')->count(),
                 'buy_symbols' => $recommendations->where('signal', 'BUY')->take(4)->pluck('symbol')->all(),
+                'sell_symbols' => $recommendations->where('signal', 'SELL')->take(4)->pluck('symbol')->all(),
                 'transition_count' => (int) $transitions->sum('transition_count'),
                 'transitions' => $transitions->take(3)->map(fn (object $transition): array => [
                     'from' => $transition->previous_signal,

@@ -24,6 +24,68 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class PredictionController extends Controller
 {
+    private const TABLE_FILTER_KEYS = [
+        'q', 'symbols', 'country', 'exchange', 'index', 'sector', 'smart_label', 'quality_tier', 'signal',
+        'score_min', 'confidence_min', 'drawdown_max', 'profit_factor_min',
+        'hit_rate_min', 'volatility_max', 'sort', 'direction',
+    ];
+
+    /**
+     * Return the canonical index universe used by all German filter/setup pages.
+     * Indexes are stored as instruments (type=index); the legacy market_indices
+     * table is intentionally only a fallback for older installations.
+     */
+    private function activeIndexOptions()
+    {
+        $options = DB::table('instruments')
+            ->where('type', 'index')
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderBy('symbol')
+            ->get(['symbol', 'name']);
+
+        if ($options->isEmpty() && DB::getSchemaBuilder()->hasTable('market_indices')) {
+            $options = DB::table('market_indices')
+                ->where('is_active', true)
+                ->orderBy('symbol')
+                ->get(['symbol', 'name']);
+        }
+
+        return $options
+            ->map(fn (object $index): object => (object) [
+                'symbol' => (string) $index->symbol,
+                'name' => trim((string) ($index->name ?: $index->symbol)),
+            ])
+            ->values();
+    }
+
+    public function storeTableFilter(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:80'],
+        ]);
+        $filters = collect(self::TABLE_FILTER_KEYS)
+            ->mapWithKeys(fn (string $key): array => [$key => $request->input($key)])
+            ->reject(fn ($value) => $value === null || $value === '')
+            ->all();
+        $user = $request->user();
+        $preferences = (array) ($user->preferences ?? []);
+        $presets = collect((array) data_get($preferences, 'prediction_table_filters', []));
+        $name = trim($validated['name']);
+        $existing = $presets->first(fn ($preset) => mb_strtolower((string) data_get($preset, 'name')) === mb_strtolower($name));
+        $id = (string) (data_get($existing, 'id') ?: Str::uuid());
+        $presets = $presets
+            ->reject(fn ($preset) => (string) data_get($preset, 'id') === $id)
+            ->push(['id' => $id, 'name' => $name, 'filters' => $filters])
+            ->take(-20)
+            ->values();
+        data_set($preferences, 'prediction_table_filters', $presets->all());
+        $user->forceFill(['preferences' => $preferences])->save();
+
+        return redirect()->route('predictions.index', array_merge($filters, ['table_filter' => $id]))
+            ->with('status', __('Tabellenfilter gespeichert.'));
+    }
+
     public function backtestTrades(Request $request): View
     {
         $modelIds = $this->requestedModelIds($request);
@@ -152,9 +214,10 @@ final class PredictionController extends Controller
         $predictionView = $this->index($request);
         $predictionData = $predictionView->getData();
 
-        return view('predictions.heatmap', array_intersect_key($predictionData, array_flip([
+        $data = array_intersect_key($predictionData, array_flip([
             'heatmap',
             'heatmapSummary',
+            'individualStats',
             'summary',
             'countries',
             'exchanges',
@@ -165,7 +228,12 @@ final class PredictionController extends Controller
             'signals',
             'validationStates',
             'rangeMaxima',
-        ])));
+            'indices',
+            'canUseSmartLabels',
+            'smartLabels',
+        ]));
+        $data['indices'] = $this->activeIndexOptions();
+        return view('predictions.heatmap', $data);
     }
 
     public function filterSetup(Request $request): View
@@ -195,7 +263,9 @@ final class PredictionController extends Controller
             'signals',
             'validationStates',
             'rangeMaxima',
+            'indices',
         ]));
+        $data['indices'] = $this->activeIndexOptions();
         $data['setupMode'] = true;
         $data['activeBacktestRun'] = $this->requestedUserBacktestRun($request);
         $data['savedFilters'] = $request->user()->savedPredictionFilters()->orderBy('name')->get();
@@ -205,14 +275,169 @@ final class PredictionController extends Controller
             : null;
         $data['hasPersonalQualityGate'] = $personalGate !== null;
 
+        // Smart Selection statistics must describe the selected backtest universe,
+        // never the latest live prediction snapshot.
+        $run = $data['activeBacktestRun'];
+        if ($run === null && $request->boolean('quality_setup')) {
+            $run = DB::table('backtest_runs')
+                ->whereIn('status', ['completed', 'completed_with_errors'])
+                ->whereRaw("COALESCE(settings->>'run_type', 'system') <> 'user_filter'")
+                ->orderByDesc('finished_at')
+                ->first();
+            $data['activeBacktestRun'] = $run;
+        }
+        if ($run !== null && in_array((string) $run->status, ['completed', 'completed_with_errors'], true)) {
+            $latestQualityRankings = DB::table('model_quality_rankings')
+                ->selectRaw('trained_model_id, MAX(id) AS ranking_id')
+                ->groupBy('trained_model_id');
+            $minimumQualityTiers = [
+                'top' => ['top'],
+                'strong' => ['top', 'strong'],
+                'solid' => ['top', 'strong', 'solid'],
+                'test' => ['top', 'strong', 'solid', 'test'],
+            ];
+            $backtestQuery = DB::table('backtest_trades as trade')
+                ->join('instruments as instrument', 'instrument.id', '=', 'trade.instrument_id')
+                ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
+                ->leftJoin('trained_models as trained_model', 'trained_model.id', '=', 'trade.trained_model_id')
+                ->leftJoinSub($latestQualityRankings, 'latest_quality', fn ($join) => $join->on('latest_quality.trained_model_id', '=', 'trained_model.id'))
+                ->leftJoin('model_quality_rankings as model_quality', 'model_quality.id', '=', 'latest_quality.ranking_id')
+                ->leftJoin('model_quality_tiers as quality_tier', 'quality_tier.id', '=', 'model_quality.tier_id')
+                ->where('trade.backtest_run_id', $run->id)
+                ->when($request->filled('q'), fn ($query) => $query->where(function ($nested) use ($request): void {
+                    $term = '%'.strtolower(trim((string) $request->query('q'))).'%';
+                    $nested->whereRaw('LOWER(instrument.symbol) LIKE ?', [$term])->orWhereRaw('LOWER(instrument.name) LIKE ?', [$term]);
+                }))
+                ->when($request->filled('country'), fn ($query) => $query->where('instrument.country', $request->query('country')))
+                ->when($request->filled('exchange'), fn ($query) => $query->where('exchange.code', strtoupper((string) $request->query('exchange'))))
+                ->when($request->filled('sector'), fn ($query) => $query->where('instrument.sector', $request->query('sector')))
+                ->when(in_array((string) $request->query('quality_tier'), ['top', 'strong', 'solid', 'test'], true), fn ($query) => $query->whereIn('quality_tier.code', $minimumQualityTiers[(string) $request->query('quality_tier')]))
+                ->when($request->query('quality_tier') === 'unqualified', fn ($query) => $query->whereNull('quality_tier.code'))
+                ->when($request->filled('index'), function ($query) use ($request): void {
+                    // Indexes are benchmark context, while backtest rows are
+                    // stocks. Use the index's country as the universe scope
+                    // instead of incorrectly requiring a traded index row.
+                    $indexCountry = DB::table('instruments')
+                        ->where('type', 'index')
+                        ->where('symbol', (string) $request->query('index'))
+                        ->value('country');
+                    if (filled($indexCountry)) {
+                        $query->where('instrument.country', strtoupper((string) $indexCountry));
+                    }
+                })
+                ->when(in_array($request->query('ai_type'), ['horizon', 'pulse'], true), fn ($query) => $query->where('trade.ai_type', $request->query('ai_type')))
+                ->when($this->requestedModelIds($request) !== [], fn ($query) => $query->whereIn('trade.model_definition_id', $this->requestedModelIds($request)))
+                ->when(in_array(strtoupper((string) $request->query('signal')), ['BUY', 'SELL'], true), fn ($query) => $query->where('trade.signal', strtoupper((string) $request->query('signal'))))
+                ->when(is_numeric($request->query('score_min')), fn ($query) => $query->where('trade.ki_score', '>=', (float) $request->query('score_min')))
+                ->when(is_numeric($request->query('confidence_min')), fn ($query) => $query->where('trade.confidence', '>=', (float) $request->query('confidence_min')))
+                ->when(is_numeric($request->query('drawdown_max')) && (float) $request->query('drawdown_max') < 50, fn ($query) => $query->whereRaw('ABS(trade.max_drawdown) * 100 <= ?', [(float) $request->query('drawdown_max')]))
+                ->get([
+                    'trade.net_return', 'trade.max_drawdown', 'trade.entry_date',
+                    'trade.ki_score', 'trade.confidence', 'trade.predicted_return', 'trade.signal',
+                    'instrument.id as instrument_id',
+                    'instrument.symbol', 'instrument.name',
+                    'instrument.type', 'instrument.country', 'instrument.sector',
+                    'exchange.code as exchange_code',
+                ]);
+            $backtestRows = $backtestQuery;
+            $profitMinimum = is_numeric($request->query('profit_factor_min')) ? (float) $request->query('profit_factor_min') : 0.0;
+            $hitMinimum = is_numeric($request->query('hit_rate_min')) ? (float) $request->query('hit_rate_min') : 0.0;
+            if ($profitMinimum > 0 || $hitMinimum > 0) {
+                $eligibleInstruments = $backtestRows->groupBy('instrument_id')->filter(function ($instrumentRows) use ($profitMinimum, $hitMinimum): bool {
+                    $winsForInstrument = $instrumentRows->filter(fn (object $row): bool => (float) $row->net_return > 0);
+                    $lossesForInstrument = $instrumentRows->filter(fn (object $row): bool => (float) $row->net_return < 0);
+                    $profitFactor = (float) $lossesForInstrument->sum('net_return') !== 0.0
+                        ? (float) $winsForInstrument->sum('net_return') / abs((float) $lossesForInstrument->sum('net_return'))
+                        : 0.0;
+                    $hitRate = $instrumentRows->count() > 0 ? ($winsForInstrument->count() / $instrumentRows->count()) * 100 : 0.0;
+                    return $profitFactor >= $profitMinimum && $hitRate >= $hitMinimum;
+                })->keys();
+                $backtestRows = $backtestRows->whereIn('instrument_id', $eligibleInstruments->all())->values();
+            }
+            $data['individualStats'] = $backtestRows->groupBy('instrument_id')->map(function ($rows): array {
+                $wins = $rows->filter(fn (object $row): bool => (float) $row->net_return > 0);
+                $losses = $rows->filter(fn (object $row): bool => (float) $row->net_return < 0);
+                $grossProfit = (float) $wins->sum('net_return');
+                $grossLoss = abs((float) $losses->sum('net_return'));
+                $first = $rows->first();
+                return [
+                    'symbol' => (string) ($first->symbol ?? '—'),
+                    'name' => (string) ($first->name ?? ''),
+                    'signal' => (string) ($first->signal ?? '—'),
+                    'trades' => $rows->count(),
+                    'hit_rate' => $rows->count() > 0 ? ($wins->count() / $rows->count()) * 100 : 0,
+                    'profit_factor' => $grossLoss > 0 ? $grossProfit / $grossLoss : null,
+                    'drawdown' => (float) $rows->max(fn (object $row): float => abs((float) $row->max_drawdown)) * 100,
+                    'average_return' => (float) $rows->avg('net_return') * 100,
+                    'score' => (float) ($rows->avg('ki_score') ?? 0),
+                    'confidence' => (float) ($rows->avg('confidence') ?? 0),
+                ];
+            })->sortByDesc('trades')->take(200)->values();
+            $wins = $backtestRows->filter(fn (object $row): bool => (float) $row->net_return > 0)->count();
+            $grossProfit = (float) $backtestRows->filter(fn (object $row): bool => (float) $row->net_return > 0)->sum('net_return');
+            $grossLoss = abs((float) $backtestRows->filter(fn (object $row): bool => (float) $row->net_return < 0)->sum('net_return'));
+            $returns = $backtestRows->pluck('net_return')->map(fn ($value): float => (float) $value)->values();
+            $meanReturn = $returns->avg() ?? 0.0;
+            $variance = $returns->count() > 1 ? $returns->map(fn (float $value): float => ($value - $meanReturn) ** 2)->sum() / ($returns->count() - 1) : 0.0;
+            $dates = $backtestRows->pluck('entry_date')->filter()->map(fn ($date): int => strtotime((string) $date))->filter()->values();
+            $months = $dates->count() > 1 ? max(1.0, ($dates->max() - $dates->min()) / (86400 * 30.4375)) : 1.0;
+            $data['marketContextCounts'] = [
+                // The backtest trades are equities; their market benchmark is
+                // represented as one index context (DAX/S&P depending on the
+                // configured market), not as a traded equity row.
+                // Backtest trades are stock trades; the index dimension is the
+                // available benchmark universe, not a traded row.  Count the
+                // selected index (or all active indexes when no selection is
+                // made) so the German "Indizes" card never appears empty.
+                'indices' => $backtestRows->isEmpty()
+                    ? 0
+                    : ($request->filled('index') ? 1 : $this->activeIndexOptions()->count()),
+                'exchanges' => $backtestRows->pluck('exchange_code')->filter()->unique()->count(),
+                'sectors' => $backtestRows->pluck('sector')->filter()->unique()->count(),
+                'countries' => $backtestRows->pluck('country')->filter()->unique()->count(),
+            ];
+            $data['heatmapSummary'] = (object) [
+                'candidates' => $backtestRows->pluck('instrument_id')->filter()->unique()->count(),
+                'qualified' => $backtestRows->pluck('instrument_id')->filter()->unique()->count(),
+                'trades' => $backtestRows->count(),
+                'winning_trades' => $wins,
+                'profit_factor' => $grossLoss > 0 ? $grossProfit / $grossLoss : 0,
+                'hit_rate' => $backtestRows->count() > 0 ? ($wins / $backtestRows->count()) * 100 : 0,
+                'drawdown' => (float) $backtestRows->max(fn (object $row): float => abs((float) $row->max_drawdown)) * 100,
+                'volatility' => sqrt($variance * 252) * 100,
+                'trades_per_month' => $backtestRows->count() / $months,
+            ];
+        }
+
         return view('predictions.heatmap', $data);
     }
 
     public function qualitySetup(Request $request): View
     {
+        if ($request->boolean('reset')) {
+            $request->session()->forget('setup_filter_state');
+            $request->replace(['reset' => '1']);
+        }
+        $request->merge(['quality_setup' => '1']);
         $view = $this->filterSetup($request);
         $data = $view->getData();
         $data['qualitySetupMode'] = true;
+        $data['marketContextCounts'] ??= [
+            'indices' => 0,
+            'exchanges' => 0,
+            'sectors' => 0,
+            'countries' => 0,
+        ];
+        // Always provide the canonical index list.  Previously this variable
+        // was missing on the setup view, leaving the German "Indizes" select
+        // and universe card empty even though index instruments existed.
+        $data['indices'] = $this->activeIndexOptions();
+        if ($data['activeBacktestRun'] === null) {
+            $data['heatmapSummary'] = (object) [
+                'candidates' => 0, 'qualified' => 0, 'trades' => 0, 'winning_trades' => 0,
+                'profit_factor' => 0, 'hit_rate' => 0, 'drawdown' => 0, 'volatility' => 0,
+            ];
+        }
 
         return view('predictions.heatmap', $data);
     }
@@ -258,7 +483,7 @@ final class PredictionController extends Controller
             'score_min' => ['nullable', 'numeric', 'between:0,10'],
             'confidence_min' => ['nullable', 'numeric', 'between:0,100'],
             'drawdown_max' => ['nullable', 'numeric', 'between:0,100'],
-            'profit_factor_min' => ['nullable', 'numeric', 'between:0,10'],
+            'profit_factor_min' => ['nullable', 'numeric', 'between:0,3'],
             'volatility_max' => ['nullable', 'numeric', 'between:0,1000000'],
             'pe_max' => ['nullable', 'numeric', 'between:0,1000000'],
             'dividend_yield_min' => ['nullable', 'numeric', 'between:0,1000000'],
@@ -376,7 +601,7 @@ final class PredictionController extends Controller
             'risk_max' => $rules['risk_max'] ?? 100,
             'predicted_return_min' => $rules['predicted_return_min'] ?? -50,
             'drawdown_max' => min(50, (float) ($rules['drawdown_max'] ?? 50)),
-            'profit_factor_min' => min(10, (float) ($rules['profit_factor_min'] ?? 0)),
+            'profit_factor_min' => min(3, (float) ($rules['profit_factor_min'] ?? 0)),
             'hit_rate_min' => $rules['hit_rate_min'] ?? 0,
             'minimum_trades' => $rules['minimum_trades'] ?? 1,
             'positive_prediction_required' => ($rules['positive_prediction_required'] ?? false) ? 1 : 0,
@@ -384,8 +609,9 @@ final class PredictionController extends Controller
         ]);
     }
 
-    public function filteredBacktestResult(Request $request, string $publicId, YahooIndexService $indices): JsonResponse
+    public function filteredBacktestResult(Request $request, string $publicId, ?YahooIndexService $indices = null): JsonResponse
     {
+        $indices ??= app(YahooIndexService::class);
         $run = DB::table('backtest_runs')
             ->where('public_id', $publicId)
             ->whereRaw("settings->>'run_type' = 'user_filter'")
@@ -945,21 +1171,28 @@ final class PredictionController extends Controller
     {
         $heatmapOnly = $request->attributes->getBoolean('heatmap_only');
 
-        if (! $request->query->has('signal')) {
-            $request->query->set('signal', 'BUY');
-        }
-
         $modelIds = $this->requestedModelIds($request);
+        $requestedSymbols = collect((array) $request->query('symbols', []))
+            ->flatMap(fn ($value) => is_string($value) ? preg_split('/\s*,\s*/', $value, -1, PREG_SPLIT_NO_EMPTY) : [$value])
+            ->map(fn ($symbol) => strtoupper(trim((string) $symbol)))
+            ->filter(fn ($symbol) => preg_match('/^[A-Z0-9.\-]{1,20}$/', $symbol))
+            ->unique()->take(20)->values()->all();
         $signalSql = app(PersonalizedSignalService::class)->sql('prediction', $request->user());
-        $canUseSmartLabels = ! $heatmapOnly
-            && app(PlanAccessService::class)->allows($request->user(), PlanLevel::Premium);
-        $smartLabels = $canUseSmartLabels
+        // Labels are available from the Plus tier onward.  Keeping this gate
+        // at Premium made the selector disappear for Pro/Plus users even
+        // when they already had active labels configured.
+        $smartLabels = ! $heatmapOnly
             ? DB::table('smart_selection_labels')
                 ->where('user_id', $request->user()->id)
                 ->where('tariff_plan_id', $request->user()->tariff_plan_id)
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'color', 'icon', 'criteria'])
+            : collect();
+        $canUseSmartLabels = ! $heatmapOnly
+            && (app(PlanAccessService::class)->allows($request->user(), PlanLevel::Plus) || $smartLabels->isNotEmpty());
+        $smartLabels = $canUseSmartLabels
+            ? $smartLabels
             : collect();
         $selectedSmartLabelId = $smartLabels->contains('id', $request->integer('smart_label'))
             ? $request->integer('smart_label')
@@ -1040,10 +1273,11 @@ final class PredictionController extends Controller
             'test' => ['top', 'strong', 'solid', 'test'],
         ];
 
-        $applyFilters = function (Builder $query, ?string $excluded = null, bool $includeNumericFilters = true) use ($request, $signalSql, $scoreSql, $confidenceSql, $predictedReturnSql, $minimumQualityTiers, $modelIds): Builder {
+        $applyFilters = function (Builder $query, ?string $excluded = null, bool $includeNumericFilters = true) use ($request, $signalSql, $scoreSql, $confidenceSql, $predictedReturnSql, $minimumQualityTiers, $modelIds, $requestedSymbols): Builder {
             $qualityTier = (string) $request->query('quality_tier');
 
             return $query
+            ->when($requestedSymbols !== [], fn (Builder $query) => $query->whereIn('instrument.symbol', $requestedSymbols))
             ->when($request->filled('q'), function (Builder $query) use ($request): void {
                 $term = '%'.strtolower(trim((string) $request->query('q'))).'%';
                 $query->where(fn (Builder $query) => $query
@@ -1077,7 +1311,7 @@ final class PredictionController extends Controller
             ->when($includeNumericFilters && $request->filled('drawdown_max') && is_numeric($request->query('drawdown_max')) && (float) $request->query('drawdown_max') < 50, fn (Builder $query) =>
                 $query->where('backtest_stat.drawdown_percent', '<=', max(0, min(50, (float) $request->query('drawdown_max')))))
             ->when($includeNumericFilters && $request->filled('profit_factor_min') && is_numeric($request->query('profit_factor_min')) && (float) $request->query('profit_factor_min') > 0, fn (Builder $query) =>
-                $query->where('backtest_stat.profit_factor', '>=', max(0, min(10, (float) $request->query('profit_factor_min')))))
+                $query->where('backtest_stat.profit_factor', '>=', max(0, min(3, (float) $request->query('profit_factor_min')))))
             ->when($includeNumericFilters && $request->filled('hit_rate_min') && is_numeric($request->query('hit_rate_min')) && (float) $request->query('hit_rate_min') > 0, fn (Builder $query) =>
                 $query->where('backtest_stat.hit_rate', '>=', max(0, min(100, (float) $request->query('hit_rate_min')))))
             ->when($includeNumericFilters && $request->filled('volatility_max') && is_numeric($request->query('volatility_max')) && (float) $request->query('volatility_max') < 100, fn (Builder $query) =>
@@ -1091,6 +1325,7 @@ final class PredictionController extends Controller
             ->select([
                 'prediction.id',
                 'prediction.instrument_id',
+                'prediction.signal',
                 'prediction.prediction_time',
                 'prediction.interval',
                 'prediction.ai_type',
@@ -1118,11 +1353,34 @@ final class PredictionController extends Controller
                 'quality_tier.name as model_quality_tier_name',
             ])
             ->selectRaw("{$signalSql} AS personalized_signal")
+            ->selectRaw("(SELECT UPPER(previous_prediction.signal)
+                FROM predictions AS previous_prediction
+                WHERE previous_prediction.instrument_id = prediction.instrument_id
+                  AND previous_prediction.prediction_time < prediction.prediction_time
+                ORDER BY previous_prediction.prediction_time DESC, previous_prediction.id DESC
+                LIMIT 1) AS previous_signal")
+            ->selectRaw("(SELECT previous_prediction.prediction_time
+                FROM predictions AS previous_prediction
+                WHERE previous_prediction.instrument_id = prediction.instrument_id
+                  AND previous_prediction.prediction_time < prediction.prediction_time
+                ORDER BY previous_prediction.prediction_time DESC, previous_prediction.id DESC
+                LIMIT 1) AS previous_signal_time")
             ->selectRaw('((prediction.predicted_price_5d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100 AS expected_return_5d')
             ->selectRaw('((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100 AS expected_return_20d')
             ->selectRaw("{$scoreSql} AS score_10")
             ->selectRaw("{$confidenceSql} AS confidence_percent")
-            ->selectRaw('(CASE WHEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) <= 1 THEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) * 100 ELSE COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) END) AS risk_percent');
+            ->selectRaw('GREATEST(
+                20,
+                COALESCE(
+                    CASE
+                        WHEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) <= 1
+                            THEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) * 100
+                        ELSE COALESCE(prediction.risk_score, prediction.drawdown_risk_factor)
+                    END,
+                    50
+                ),
+                COALESCE(backtest_stat.drawdown_percent, 0)
+            ) AS risk_percent');
 
         $query
             ->orderBy($sortColumns[$sort], $direction)
@@ -1197,16 +1455,19 @@ final class PredictionController extends Controller
             'instruments' => 0,
             'validated' => 0,
             'oldest_training' => null,
+            'latest_prediction' => null,
         ] : $applyFilters($baseQuery())
             ->selectRaw('COUNT(*) AS total')
             ->selectRaw('COUNT(DISTINCT prediction.instrument_id) AS instruments')
             ->selectRaw('COUNT(prediction.validated_at) AS validated')
             ->selectRaw('MIN(trained_model.trained_at) AS oldest_training')
+            ->selectRaw('MAX(prediction.prediction_time) AS latest_prediction')
             ->first();
         if ($selectedSmartLabelId !== null) {
             $summary->total = $predictions->count();
             $summary->instruments = $predictions->pluck('instrument_id')->unique()->count();
             $summary->validated = $predictions->whereNotNull('validated_at')->count();
+            $summary->latest_prediction = $predictions->max('prediction_time');
         }
 
         $aiTypes = $applyFilters($baseQuery(), 'ai_type', false)
@@ -1322,8 +1583,10 @@ final class PredictionController extends Controller
             'score' => $ceilTo($rangeValues?->score, .5, 10),
             'confidence' => $ceilTo($rangeValues?->confidence, 5, 100),
             'drawdown' => $ceilTo($rangeValues?->drawdown, 5, 50),
-            'profit_factor' => 10.0,
-            'volatility' => $ceilTo($rangeValues?->volatility, 5, 100),
+            'profit_factor' => 3.0,
+            // Volatility is displayed as a percentage and is intentionally
+            // capped at 100 for every German filter page.
+            'volatility' => min(100.0, $ceilTo($rangeValues?->volatility, 5, 100)),
             'predicted_return' => $ceilTo($rangeValues?->predicted_return, .5, 20),
             'pe' => $ceilTo($rangeValues?->pe, 1, 100),
             'dividend_yield' => $ceilTo($rangeValues?->dividend_yield, .1, 10),
@@ -1439,6 +1702,15 @@ final class PredictionController extends Controller
                 ->get(['instrument_id', 'watchlist_id'])
                 ->groupBy('instrument_id')
                 ->map(fn ($items) => $items->pluck('watchlist_id')->map(fn ($id) => (int) $id));
+        $savedPredictionFilters = collect((array) data_get($request->user()->preferences, 'prediction_table_filters', []))
+            ->map(fn ($preset): object => (object) [
+                'id' => (string) data_get($preset, 'id'),
+                'name' => (string) data_get($preset, 'name'),
+                'filters' => (array) data_get($preset, 'filters', []),
+            ])
+            ->filter(fn (object $preset): bool => $preset->id !== '' && $preset->name !== '')
+            ->sortBy('name')
+            ->values();
 
         return view('predictions.index', compact(
             'predictions',
@@ -1460,6 +1732,7 @@ final class PredictionController extends Controller
             'direction',
             'canUseSmartLabels',
             'smartLabels',
+            'savedPredictionFilters',
         ));
     }
 

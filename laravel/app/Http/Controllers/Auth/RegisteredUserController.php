@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
@@ -72,8 +74,9 @@ class RegisteredUserController extends Controller
 
         $legalVersion = '1.0';
         $riskLevel = $request->string('risk_level')->toString();
+        $betaCode = Str::upper(Str::random(4).'-'.Str::random(4));
 
-        $user = DB::transaction(function () use ($request, $legalVersion, $riskLevel) {
+        $user = DB::transaction(function () use ($request, $legalVersion, $riskLevel, $betaCode) {
             if (DB::connection()->getDriverName() === 'pgsql') {
                 DB::statement('SELECT pg_advisory_xact_lock(?)', [24072026]);
             }
@@ -86,7 +89,8 @@ class RegisteredUserController extends Controller
                 'name' => $request->name,
                 'email' => strtolower($request->email),
                 'password' => Hash::make($request->password),
-                'account_status' => $isBetaTester ? 'tester' : 'active',
+                'account_status' => (bool) config('aktienki.beta.enabled', true) ? 'pending_beta' : ($isBetaTester ? 'tester' : 'active'),
+                'is_beta_tester' => (bool) config('aktienki.beta.enabled', true),
 
                 'legal_accepted' => true,
                 'legal_accepted_at' => now(),
@@ -111,6 +115,12 @@ class RegisteredUserController extends Controller
                         'joined_at' => now()->toIso8601String(),
                         'permanent_pro_access' => true,
                     ] : null,
+                    'beta_registration' => [
+                        'status' => (bool) config('aktienki.beta.enabled', true) ? 'pending_verification' : 'active',
+                        'code_hash' => Hash::make($betaCode),
+                        'code_encrypted' => Crypt::encryptString($betaCode),
+                        'created_at' => now()->toIso8601String(),
+                    ],
                 ],
             ]);
 
@@ -146,6 +156,6 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        return redirect()->route('verification.notice');
     }
 }

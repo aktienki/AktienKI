@@ -4,11 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\BetaEmailVerificationNotification;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable;
 
@@ -26,6 +28,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'active' => 'boolean',
             'is_admin' => 'boolean',
+            'is_beta_tester' => 'boolean',
+            'beta_access_exempt' => 'boolean',
 
             'accepted_terms' => 'boolean',
             'accepted_terms_at' => 'datetime',
@@ -47,7 +51,13 @@ class User extends Authenticatable
             'preferences' => 'array',
             'meta' => 'array',
             'risk_profile' => 'array',
+            'subscription_metadata' => 'array',
         ];
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new BetaEmailVerificationNotification);
     }
 
     public function watchlists(): HasMany

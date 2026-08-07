@@ -142,8 +142,8 @@
                         : null;
                 @endphp
 
-                <article class="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border {{ $rank === 1 ? 'border-amber-400/35' : ($isTestCandidate ? 'border-dashed border-teal-500/35' : 'border-[var(--ak-border)]') }} bg-[var(--ak-card-strong)] shadow-[var(--ak-shadow)] backdrop-blur-xl">
-                    <div class="flex h-[98px] shrink-0 items-start justify-between gap-3 border-b border-[var(--ak-border)] p-2.5">
+                <article class="ak-top3-card relative flex min-w-0 flex-col overflow-hidden rounded-2xl border {{ $rank === 1 ? 'ak-top3-winner border-amber-400/55' : ($isTestCandidate ? 'border-dashed border-teal-500/35' : 'border-[var(--ak-border)]') }} backdrop-blur-xl">
+                    <div class="ak-top3-card-head flex h-[98px] shrink-0 items-start justify-between gap-3 border-b border-[var(--ak-border)] p-2.5">
                         <div class="flex min-w-0 items-center gap-3">
                             <div class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--ak-border)] bg-white">
                                 <span class="text-[10px] font-black text-teal-700">{{ strtoupper(substr($recommendation->symbol, 0, 2)) }}</span>
@@ -217,7 +217,8 @@
                     <div class="mt-1 grid h-[72px] shrink-0 grid-cols-3 gap-2 px-3 pb-2 pt-2">
                         <div class="min-h-0 overflow-hidden rounded-xl border border-emerald-400/20 bg-emerald-400/[.06] p-2 text-right">
                             <p class="flex items-center justify-end gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
-                                <span data-live-time-symbol="{{ $recommendation->symbol }}">
+                                <span data-top3-live-change="{{ $recommendation->symbol }}" class="hidden"></span>
+                                <span data-live-time-symbol="{{ $recommendation->symbol }}" data-top3-live-time="{{ $recommendation->symbol }}">
                                     {{ $recommendation->current_quote_time
                                         ? \Illuminate\Support\Carbon::parse($recommendation->current_quote_time)->timezone('Europe/Berlin')->format('H:i:s')
                                         : __('Kurszeit') }}
@@ -226,6 +227,7 @@
                             </p>
                             <p
                                 data-live-symbol="{{ $recommendation->symbol }}"
+                                data-top3-live-price="{{ $recommendation->symbol }}"
                                 data-live-currency="{{ $recommendation->currency ?: 'EUR' }}"
                                 data-live-decimals="2"
                                 class="ak-top3-metric-value mt-0.5 truncate font-black tabular-nums text-[var(--ak-text)]"
@@ -239,7 +241,7 @@
                         </div>
                         <div class="min-h-0 overflow-hidden rounded-xl bg-[var(--ak-surface-muted)] p-2 text-right">
                             <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Prognose 20 Tage') }}</p>
-                            <p class="ak-top3-metric-value mt-0.5 whitespace-nowrap font-black tabular-nums {{ $recommendation->expected_return_20d >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $recommendation->expected_return_20d >= 0 ? '+' : '' }}{{ number_format($recommendation->expected_return_20d, 2, ',', '.') }} %</p>
+                            <p data-top3-live-return="{{ $recommendation->symbol }}" data-target-price="{{ $recommendation->predicted_price_20d }}" class="ak-top3-metric-value mt-0.5 whitespace-nowrap font-black tabular-nums {{ $recommendation->expected_return_20d >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $recommendation->expected_return_20d >= 0 ? '+' : '' }}{{ number_format($recommendation->expected_return_20d, 2, ',', '.') }} %</p>
                         </div>
                     </div>
 
@@ -269,7 +271,7 @@
                         </div>
                     </div>
 
-                    <div class="grid h-[60px] shrink-0 grid-cols-3 gap-2 px-3 pb-1.5">
+                    <div class="mb-2 grid h-[60px] shrink-0 grid-cols-3 gap-2 px-3 pb-1.5">
                         <div class="flex h-full min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2 shadow-sm">
                             <span class="min-w-0 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
                             <div class="ak-prediction-donut" style="--value: {{ $recommendation->score_percent }}%; --color: {{ $scoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $recommendation->score_10 }}">
@@ -293,7 +295,7 @@
                         </div>
                     </div>
 
-                    <div class="mt-auto flex h-[40px] shrink-0 items-center justify-end border-t border-[var(--ak-border)] px-3 py-1">
+                    <div class="ak-top3-card-footer mt-auto flex h-[40px] shrink-0 items-center justify-end border-t border-[var(--ak-border)] px-3 py-1">
                         <a href="{{ route('stocks.show', ['symbol' => $recommendation->symbol, 'prediction' => $recommendation->prediction_id, 'return_to' => request()->getRequestUri()]) }}" class="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg bg-teal-700 px-3 text-xs font-black text-white transition hover:bg-teal-600">
                             {{ __('Details') }}<x-heroicon-o-arrow-right class="h-4 w-4" />
                         </a>
@@ -330,9 +332,95 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const charts = @json($recommendationCharts);
+            const liveQuotesUrl = @js(route('recommendations.live-quotes'));
+            const liveSymbols = Object.values(charts).map(stock => stock.symbol).filter(Boolean);
+            const latestQuoteTimestamps = new Map();
+            const realtimeSymbols = new Set();
+            const applyDailyChange = (symbol, change) => {
+                const changePercent = Number(change);
+                const changeElement = document.querySelector(`[data-top3-live-change="${CSS.escape(symbol)}"]`);
+                if (!changeElement || !Number.isFinite(changePercent)) return;
+                changeElement.textContent = `${changePercent >= 0 ? '+' : ''}${changePercent.toLocaleString(document.documentElement.lang, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                })} %`;
+                changeElement.classList.remove('hidden', 'text-emerald-500', 'text-rose-500');
+                changeElement.classList.add(changePercent >= 0 ? 'text-emerald-500' : 'text-rose-500');
+            };
+            const applyLiveQuote = (symbol, quote, source = 'realtime') => {
+                const price = Number(quote?.price);
+                const timestamp = Number(quote?.timestamp);
+                if (!symbol || !Number.isFinite(price) || price <= 0 || !Number.isFinite(timestamp)) return;
+
+                applyDailyChange(symbol, quote.change_percent);
+                if (source === 'fallback' && realtimeSymbols.has(symbol)) return;
+                if (source === 'realtime') realtimeSymbols.add(symbol);
+
+                const previous = latestQuoteTimestamps.get(symbol) ?? { timestamp: 0, source: null };
+                if (timestamp < previous.timestamp || (timestamp === previous.timestamp && source === 'fallback' && previous.source === 'realtime')) return;
+                latestQuoteTimestamps.set(symbol, { timestamp, source });
+
+                const priceElement = document.querySelector(`[data-top3-live-price="${CSS.escape(symbol)}"]`);
+                const timeElement = document.querySelector(`[data-top3-live-time="${CSS.escape(symbol)}"]`);
+                const returnElement = document.querySelector(`[data-top3-live-return="${CSS.escape(symbol)}"]`);
+                const currency = quote.currency || priceElement?.dataset.liveCurrency || '';
+                if (priceElement) {
+                    priceElement.textContent = `${price.toLocaleString(document.documentElement.lang, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    })}${currency ? ` ${currency}` : ''}`;
+                    priceElement.dataset.liveUpdatedAt = String(timestamp);
+                }
+                if (timeElement) {
+                    const quoteTime = new Date(timestamp * 1000);
+                    timeElement.textContent = quoteTime.toLocaleTimeString(
+                        document.documentElement.lang,
+                        { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Berlin' },
+                    );
+                    timeElement.title = quoteTime.toLocaleString(
+                        document.documentElement.lang,
+                        { dateStyle: 'medium', timeStyle: 'medium', timeZone: 'Europe/Berlin' },
+                    );
+                }
+                const target = Number(returnElement?.dataset.targetPrice);
+                if (returnElement && Number.isFinite(target)) {
+                    const expectedReturn = ((target - price) / price) * 100;
+                    returnElement.textContent = `${expectedReturn >= 0 ? '+' : ''}${expectedReturn.toLocaleString(document.documentElement.lang, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    })} %`;
+                    returnElement.classList.toggle('text-emerald-400', expectedReturn >= 0);
+                    returnElement.classList.toggle('text-rose-400', expectedReturn < 0);
+                }
+            };
+            const refreshLiveQuotes = async () => {
+                if (!liveSymbols.length || document.visibilityState === 'hidden') return;
+                try {
+                    const url = new URL(liveQuotesUrl, window.location.origin);
+                    url.searchParams.set('symbols', liveSymbols.join(','));
+                    const response = await fetch(url, {
+                        credentials: 'same-origin',
+                        headers: { Accept: 'application/json' },
+                        cache: 'no-store',
+                    });
+                    if (!response.ok) return;
+                    const { quotes = {} } = await response.json();
+                    Object.entries(quotes).forEach(([symbol, quote]) => applyLiveQuote(symbol, quote, 'fallback'));
+                } catch (_) {
+                    // Der letzte gültige Kurs bleibt bei kurzzeitigen API-Fehlern sichtbar.
+                }
+            };
+            refreshLiveQuotes();
+            const liveQuotesTimer = window.setInterval(refreshLiveQuotes, 2_000);
+            window.addEventListener('pagehide', () => window.clearInterval(liveQuotesTimer), { once: true });
+            window.addEventListener('aktienki:live-price', event => {
+                const symbol = String(event.detail?.symbol ?? '');
+                applyLiveQuote(symbol, event.detail, 'realtime');
+            });
+
             if (!window.ApexCharts) return;
 
-            const charts = @json($recommendationCharts);
             const light = document.documentElement.dataset.theme === 'light';
             const addTradingDays = (timestamp, tradingDays) => {
                 const target = new Date(timestamp);
@@ -357,8 +445,8 @@
                     unique.set(tradingDay, {
                         x: timestamp,
                         y: values,
-                        fillColor: rising ? '#20c9a0' : '#ee6678',
-                        strokeColor: rising ? '#20c9a0' : '#ee6678',
+                        fillColor: rising ? (light ? '#0f8f78' : '#2de2b6') : (light ? '#d63f55' : '#ff667d'),
+                        strokeColor: rising ? (light ? '#0b7565' : '#2de2b6') : (light ? '#b92740' : '#ff667d'),
                     });
                 });
 
@@ -407,12 +495,15 @@
                 const forecastColor = positiveForecast ? '#14b8a6' : '#e56b75';
                 const values = candles
                     .flatMap(candle => candle.y);
-                if (Number.isFinite(forecastTarget)) values.push(forecastTarget);
                 const minimum = Math.min(...values);
                 const maximum = Math.max(...values);
-                const padding = Math.max((maximum - minimum) * 0.08, maximum * 0.005);
+                const candleRange = Math.max(maximum - minimum, maximum * 0.015);
+                const padding = Math.max(candleRange * 0.14, maximum * 0.004);
                 const yMin = minimum - padding;
                 const yMax = maximum + padding;
+                const displayedForecastTarget = Number.isFinite(forecastTarget)
+                    ? Math.min(yMax - padding * 0.25, Math.max(yMin + padding * 0.25, forecastTarget))
+                    : null;
                 const xMin = candles[0].x;
                 const xMax = targetTimestamp;
 
@@ -436,11 +527,11 @@
                     }],
                     plotOptions: {
                         candlestick: {
-                            colors: { upward: '#20c9a0', downward: '#ee6678' },
-                            wick: { useFillColor: false },
+                            colors: { upward: light ? '#0f8f78' : '#2de2b6', downward: light ? '#d63f55' : '#ff667d' },
+                            wick: { useFillColor: true },
                         },
                     },
-                    stroke: { width: window.innerWidth >= 768 && window.innerWidth < 1280 ? 1.5 : 1 },
+                    stroke: { width: window.innerWidth >= 768 && window.innerWidth < 1280 ? 1.7 : 1.4 },
                     fill: { opacity: 1 },
                     dataLabels: { enabled: false },
                     states: {
@@ -525,7 +616,7 @@
                             </pattern>
                         </defs>
                         <polygon
-                            points="${toX(lastTimestamp)},${toY(lastClose)} ${toX(targetTimestamp)},${toY(Math.max(lastClose, forecastTarget))} ${toX(targetTimestamp)},${toY(Math.min(lastClose, forecastTarget))}"
+                            points="${toX(lastTimestamp)},${toY(lastClose)} ${toX(targetTimestamp)},${toY(Math.max(lastClose, displayedForecastTarget))} ${toX(targetTimestamp)},${toY(Math.min(lastClose, displayedForecastTarget))}"
                             fill="url(#${patternId})"
                             stroke="${forecastColor}"
                             stroke-width="1.6"

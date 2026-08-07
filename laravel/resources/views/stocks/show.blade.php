@@ -2,6 +2,119 @@
 
 @section('content')
     <style>
+        #stock-detail-page {
+            --stock-detail-accent: #14b8a6;
+            --stock-detail-accent-bright: #22d3ee;
+        }
+
+        #stock-detail-page .stock-detail-panel {
+            --stock-panel-padding: 1rem;
+            position: relative;
+            border-color: color-mix(in srgb, var(--ak-border) 76%, var(--stock-detail-accent) 24%) !important;
+            background:
+                radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .12), transparent 28%),
+                linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(244, 250, 249, .96)) !important;
+            box-shadow:
+                0 1px 0 rgba(255, 255, 255, .9) inset,
+                0 0 0 1px rgba(15, 118, 110, .055),
+                0 14px 34px rgba(15, 23, 42, .105),
+                0 4px 12px rgba(15, 118, 110, .07) !important;
+        }
+
+        :root:not([data-theme="light"]) #stock-detail-page .stock-detail-panel {
+            background:
+                radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .11), transparent 30%),
+                linear-gradient(145deg, rgba(22, 35, 45, .98), rgba(13, 25, 34, .98)) !important;
+            box-shadow:
+                0 1px 0 rgba(255, 255, 255, .045) inset,
+                0 0 0 1px rgba(34, 211, 238, .065),
+                0 18px 42px rgba(0, 0, 0, .34),
+                0 5px 16px rgba(6, 182, 212, .055) !important;
+        }
+
+        #stock-detail-page .stock-detail-panel-compact {
+            --stock-panel-padding: .75rem;
+        }
+
+        #stock-detail-page .stock-detail-panel::before {
+            content: '';
+            position: absolute;
+            z-index: 3;
+            inset: 0 18% auto;
+            height: 2px;
+            border-radius: 0 0 999px 999px;
+            background: linear-gradient(90deg, transparent, rgba(13, 148, 136, .62), rgba(34, 211, 238, .78), transparent);
+            pointer-events: none;
+        }
+
+        #stock-detail-page .stock-detail-card-head {
+            position: relative;
+            margin: calc(var(--stock-panel-padding) * -1) calc(var(--stock-panel-padding) * -1) .75rem;
+            padding: var(--stock-panel-padding);
+            border-bottom: 1px solid rgba(13, 148, 136, .28);
+            background:
+                radial-gradient(circle at 5% 0%, rgba(34, 211, 238, .22), transparent 40%),
+                linear-gradient(108deg, rgba(13, 148, 136, .24), rgba(20, 184, 166, .14) 42%, rgba(6, 182, 212, .08) 72%, transparent);
+            box-shadow: 0 6px 16px rgba(15, 118, 110, .055);
+        }
+
+        #stock-detail-page .ak-prediction-donut {
+            width: 46px;
+            height: 46px;
+            flex-basis: 46px;
+            box-shadow: 0 0 0 1px var(--ak-border), 0 3px 8px rgba(15, 23, 42, .10);
+            filter: none !important;
+        }
+
+        #stock-detail-page .ak-prediction-donut::after {
+            z-index: 0;
+            inset: 3px !important;
+            background: #f7fbfa !important;
+            opacity: 1 !important;
+        }
+
+        :root:not([data-theme="light"]) #stock-detail-page .ak-prediction-donut::after {
+            background: #1b2a33 !important;
+        }
+
+        #stock-detail-page .ak-prediction-donut > span {
+            z-index: 2;
+        }
+
+        #stock-detail-page .stock-company-mark {
+            border-color: color-mix(in srgb, var(--stock-detail-accent) 35%, transparent) !important;
+            background: color-mix(in srgb, var(--stock-detail-accent) 12%, transparent) !important;
+            color: var(--stock-detail-accent) !important;
+        }
+
+        #stock-detail-page .stock-company-title {
+            border-color: color-mix(in srgb, var(--stock-detail-accent) 30%, var(--ak-border)) !important;
+            background: linear-gradient(135deg, color-mix(in srgb, var(--ak-card) 89%, var(--stock-detail-accent) 11%), var(--ak-card)) !important;
+        }
+
+        #stock-detail-page .stock-company-symbol {
+            border: 1px solid color-mix(in srgb, var(--stock-detail-accent) 24%, transparent);
+            background: color-mix(in srgb, var(--stock-detail-accent) 10%, transparent) !important;
+            color: var(--stock-detail-accent) !important;
+        }
+
+        #stock-detail-page .text-violet-300,
+        #stock-detail-page .text-violet-200 {
+            color: #2dd4bf !important;
+        }
+
+        #stock-detail-page .bg-violet-500\/10,
+        #stock-detail-page .bg-violet-500\/15 {
+            background-color: color-mix(in srgb, var(--stock-detail-accent) 11%, transparent) !important;
+        }
+
+        #stock-detail-page .border-violet-400\/20,
+        #stock-detail-page .border-violet-400\/25,
+        #stock-detail-page .border-violet-400\/30,
+        #stock-detail-page .border-violet-400\/35 {
+            border-color: color-mix(in srgb, var(--stock-detail-accent) 32%, transparent) !important;
+        }
+
         @media (min-width: 1024px) {
             .stock-overview-grid {
                 height: calc(100% - 3rem);
@@ -34,7 +147,7 @@
             : null;
         $displayRiskScore = $prediction?->risk_score ?? $prediction?->drawdown_risk_factor;
         $riskPercent = is_numeric($displayRiskScore)
-            ? max(0, min(100, (float) $displayRiskScore <= 1 ? (float) $displayRiskScore * 100 : (float) $displayRiskScore))
+            ? max(20, min(100, (float) $displayRiskScore <= 1 ? (float) $displayRiskScore * 100 : (float) $displayRiskScore))
             : null;
         $signal = strtoupper((string) ($prediction?->personalized_signal ?? 'HOLD'));
         $signalClass = $signal === 'BUY'
@@ -128,19 +241,20 @@
     @endphp
 
     <div
+        id="stock-detail-page"
         x-data="{ stockTab: 'overview' }"
         x-init="$watch('stockTab', value => $nextTick(() => window.dispatchEvent(new CustomEvent('stock-tab-changed', { detail: { tab: value } }))))"
         class="mx-auto flex h-[calc(100dvh-89px)] min-h-0 w-full max-w-screen-2xl flex-col py-4"
     >
         <header class="mb-4 flex shrink-0 flex-col justify-between gap-4 border-b border-[var(--ak-border)] pb-3 sm:flex-row sm:items-end">
             <div class="flex min-w-0 items-center gap-4">
-                <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-violet-400/25 bg-violet-500/10 text-xl font-black text-violet-300">
+                <span class="stock-company-mark flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border text-xl font-black">
                     {{ strtoupper(substr($instrument->symbol, 0, 2)) }}
                 </span>
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2.5">
-                        <h1 class="inline-flex max-w-full truncate rounded-xl border border-amber-300/30 bg-[linear-gradient(135deg,rgba(139,92,246,.18),rgba(251,191,36,.11))] px-3.5 py-1.5 text-2xl font-black text-[var(--ak-text)] shadow-[0_10px_28px_rgba(0,0,0,.16)]">{{ $instrument->name }}</h1>
-                        <span class="rounded-lg bg-violet-500/10 px-2.5 py-1 text-xs font-black text-violet-300">{{ $instrument->symbol }}</span>
+                        <h1 class="stock-company-title inline-flex max-w-full truncate rounded-xl border px-3.5 py-1.5 text-2xl font-black text-[var(--ak-text)] shadow-[0_10px_28px_rgba(0,0,0,.12)]">{{ $instrument->name }}</h1>
+                        <span class="stock-company-symbol rounded-lg px-2.5 py-1 text-xs font-black">{{ $instrument->symbol }}</span>
                     </div>
                     <p class="mt-1 flex items-center gap-1.5 text-sm text-[var(--ak-muted)]">
                         <x-sector-icon :sector="$instrument->sector" class="h-4 w-4 shrink-0 text-teal-500" />
@@ -214,6 +328,7 @@
             @foreach ([
                 ['overview', __('Übersicht'), 'heroicon-o-squares-2x2'],
                 ['indicators', __('Indikatoren Statistik'), 'heroicon-o-presentation-chart-line'],
+                ['indicator-matrix', __('Indikator Matrix'), 'heroicon-o-squares-plus'],
                 ['heatmap', __('Heatmap'), 'heroicon-o-table-cells'],
                 ['fundamentals', __('Fundamentals'), 'heroicon-o-building-library'],
                 ['aki', __('aKI Daten'), 'heroicon-o-cpu-chip'],
@@ -243,8 +358,8 @@
             x-show="stockTab === 'overview'"
             class="stock-overview-grid {{ $requestedPredictionId > 0 && $prediction ? 'stock-overview-grid-with-evaluation' : 'lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]' }} grid min-h-0 gap-4"
         >
-            <article class="stock-overview-chart flex min-h-[350px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)] lg:h-full lg:min-h-0">
-                <div class="mb-3 flex shrink-0 items-start justify-between gap-3">
+            <article class="stock-detail-panel stock-overview-chart flex min-h-[350px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)] lg:h-full lg:min-h-0">
+                <div class="stock-detail-card-head flex shrink-0 items-start justify-between gap-3">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Kurschart') }}</p>
                         <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Kursentwicklung') }}</h2>
@@ -274,11 +389,19 @@
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-2">
-                        @if ($chartLast !== null)
-                            <span class="rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-sm font-black text-violet-200">
-                                {{ number_format((float) $chartLast, 2, ',', '.') }} {{ $currency }}
-                            </span>
-                        @endif
+                        <div class="rounded-xl border border-teal-500/25 bg-teal-500/[.09] px-3 py-1.5 text-right">
+                            <p
+                                data-live-symbol="{{ $instrument->symbol }}"
+                                data-stock-live-price
+                                data-live-currency="{{ $currency }}"
+                                data-live-decimals="2"
+                                class="whitespace-nowrap text-sm font-black tabular-nums text-teal-400"
+                            >{{ number_format((float) ($chartLast ?? $prediction?->current_price ?? 0), 2, ',', '.') }} {{ $currency }}</p>
+                            <p class="mt-0.5 flex items-center justify-end gap-1 text-[7px] font-black uppercase tracking-wide text-teal-400/75">
+                                <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-teal-400 shadow-[0_0_5px_rgba(45,212,191,.55)]"></span>
+                                TwelveData · <span data-live-time-symbol="{{ $instrument->symbol }}" data-stock-live-time>{{ !empty($prediction->current_quote_time) ? \Illuminate\Support\Carbon::parse($prediction->current_quote_time)->timezone('Europe/Berlin')->format('H:i:s') : __('wartet') }}</span>
+                            </p>
+                        </div>
                         <span class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2 text-[10px] font-bold text-[var(--ak-muted)]">
                             {{ $chartCandles->count() }} {{ __('Tage') }}
                         </span>
@@ -288,11 +411,6 @@
                         <span class="inline-flex items-center gap-1.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                             <i class="h-4 border-l border-dashed border-emerald-500/70"></i>{{ __('Signalwechsel') }}
                         </span>
-                        @if ($chartChange !== null)
-                            <span id="stock-chart-change" title="{{ __('Tagesveränderung') }}" class="rounded-xl px-3 py-2 text-sm font-black {{ $chartChange >= 0 ? 'bg-emerald-400/10 text-emerald-400' : 'bg-rose-400/10 text-rose-400' }}">
-                                1T · {{ $chartChange > 0 ? '+' : '' }}{{ number_format($chartChange, 2, ',', '.') }} %
-                            </span>
-                        @endif
                     </div>
                 </div>
                 @if ($chartCandles->isNotEmpty())
@@ -314,8 +432,8 @@
                 @endif
             </article>
 
-            <article x-show="stockTab === 'overview'" class="stock-overview-analysis min-h-0 overflow-y-auto rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] lg:h-full">
-                <div class="flex items-start justify-between gap-4">
+            <article x-show="stockTab === 'overview'" class="stock-detail-panel stock-detail-panel-compact stock-overview-analysis min-h-0 overflow-y-auto rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] lg:h-full">
+                <div class="stock-detail-card-head flex items-start justify-between gap-4">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Aktuelle KI-Analyse') }}</p>
                         <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Persönliche Einordnung') }}</h2>
@@ -362,13 +480,18 @@
                             $analysisModelQualityPercent < 88 => '#91c94b',
                             default => '#22c58b',
                         };
+                        $analysisScoreColor = match (true) {
+                            $scorePercent === null => '#64748b',
+                            $scorePercent < 40 => '#e35f72',
+                            $scorePercent < 55 => '#f28a45',
+                            $scorePercent < 70 => '#e5b643',
+                            $scorePercent < 82 => '#84cc16',
+                            default => '#22c58b',
+                        };
                         $analysisRiskColor = match (true) {
                             $riskPercent === null => '#64748b',
-                            $riskPercent < 10 => '#22c58b',
-                            $riskPercent < 20 => '#91c94b',
-                            $riskPercent < 30 => '#e5b643',
-                            $riskPercent < 40 => '#f28a45',
-                            default => '#e35f72',
+                            $riskPercent <= 20 => '#dc3f58',
+                            default => sprintf('hsl(%.1f 72%% 43%%)', 52 + (($riskPercent - 20) / 80 * 68)),
                         };
                     @endphp
                     <div class="mt-3 space-y-3">
@@ -381,17 +504,17 @@
                                     <span class="ak-model-tier mt-1.5 {{ $analysisModelTierClass }}">{{ $analysisModelTierName }}</span>
                                 </div>
                                 <div class="min-w-0 rounded-lg border border-teal-500/20 bg-teal-500/[.06] px-2.5 py-2">
-                                    <p class="text-[8px] font-black uppercase tracking-[.12em] text-teal-500">{{ __('Challenger') }}</p>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p class="text-[8px] font-black uppercase tracking-[.12em] text-teal-500">{{ __('Challenger') }}</p>
+                                        @if ($analysisChallengerQualityPercent !== null)
+                                            <span class="shrink-0 rounded-md border border-teal-500/20 bg-teal-500/[.08] px-1.5 py-0.5 text-[8px] font-black tabular-nums text-teal-500" title="{{ __('Challenger Quality Score') }}">
+                                                {{ number_format($analysisChallengerQualityPercent, 1, ',', '.') }} %
+                                            </span>
+                                        @endif
+                                    </div>
                                     @if ($modelChallenger)
                                         <p class="mt-1 truncate text-xs font-black text-[var(--ak-text)]">{{ $modelChallenger->model_alias ?: '—' }}</p>
-                                        <div class="mt-1.5 flex items-center gap-1.5">
-                                            <span class="ak-model-tier {{ $analysisChallengerTierClass }}">{{ $analysisChallengerTierName }}</span>
-                                            @if ($analysisChallengerQualityPercent !== null)
-                                                <span class="shrink-0 rounded-md border border-teal-500/20 bg-teal-500/[.08] px-1.5 py-1 text-[8px] font-black tabular-nums text-teal-500" title="{{ __('Challenger Quality Score') }}">
-                                                    {{ number_format($analysisChallengerQualityPercent, 1, ',', '.') }} %
-                                                </span>
-                                            @endif
-                                        </div>
+                                        <span class="ak-model-tier mt-1.5 !w-full !max-w-none !flex-1 {{ $analysisChallengerTierClass }}">{{ $analysisChallengerTierName }}</span>
                                     @else
                                         <p class="mt-1 text-xs font-bold text-[var(--ak-muted)]">{{ __('Kein aktiver Challenger') }}</p>
                                     @endif
@@ -399,26 +522,20 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
-                            <div class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
-                                <div class="mb-1.5 flex items-baseline justify-between gap-1">
-                                    <p class="truncate text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Score') }}</p>
-                                    <p class="shrink-0 text-sm font-black tabular-nums text-[var(--ak-text)]">
-                                        {{ $analysisScore10 !== null ? number_format($analysisScore10, 1, ',', '.') : '—' }}<small class="ml-0.5 text-[8px] text-[var(--ak-muted)]">/10</small>
-                                    </p>
+                            <div class="flex min-h-[88px] min-w-0 flex-col items-center justify-start gap-2.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2 py-2">
+                                <p class="w-full truncate text-center text-[8px] font-black uppercase leading-none tracking-[.035em] text-[var(--ak-muted)]">{{ __('KI-Score') }}</p>
+                                <div class="ak-prediction-donut" style="--value:{{ $scorePercent ?? 0 }}%;--color:{{ $analysisScoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $analysisScore10 ?? 0 }}">
+                                    <span>{{ $analysisScore10 !== null ? number_format($analysisScore10, 1, ',', '.') : '—' }}<small>{{ $analysisScore10 !== null ? '/10' : '' }}</small></span>
                                 </div>
-                                <x-dashboard.score-stripes :percent="$scorePercent ?? 0" />
                             </div>
-                            <div class="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
-                                <p class="min-w-0 text-[9px] font-black uppercase leading-[1.15] tracking-wide text-[var(--ak-muted)]">
-                                    <span class="block">{{ __('Modell') }}</span>
-                                    <span class="block">{{ __('Qualität') }}</span>
-                                </p>
+                            <div class="flex min-h-[88px] min-w-0 flex-col items-center justify-start gap-2.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2 py-2">
+                                <p class="w-full truncate text-center text-[8px] font-black uppercase leading-none tracking-[.025em] text-[var(--ak-muted)]">{{ __('Modellqualität') }}</p>
                                 <div class="ak-prediction-donut" style="--value:{{ $analysisModelQualityPercent ?? 0 }}%;--color:{{ $analysisModelQualityColor }}" role="meter" aria-label="{{ __('Modellqualität') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($analysisModelQualityPercent ?? 0) }}">
                                     <span>{{ $analysisModelQualityPercent !== null ? number_format($analysisModelQualityPercent, 0, ',', '.') : '—' }}<small>{{ $analysisModelQualityPercent !== null ? '%' : '' }}</small></span>
                                 </div>
                             </div>
-                            <div class="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
-                                <p class="min-w-0 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Risiko') }}</p>
+                            <div class="flex min-h-[88px] min-w-0 flex-col items-center justify-start gap-2.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2 py-2">
+                                <p class="w-full truncate text-center text-[8px] font-black uppercase leading-none tracking-[.035em] text-[var(--ak-muted)]">{{ __('Risiko') }}</p>
                                 <div class="ak-prediction-donut" style="--value:{{ $riskPercent ?? 0 }}%;--color:{{ $analysisRiskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($riskPercent ?? 0) }}">
                                     <span>{{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.') : '—' }}<small>{{ $riskPercent !== null ? '%' : '' }}</small></span>
                                 </div>
@@ -436,37 +553,17 @@
                                 </p>
                             @endif
                         </div>
-                        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
-                                <p class="text-[9px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Aktueller Kurs') }}</p>
-                                <p
-                                    @if($requestedPredictionId === 0)
-                                    data-live-symbol="{{ $instrument->provider_symbol ?: $instrument->symbol }}"
-                                    data-live-currency="{{ $currency }}"
-                                    data-live-decimals="2"
-                                    @endif
-                                    class="mt-1 text-base font-black text-[var(--ak-text)]"
-                                >{{ number_format((float) $prediction->current_price, 2, ',', '.') }} {{ $currency }}</p>
-                                @if($requestedPredictionId === 0)
-                                    <p class="mt-0.5 flex items-center gap-1 text-[8px] font-bold uppercase tracking-wide text-teal-400/80">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-teal-400 shadow-[0_0_5px_rgba(45,212,191,.55)]"></span>
-                                        TwelveData ·
-                                        <span data-live-time-symbol="{{ $instrument->provider_symbol ?: $instrument->symbol }}">
-                                            {{ !empty($prediction->current_quote_time) ? \Illuminate\Support\Carbon::parse($prediction->current_quote_time)->timezone('Europe/Berlin')->format('H:i:s') : __('wartet') }}
-                                        </span>
-                                    </p>
-                                @endif
-                            </div>
+                        <div class="grid grid-cols-2 gap-2">
                             <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
                                 <p class="text-[9px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Ziel 5 Tage') }}</p>
                                 <p class="mt-1 text-base font-black text-violet-300">{{ is_numeric($prediction->predicted_price_5d) ? number_format((float) $prediction->predicted_price_5d, 2, ',', '.').' '.$currency : '—' }}</p>
                             </div>
                             <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
                                 <p class="text-[9px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Ziel 20 Tage') }}</p>
-                                <div class="mt-1 flex items-baseline justify-between gap-2">
-                                    <p class="text-base font-black text-violet-300">{{ is_numeric($prediction->predicted_price_20d) ? number_format((float) $prediction->predicted_price_20d, 2, ',', '.').' '.$currency : '—' }}</p>
+                                <div class="mt-1 min-w-0">
+                                    <p class="truncate text-base font-black text-violet-300">{{ is_numeric($prediction->predicted_price_20d) ? number_format((float) $prediction->predicted_price_20d, 2, ',', '.').' '.$currency : '—' }}</p>
                                     @if ($outlook20dPercent !== null)
-                                        <span class="text-[10px] font-black {{ $outlook20dPercent >= 0 ? 'text-teal-400' : 'text-rose-400' }}">
+                                        <span class="mt-0.5 block truncate text-[10px] font-black {{ $outlook20dPercent >= 0 ? 'text-teal-400' : 'text-rose-400' }}">
                                             {{ $outlook20dPercent > 0 ? '+' : '' }}{{ number_format($outlook20dPercent, 2, ',', '.') }} %
                                         </span>
                                     @endif
@@ -480,8 +577,8 @@
             </article>
 
             @if ($requestedPredictionId > 0 && $prediction)
-                <aside class="stock-overview-evaluation min-h-0 overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] lg:h-full">
-                    <div class="mb-3 flex items-center gap-2">
+                <aside class="stock-detail-panel stock-detail-panel-compact stock-overview-evaluation min-h-0 overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] lg:h-full">
+                    <div class="stock-detail-card-head flex items-center gap-2">
                         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-300/10 text-amber-300"><x-heroicon-o-clock class="h-4 w-4" /></span>
                         <div class="min-w-0">
                             <h2 class="text-xs font-black leading-tight text-[var(--ak-text)]">{{ __('Historische Prognoseauswertung') }}</h2>
@@ -519,37 +616,53 @@
                 ->filter(fn ($value) => is_numeric($value))
                 ->avg();
         @endphp
-        <section x-cloak x-show="stockTab === 'indicators'" class="space-y-3">
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] px-4 py-3">
-                <div>
-                    <p class="text-[10px] font-black uppercase tracking-[.14em] text-teal-500">{{ __('Historische Indikatoranalyse') }}</p>
-                    <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Realisierte 20-Tage-Fälle aus den letzten drei Jahren') }}</p>
+        <section x-cloak x-show="stockTab === 'indicators'" class="space-y-4">
+            <article class="stock-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+                <div class="stock-detail-card-head flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-teal-500/25 bg-teal-500/10 text-teal-500">
+                            <x-heroicon-o-presentation-chart-line class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Indikatoren Statistik') }}</p>
+                            <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Historische Indikatoranalyse') }}</h2>
+                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Realisierte 20-Tage-Fälle aus den letzten drei Jahren') }}</p>
+                        </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <span class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                            {{ number_format($indicatorDataPointCount, 0, ',', '.') }} {{ __('Datenpunkte') }}
+                        </span>
+                        <span class="rounded-xl border px-3 py-2 text-sm font-black tabular-nums {{ ($indicatorOverallProbability ?? 0) >= 50 ? 'border-teal-500/25 bg-teal-500/10 text-teal-500' : 'border-rose-500/25 bg-rose-500/10 text-rose-500' }}">
+                            {{ $indicatorOverallProbability !== null ? number_format($indicatorOverallProbability, 1, ',', '.').' %' : '—' }}
+                        </span>
+                    </div>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
-                        {{ number_format($indicatorDataPointCount, 0, ',', '.') }} {{ __('Datenpunkte') }}
-                    </span>
-                    <div class="w-44"><x-dashboard.score-stripes :percent="$indicatorOverallProbability ?? 0" palette="teal" /></div>
-                    <span class="text-xs font-black tabular-nums {{ ($indicatorOverallProbability ?? 0) >= 50 ? 'text-teal-500' : 'text-rose-500' }}">
-                        {{ $indicatorOverallProbability !== null ? number_format($indicatorOverallProbability, 1, ',', '.').' %' : '—' }}
-                    </span>
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Mittlere Steigwahrscheinlichkeit') }}</span>
+                    <div class="min-w-44 flex-1"><x-dashboard.score-stripes :percent="$indicatorOverallProbability ?? 0" palette="teal" /></div>
                 </div>
-            </div>
+            </article>
 
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 @foreach ($indicatorCards as $index => $card)
-                    <article class="flex h-[210px] min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] shadow-[var(--ak-shadow)]">
-                        <div class="flex h-[50px] shrink-0 items-center justify-between gap-2 border-b border-[var(--ak-border)] px-3 py-1.5">
-                            <div class="min-w-0">
-                                <p class="truncate text-xs font-black text-[var(--ak-text)]">{{ $card['label'] }}</p>
-                                <p class="mt-0.5 truncate text-[8px] font-bold text-[var(--ak-muted)]">{{ __('20-Tage-Steigwahrscheinlichkeit') }}</p>
+                    <article class="stock-detail-panel stock-detail-panel-compact flex h-[230px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]">
+                        <div class="stock-detail-card-head flex shrink-0 items-center justify-between gap-3">
+                            <div class="flex min-w-0 items-center gap-2.5">
+                                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-teal-500/20 bg-teal-500/[.08] text-teal-500">
+                                    <x-heroicon-o-chart-bar-square class="h-4 w-4" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="truncate text-xs font-black text-[var(--ak-text)]">{{ $card['label'] }}</p>
+                                    <p class="mt-0.5 truncate text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]">{{ __('20-Tage-Steigwahrscheinlichkeit') }}</p>
+                                </div>
                             </div>
                             <div class="shrink-0 text-right">
-                                <p class="text-sm font-black tabular-nums text-amber-500">
+                                <p class="rounded-lg border border-amber-400/20 bg-amber-400/[.08] px-2 py-1 text-sm font-black tabular-nums text-amber-500">
                                     {{ is_numeric($card['currentValue']) ? number_format($card['currentValue'], 2, ',', '.').' '.$card['unit'] : '—' }}
                                 </p>
                                 @if (is_numeric($card['currentProbability']))
-                                    <p class="text-[8px] font-black">
+                                    <p class="mt-1 text-[8px] font-black">
                                         <span class="text-teal-500">{{ number_format($card['currentProbability'], 1, ',', '.') }} % ↑</span>
                                         <span class="text-[var(--ak-muted)]"> · </span>
                                         <span class="text-rose-500">{{ number_format($card['currentFallProbability'], 1, ',', '.') }} % ↓</span>
@@ -557,10 +670,206 @@
                                 @endif
                             </div>
                         </div>
-                        <div id="stock-indicator-probability-chart-{{ $index }}" class="min-h-0 flex-1"></div>
+                        <div class="min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-1 py-0.5">
+                            <div id="stock-indicator-probability-chart-{{ $index }}" class="h-full min-h-0"></div>
+                        </div>
                     </article>
                 @endforeach
             </div>
+        </section>
+
+        @php
+            $indicatorMatrixCards = $indicatorCards->keyBy('label');
+            $indicatorMatrixBuild = static function (array $trendCard, array $oscillatorCard): array {
+                $trendPoints = collect($trendCard['points'])->keyBy('date');
+                $joined = collect($oscillatorCard['points'])->map(function (array $oscillatorPoint) use ($trendPoints): ?array {
+                    $trendPoint = $trendPoints->get($oscillatorPoint['date']);
+                    if (! $trendPoint || ! is_numeric($trendPoint['x'] ?? null) || ! is_numeric($oscillatorPoint['x'] ?? null)) return null;
+
+                    return [
+                        'trend' => (float) $trendPoint['x'],
+                        'oscillator' => (float) $oscillatorPoint['x'],
+                        'up' => (bool) $oscillatorPoint['up'],
+                    ];
+                })->filter()->values();
+                $quantiles = static function ($values): array {
+                    $sorted = collect($values)->sort()->values();
+                    if ($sorted->isEmpty()) return [];
+
+                    return collect([.2, .4, .6, .8])->map(
+                        fn (float $quantile): float => (float) $sorted->get((int) floor(($sorted->count() - 1) * $quantile))
+                    )->all();
+                };
+                $trendLimits = $quantiles($joined->pluck('trend'));
+                $oscillatorLimits = $quantiles($joined->pluck('oscillator'));
+                $binFor = static function (float $value, array $limits): int {
+                    foreach ($limits as $index => $limit) {
+                        if ($value <= $limit) return $index;
+                    }
+
+                    return 4;
+                };
+                $cells = array_fill(0, 5, array_fill(0, 5, ['samples' => 0, 'up' => 0]));
+                foreach ($joined as $point) {
+                    $x = $binFor($point['trend'], $trendLimits);
+                    $y = $binFor($point['oscillator'], $oscillatorLimits);
+                    $cells[$y][$x]['samples']++;
+                    if ($point['up']) $cells[$y][$x]['up']++;
+                }
+                foreach ($cells as $y => $row) {
+                    foreach ($row as $x => $cell) {
+                        $cells[$y][$x]['probability'] = $cell['samples'] > 0 ? ($cell['up'] / $cell['samples']) * 100 : null;
+                    }
+                }
+
+                return [
+                    'trend' => $trendCard,
+                    'oscillator' => $oscillatorCard,
+                    'cells' => $cells,
+                    'samples' => $joined->count(),
+                    'trendAxis' => $joined->isEmpty() ? [] : [
+                        (float) $joined->min('trend'), ...$trendLimits, (float) $joined->max('trend'),
+                    ],
+                    'oscillatorAxis' => $joined->isEmpty() ? [] : [
+                        (float) $joined->min('oscillator'), ...$oscillatorLimits, (float) $joined->max('oscillator'),
+                    ],
+                    'currentX' => is_numeric($trendCard['currentValue'] ?? null) ? $binFor((float) $trendCard['currentValue'], $trendLimits) : null,
+                    'currentY' => is_numeric($oscillatorCard['currentValue'] ?? null) ? $binFor((float) $oscillatorCard['currentValue'], $oscillatorLimits) : null,
+                ];
+            };
+            $indicatorMatrixPairs = collect([
+                [__('Momentum 10T'), 'Stochastik %K'],
+                ['ADX 14', 'Stochastik %K'],
+                ['MACD Histogramm', 'Stochastik %K'],
+            ])->map(function (array $pair) use ($indicatorMatrixCards, $indicatorMatrixBuild): ?array {
+                $trendCard = $indicatorMatrixCards->get($pair[0]);
+                $oscillatorCard = $indicatorMatrixCards->get($pair[1]);
+
+                return $trendCard && $oscillatorCard ? $indicatorMatrixBuild($trendCard, $oscillatorCard) : null;
+            })->filter()->values();
+        @endphp
+        <section x-cloak x-show="stockTab === 'indicator-matrix'" class="space-y-4">
+            <article class="stock-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+                <div class="stock-detail-card-head flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-teal-500/25 bg-teal-500/10 text-teal-500">
+                            <x-heroicon-o-squares-plus class="h-5 w-5" />
+                        </span>
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Indikator Matrix') }}</p>
+                            <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Trend trifft Stochastik') }}</h2>
+                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Historische 20-Tage-Steigwahrscheinlichkeit nach gemeinsamen Indikatorzuständen') }}</p>
+                        </div>
+                    </div>
+                    <span class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                        {{ $indicatorMatrixPairs->count() }} {{ __('Vergleiche') }}
+                    </span>
+                </div>
+
+                <div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(22rem, 26rem)); justify-content: start;">
+                    @forelse ($indicatorMatrixPairs as $matrix)
+                        <article class="min-w-0 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2.5">
+                            <div class="mb-2 flex items-start justify-between gap-2">
+                                <div>
+                                    <p class="text-[10px] font-black text-[var(--ak-text)]">{{ $matrix['trend']['label'] }} × {{ $matrix['oscillator']['label'] }}</p>
+                                    <p class="mt-1 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]">{{ number_format($matrix['samples'], 0, ',', '.') }} {{ __('gemeinsame Fälle') }}</p>
+                                </div>
+                                <div class="flex gap-1.5 text-[8px] font-black uppercase">
+                                    <span class="rounded-md bg-rose-500/15 px-1.5 py-1 text-rose-500">↓</span>
+                                    <span class="rounded-md bg-amber-400/15 px-1.5 py-1 text-amber-500">50 %</span>
+                                    <span class="rounded-md bg-teal-500/15 px-1.5 py-1 text-teal-500">↑</span>
+                                </div>
+                            </div>
+                            <table class="mx-auto border-separate border-spacing-0.5" style="width: 17.25rem; table-layout: fixed;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 3rem;"></th>
+                                        @foreach ([0, 1, 2, 3, 4] as $x)
+                                            @php
+                                                $xFrom = $matrix['trendAxis'][$x] ?? null;
+                                                $xTo = $matrix['trendAxis'][$x + 1] ?? null;
+                                            @endphp
+                                            <th class="pb-0.5 text-center text-[6px] font-black tabular-nums text-[var(--ak-muted)]" title="{{ $xFrom !== null && $xTo !== null ? number_format($xFrom, 2, ',', '.').' – '.number_format($xTo, 2, ',', '.') : '—' }}">
+                                                {{ $xFrom !== null && $xTo !== null ? number_format(($xFrom + $xTo) / 2, 1, ',', '.') : '—' }}
+                                            </th>
+                                        @endforeach
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @foreach ([4, 3, 2, 1, 0] as $y)
+                                    @php
+                                        $yFrom = $matrix['oscillatorAxis'][$y] ?? null;
+                                        $yTo = $matrix['oscillatorAxis'][$y + 1] ?? null;
+                                    @endphp
+                                    <tr>
+                                        <th class="pr-1 text-right text-[7px] font-black tabular-nums text-[var(--ak-muted)]" title="{{ $yFrom !== null && $yTo !== null ? number_format($yFrom, 1, ',', '.').' – '.number_format($yTo, 1, ',', '.') : '—' }}">
+                                            {{ $yFrom !== null && $yTo !== null ? number_format(($yFrom + $yTo) / 2, 0, ',', '.') : '—' }}
+                                        </th>
+                                    @foreach ([0, 1, 2, 3, 4] as $x)
+                                        @php
+                                            $cell = $matrix['cells'][$y][$x];
+                                            $probability = $cell['probability'];
+                                            $cellClass = $probability === null
+                                                ? 'border-[var(--ak-border)] bg-[var(--ak-card)] text-[var(--ak-muted)]'
+                                                : ($probability >= 65
+                                                    ? 'border-teal-400/45 bg-teal-500/35 text-[var(--ak-text)]'
+                                                    : ($probability >= 55
+                                                        ? 'border-teal-400/30 bg-teal-500/20 text-[var(--ak-text)]'
+                                                        : ($probability >= 45
+                                                            ? 'border-amber-400/30 bg-amber-400/20 text-[var(--ak-text)]'
+                                                            : ($probability >= 35
+                                                                ? 'border-rose-400/30 bg-rose-500/20 text-[var(--ak-text)]'
+                                                                : 'border-rose-400/45 bg-rose-500/35 text-[var(--ak-text)]'))));
+                                            $isCurrentCell = $matrix['currentX'] === $x && $matrix['currentY'] === $y;
+                                            $cellBackgroundStyle = '';
+                                            if ($probability !== null && $probability >= 65) {
+                                                $cellBackgroundStyle = 'background: linear-gradient(135deg, rgba(16,185,129,.12), rgba(34,197,94,.30));';
+                                            } elseif ($probability !== null && $probability >= 55) {
+                                                $cellBackgroundStyle = 'background: linear-gradient(135deg, rgba(16,185,129,.07), rgba(34,197,94,.19));';
+                                            } elseif ($probability !== null && $probability >= 45) {
+                                                $cellBackgroundStyle = 'background: linear-gradient(135deg, rgba(245,158,11,.05), rgba(250,204,21,.14));';
+                                            } elseif ($probability !== null && $probability >= 35) {
+                                                $cellBackgroundStyle = 'background: linear-gradient(135deg, rgba(244,63,94,.05), rgba(244,63,94,.14));';
+                                            } elseif ($probability !== null) {
+                                                $cellBackgroundStyle = 'background: linear-gradient(135deg, rgba(244,63,94,.09), rgba(225,29,72,.23));';
+                                            }
+                                        @endphp
+                                        <td class="p-0.5">
+                                            <div
+                                                class="relative flex h-9 flex-col items-center justify-center rounded-md border text-center {{ $cellClass }} {{ $isCurrentCell ? 'z-10 border-cyan-300' : '' }}"
+                                                style="{{ $cellBackgroundStyle }} {{ $isCurrentCell ? 'box-shadow: 0 0 0 3px #22d3ee, 0 0 16px rgba(34,211,238,.72); transform: scale(1.08);' : '' }}"
+                                                title="{{ $isCurrentCell ? __('Aktuelle Indikatorkombination').' · ' : '' }}{{ $cell['samples'] }} {{ __('Fälle') }}"
+                                            >
+                                                @if ($isCurrentCell)
+                                                    <span class="absolute right-0.5 top-0.5 grid h-2.5 w-2.5 place-items-center rounded-full border border-white/70 bg-cyan-400 shadow-[0_0_7px_rgba(34,211,238,1)]">
+                                                        <span class="h-1 w-1 rounded-full bg-slate-950"></span>
+                                                    </span>
+                                                @endif
+                                                <span class="text-[8px] font-black leading-none tabular-nums">{{ $probability !== null ? number_format($probability, 0, ',', '.').' %' : '—' }}</span>
+                                                <span class="mt-1 text-[6px] font-bold leading-none opacity-65">n={{ $cell['samples'] }}</span>
+                                            </div>
+                                        </td>
+                                    @endforeach
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                            <div class="mt-1.5 grid grid-cols-[auto_1fr] items-center gap-2 text-[7px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                <span class="rounded-md border border-[var(--ak-border)] px-1.5 py-1">Y · {{ $matrix['oscillator']['label'] }}</span>
+                                <span class="text-center">X · {{ $matrix['trend']['label'] }}</span>
+                            </div>
+                            <div class="mt-2 flex items-center justify-center gap-1.5 rounded-md border border-cyan-400/25 bg-cyan-400/[.08] px-2 py-1 text-[7px] font-black uppercase tracking-wide text-cyan-400">
+                                <span class="h-2 w-2 rounded-sm border-2 border-cyan-300 shadow-[0_0_6px_rgba(34,211,238,.8)]"></span>
+                                {{ __('Cyan markiert die aktuelle Kombination') }}
+                            </div>
+                        </article>
+                    @empty
+                        <div class="rounded-2xl border border-dashed border-[var(--ak-border)] px-4 py-10 text-center text-xs font-bold text-[var(--ak-muted)] xl:col-span-3">
+                            {{ __('Keine gemeinsamen Indikatordaten verfügbar.') }}
+                        </div>
+                    @endforelse
+                </div>
+            </article>
         </section>
 
         <section x-cloak x-show="stockTab === 'analysis'" class="rounded-[1.5rem] border border-teal-500/20 bg-[linear-gradient(120deg,rgba(20,184,166,.07),var(--ak-card))] p-5 shadow-[var(--ak-shadow)]">
@@ -1056,7 +1365,7 @@
                 const sectorColor = lightTheme ? '#14b8a6' : @json($sectorColor);
                 const predictedPrice20d = @json(is_numeric($prediction?->predicted_price_20d) ? (float) $prediction->predicted_price_20d : null);
                 const chartFocusAt = @json($chartFocusAt?->getTimestampMs());
-                const liveSourceSymbol = @json($requestedPredictionId === 0 ? ($instrument->provider_symbol ?: $instrument->symbol) : null);
+                const liveSourceSymbol = @json($requestedPredictionId === 0 ? $instrument->symbol : null);
                 const dataUrl = @json($chartDataUrl);
                 const updatedElement = document.querySelector('#stock-chart-updated');
                 const changeElement = document.querySelector('#stock-chart-change');
@@ -1750,6 +2059,46 @@
                         });
                     }
                 });
+
+                const liveQuoteUrl = @js(route('stocks.live-quote', ['symbol' => $instrument->symbol]));
+                const refreshTwelveDataQuote = async () => {
+                    try {
+                        const response = await fetch(liveQuoteUrl, {
+                            credentials: 'same-origin',
+                            headers: { 'Accept': 'application/json' },
+                            cache: 'no-store',
+                        });
+                        if (!response.ok) return;
+                        const quote = await response.json();
+                        const price = Number(quote.price);
+                        const timestamp = Number(quote.timestamp);
+                        if (!Number.isFinite(price) || price <= 0) return;
+
+                        const priceElement = document.querySelector('[data-stock-live-price]');
+                        const timeElement = document.querySelector('[data-stock-live-time]');
+                        const currency = quote.currency || priceElement?.dataset.liveCurrency || '';
+                        if (priceElement) {
+                            priceElement.textContent = `${price.toLocaleString(document.documentElement.lang, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                            })}${currency ? ` ${currency}` : ''}`;
+                        }
+                        if (timeElement && Number.isFinite(timestamp)) {
+                            timeElement.textContent = new Date(timestamp * 1000).toLocaleTimeString(
+                                document.documentElement.lang,
+                                { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Berlin' },
+                            );
+                        }
+                        window.dispatchEvent(new CustomEvent('aktienki:live-price', {
+                            detail: { symbol: @js($instrument->symbol), price, timestamp },
+                        }));
+                    } catch (_) {
+                        // Der zuletzt bekannte Kurs bleibt bei einem kurzzeitigen API-Fehler sichtbar.
+                    }
+                };
+                refreshTwelveDataQuote();
+                const liveQuoteTimer = window.setInterval(refreshTwelveDataQuote, 2_000);
+                window.addEventListener('pagehide', () => window.clearInterval(liveQuoteTimer), { once: true });
 
                 const refreshChart = async () => {
                     if (document.visibilityState !== 'visible') return;

@@ -15,7 +15,7 @@
 @endphp
 
 <section class="ak-container ak-market-command py-5 lg:py-7">
-    <header class="ak-market-command-hero">
+    <header class="ak-market-command-hero ak-detail-hero">
         <div class="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(330px,.8fr)] lg:items-end">
             <div>
                 <div class="flex flex-wrap items-center gap-2">
@@ -50,7 +50,7 @@
         </div>
     </header>
 
-    <div class="ak-market-tape mt-4 grid gap-px overflow-hidden sm:grid-cols-2 lg:grid-cols-5">
+    <div class="ak-market-tape ak-detail-panel ak-standard-card mt-4 grid gap-px overflow-hidden sm:grid-cols-2 lg:grid-cols-5">
         @foreach ($markets as $market)
             @php $change = $market['change'] ?? null; @endphp
             <div class="ak-market-tape-item">
@@ -87,7 +87,9 @@
         </div>
     </div>
 
-    <article class="ak-market-briefing mt-4">
+    <x-dashboard.macro-indicator-cards :cards="$macroCards" />
+
+    <article class="ak-market-briefing ak-detail-panel ak-standard-card mt-4">
         <div class="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,.85fr)]">
             <div>
                 <p class="ak-market-eyebrow">{{ __('KI Market Briefing') }}</p>

@@ -8,8 +8,8 @@
     };
 @endphp
 
-<x-dashboard.card class="ak-card-static ak-dashboard-card ak-dashboard-market-card ak-dashboard-overall flex min-h-[260px] flex-col border-orange-400/25 lg:min-h-0">
-    <div class="flex items-start justify-between gap-4">
+<x-dashboard.card class="ak-standard-card ak-card-static ak-dashboard-card ak-dashboard-market-card ak-dashboard-overall flex min-h-[260px] flex-col lg:min-h-0">
+    <div class="ak-standard-card-head flex items-start justify-between gap-4">
         <div>
             <p class="flex items-center gap-2 text-xs font-black uppercase tracking-[.18em] text-orange-400">
                 <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-[10px] tracking-normal">AKI</span>

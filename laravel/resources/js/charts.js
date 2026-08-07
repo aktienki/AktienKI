@@ -193,7 +193,7 @@ window.worldMarketMap = (countryScores = {}, stocksUrl = '/stocks') => ({
                     : direction > 0
                         ? (lightTheme ? `hsl(152, 46%, ${72 - intensity * 30}%)` : `hsl(152, 66%, ${50 + intensity * 5}%)`)
                         : (lightTheme ? `hsl(352, 52%, ${78 - intensity * 28}%)` : `hsl(352, 68%, ${56 + intensity * 4}%)`);
-                const inactiveStroke = lightTheme ? '#4b5563' : 'currentColor';
+                const inactiveStroke = lightTheme ? '#4b5563' : '#8a9ab8';
                 const activeStroke = color;
                 const restingOpacity = lightTheme ? '0.66' : '0.48';
 
@@ -201,8 +201,8 @@ window.worldMarketMap = (countryScores = {}, stocksUrl = '/stocks') => ({
                 path.setAttribute('fill', color);
                 path.setAttribute('fill-opacity', score === null ? '0' : restingOpacity);
                 path.setAttribute('stroke', score === null ? inactiveStroke : activeStroke);
-                path.setAttribute('stroke-opacity', score === null ? (lightTheme ? '0.78' : '0.42') : '1');
-                path.setAttribute('stroke-width', score === null ? (lightTheme ? '0.9' : '0.65') : (lightTheme ? '1.8' : '1.5'));
+                path.setAttribute('stroke-opacity', score === null ? (lightTheme ? '0.78' : '0.68') : '1');
+                path.setAttribute('stroke-width', score === null ? (lightTheme ? '0.9' : '0.85') : (lightTheme ? '1.8' : '1.5'));
                 path.setAttribute('vector-effect', 'non-scaling-stroke');
                 path.setAttribute('stroke-linejoin', 'round');
 

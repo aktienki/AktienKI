@@ -1,4 +1,5 @@
 <x-app-layout>
+    <x-detail-page-theme />
     @php
         $countryFlag = fn (?string $country): string => strlen((string) $country) === 2
             ? mb_chr(127397 + ord(strtoupper($country[0]))) . mb_chr(127397 + ord(strtoupper($country[1])))
@@ -27,11 +28,11 @@
         $marketsByContinent = collect(['all' => $orderedMarkets]);
     @endphp
 
-    <div id="markets-page">
-        <div id="markets-page-heading" class="z-30 border-b border-[var(--ak-border)] bg-[var(--ak-bg)]/95 py-2.5 backdrop-blur-xl">
-            <div class="ak-container flex flex-wrap items-center justify-between gap-4">
+    <div id="markets-page" class="ak-detail-design">
+        <div id="markets-page-heading" class="z-30 py-2.5">
+            <div class="ak-container ak-detail-hero flex flex-wrap items-center justify-between gap-4 rounded-[1.5rem] border px-5 py-4">
                 <div>
-                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-orange-400">aKI Market Intelligence</p>
+                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-teal-500">aKI Market Intelligence</p>
                     <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)]">{{ __('Märkte') }}</h1>
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-3">
@@ -41,7 +42,7 @@
                         <span class="inline-flex items-center gap-1"><i class="ak-watch-swatch h-2 w-2 rounded-full"></i>{{ __('Watch') }}</span>
                         <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-teal-500"></i>{{ __('Buy') }}</span>
                     </div>
-                    <span class="rounded-xl border border-orange-400/30 bg-orange-400/[.07] px-3 py-2 text-xs font-bold text-[var(--ak-muted)] shadow-[0_8px_24px_rgba(251,146,60,.08)]">
+                    <span class="rounded-xl border border-teal-500/30 bg-teal-500/[.08] px-3 py-2 text-xs font-bold text-[var(--ak-muted)] shadow-[0_8px_24px_rgba(20,184,166,.09)]">
                         {{ $exchanges->count() }} {{ __('Exchanges') }}
                     </span>
                 </div>
@@ -49,6 +50,64 @@
         </div>
 
         <main id="markets-page-content" class="ak-container mt-2 pb-2">
+            @if (false)
+            <section id="macro-indicator-cards" class="mb-4 grid gap-3 md:grid-cols-3" aria-label="{{ __('Makroindikatoren') }}">
+                @foreach ($macroCards as $macroCard)
+                    @php
+                        $allPoints = collect($macroCard['series'])->flatMap(fn (array $series) => $series['points'] ?? [])->filter(fn (array $point) => is_numeric($point['value'] ?? null))->values();
+                        $minValue = (float) ($allPoints->min('value') ?? 0);
+                        $maxValue = (float) ($allPoints->max('value') ?? 1);
+                        $range = max(0.0001, $maxValue - $minValue);
+                        $chartPoints = function (array $points) use ($minValue, $range): string {
+                            $count = max(1, count($points) - 1);
+                            return collect($points)->values()->map(function (array $point, int $index) use ($minValue, $range, $count): string {
+                                $x = 8 + ($index / $count) * 304;
+                                $y = 78 - (((float) $point['value'] - $minValue) / $range) * 64;
+                                return number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+                            })->implode(' ');
+                        };
+                        $latestPoint = $allPoints->last();
+                    @endphp
+                    <article class="ak-card-static ak-standard-card overflow-hidden rounded-2xl border border-teal-500/25 bg-[var(--ak-surface)] p-0 shadow-[0_12px_28px_rgba(15,23,42,.08)]">
+                        <header class="flex items-start justify-between gap-3 border-b border-teal-500/20 bg-gradient-to-r from-teal-500/[.12] via-transparent to-amber-400/[.08] px-4 py-3">
+                            <div class="min-w-0">
+                                <p class="text-[9px] font-black uppercase tracking-[.18em] text-teal-500">{{ __('Makroindikator') }}</p>
+                                <h2 class="mt-1 truncate text-base font-black text-[var(--ak-text)]">{{ $macroCard['title'] }}</h2>
+                                <p class="mt-0.5 truncate text-[10px] text-[var(--ak-muted)]">{{ $macroCard['subtitle'] }}</p>
+                            </div>
+                            @if ($latestPoint)
+                                <div class="shrink-0 text-right">
+                                    <strong class="block text-lg font-black tabular-nums text-[var(--ak-text)]">{{ number_format((float) $latestPoint['value'], 2, ',', '.') }}{{ $macroCard['unit'] }}</strong>
+                                    <small class="text-[9px] font-bold text-[var(--ak-muted)]">{{ $latestPoint['label'] }}</small>
+                                </div>
+                            @endif
+                        </header>
+                        <div class="px-3 pb-3 pt-2">
+                            @if ($allPoints->isEmpty())
+                                <div class="grid h-[104px] place-items-center rounded-xl border border-dashed border-[var(--ak-border)] text-[10px] font-bold text-[var(--ak-muted)]">{{ __('Noch keine historischen Reihen verfügbar.') }}</div>
+                            @else
+                                <div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                    @foreach ($macroCard['series'] as $series)
+                                        <span class="inline-flex items-center gap-1 text-[9px] font-black text-[var(--ak-muted)]"><i class="h-2 w-2 rounded-full" style="background:{{ $series['color'] }}"></i>{{ $series['name'] }}</span>
+                                    @endforeach
+                                </div>
+                                <svg viewBox="0 0 320 92" class="h-[104px] w-full" role="img" aria-label="{{ $macroCard['title'] }} {{ __('Linienchart') }}">
+                                    <line x1="8" y1="14" x2="312" y2="14" stroke="currentColor" stroke-opacity=".10" stroke-dasharray="3 4" />
+                                    <line x1="8" y1="46" x2="312" y2="46" stroke="currentColor" stroke-opacity=".10" stroke-dasharray="3 4" />
+                                    <line x1="8" y1="78" x2="312" y2="78" stroke="currentColor" stroke-opacity=".10" stroke-dasharray="3 4" />
+                                    @foreach ($macroCard['series'] as $series)
+                                        @php $points = $series['points'] ?? []; @endphp
+                                        @if (count($points) > 0)
+                                            <polyline points="{{ $chartPoints($points) }}" fill="none" stroke="{{ $series['color'] }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+                                        @endif
+                                    @endforeach
+                                </svg>
+                            @endif
+                        </div>
+                    </article>
+                @endforeach
+            </section>
+            @endif
             <section id="markets-exchange-pane" class="rounded-2xl">
                 <div id="markets-continent-scroll" class="h-full overflow-auto pr-1">
                     <div>
@@ -56,7 +115,7 @@
                             @php $continentMarkets = $marketsByContinent->get($continent, collect()); @endphp
                             @continue($continentMarkets->isEmpty())
                             <section class="min-w-0">
-                                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+                                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                     @foreach ($continentMarkets as $exchange)
                                         @php
                                             $signalCounts = [
@@ -81,8 +140,8 @@
                                             };
                                             $target = route('stocks.index', ['exchange' => $exchange->code]);
                                         @endphp
-                                        <x-dashboard.card onclick="window.location.href=@js($target)" class="ak-card-static ak-dashboard-card ak-cyan-dashboard-card ak-market-card-prominent min-h-[168px] cursor-pointer overflow-hidden p-0">
-                                            <div class="ak-market-card-head flex items-center justify-between gap-1.5 border-b border-orange-200/30 px-2 py-1.5">
+                                        <x-dashboard.card onclick="window.location.href=@js($target)" class="ak-card-static ak-dashboard-card ak-standard-card ak-cyan-dashboard-card ak-market-card-prominent min-h-[258px] cursor-pointer overflow-hidden p-0">
+                                            <div class="ak-market-card-head ak-standard-market-head flex items-center justify-between gap-1.5 border-b px-2 py-1.5">
                                                 <div class="flex min-w-0 items-center gap-2">
                                                     <span class="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-orange-200/25 bg-orange-200/10 text-sm">{{ $countryFlag($exchange->country) }}</span>
                                                     <div class="min-w-0">
@@ -343,7 +402,7 @@
                         };
                     @endphp
                     <div class="grid items-stretch gap-4 lg:grid-cols-2">
-                        <article class="ak-card ak-card-static ak-market-dashboard-card flex min-h-[360px] flex-col p-6">
+                        <article class="ak-card ak-card-static ak-detail-panel ak-standard-card ak-market-dashboard-card flex min-h-[360px] flex-col p-6">
                             <div class="ak-market-comment-heading flex flex-wrap items-start justify-between gap-4">
                                 <div class="flex items-start gap-3">
                                     <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-orange-400/25 bg-orange-400/10 text-orange-400">
@@ -363,7 +422,7 @@
                             </div>
                         </article>
 
-                        <article class="ak-card ak-card-static ak-market-dashboard-card flex min-h-[360px] flex-col p-6">
+                        <article class="ak-card ak-card-static ak-detail-panel ak-standard-card ak-market-dashboard-card flex min-h-[360px] flex-col p-6">
                             <div class="ak-market-comment-heading flex items-start gap-3">
                                 <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-orange-400/25 bg-orange-400/10 text-orange-400">
                                     <x-heroicon-o-chart-bar-square class="h-5 w-5" />
@@ -381,7 +440,7 @@
                         </article>
                     </div>
                 @else
-                    <article class="ak-card grid min-h-[320px] place-items-center text-sm text-[var(--ak-muted)]">{{ __('Noch kein Marktkommentar verfügbar.') }}</article>
+                    <article class="ak-card ak-detail-panel ak-standard-card grid min-h-[320px] place-items-center text-sm text-[var(--ak-muted)]">{{ __('Noch kein Marktkommentar verfügbar.') }}</article>
                 @endif
             </section>
         </main>
@@ -406,8 +465,12 @@
                 flex: 1 1 auto;
                 flex-direction: column;
                 min-height: 0;
-                overflow: hidden;
+                overflow: auto;
             }
+
+            /* Signal-/Exchange-Karten zuerst, Makro-Linien direkt darunter. */
+            #markets-exchange-pane { order: 1; flex: 0 0 auto; overflow: visible; }
+            #macro-indicator-cards { order: 2; flex: 0 0 auto; width: 100%; }
 
             #markets-exchange-pane,
             #markets-comments-pane {
@@ -474,6 +537,47 @@
                     0 0 0 1px rgba(255, 237, 213, .11) inset,
                     0 0 20px rgba(254, 215, 170, .12),
                     0 12px 27px rgba(154, 52, 18, .14) !important;
+            }
+
+            /* Einheitliches Kartenbild der Detail- und Depotansichten. */
+            #markets-page.ak-detail-design .ak-standard-card.ak-market-card-prominent {
+                border-color: color-mix(in srgb, var(--ak-border) 68%, #14b8a6 32%) !important;
+                background:
+                    radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .10), transparent 31%),
+                    linear-gradient(145deg, rgba(255,255,255,.99), rgba(242,250,249,.97)) !important;
+                box-shadow: inset 0 1px 0 #fff, 0 12px 28px rgba(15,23,42,.11), 0 3px 10px rgba(15,118,110,.07) !important;
+            }
+
+            #markets-page.ak-detail-design .ak-standard-card .ak-standard-market-head {
+                border-bottom-color: rgba(13,148,136,.24) !important;
+                background:
+                    radial-gradient(circle at 4% 0, rgba(34,211,238,.22), transparent 42%),
+                    linear-gradient(105deg, rgba(13,148,136,.18), rgba(20,184,166,.08) 58%, transparent) !important;
+                box-shadow: inset 0 -1px 0 rgba(13,148,136,.16), inset 0 1px 0 rgba(255,255,255,.65) !important;
+            }
+
+            #markets-page.ak-detail-design .ak-standard-card :is(.text-orange-200,.text-orange-300,.text-orange-400) { color: #0f9f98 !important; }
+            #markets-page.ak-detail-design .ak-standard-card :is(.border-orange-200\/25,.border-orange-200\/30) { border-color: rgba(20,184,166,.24) !important; }
+            #markets-page.ak-detail-design .ak-standard-card :is(.bg-orange-200\/10,.bg-orange-400\/10) { background-color: rgba(20,184,166,.09) !important; }
+
+            #markets-page.ak-detail-design .ak-standard-card.ak-market-card-prominent:hover {
+                border-color: color-mix(in srgb, var(--ak-border) 68%, #14b8a6 32%) !important;
+                box-shadow: inset 0 1px 0 #fff, 0 12px 28px rgba(15,23,42,.11), 0 3px 10px rgba(15,118,110,.07) !important;
+                transform: none !important;
+            }
+
+            :root:not([data-theme="light"]) #markets-page.ak-detail-design .ak-standard-card.ak-market-card-prominent {
+                background:
+                    radial-gradient(circle at 94% 100%, rgba(34,211,238,.11), transparent 31%),
+                    linear-gradient(145deg, rgba(22,35,45,.99), rgba(13,25,34,.99)) !important;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 16px 34px rgba(0,0,0,.30), 0 3px 12px rgba(6,182,212,.05) !important;
+            }
+
+            :root:not([data-theme="light"]) #markets-page.ak-detail-design .ak-standard-card .ak-standard-market-head {
+                background:
+                    radial-gradient(circle at 4% 0, rgba(34,211,238,.18), transparent 42%),
+                    linear-gradient(105deg, rgba(13,148,136,.24), rgba(20,184,166,.08) 58%, rgba(13,25,34,.15)) !important;
+                box-shadow: inset 0 -1px 0 rgba(34,211,238,.18), inset 0 1px 0 rgba(255,255,255,.035) !important;
             }
 
             .ak-market-tab {

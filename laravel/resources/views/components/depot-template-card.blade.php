@@ -22,9 +22,10 @@
     $countryFlags = ['DE' => '🇩🇪', 'US' => '🇺🇸', 'JP' => '🇯🇵', 'CN' => '🇨🇳', 'GB' => '🇬🇧', 'FR' => '🇫🇷', 'CH' => '🇨🇭', 'NL' => '🇳🇱', 'AU' => '🇦🇺', 'CA' => '🇨🇦', 'BR' => '🇧🇷', 'ZA' => '🇿🇦'];
 @endphp
 
-<article class="flex h-full min-h-0 cursor-pointer flex-col rounded-2xl border border-dashed border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)] transition hover:-translate-y-0.5 hover:border-teal-500/45">
+<article class="ak-strategy-depot-card ak-detail-panel group/card relative flex h-full min-h-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)] transition hover:border-teal-500/45">
+    <div class="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-500/25 via-cyan-500 to-amber-400/45"></div>
     <div class="flex items-center gap-3">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-teal-500/25 bg-teal-500/10 text-teal-600">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-teal-500/25 bg-gradient-to-br from-teal-500/15 to-cyan-500/[.04] text-teal-600 shadow-[inset_0_1px_0_rgba(255,255,255,.12)]">
             @if ($icon === 'sparkles')<x-heroicon-o-sparkles class="h-5 w-5" />
             @elseif ($icon === 'shield')<x-heroicon-o-shield-check class="h-5 w-5" />
             @elseif ($icon === 'scale')<x-heroicon-o-scale class="h-5 w-5" />
@@ -36,19 +37,21 @@
         <div class="min-w-0">
             @if ($type === 'paper')
                 <p class="text-[9px] font-black uppercase tracking-[.14em] text-teal-700">{{ __('Musterdepot') }}</p>
+            @else
+                <p class="text-[9px] font-black uppercase tracking-[.14em] text-teal-600">{{ __('KI-Strategie') }}</p>
             @endif
-            <h2 class="{{ $type === 'paper' ? 'mt-0.5' : '' }} truncate text-xl font-black">{{ $name }}</h2>
+            <h2 class="mt-0.5 truncate text-xl font-black">{{ $name }}</h2>
         </div>
     </div>
 
     <p class="mt-2 min-h-10 text-sm leading-5 text-[var(--ak-muted)]">{{ $description }}</p>
 
     <div class="mt-2 grid grid-cols-2 gap-2">
-        <div class="rounded-xl bg-[var(--ak-surface-muted)] px-3 py-2">
+        <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2">
             <p class="text-[10px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Depotwert') }}</p>
             <p class="mt-0.5 text-lg font-black tabular-nums">{{ number_format($simulatedValue, 2, ',', '.') }} {{ $currency }}</p>
         </div>
-        <div class="rounded-xl bg-[var(--ak-surface-muted)] px-3 py-2">
+        <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2">
             <p class="text-[10px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Performance') }}</p>
             <p class="mt-0.5 text-lg font-black tabular-nums {{ $simulatedPerformance > 0 ? 'text-emerald-400' : ($simulatedPerformance < 0 ? 'text-rose-400' : 'text-[var(--ak-muted)]') }}">{{ $simulatedPerformance > 0 ? '+' : '' }}{{ number_format($simulatedPerformance, 2, ',', '.') }} %</p>
         </div>
@@ -56,8 +59,8 @@
 
     @if (count($stocks) > 0)
         <div class="mt-2 flex items-center justify-between">
-            <p class="text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Virtuelle Positionen') }}</p>
-            <span class="rounded-md border border-amber-400/25 bg-amber-400/10 px-2 py-1 text-[9px] font-black uppercase text-amber-400">{{ __('Virtuell') }}</span>
+            <p class="text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Aktuelle Auswahl') }}</p>
+            <span class="rounded-md border border-teal-500/25 bg-teal-500/10 px-2 py-1 text-[9px] font-black uppercase text-teal-600">{{ count($stocks) }} {{ __('Positionen') }}</span>
         </div>
         <div class="mt-1.5 grid auto-rows-fr grid-cols-1 gap-1.5">
             @foreach ($stocks as $stock)
@@ -83,7 +86,7 @@
                                 @endif
                             </span>
                             <div class="min-w-0">
-                                <p class="truncate text-base font-black text-white">{{ $stock['name'] }}</p>
+                                <p class="truncate text-base font-black text-[var(--ak-text)]">{{ $stock['name'] }}</p>
                                 <p class="truncate text-[10px] font-black tracking-wide text-amber-500">{{ $stock['symbol'] }}</p>
                                 <p class="truncate text-[9px] font-bold text-[var(--ak-muted)]" title="{{ $stock['exchange_name'] ?: __('Keine Exchange') }}">
                                     <span>{{ $countryFlags[$stock['country']] ?? '🌐' }} {{ $stock['country'] ?: '—' }}</span>
@@ -110,7 +113,7 @@
         </div>
     @endif
 
-    <button type="button" class="mt-2 inline-flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-xs font-black text-[var(--ak-muted)] transition group-hover:border-teal-500/35 group-hover:text-teal-600">
-        <x-heroicon-o-chart-bar-square class="h-4 w-4" />{{ __('Depot anzeigen') }}
+    <button type="button" class="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-teal-600/25 bg-teal-600/[.10] text-xs font-black text-teal-600 transition group-hover/card:border-teal-500/45 group-hover/card:bg-teal-500/[.14]">
+        <x-heroicon-o-chart-bar-square class="h-4 w-4" />{{ __('Strategie analysieren') }}<x-heroicon-o-arrow-right class="h-3.5 w-3.5" />
     </button>
 </article>

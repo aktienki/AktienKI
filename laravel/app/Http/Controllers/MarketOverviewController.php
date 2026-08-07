@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\PersonalizedSignalService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -135,6 +136,93 @@ class MarketOverviewController extends Controller
             );
         });
 
-        return view('markets.index', compact('exchanges', 'marketAnalysis'));
+        // Cross-asset context for the market overview.  The series are read
+        // from the same persisted price-bar store used by the training
+        // pipeline, so the cards remain useful even when no AI commentary is
+        // available.
+        $macroBars = DB::table('instruments as instrument')
+            ->join('price_bars as bar', 'bar.instrument_id', '=', 'instrument.id')
+            ->whereIn('instrument.symbol', ['US2Y', 'US10Y'])
+            ->whereIn('bar.interval', ['1d', '1h'])
+            ->orderByDesc('bar.bar_time')
+            ->orderByDesc('bar.id')
+            ->limit(180)
+            ->get(['instrument.symbol', 'bar.close', 'bar.bar_time'])
+            ->groupBy('symbol')
+            ->map(fn ($rows) => $rows->sortBy('bar_time')->values());
+
+        $macroSeries = static function ($rows): array {
+            return collect($rows ?? [])->map(fn (object $row): array => [
+                'label' => Carbon::parse($row->bar_time)->format('d.m.'),
+                'value' => is_numeric($row->close) ? (float) $row->close : null,
+            ])->filter(fn (array $point): bool => $point['value'] !== null)->values()->all();
+        };
+        $us2y = $macroSeries($macroBars->get('US2Y', collect()));
+        $us10y = $macroSeries($macroBars->get('US10Y', collect()));
+
+        $volatilitySeries = DB::table('market_snapshots')
+            ->whereNotNull('volatility')
+            ->orderByDesc('snapshot_time')
+            ->limit(30)
+            ->get(['snapshot_time', 'volatility'])
+            ->sortBy('snapshot_time')
+            ->map(fn (object $row): array => [
+                'label' => Carbon::parse($row->snapshot_time)->format('d.m.'),
+                'value' => is_numeric($row->volatility) ? (float) $row->volatility : null,
+            ])->filter(fn (array $point): bool => $point['value'] !== null)->values()->all();
+
+        // If the snapshot worker has not produced a row yet, derive a small
+        // realised-volatility line from the persisted S&P 500 daily bars.
+        if ($volatilitySeries === []) {
+            $spxId = DB::table('instruments')->where('symbol', '^GSPC')->value('id');
+            $closes = $spxId
+                ? DB::table('price_bars')->where('instrument_id', $spxId)->where('interval', '1d')->orderByDesc('bar_time')->limit(45)->get(['close', 'bar_time'])->sortBy('bar_time')->values()
+                : collect();
+            $prices = $closes->map(fn (object $row): ?float => is_numeric($row->close) ? (float) $row->close : null)->filter(fn ($value) => $value !== null)->values();
+            $dailyReturns = collect();
+            for ($index = 1; $index < $prices->count(); $index++) {
+                $dailyReturns->push($prices[$index - 1] > 0 ? ($prices[$index] / $prices[$index - 1]) - 1 : null);
+            }
+            for ($index = 20; $index < $dailyReturns->count(); $index++) {
+                $window = $dailyReturns->slice($index - 20, 20)->filter(fn ($value) => $value !== null)->values();
+                $mean = $window->avg();
+                $variance = $window->map(fn (float $value): float => ($value - $mean) ** 2)->avg() ?? 0.0;
+                $volatilitySeries[] = [
+                    'label' => Carbon::parse($closes[$index + 1]->bar_time)->format('d.m.'),
+                    'value' => sqrt($variance) * sqrt(252) * 100,
+                ];
+            }
+        }
+
+        $normalise = static function (array $values): array {
+            $numeric = collect($values)->pluck('value')->filter(fn ($value) => is_numeric($value));
+            $base = (float) ($numeric->first() ?? 0);
+            return $base > 0
+                ? collect($values)->map(fn (array $point): array => ['label' => $point['label'], 'value' => (($point['value'] / $base) - 1) * 100])->all()
+                : [];
+        };
+        $bondSeries = $normalise($us10y);
+        $macroCards = [
+            [
+                'key' => 'rates', 'title' => __('Zinsen'),
+                'subtitle' => __('US Treasury Renditen · 2J und 10J'),
+                'series' => [['name' => 'US 2J', 'color' => '#22d3ee', 'points' => $us2y], ['name' => 'US 10J', 'color' => '#fbbf24', 'points' => $us10y]],
+                'unit' => '%',
+            ],
+            [
+                'key' => 'volatility', 'title' => __('Volatilität'),
+                'subtitle' => __('Marktvolatilität aus den letzten Snapshots'),
+                'series' => [['name' => __('Volatilität'), 'color' => '#fb7185', 'points' => $volatilitySeries]],
+                'unit' => '%',
+            ],
+            [
+                'key' => 'bonds', 'title' => __('Anleihen'),
+                'subtitle' => __('US 10J · Veränderung seit Serienbeginn'),
+                'series' => [['name' => 'US 10J', 'color' => '#34d399', 'points' => $bondSeries]],
+                'unit' => '%',
+            ],
+        ];
+
+        return view('markets.index', compact('exchanges', 'marketAnalysis', 'macroCards'));
     }
 }

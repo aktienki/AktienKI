@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Throwable;
@@ -240,7 +241,9 @@ class StockController extends Controller
             ? __('Zurück zur Watchlist')
             : ($returnTo && Str::startsWith($returnTo, '/predictions')
                 ? __('Zurück zu Prognosen')
-                : null);
+                : ($returnTo && (Str::startsWith($returnTo, '/depots') || Str::startsWith($returnTo, '/paper-depots'))
+                    ? __('Zurück zum Musterdepot')
+                    : null));
 
         $fundamental = DB::table('instrument_fundamentals')
             ->where('instrument_id', $instrument->id)
@@ -459,6 +462,40 @@ class StockController extends Controller
             'stockHeatmap',
             'stockHeatmapSummary',
         ));
+    }
+
+    public function liveQuote(string $symbol, TwelveDataService $marketData): JsonResponse
+    {
+        $instrument = $this->instrument($symbol);
+        $providerSymbol = (string) ($instrument->provider_symbol ?: $instrument->symbol);
+        $streamQuote = Cache::get('twelve_data_stream_quote_'.sha1(strtoupper((string) $instrument->symbol)));
+
+        try {
+            $quote = is_numeric($streamQuote['price'] ?? null)
+                ? $streamQuote
+                : $marketData->liveQuote($providerSymbol);
+        } catch (Throwable) {
+            $quote = null;
+        }
+
+        if (! is_numeric($quote['price'] ?? null)) {
+            return response()->json([
+                'message' => __('Aktuell ist kein Livekurs verfügbar.'),
+            ], 503);
+        }
+
+        return response()->json([
+            'symbol' => (string) $instrument->symbol,
+            'price' => (float) $quote['price'],
+            'currency' => (string) (($quote['currency'] ?? null) ?: $instrument->currency ?: ''),
+            'change_percent' => is_numeric($quote['change_percent'] ?? null)
+                ? (float) $quote['change_percent']
+                : null,
+            'timestamp' => is_numeric($quote['timestamp'] ?? null)
+                ? (int) $quote['timestamp']
+                : now()->timestamp,
+            'provider' => 'TwelveData',
+        ]);
     }
 
     public function chartData(Request $request, string $symbol, TwelveDataService $yahooFinance): JsonResponse

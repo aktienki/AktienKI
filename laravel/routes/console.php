@@ -20,3 +20,7 @@ Schedule::command('portfolios:send-trade-emails --limit=100')
     ->everyMinute()
     ->withoutOverlapping(10)
     ->runInBackground();
+
+Schedule::command('beta:send-trial-reminders')
+    ->dailyAt('09:00')
+    ->withoutOverlapping();

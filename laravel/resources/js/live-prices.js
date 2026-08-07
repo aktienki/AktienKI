@@ -27,6 +27,7 @@ if (authenticated) {
 
     if (symbols.length) {
         let providerToSource = {};
+        const latestTimestamps = new Map();
         const subscribe = () => fetch('/live-prices/subscribe', {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -48,8 +49,12 @@ if (authenticated) {
         subscribe();
         window.setInterval(subscribe, 60_000);
 
-        echo.private('market-prices').listen('.price.updated', event => {
+        echo.channel('market-prices').listen('.price.updated', event => {
             const sourceSymbol = providerToSource[event.symbol] ?? event.symbol;
+            const timestamp = Number(event.timestamp);
+            const previousTimestamp = latestTimestamps.get(sourceSymbol) ?? 0;
+            if (!Number.isFinite(timestamp) || timestamp < previousTimestamp) return;
+            latestTimestamps.set(sourceSymbol, timestamp);
             document.querySelectorAll(`[data-live-symbol="${CSS.escape(sourceSymbol)}"]`).forEach(element => {
                 const decimals = Number(element.dataset.liveDecimals ?? 2);
                 const currency = element.dataset.liveCurrency ?? '';
@@ -60,8 +65,6 @@ if (authenticated) {
                 element.dataset.liveUpdatedAt = String(event.timestamp);
             });
             document.querySelectorAll(`[data-live-time-symbol="${CSS.escape(sourceSymbol)}"]`).forEach(element => {
-                const timestamp = Number(event.timestamp);
-                if (!Number.isFinite(timestamp)) return;
                 element.textContent = new Date(timestamp * 1000).toLocaleTimeString(
                     document.documentElement.lang,
                     {
@@ -76,7 +79,7 @@ if (authenticated) {
                 detail: {
                     symbol: sourceSymbol,
                     price: Number(event.price),
-                    timestamp: Number(event.timestamp),
+                    timestamp,
                 },
             }));
         });

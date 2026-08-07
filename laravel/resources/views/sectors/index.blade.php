@@ -1,9 +1,10 @@
 <x-app-layout>
-    <div id="sectors-page" class="text-[var(--ak-text)]">
-        <div id="sectors-page-heading" class="z-30 border-b border-[var(--ak-border)] bg-[var(--ak-bg)]/95 py-2.5 backdrop-blur-xl">
-            <div class="ak-container flex flex-wrap items-center justify-between gap-4">
+    <x-detail-page-theme />
+    <div id="sectors-page" class="ak-detail-design text-[var(--ak-text)]">
+        <div id="sectors-page-heading" class="z-30 py-2.5">
+            <div class="ak-container ak-detail-hero flex flex-wrap items-center justify-between gap-4 rounded-[1.5rem] border px-5 py-4">
                 <div>
-                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-orange-400">aKI Sector Intelligence</p>
+                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-cyan-500">aKI Sector Intelligence</p>
                     <h1 class="mt-1 text-2xl font-black">{{ __('Sektoren') }}</h1>
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-3">
@@ -13,7 +14,7 @@
                         <span class="inline-flex items-center gap-1"><i class="ak-watch-swatch h-2 w-2 rounded-full"></i>{{ __('Watch') }}</span>
                         <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-teal-500"></i>{{ __('Buy') }}</span>
                     </div>
-                    <span class="rounded-xl border border-orange-400/30 bg-orange-400/[.07] px-3 py-2 text-xs font-bold text-[var(--ak-muted)]">
+                    <span class="rounded-xl border border-cyan-500/30 bg-cyan-500/[.08] px-3 py-2 text-xs font-bold text-[var(--ak-muted)]">
                         {{ $sectors->count() }} {{ __('Sektoren') }}
                     </span>
                 </div>
@@ -88,11 +89,11 @@
                                     default => (string) ($topStock?->currency ?? ''),
                                 };
                             @endphp
-                            <x-dashboard.card onclick="window.location.href=@js($cardTarget)" class="ak-card-static ak-dashboard-card ak-cyan-dashboard-card ak-market-card-prominent ak-sector-overview-card min-w-0 cursor-pointer overflow-hidden p-0">
-                                <div class="ak-market-card-head ak-sector-overview-card-head flex items-center justify-between gap-1.5 border-b border-orange-200/30 px-2 py-1.5">
+                            <x-dashboard.card onclick="window.location.href=@js($cardTarget)" class="ak-card-static ak-dashboard-card ak-standard-card ak-cyan-dashboard-card ak-market-card-prominent ak-sector-overview-card min-w-0 cursor-pointer overflow-hidden p-0">
+                                <div class="ak-market-card-head ak-standard-market-head ak-sector-overview-card-head flex items-center justify-between gap-1.5 border-b px-2 py-1.5">
                                     <div class="flex min-w-0 items-center gap-2">
                                         <span class="grid h-7 w-7 shrink-0 place-items-center text-orange-200">
-                                            <x-sector-icon :sector="$sector->sector" class="h-4 w-4" style="--ak-sector-icon-color:#fed7aa;stroke-width:1.35!important" />
+                                            <x-sector-icon :sector="$sector->sector" class="h-4 w-4" style="--ak-sector-icon-color:#06b6d4;stroke-width:1.35!important" />
                                         </span>
                                         <div class="min-w-0">
                                             <h2 class="truncate text-[13px] font-black text-[var(--ak-text)]">{{ __($sector->sector) }}</h2>
@@ -300,11 +301,11 @@
                                     default => 'border-amber-500/35 bg-amber-500/15 text-amber-400',
                                 };
                             @endphp
-                            <article class="ak-card ak-card-static flex min-h-[172px] flex-col p-4">
+                            <article class="ak-card ak-card-static ak-detail-panel ak-standard-card flex min-h-[172px] flex-col p-4">
                                 <div class="ak-sector-comment-heading flex items-start justify-between gap-3">
                                     <div class="flex min-w-0 items-start gap-2.5">
                                         <span class="grid h-8 w-8 shrink-0 place-items-center text-orange-400">
-                                            <x-sector-icon :sector="$comment['sector'] ?? null" class="h-4 w-4" style="--ak-sector-icon-color:#fb923c;stroke-width:1.35!important" />
+                                            <x-sector-icon :sector="$comment['sector'] ?? null" class="h-4 w-4" style="--ak-sector-icon-color:#06b6d4;stroke-width:1.35!important" />
                                         </span>
                                         <div class="min-w-0">
                                             <p class="text-[9px] font-black uppercase tracking-[.16em] text-orange-4000">{{ __('Sektorenkommentar') }}</p>
@@ -321,7 +322,7 @@
                         @endforeach
                     </div>
                 @else
-                    <article class="ak-card grid min-h-[280px] place-items-center text-sm text-[var(--ak-muted)]">{{ __('Noch keine Sektorenkommentare verfügbar.') }}</article>
+                    <article class="ak-card ak-detail-panel ak-standard-card grid min-h-[280px] place-items-center text-sm text-[var(--ak-muted)]">{{ __('Noch keine Sektorenkommentare verfügbar.') }}</article>
                 @endif
             </section>
         </main>
@@ -340,6 +341,14 @@
         #sectors-page .ak-market-card-prominent{height:258px!important;min-height:258px!important;border-color:rgba(254,215,170,.22)!important;background:radial-gradient(circle at 0 0,rgba(254,215,170,.26),transparent 40%),radial-gradient(circle at 100% 0,rgba(254,215,170,.17),transparent 38%),linear-gradient(150deg,rgba(254,215,170,.12),rgba(124,45,18,.22) 52%,transparent),rgba(68,82,113,.98)!important;box-shadow:0 0 0 1px rgba(253,186,116,.08) inset,0 0 16px rgba(254,215,170,.09),0 10px 24px rgba(154,52,18,.12),inset 0 1px 0 rgba(255,237,213,.10)!important}
         #sectors-page .ak-market-card-head{background:linear-gradient(105deg,rgba(254,215,170,.22),rgba(254,215,170,.08)),rgba(54,66,93,.96);box-shadow:inset 0 -1px 0 rgba(254,215,170,.24),inset 0 1px 0 rgba(255,247,237,.06)}
         #sectors-page .ak-market-card-prominent:hover{border-color:rgba(253,186,116,.34)!important;box-shadow:0 0 0 1px rgba(255,237,213,.11) inset,0 0 20px rgba(254,215,170,.12),0 12px 27px rgba(154,52,18,.14)!important}
+        #sectors-page.ak-detail-design .ak-standard-card.ak-market-card-prominent{border-color:color-mix(in srgb,var(--ak-border) 66%,#06b6d4 34%)!important;background:radial-gradient(circle at 94% 100%,rgba(34,211,238,.13),transparent 31%),linear-gradient(145deg,rgba(255,255,255,.99),rgba(241,249,250,.97))!important;box-shadow:inset 0 1px 0 #fff,0 12px 28px rgba(15,23,42,.11),0 3px 11px rgba(6,182,212,.08)!important}
+        #sectors-page.ak-detail-design .ak-standard-card .ak-standard-market-head{border-bottom-color:rgba(6,182,212,.26)!important;background:radial-gradient(circle at 4% 0,rgba(34,211,238,.25),transparent 42%),linear-gradient(105deg,rgba(6,182,212,.18),rgba(20,184,166,.07) 58%,transparent)!important;box-shadow:inset 0 -1px 0 rgba(6,182,212,.18),inset 0 1px 0 rgba(255,255,255,.65)!important}
+        #sectors-page.ak-detail-design .ak-standard-card :is(.text-orange-200,.text-orange-300,.text-orange-400){color:#0891b2!important}
+        #sectors-page.ak-detail-design .ak-standard-card :is(.border-orange-200\/25,.border-orange-200\/30){border-color:rgba(6,182,212,.25)!important}
+        #sectors-page.ak-detail-design .ak-standard-card :is(.bg-orange-200\/10,.bg-orange-400\/10){background-color:rgba(6,182,212,.09)!important}
+        #sectors-page.ak-detail-design .ak-standard-card.ak-market-card-prominent:hover{border-color:color-mix(in srgb,var(--ak-border) 66%,#06b6d4 34%)!important;box-shadow:inset 0 1px 0 #fff,0 12px 28px rgba(15,23,42,.11),0 3px 11px rgba(6,182,212,.08)!important;transform:none!important}
+        :root:not([data-theme="light"]) #sectors-page.ak-detail-design .ak-standard-card.ak-market-card-prominent{background:radial-gradient(circle at 94% 100%,rgba(34,211,238,.13),transparent 31%),linear-gradient(145deg,rgba(20,35,46,.99),rgba(12,25,35,.99))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 16px 34px rgba(0,0,0,.30),0 3px 12px rgba(6,182,212,.06)!important}
+        :root:not([data-theme="light"]) #sectors-page.ak-detail-design .ak-standard-card .ak-standard-market-head{background:radial-gradient(circle at 4% 0,rgba(34,211,238,.20),transparent 42%),linear-gradient(105deg,rgba(6,182,212,.24),rgba(20,184,166,.07) 58%,rgba(12,25,35,.15))!important;box-shadow:inset 0 -1px 0 rgba(34,211,238,.19),inset 0 1px 0 rgba(255,255,255,.035)!important}
         .ak-sector-tab{display:inline-flex;width:116px;height:34px;align-items:center;justify-content:center;gap:6px;border:1px solid var(--ak-border);border-bottom-width:2px;border-radius:9px 9px 5px 5px;padding:0 10px;font-size:10px;font-weight:900;letter-spacing:.035em;box-shadow:0 4px 10px rgba(3,7,18,.1);transition:none}
         .ak-sector-tab-active{border-color:color-mix(in srgb,rgb(6 182 212) 38%,var(--ak-border));border-bottom-color:rgb(6 182 212);background:var(--ak-card);color:rgb(6 182 212);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 4px 12px rgba(3,7,18,.14)}
         .ak-sector-tab-idle{background:color-mix(in srgb,var(--ak-card) 72%,var(--ak-bg) 28%);color:var(--ak-muted)}

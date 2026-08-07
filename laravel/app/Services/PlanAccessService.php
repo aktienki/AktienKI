@@ -11,6 +11,7 @@ final class PlanAccessService
     public function allows(User $user, PlanLevel|string $required): bool
     {
         if ((bool) $user->is_admin || strtolower((string) ($user->role ?? '')) === 'admin') return true;
+        if ((bool) $user->beta_access_exempt) return true;
         $requiredLevel = $required instanceof PlanLevel ? $required : PlanLevel::tryFrom(strtolower($required));
         if (! $requiredLevel) return false;
 

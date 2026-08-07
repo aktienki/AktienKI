@@ -6,6 +6,7 @@ use App\Models\SavedPredictionFilter;
 use App\Enums\PlanLevel;
 use App\Services\PlanAccessService;
 use App\Services\SavedFilterLimitService;
+use App\Services\YahooIndexService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -70,7 +71,7 @@ final class SavedPredictionFilterController extends Controller
                 now()->addMinutes(10),
                 function () use ($request, $run): array {
                     $result = app(PredictionController::class)
-                        ->filteredBacktestResult($request, (string) $run->public_id)
+                        ->filteredBacktestResult($request, (string) $run->public_id, app(YahooIndexService::class))
                         ->getData(true);
                     $years = max(1 / 12, (float) ($result['backtest_months'] ?? 36) / 12);
                     $totalPerformance = (float) ($result['strategy_performance'] ?? 0);
@@ -130,6 +131,7 @@ final class SavedPredictionFilterController extends Controller
             ->unique()
             ->values()
             ->all();
+        $filters['profit_factor_min'] = max(0, min(3, (float) ($filters['profit_factor_min'] ?? 0)));
         $filters['exit_strategy'] = in_array($filters['exit_strategy'] ?? null, ['fixed_20d', 'winner_runner', 'prediction_target', 'buy_and_hold'], true)
             ? $filters['exit_strategy']
             : 'fixed_20d';

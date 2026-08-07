@@ -29,6 +29,129 @@
         line-height: 1.1;
     }
 
+    .ak-top3-chart .apexcharts-candlestick-series path {
+        opacity: 1 !important;
+        stroke-width: 1.5px !important;
+        filter: none !important;
+        shape-rendering: crispEdges;
+    }
+
+    .ak-top3-card {
+        background:
+            linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(244, 250, 249, .96));
+        box-shadow:
+            0 1px 0 rgba(255, 255, 255, .95) inset,
+            0 0 0 1px rgba(15, 118, 110, .055),
+            0 14px 34px rgba(15, 23, 42, .105),
+            0 4px 12px rgba(15, 118, 110, .07);
+        transform: translateZ(0);
+        transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+    }
+
+    :root:not([data-theme="light"]) .ak-top3-card {
+        background:
+            linear-gradient(145deg, rgba(22, 35, 45, .98), rgba(13, 25, 34, .98));
+        box-shadow:
+            0 1px 0 rgba(255, 255, 255, .045) inset,
+            0 0 0 1px rgba(34, 211, 238, .065),
+            0 18px 42px rgba(0, 0, 0, .34),
+            0 5px 16px rgba(6, 182, 212, .055);
+    }
+
+    .ak-top3-card .ak-top3-card-head {
+        position: relative;
+        background:
+            radial-gradient(circle at 5% 0%, rgba(34, 211, 238, .24), transparent 39%),
+            linear-gradient(108deg, rgba(13, 148, 136, .21) 0%, rgba(20, 184, 166, .14) 38%, rgba(6, 182, 212, .10) 68%, rgba(255, 255, 255, .48) 100%);
+        border-bottom-color: rgba(13, 148, 136, .32);
+        box-shadow:
+            0 1px 0 rgba(255, 255, 255, .82) inset,
+            0 5px 14px rgba(15, 118, 110, .055);
+    }
+
+    .ak-top3-card .ak-top3-card-head::after {
+        content: '';
+        position: absolute;
+        inset: 0 18% auto;
+        height: 2px;
+        border-radius: 0 0 999px 999px;
+        background: linear-gradient(90deg, transparent, rgba(13, 148, 136, .62), rgba(34, 211, 238, .72), transparent);
+        pointer-events: none;
+    }
+
+    :root:not([data-theme="light"]) .ak-top3-card .ak-top3-card-head {
+        background:
+            radial-gradient(circle at 5% 0%, rgba(34, 211, 238, .22), transparent 40%),
+            linear-gradient(108deg, rgba(13, 148, 136, .27) 0%, rgba(20, 184, 166, .17) 40%, rgba(6, 182, 212, .105) 70%, rgba(15, 23, 42, .24) 100%);
+        border-bottom-color: rgba(34, 211, 238, .26);
+        box-shadow:
+            0 1px 0 rgba(255, 255, 255, .04) inset,
+            0 7px 18px rgba(0, 0, 0, .12);
+    }
+
+    .ak-top3-card .ak-top3-card-footer {
+        background:
+            radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .22), transparent 38%),
+            linear-gradient(108deg, rgba(255, 255, 255, .48) 0%, rgba(6, 182, 212, .09) 34%, rgba(20, 184, 166, .15) 66%, rgba(13, 148, 136, .22) 100%);
+        border-top-color: rgba(13, 148, 136, .30);
+        box-shadow:
+            0 1px 0 rgba(255, 255, 255, .75) inset,
+            0 -5px 14px rgba(15, 118, 110, .055);
+    }
+
+    :root:not([data-theme="light"]) .ak-top3-card .ak-top3-card-footer {
+        background:
+            radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .20), transparent 40%),
+            linear-gradient(108deg, rgba(15, 23, 42, .24) 0%, rgba(6, 182, 212, .10) 34%, rgba(20, 184, 166, .17) 66%, rgba(13, 148, 136, .27) 100%);
+        border-top-color: rgba(34, 211, 238, .24);
+        box-shadow: 0 -6px 16px rgba(0, 0, 0, .12);
+    }
+
+    .ak-top3-winner {
+        border-width: 2px;
+        background:
+            radial-gradient(circle at 8% 0%, rgba(245, 158, 11, .10), transparent 30%),
+            radial-gradient(circle at 92% 0%, rgba(6, 182, 212, .08), transparent 28%),
+            var(--ak-card-strong);
+        box-shadow:
+            0 0 0 1px rgba(245, 158, 11, .10),
+            0 18px 45px rgba(15, 118, 110, .11),
+            0 8px 24px rgba(245, 158, 11, .10);
+    }
+
+    .ak-top3-winner::before {
+        content: '';
+        position: absolute;
+        z-index: 20;
+        inset: 0 14% auto;
+        height: 3px;
+        border-radius: 0 0 999px 999px;
+        background: linear-gradient(90deg, transparent, #fbbf24 28%, #22d3ee 72%, transparent);
+        box-shadow: 0 2px 12px rgba(34, 211, 238, .28);
+        pointer-events: none;
+    }
+
+    .ak-top3-winner .ak-top3-card-head {
+        background:
+            radial-gradient(circle at 5% 0%, rgba(245, 158, 11, .28), transparent 40%),
+            linear-gradient(108deg, rgba(245, 158, 11, .22) 0%, rgba(251, 191, 36, .13) 34%, rgba(20, 184, 166, .12) 67%, rgba(6, 182, 212, .09) 100%);
+        border-bottom-color: rgba(245, 158, 11, .36);
+    }
+
+    .ak-top3-winner .ak-top3-card-footer {
+        background:
+            radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .18), transparent 38%),
+            linear-gradient(108deg, rgba(245, 158, 11, .20) 0%, rgba(251, 191, 36, .13) 34%, rgba(20, 184, 166, .13) 68%, rgba(6, 182, 212, .10) 100%);
+        border-top-color: rgba(245, 158, 11, .34);
+    }
+
+    :root:not([data-theme="light"]) .ak-top3-winner {
+        box-shadow:
+            0 0 0 1px rgba(251, 191, 36, .13),
+            0 18px 48px rgba(0, 0, 0, .30),
+            0 0 30px rgba(6, 182, 212, .08);
+    }
+
     @media (min-width: 768px) and (max-width: 1279px) {
         .ak-top3-page .ak-top3-metric-value {
             font-size: clamp(1rem, 2vw, 1.22rem);
@@ -50,6 +173,7 @@
         flex: 0 0 7.25rem;
         align-items: center;
         justify-content: center;
+        gap: .3rem;
         overflow: hidden;
         border: 1px solid;
         border-radius: .375rem;
@@ -618,12 +742,8 @@ body:not(.welcome-background) :is(
 }
 
 :root:not([data-theme="light"]) .ak-brand-link .ak-brand-logo-dark {
-    filter:
-        hue-rotate(155deg)
-        brightness(1.16)
-        contrast(1.08)
-        saturate(1.08)
-        drop-shadow(0 0 8px rgba(34, 211, 238, .18));
+    /* Keep the original orange accent in dark mode for stronger brand contrast. */
+    filter: brightness(1.08) contrast(1.06) saturate(1.04) drop-shadow(0 0 8px rgba(245, 158, 11, .18));
 }
 
 :root[data-theme="light"] .ak-brand-link .ak-brand-logo-light {
@@ -639,7 +759,8 @@ body:not(.welcome-background) :is(
 }
 
 :root:not([data-theme="light"]) .ak-brand-wordmark-dark {
-    filter: hue-rotate(155deg) brightness(1.16) contrast(1.08) saturate(1.08) drop-shadow(0 0 8px rgba(34, 211, 238, .18));
+    /* Welcome and application dark themes use the orange-accent logo asset unchanged. */
+    filter: brightness(1.08) contrast(1.06) saturate(1.04) drop-shadow(0 0 8px rgba(245, 158, 11, .18));
 }
 
 :root[data-theme="light"] .ak-brand-wordmark-dark {
@@ -651,7 +772,7 @@ body:not(.welcome-background) :is(
 }
 
 :root:not([data-theme="light"]) .ak-brand-icon {
-    filter: hue-rotate(155deg) brightness(1.16) contrast(1.08) saturate(1.08) drop-shadow(0 0 7px rgba(34, 211, 238, .18));
+    filter: brightness(1.08) contrast(1.06) saturate(1.04) drop-shadow(0 0 7px rgba(245, 158, 11, .18));
 }
 
 :root[data-theme="light"] .ak-brand-icon {
@@ -1662,6 +1783,20 @@ body:not(.welcome-background) :is(
 */
 
 @layer components {
+    /* Keep the primary navigation readable without letting long labels
+       overflow the compact application topbar. */
+    .ak-app-topbar nav .ak-top-link span,
+    .ak-app-topbar nav .ak-top-link-active span {
+        font-size: clamp(.72rem, .78vw, .86rem);
+        letter-spacing: -.01em;
+    }
+
+    .ak-app-topbar nav .ak-top-link,
+    .ak-app-topbar nav .ak-top-link-active {
+        gap: .4rem;
+        padding-inline: .7rem;
+    }
+
     .ak-top-link {
         @apply inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl border border-transparent px-3.5 py-2 text-sm font-medium text-slate-300 transition-all duration-200 hover:text-white;
     }
@@ -3138,6 +3273,62 @@ body:not(.welcome-background) :is(
 
 #predictions-page .ak-prediction-donut-track {
     stroke: color-mix(in srgb, var(--predictions-accent-bright) 13%, transparent) !important;
+}
+
+#predictions-page .ak-prediction-signal-badge {
+    display: inline-flex;
+    height: 1.75rem;
+    width: 4.25rem;
+    min-width: 4.25rem;
+    max-width: 4.25rem;
+    align-items: center;
+    justify-content: center;
+    gap: .25rem;
+    border: 1px solid;
+    border-radius: 999px;
+    padding: 0 .45rem;
+    font-size: .5rem;
+    font-weight: 900;
+    letter-spacing: .08em;
+    line-height: 1;
+    text-transform: uppercase;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14);
+}
+
+#predictions-page .ak-prediction-signal-badge[data-signal="buy"] {
+    border-color: #0f766e;
+    background: #137f73;
+    color: #fff;
+}
+
+#predictions-page .ak-prediction-signal-badge[data-signal="watch"] {
+    border-color: rgba(101, 127, 57, .42);
+    background: rgba(132, 169, 94, .16);
+    color: #789247;
+}
+
+#predictions-page .ak-prediction-signal-badge[data-signal="hold"] {
+    border-color: rgba(217, 119, 6, .38);
+    background: rgba(245, 158, 11, .13);
+    color: #b66b08;
+}
+
+#predictions-page .ak-prediction-signal-badge[data-signal="sell"] {
+    border-color: rgba(190, 70, 91, .42);
+    background: rgba(225, 93, 115, .12);
+    color: #bd4b60;
+}
+
+:root:not([data-theme="light"]) #predictions-page .ak-prediction-signal-badge[data-signal="watch"] {
+    color: #b5cb8b;
+}
+
+:root:not([data-theme="light"]) #predictions-page .ak-prediction-signal-badge[data-signal="hold"] {
+    color: #f6bd55;
+}
+
+:root:not([data-theme="light"]) #predictions-page .ak-prediction-signal-badge[data-signal="sell"] {
+    color: #f08ca0;
 }
 
 #predictions-page #prediction-filterboard .ak-heatmap-range {

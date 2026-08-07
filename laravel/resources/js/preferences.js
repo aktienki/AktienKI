@@ -28,6 +28,17 @@ function applyTheme(theme = selectedTheme()) {
     window.dispatchEvent(new CustomEvent('aktienki:theme-changed', { detail: { theme: resolved } }));
 }
 
+function persistTheme(theme) {
+    const token = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (!token || !window.fetch) return;
+    fetch('/profile/theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
+        body: JSON.stringify({ theme }),
+        credentials: 'same-origin',
+    }).catch(() => {});
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     applyTheme();
     document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
@@ -35,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const next = resolvedTheme() === 'dark' ? 'light' : 'dark';
             localStorage.setItem(storageKey, next);
             applyTheme(next);
+            persistTheme(next);
         });
     });
 });

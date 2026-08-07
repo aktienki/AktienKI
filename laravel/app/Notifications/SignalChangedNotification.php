@@ -33,6 +33,7 @@ class SignalChangedNotification extends Notification implements ShouldQueue
         $signal = strtoupper((string) $this->prediction->signal);
         $locale = data_get($notifiable->preferences, 'locale', app()->getLocale());
         app()->setLocale(in_array($locale, ['de', 'en'], true) ? $locale : 'de');
+        $theme = data_get($notifiable->preferences, 'theme', data_get($notifiable->preferences, 'color_scheme', 'light'));
 
         return (new MailMessage)
             ->subject(__('Neues aKI-Signal für :symbol', ['symbol' => $instrument->symbol]))
@@ -43,6 +44,7 @@ class SignalChangedNotification extends Notification implements ShouldQueue
                 'previousSignal' => strtoupper($this->previousSignal),
                 'signal' => $signal,
                 'expectedReturn' => $this->expectedReturn(),
+                'emailTheme' => in_array($theme, ['dark', 'light'], true) ? $theme : 'light',
             ]);
     }
 

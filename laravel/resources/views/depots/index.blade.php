@@ -1,4 +1,5 @@
 <x-app-layout>
+    <x-detail-page-theme />
     @php
         $depotExplorerData = collect($strategyTemplates)->values()->mapWithKeys(function ($template, $index) {
             [$type, $name, $description, $icon, $currency, $stocks, $history] = array_pad($template, 7, []);
@@ -25,18 +26,23 @@
                 ])->all(),
             ]];
         })->all();
+        $strategyDepotSummary = collect($depotExplorerData);
+        $strategyPositionCount = $strategyDepotSummary->sum(fn ($depot) => count($depot['stocks'] ?? []));
+        $strategyBestPerformance = (float) ($strategyDepotSummary->max('performance') ?? 0);
     @endphp
-    <div x-data="depotExplorer(@js($depotExplorerData))" class="flex min-h-[calc(100dvh-89px)] flex-col py-3 text-[var(--ak-text)]">
-        <div class="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <div x-data="depotExplorer(@js($depotExplorerData))" class="ak-detail-design flex min-h-[calc(100dvh-89px)] flex-col py-3 text-[var(--ak-text)]">
+        <div class="ak-detail-hero mb-3 flex shrink-0 flex-col gap-2 rounded-2xl border border-[var(--ak-border)] px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
             <div class="flex items-center gap-3">
                 <div class="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300">
                     @if ($paperMode)<x-heroicon-o-beaker class="h-6 w-6" />@else<x-heroicon-o-briefcase class="h-6 w-6" />@endif
                 </div>
                 <div>
-                    <p class="text-[10px] font-black uppercase tracking-[.18em] text-teal-700">{{ $paperMode ? __('Virtuelle Portfolioübersicht') : __('Portfolioübersicht') }}</p>
-                    <h1 class="mt-1 text-2xl font-black tracking-tight">{{ $paperMode ? __('Meine Musterdepots') : __('aKI Virtuelle Depots') }}</h1>
+                    <p class="text-[10px] font-black uppercase tracking-[.18em] text-teal-700">{{ $paperMode ? __('Virtuelle Portfolioübersicht') : __('KI-gestützte Portfolioauswahl') }}</p>
+                    <h1 class="mt-1 text-2xl font-black tracking-tight">{{ $paperMode ? __('Meine Musterdepots') : __('Strategiedepots') }}</h1>
                     @if ($paperMode)
                         <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ __('Teste Strategien und KI-Empfehlungen ohne reales Kapital.') }}</p>
+                    @else
+                        <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ __('Vergleiche unterschiedliche Anlageprofile, Positionen und deren modellbasierte Entwicklung.') }}</p>
                     @endif
                 </div>
             </div>
@@ -54,6 +60,23 @@
             <div class="mb-4 rounded-xl border border-rose-400/25 bg-rose-400/10 px-4 py-3 text-sm font-bold text-rose-400">{{ $errors->first() }}</div>
         @endif
 
+        @unless ($paperMode)
+            <section x-show="!selected" x-transition.opacity.duration.500ms class="mb-3 grid shrink-0 grid-cols-3 gap-2">
+                <div class="ak-strategy-summary-card">
+                    <span class="ak-strategy-summary-icon"><x-heroicon-o-squares-2x2 class="h-4 w-4" /></span>
+                    <div><p>{{ __('Strategien') }}</p><strong>{{ number_format($strategyDepotSummary->count(), 0, ',', '.') }}</strong></div>
+                </div>
+                <div class="ak-strategy-summary-card">
+                    <span class="ak-strategy-summary-icon"><x-heroicon-o-building-office-2 class="h-4 w-4" /></span>
+                    <div><p>{{ __('Ausgewählte Positionen') }}</p><strong>{{ number_format($strategyPositionCount, 0, ',', '.') }}</strong></div>
+                </div>
+                <div class="ak-strategy-summary-card">
+                    <span class="ak-strategy-summary-icon"><x-heroicon-o-arrow-trending-up class="h-4 w-4" /></span>
+                    <div><p>{{ __('Beste Entwicklung') }}</p><strong class="{{ $strategyBestPerformance >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $strategyBestPerformance >= 0 ? '+' : '' }}{{ number_format($strategyBestPerformance, 2, ',', '.') }} %</strong></div>
+                </div>
+            </section>
+        @endunless
+
         <section class="grid gap-3" :class="['idle', 'fading', 'returning', 'appearing'].includes(phase) ? '{{ $paperMode ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-2 xl:grid-cols-3' }}' : 'xl:grid-cols-12'">
             @foreach ($portfolios as $portfolio)
                 @php
@@ -65,9 +88,9 @@
                     $performance = (float) $portfolio->performance_percent;
                     $isStrategyAccount = $paperMode && (bool) data_get($portfolio->meta, 'automation.live_enabled', false);
                 @endphp
-                <article x-data="{ strategyOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--ak-card)] transition {{ $isStrategyAccount ? 'min-h-[29rem] border-orange-400/50 shadow-[0_0_0_1px_rgba(251,146,60,.08),0_18px_45px_rgba(251,146,60,.16)] xl:row-span-2' : 'min-h-52 border-[var(--ak-border)] shadow-[var(--ak-shadow)] hover:border-teal-500/35' }}" @if($isStrategyAccount) style="background:linear-gradient(155deg,rgba(251,146,60,.14) 0%,rgba(21,36,58,.96) 34%,rgba(21,36,58,1) 100%);" @endif>
+                <article x-data="{ strategyOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="ak-detail-panel relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--ak-card)] transition {{ $isStrategyAccount ? 'min-h-[29rem] border-orange-400/50 shadow-[0_0_0_1px_rgba(251,146,60,.08),0_18px_45px_rgba(251,146,60,.16)] xl:row-span-2' : 'min-h-52 border-[var(--ak-border)] shadow-[var(--ak-shadow)] hover:border-teal-500/35' }}" @if($isStrategyAccount) style="background:linear-gradient(155deg,rgba(251,146,60,.14) 0%,rgba(21,36,58,.96) 34%,rgba(21,36,58,1) 100%);" @endif>
                     @if($isStrategyAccount)<div class="h-1 w-full shrink-0 bg-gradient-to-r from-orange-400/25 via-orange-400 to-sky-400/25 shadow-[0_0_12px_rgba(251,146,60,.45)]"></div>@endif
-                    <div class="flex items-start justify-between gap-3 border-b border-[var(--ak-border)] {{ $isStrategyAccount ? 'p-4' : 'p-3' }}">
+                    <div class="ak-detail-card-head flex items-start justify-between gap-3 border-b border-[var(--ak-border)] {{ $isStrategyAccount ? 'p-4' : 'p-3' }}">
                         <div class="flex min-w-0 items-center gap-3">
                             <span class="flex shrink-0 items-center justify-center rounded-xl border {{ $isStrategyAccount ? 'h-11 w-11 border-orange-400/35 bg-orange-400/[.12] text-orange-400 shadow-[0_0_18px_rgba(251,146,60,.12)]' : 'h-9 w-9 '.$type[2].' '.$type[1] }}">
                                 @if($isStrategyAccount)<x-heroicon-o-bolt class="h-5 w-5" />
@@ -211,7 +234,7 @@
                     </div>
                 @endforeach
                 @if ($paperMode)
-                    <article class="col-span-full mx-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
+                    <article class="ak-detail-panel col-span-full mx-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
                         <div class="flex items-center gap-3 border-b border-[var(--ak-border)] px-5 py-4">
                             <span class="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-400/10 text-amber-400"><x-heroicon-o-plus class="h-5 w-5" /></span>
                             <div><p class="text-[9px] font-black uppercase tracking-[.14em] text-amber-400">{{ __('Neues Musterdepot') }}</p><h2 class="mt-1 text-lg font-black">{{ __('Virtuelles Depot einrichten') }}</h2></div>
@@ -245,7 +268,7 @@
                         </div>
                     @endforeach
                 @endunless
-                <div x-data="{ open: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="{{ $paperMode ? 'min-h-52 p-3' : 'min-h-72 p-5' }} rounded-2xl border border-dashed border-[var(--ak-border)] bg-[var(--ak-card)]">
+                <div x-data="{ open: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="ak-detail-panel {{ $paperMode ? 'min-h-52 p-3' : 'min-h-72 p-5' }} rounded-2xl border border-dashed border-[var(--ak-border)] bg-[var(--ak-card)]">
                     <button type="button" @click="open = !open" class="flex h-full w-full flex-col items-center justify-center text-center text-[var(--ak-muted)] transition hover:text-teal-700" x-show="!open">
                         <span class="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]"><x-heroicon-o-plus class="h-6 w-6" /></span>
                         <strong class="mt-4 text-sm">{{ __('Weiteres Depot anlegen') }}</strong>
@@ -272,7 +295,7 @@
             @endif
 
             <aside x-cloak x-show="phase === 'detail' && active" x-transition.opacity.duration.500ms class="min-w-0 space-y-4 xl:col-span-8">
-                <section class="overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
+                <section class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
                     <div class="border-b border-[var(--ak-border)] px-4 py-3">
                         <div>
                             <p class="text-[9px] font-black uppercase tracking-[.14em] text-teal-600">{{ __('Performance & durchschnittlicher KI-Score') }}</p>
@@ -286,7 +309,7 @@
                     <div x-ref="performanceChart" class="h-56 w-full px-2"></div>
                 </section>
 
-                <section class="overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
+                <section class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
                     <div class="flex items-center gap-2 border-b border-[var(--ak-border)] px-4 py-3">
                         <x-heroicon-o-clock class="h-4 w-4 text-amber-500" />
                         <h3 class="text-sm font-black">{{ __('Historie') }}</h3>
@@ -309,6 +332,48 @@
             </aside>
         </section>
     </div>
+
+    <style>
+        .ak-strategy-summary-card {
+            display: flex;
+            min-width: 0;
+            align-items: center;
+            gap: .7rem;
+            border: 1px solid var(--ak-border);
+            border-radius: .85rem;
+            background: linear-gradient(135deg, color-mix(in srgb, var(--ak-card) 92%, #14b8a6 8%), var(--ak-card));
+            padding: .65rem .8rem;
+            box-shadow: var(--ak-shadow);
+        }
+        .ak-strategy-summary-icon {
+            display: grid;
+            width: 2rem;
+            height: 2rem;
+            flex: 0 0 2rem;
+            place-items: center;
+            border: 1px solid color-mix(in srgb, #14b8a6 30%, transparent);
+            border-radius: .6rem;
+            background: color-mix(in srgb, #14b8a6 11%, transparent);
+            color: #0d9488;
+        }
+        .ak-strategy-summary-card p {
+            overflow: hidden;
+            color: var(--ak-muted);
+            font-size: .53rem;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-overflow: ellipsis;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .ak-strategy-summary-card strong {
+            display: block;
+            margin-top: .15rem;
+            font-size: .95rem;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
 
         <script>
             function depotExplorer(depots) {

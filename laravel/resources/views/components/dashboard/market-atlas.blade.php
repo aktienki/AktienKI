@@ -1,7 +1,7 @@
 @props(['countryAiScores' => []])
 
-<x-dashboard.card id="market-atlas" class="ak-card-static ak-dashboard-card ak-dashboard-atlas flex min-h-[260px] flex-col scroll-mt-24 border-orange-400/25 p-3 lg:min-h-0">
-    <div class="mb-2 flex flex-wrap items-start justify-between gap-2">
+<x-dashboard.card id="market-atlas" class="ak-standard-card ak-card-static ak-dashboard-card ak-dashboard-atlas flex min-h-[260px] flex-col scroll-mt-24 p-4 lg:min-h-0">
+    <div class="ak-standard-card-head flex flex-wrap items-start justify-between gap-2">
         <div>
             <p class="text-xs font-black uppercase tracking-[.18em] text-orange-400">{{ __('Global Market Map') }}</p>
             <p class="mt-1 text-xs text-slate-400">{{ __('Wo der Markt heute Stärke zeigt – aggregiert nach Herkunftsland') }}</p>

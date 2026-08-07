@@ -1,22 +1,29 @@
 @extends('layouts.aktienki')
 
 @section('content')
+    <x-detail-page-theme />
     @php
         $preferences = $user->preferences ?? [];
         $selectedLocale = old('locale', $preferences['locale'] ?? app()->getLocale());
         $selectedRiskLevel = old('risk_level', data_get($user->meta, 'risk_profile.level', 'normal'));
     @endphp
 
-    <div class="mx-auto w-full max-w-6xl py-6">
-        <div class="mb-6 flex items-end justify-between gap-5">
-            <div>
-                <p class="text-xs font-black uppercase tracking-[.2em] text-violet-300">{{ __('Persönlicher Bereich') }}</p>
+    <div class="ak-detail-design mx-auto w-full max-w-6xl py-6">
+        <div class="ak-detail-hero mb-6 flex flex-col gap-5 rounded-[1.5rem] border border-[var(--ak-border)] p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-4">
+                <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-teal-400/30 bg-teal-400/10 text-teal-500"><x-heroicon-o-user-circle class="h-7 w-7" /></span>
+                <div>
+                <p class="text-xs font-black uppercase tracking-[.2em] text-teal-500">{{ __('Persönlicher Bereich') }}</p>
                 <h1 class="mt-2 text-3xl font-black text-[var(--ak-text)]">{{ __('Profil & Einstellungen') }}</h1>
                 <p class="mt-2 text-sm text-[var(--ak-muted)]">{{ __('Verwalte dein Konto und bestimme, wie AktienKI dich informiert.') }}</p>
+                </div>
             </div>
-            @if (session('status') === 'profile-updated')
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                <a href="{{ route('integrations.index') }}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-teal-400/30 bg-teal-400/10 px-4 text-xs font-black text-teal-600"><x-heroicon-o-link class="h-4 w-4" />{{ __('Broker & WhatsApp') }}</a>
+                @if (session('status') === 'profile-updated')
                 <div class="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-2.5 text-sm font-semibold text-emerald-400">{{ __('Einstellungen gespeichert') }}</div>
-            @endif
+                @endif
+            </div>
         </div>
 
         <form method="POST" action="{{ route('profile.update') }}" class="grid gap-5 lg:grid-cols-[1fr_1fr]">
@@ -26,9 +33,9 @@
                 <input type="hidden" name="return_to" value="{{ old('return_to', request('return_to')) }}">
             @endif
 
-            <section class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300"><x-heroicon-o-user class="h-5 w-5" /></span>
+            <section class="ak-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl">
+                <div class="ak-detail-card-head -mx-6 -mt-6 flex items-center gap-3 px-6 py-5">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-400/25 bg-teal-500/10 text-teal-500"><x-heroicon-o-user class="h-5 w-5" /></span>
                     <div><h2 class="font-black text-[var(--ak-text)]">{{ __('Kontodaten') }}</h2><p class="mt-0.5 text-xs text-[var(--ak-muted)]">{{ __('Deine persönlichen Zugangsdaten') }}</p></div>
                 </div>
 
@@ -38,9 +45,9 @@
                 </div>
             </section>
 
-            <section id="darstellung" class="scroll-mt-24 rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-4000/10 text-orange-400"><x-heroicon-o-language class="h-5 w-5" /></span>
+            <section id="darstellung" class="ak-detail-panel scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl">
+                <div class="ak-detail-card-head -mx-6 -mt-6 flex items-center gap-3 px-6 py-5">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-500"><x-heroicon-o-language class="h-5 w-5" /></span>
                     <div><h2 class="font-black text-[var(--ak-text)]">{{ __('Sprache & Darstellung') }}</h2><p class="mt-0.5 text-xs text-[var(--ak-muted)]">{{ __('Passe AktienKI an deine Vorlieben an') }}</p></div>
                 </div>
 
@@ -59,9 +66,9 @@
                 </div>
             </section>
 
-            <section class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl lg:col-span-2">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300"><x-heroicon-o-shield-check class="h-5 w-5" /></span>
+            <section class="ak-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl lg:col-span-2">
+                <div class="ak-detail-card-head -mx-6 -mt-6 flex items-center gap-3 px-6 py-5">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-400/25 bg-teal-500/10 text-teal-500"><x-heroicon-o-shield-check class="h-5 w-5" /></span>
                     <div>
                         <h2 class="font-black text-[var(--ak-text)]">{{ __('Risikoprofil') }}</h2>
                         <p class="mt-0.5 text-xs text-[var(--ak-muted)]">{{ __('Du kannst das Risikoprofil jederzeit in deinem Nutzerprofil ändern. Welche Aktien und Auswertungen dir angezeigt werden, hängt sowohl von deinem gebuchten Tarif als auch vom gewählten Risikoprofil ab.') }}</p>
@@ -80,11 +87,11 @@
                             <span class="mt-2 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Orientierung: niedrige Volatilität und historischer beziehungsweise modellierter Drawdown bis etwa 15 %.') }}</span>
                         </label>
 
-                        <label class="group relative cursor-pointer rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-violet-400/35 has-[:checked]:border-violet-400/60 has-[:checked]:bg-violet-500/[.09] has-[:checked]:ring-2 has-[:checked]:ring-violet-400/10">
+                        <label class="group relative cursor-pointer rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-teal-400/35 has-[:checked]:border-teal-400/60 has-[:checked]:bg-teal-500/[.09] has-[:checked]:ring-2 has-[:checked]:ring-teal-400/10">
                             <input class="sr-only" type="radio" name="risk_level" value="normal" @checked($selectedRiskLevel === 'normal')>
                             <span class="flex items-center justify-between gap-3">
-                                <strong class="text-sm text-violet-300">{{ __('Normal') }}</strong>
-                                <x-heroicon-o-check-circle class="h-5 w-5 text-violet-300 opacity-0 transition group-has-[:checked]:opacity-100" />
+                                <strong class="text-sm text-teal-500">{{ __('Normal') }}</strong>
+                                <x-heroicon-o-check-circle class="h-5 w-5 text-teal-500 opacity-0 transition group-has-[:checked]:opacity-100" />
                             </span>
                             <span class="mt-2 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Orientierung: mittlere Volatilität und historischer beziehungsweise modellierter Drawdown bis etwa 25 %.') }}</span>
                         </label>
@@ -102,9 +109,9 @@
                 </fieldset>
             </section>
 
-            <section class="rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl lg:col-span-2">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300"><x-heroicon-o-envelope class="h-5 w-5" /></span>
+            <section class="ak-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl lg:col-span-2">
+                <div class="ak-detail-card-head -mx-6 -mt-6 flex items-center gap-3 px-6 py-5">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-500"><x-heroicon-o-envelope class="h-5 w-5" /></span>
                     <div><h2 class="font-black text-[var(--ak-text)]">{{ __('E-Mail-Service') }}</h2><p class="mt-0.5 text-xs text-[var(--ak-muted)]">{{ __('Lege fest, welche Mitteilungen du erhalten möchtest') }}</p></div>
                 </div>
 
@@ -115,9 +122,9 @@
                         ['email_price_alerts', __('Preis- und Signalsalarme'), __('Hinweise zu deinen Watchlists und festgelegten Signalen')],
                         ['email_product_updates', __('AktienKI Neuigkeiten'), __('Neue Funktionen, Verbesserungen und wichtige Produktinformationen')],
                     ] as [$key, $title, $copy])
-                        <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-violet-400/30">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-teal-400/30">
                             <input type="hidden" name="{{ $key }}" value="0">
-                            <input type="checkbox" name="{{ $key }}" value="1" @checked((bool) old($key, $preferences[$key] ?? ($key === 'email_service'))) class="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-600 bg-transparent text-violet-500 focus:ring-violet-500">
+                            <input type="checkbox" name="{{ $key }}" value="1" @checked((bool) old($key, $preferences[$key] ?? ($key === 'email_service'))) class="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-600 bg-transparent text-teal-500 focus:ring-teal-500">
                             <span><strong class="block text-sm text-[var(--ak-text)]">{{ $title }}</strong><span class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ $copy }}</span></span>
                         </label>
                     @endforeach
@@ -125,7 +132,7 @@
             </section>
 
             <div class="flex items-center justify-end lg:col-span-2">
-                <button class="inline-flex h-11 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-orange-4000 px-7 text-sm font-bold text-white shadow-lg shadow-violet-950/30 transition hover:-translate-y-0.5 hover:brightness-110" type="submit">{{ __('Einstellungen speichern') }}</button>
+                <button class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-500 px-7 text-sm font-black text-white shadow-lg shadow-teal-950/20 transition hover:brightness-110" type="submit"><x-heroicon-o-check class="h-4 w-4" />{{ __('Einstellungen speichern') }}</button>
             </div>
         </form>
     </div>

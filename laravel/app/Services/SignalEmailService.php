@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\Prediction;
 use App\Models\SavedPredictionFilter;
+use App\Models\SmartSelectionLabel;
 use App\Models\SignalEmailDelivery;
 use App\Notifications\SignalChangedNotification;
+use App\Notifications\SmartSelectionSignalNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -71,10 +73,46 @@ final class SignalEmailService
                                 $stats['queued']++;
                             }
                         });
+
+                    if (strtoupper((string) $prediction->signal) === 'BUY') {
+                        SmartSelectionLabel::query()
+                            ->with('user')
+                            ->where('is_active', true)
+                            ->whereRaw("COALESCE((criteria->>'email_notification_enabled')::boolean, false) = true")
+                            ->whereHas('user')
+                            ->chunkById(100, function ($labels) use ($prediction, $previous, &$stats): void {
+                                foreach ($labels as $label) {
+                                    if (! data_get($label->user->preferences, 'email_service', true)
+                                        || ! $this->matchesSmartLabel($label, $prediction)) {
+                                        continue;
+                                    }
+                                    $label->user->notify(new SmartSelectionSignalNotification(
+                                        $prediction, $label, (string) $previous->signal
+                                    ));
+                                    $stats['queued']++;
+                                }
+                            });
+                    }
                 }
             });
 
         return $stats;
+    }
+
+    private function matchesSmartLabel(SmartSelectionLabel $label, Prediction $prediction): bool
+    {
+        $criteria = (array) $label->criteria;
+        $score = (float) ($prediction->ai_score ?? $prediction->prediction_score ?? 0);
+        if ($score > 10) $score /= 10;
+        $confidence = (float) ($prediction->confidence ?? 0);
+        if ($confidence <= 1) $confidence *= 100;
+        $current = (float) ($prediction->current_price ?? 0);
+        $target = (float) ($prediction->predicted_price_20d ?? 0);
+        $return = $current > 0 && $target > 0 ? (($target / $current) - 1) * 100 : null;
+
+        return $score >= (float) ($criteria['score_min'] ?? 0)
+            && $confidence >= (float) ($criteria['confidence_min'] ?? 0)
+            && ($return === null || $return >= (float) ($criteria['predicted_return_min'] ?? -20));
     }
 
     private function matches(SavedPredictionFilter $strategy, Prediction $prediction): bool

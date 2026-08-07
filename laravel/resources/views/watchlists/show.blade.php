@@ -1,8 +1,9 @@
 @extends('layouts.aktienki')
 
 @section('content')
-    <div class="mx-auto w-full max-w-screen-2xl space-y-5 py-5">
-        <header class="sticky top-[73px] z-40 -mx-2 flex flex-col justify-between gap-4 border-b border-[var(--ak-border)] bg-[var(--ak-bg-1)] px-2 py-3 shadow-[0_12px_24px_rgba(0,0,0,.12)] sm:flex-row sm:items-end">
+    <x-detail-page-theme />
+    <div class="ak-detail-design mx-auto w-full max-w-screen-2xl space-y-5 py-5">
+        <header class="ak-detail-hero sticky top-[73px] z-40 flex flex-col justify-between gap-4 rounded-2xl border border-[var(--ak-border)] px-4 py-3 sm:flex-row sm:items-end">
             <div>
                 <div class="flex flex-wrap items-center gap-2">
                     <p class="text-xs font-black uppercase tracking-[.2em] text-violet-300">{{ __('Watchlist') }}</p>
@@ -26,23 +27,23 @@
         </header>
 
         <section class="grid gap-3 sm:grid-cols-3">
-            <article class="rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+            <article class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
                 <p class="text-[10px] font-black uppercase tracking-[.15em] text-[var(--ak-muted)]">{{ __('Aktien') }}</p>
                 <p class="mt-2 text-2xl font-black text-[var(--ak-text)]">{{ $watchlist->items->count() }}</p>
             </article>
-            <article class="rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+            <article class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
                 <p class="text-[10px] font-black uppercase tracking-[.15em] text-[var(--ak-muted)]">{{ __('Durchschnittlicher Profit') }}</p>
                 <p class="mt-2 text-2xl font-black {{ ($averageProfit ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">
                     {{ $averageProfit !== null ? (($averageProfit > 0 ? '+' : '').number_format($averageProfit, 2, ',', '.').' %') : '—' }}
                 </p>
             </article>
-            <article class="rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+            <article class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
                 <p class="text-[10px] font-black uppercase tracking-[.15em] text-[var(--ak-muted)]">{{ __('Berechnungsbasis') }}</p>
                 <p class="mt-2 text-sm font-black text-[var(--ak-text)]">{{ __('Seit Aufnahme in die Watchlist') }}</p>
             </article>
         </section>
 
-        <section class="overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
+        <section class="ak-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
             @if ($watchlist->items->isEmpty())
                 <div class="px-6 py-20 text-center">
                     <x-heroicon-o-star class="mx-auto h-10 w-10 text-violet-300/50" />
@@ -85,7 +86,7 @@
                                         $itemIndices = $instrumentIndices->get($item->instrument_id, collect());
                                     @endphp
                                     <tr
-                                        data-href="{{ route('stocks.show', ['symbol' => $item->instrument->symbol, 'return_to' => request()->getRequestUri()]) }}"
+                                        data-href="{{ route('stocks.show', ['symbol' => $item->instrument->symbol, 'prediction' => $prediction?->id, 'return_to' => request()->getRequestUri()]) }}"
                                         role="link"
                                         tabindex="0"
                                         onclick="if (!event.target.closest('a,button,input,select,label,form')) window.location.assign(this.dataset.href)"
@@ -93,7 +94,7 @@
                                         class="cursor-pointer transition hover:bg-violet-500/[.075] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-400/70"
                                     >
                                         <td class="px-5 py-4">
-                                            <a href="{{ route('stocks.show', ['symbol' => $item->instrument->symbol, 'return_to' => request()->getRequestUri()]) }}" class="group flex min-w-0 items-center gap-3">
+                                            <a href="{{ route('stocks.show', ['symbol' => $item->instrument->symbol, 'prediction' => $prediction?->id, 'return_to' => request()->getRequestUri()]) }}" class="group flex min-w-0 items-center gap-3">
                                                 <span class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-violet-400/20 bg-white/[.06]">
                                                     <span class="flex h-full w-full items-center justify-center bg-violet-500/10 text-xs font-black leading-none text-violet-300">
                                                         {{ strtoupper(substr($item->instrument->symbol, 0, 2)) }}

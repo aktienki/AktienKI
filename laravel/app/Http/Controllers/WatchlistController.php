@@ -75,6 +75,13 @@ class WatchlistController extends Controller
                     'quote.quote_time as prediction_time',
                 ])
                 ->keyBy('instrument_id');
+        $latestPredictionIds = $instrumentIds->isEmpty()
+            ? collect()
+            : DB::table('predictions')
+                ->whereIn('instrument_id', $instrumentIds)
+                ->selectRaw('instrument_id, MAX(id) AS prediction_id')
+                ->groupBy('instrument_id')
+                ->pluck('prediction_id', 'instrument_id');
 
         $watchlistPerformance = $watchlists->mapWithKeys(function (Watchlist $watchlist) use ($currentPrices): array {
             $returns = $watchlist->items
@@ -98,7 +105,7 @@ class WatchlistController extends Controller
         });
         $instrumentIndices = $this->instrumentIndices($instrumentIds);
 
-        return view('watchlists.index', compact('watchlists', 'currentPrices', 'watchlistPerformance', 'instrumentIndices'));
+        return view('watchlists.index', compact('watchlists', 'currentPrices', 'latestPredictionIds', 'watchlistPerformance', 'instrumentIndices'));
     }
 
     public function show(Request $request, int $watchlist): View
@@ -135,6 +142,7 @@ class WatchlistController extends Controller
                     $join->on('latest_quote.instrument_id', '=', 'prediction.instrument_id'))
                 ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
                 ->get([
+                    'prediction.id',
                     'prediction.instrument_id',
                     'prediction.prediction_score',
                     'prediction.prediction_time',
