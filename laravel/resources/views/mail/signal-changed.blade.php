@@ -1,6 +1,6 @@
 <x-mail::message>
 @php
-    $score = (float) ($prediction->ai_score ?? $prediction->prediction_score ?? 0);
+    $score = \App\Support\AiScore::toTen($prediction->ai_score ?? $prediction->prediction_score) ?? 0;
     if ($score > 10) $score /= 10;
     $confidence = (float) ($prediction->confidence ?? 0);
     if ($confidence <= 1) $confidence *= 100;

@@ -9,8 +9,8 @@
 <x-dashboard.card class="ak-standard-card ak-card-static ak-dashboard-card ak-dashboard-market-card flex min-h-[260px] flex-col lg:min-h-0">
     <div class="ak-standard-card-head flex items-start justify-between gap-4">
         <div>
-            <p class="flex items-center gap-2 text-xs font-black uppercase tracking-[.18em] text-orange-400">
-                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-orange-400/25 bg-orange-400/10">
+            <p class="flex items-center gap-2 text-xs font-black uppercase tracking-[.18em] text-cyan-300">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10">
                     <x-heroicon-o-chart-bar-square class="h-4 w-4" />
                 </span>
                 {{ __('Market Momentum') }}

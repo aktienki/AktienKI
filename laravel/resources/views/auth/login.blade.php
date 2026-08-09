@@ -32,7 +32,7 @@
                 <a href="{{ route('reviews.index') }}" class="hidden h-10 w-10 items-center justify-center rounded-xl text-[var(--ak-muted)] transition hover:bg-[var(--ak-surface-muted)] hover:text-[var(--ak-text)] lg:flex" title="{{ __('Bewertungen') }}" aria-label="{{ __('Bewertungen') }}"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke-linejoin="round"/></svg></a>
                 <x-preference-controls />
                 <a href="{{ route('login') }}" class="hidden w-24 justify-center rounded-lg border border-orange-400/25 bg-orange-400/15 px-3 py-2.5 text-sm font-bold leading-5 text-orange-400 sm:inline-flex">{{ __('Anmelden') }}</a>
-                <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/25 bg-orange-400/10 px-3 py-2.5 text-sm font-bold leading-5 text-orange-400 transition hover:bg-orange-400/20 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
+                <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/25 bg-orange-400/10 px-3 py-2.5 text-sm font-bold leading-5 text-orange-400 transition hover:bg-orange-400/20 lg:inline-flex">{{ __('Als Tester registrieren') }}</a>
                 <x-public-mobile-menu />
             </div>
         </div>

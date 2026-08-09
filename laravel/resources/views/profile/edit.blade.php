@@ -131,6 +131,21 @@
                 </div>
             </section>
 
+            <section class="ak-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl lg:col-span-2">
+                <div class="ak-detail-card-head -mx-6 -mt-6 mb-4 flex items-center gap-3 px-6 py-5">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-500"><x-heroicon-o-chat-bubble-left-right class="h-5 w-5" /></span>
+                    <div><h2 class="font-black text-[var(--ak-text)]">WhatsApp</h2><p class="mt-0.5 text-xs text-[var(--ak-muted)]">{{ __('Sichere Benachrichtigungen direkt im Profil verwalten.') }}</p></div>
+                </div>
+                <div class="mt-5 grid gap-3 md:grid-cols-3">
+                    <label><span class="ak-label">Access Token</span><input type="password" name="whatsapp_access_token" class="ak-input mt-2" autocomplete="new-password" placeholder="{{ data_get($whatsapp->credentials,'access_token') ? __('Gespeichert') : '' }}"></label>
+                    <label><span class="ak-label">Phone Number ID</span><input name="whatsapp_phone_number_id" class="ak-input mt-2" placeholder="{{ data_get($whatsapp->credentials,'phone_number_id') ? __('Gespeichert') : '' }}"></label>
+                    <label><span class="ak-label">{{ __('Empfänger mit Ländervorwahl') }}</span><input name="whatsapp_recipient" value="{{ $whatsapp->recipient }}" class="ak-input mt-2" placeholder="491701234567"></label>
+                </div>
+                <div class="mt-3 flex flex-wrap items-center gap-3">
+                    <label class="flex items-center gap-2 text-xs font-bold"><input type="hidden" name="whatsapp_enabled" value="0"><input type="checkbox" name="whatsapp_enabled" value="1" @checked($whatsapp->enabled) class="h-4 w-4 accent-cyan-500">{{ __('Benachrichtigungen aktiv') }}</label>
+                </div>
+            </section>
+
             <div class="flex items-center justify-end lg:col-span-2">
                 <button class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-500 px-7 text-sm font-black text-white shadow-lg shadow-teal-950/20 transition hover:brightness-110" type="submit"><x-heroicon-o-check class="h-4 w-4" />{{ __('Einstellungen speichern') }}</button>
             </div>

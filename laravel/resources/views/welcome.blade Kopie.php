@@ -144,7 +144,7 @@
                 <div class="mt-10 flex flex-wrap gap-4">
                     <a href="{{ route('register') }}"
                        class="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-semibold transition">
-                        Kostenlos starten
+                        Als Tester registrieren
                     </a>
 
                     <a href="#daten"

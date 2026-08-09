@@ -61,7 +61,7 @@
                 <div class="ak-cta-row">
                     @guest
                         <a class="ak-cta-primary" href="{{ route('register') }}">
-                            Kostenlos starten
+                            Als Tester registrieren
                             <span>→</span>
                         </a>
                     @else

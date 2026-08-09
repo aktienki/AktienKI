@@ -32,7 +32,7 @@
         <div id="markets-page-heading" class="z-30 py-2.5">
             <div class="ak-container ak-detail-hero flex flex-wrap items-center justify-between gap-4 rounded-[1.5rem] border px-5 py-4">
                 <div>
-                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-teal-500">aKI Market Intelligence</p>
+                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-cyan-400">aKI Market Intelligence</p>
                     <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)]">{{ __('Märkte') }}</h1>
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-3">
@@ -42,7 +42,7 @@
                         <span class="inline-flex items-center gap-1"><i class="ak-watch-swatch h-2 w-2 rounded-full"></i>{{ __('Watch') }}</span>
                         <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-teal-500"></i>{{ __('Buy') }}</span>
                     </div>
-                    <span class="rounded-xl border border-teal-500/30 bg-teal-500/[.08] px-3 py-2 text-xs font-bold text-[var(--ak-muted)] shadow-[0_8px_24px_rgba(20,184,166,.09)]">
+                    <span class="rounded-xl border border-cyan-400/30 bg-cyan-400/[.08] px-3 py-2 text-xs font-bold text-[var(--ak-muted)] shadow-[0_8px_24px_rgba(34,211,238,.10)]">
                         {{ $exchanges->count() }} {{ __('Exchanges') }}
                     </span>
                 </div>
@@ -783,6 +783,74 @@
                 color: rgb(251 146 60);
                 opacity: 1;
             }
+            /* Dashboard-Farbwelt: Cyan als Leitfarbe, Teal nur noch für Signale. */
+            #markets-page.ak-detail-design .ak-standard-card.ak-market-card-prominent {
+                border-color: rgba(34, 211, 238, .34) !important;
+                background:
+                    radial-gradient(circle at 92% 0, rgba(34, 211, 238, .12), transparent 35%),
+                    linear-gradient(145deg, color-mix(in srgb, var(--ak-card) 94%, rgb(34 211 238) 6%), var(--ak-card)) !important;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 12px 28px rgba(8, 47, 73, .18) !important;
+            }
+
+            #markets-page.ak-detail-design .ak-standard-card .ak-standard-market-head {
+                border-bottom-color: rgba(34, 211, 238, .28) !important;
+                background:
+                    radial-gradient(circle at 4% 0, rgba(34, 211, 238, .25), transparent 43%),
+                    linear-gradient(105deg, rgba(8, 145, 178, .18), rgba(34, 211, 238, .09) 58%, transparent) !important;
+                box-shadow: inset 0 -1px 0 rgba(34, 211, 238, .2), inset 0 1px 0 rgba(255,255,255,.08) !important;
+            }
+
+            #markets-page.ak-detail-design .ak-standard-card :is(.text-teal-500,.text-teal-600,.text-teal-700) { color: rgb(8 145 178) !important; }
+            #markets-page.ak-detail-design .ak-standard-card :is(.text-orange-200,.text-orange-300,.text-orange-400) { color: rgb(245 158 11) !important; }
+            #markets-page.ak-detail-design .ak-standard-card :is(.border-orange-200\/25,.border-orange-200\/30) { border-color: rgba(34, 211, 238, .24) !important; }
+            #markets-page.ak-detail-design .ak-standard-card :is(.bg-orange-200\/10,.bg-orange-400\/10) { background-color: rgba(34, 211, 238, .1) !important; }
+
+            :root:not([data-theme="light"]) #markets-page.ak-detail-design .ak-standard-card.ak-market-card-prominent {
+                background:
+                    radial-gradient(circle at 92% 0, rgba(34, 211, 238, .14), transparent 35%),
+                    linear-gradient(145deg, color-mix(in srgb, var(--ak-card) 90%, rgb(8 47 73) 10%), var(--ak-card)) !important;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 16px 34px rgba(0,0,0,.28), 0 3px 12px rgba(34,211,238,.08) !important;
+            }
+
+            :root:not([data-theme="light"]) #markets-page.ak-detail-design .ak-standard-card .ak-standard-market-head {
+                background:
+                    radial-gradient(circle at 4% 0, rgba(34,211,238,.2), transparent 43%),
+                    linear-gradient(105deg, rgba(8,145,178,.24), rgba(34,211,238,.08) 58%, rgba(7,25,42,.2)) !important;
+                box-shadow: inset 0 -1px 0 rgba(34,211,238,.24), inset 0 1px 0 rgba(255,255,255,.04) !important;
+            }
+
+            #markets-page .ak-market-signal-pie { box-shadow: 0 0 0 2px rgba(34,211,238,.16), 0 0 13px rgba(34,211,238,.12); }
+
+            /* Exakt dieselbe Kartenbasis wie im Dashboard. */
+            :root:not([data-theme="light"]) #markets-page .ak-dashboard-card {
+                position: relative;
+                border: 1px solid rgba(103, 232, 249, .12) !important;
+                border-radius: 14px !important;
+                background: linear-gradient(145deg, rgba(15, 32, 51, .96), rgba(10, 24, 41, .94)) !important;
+                box-shadow: 0 14px 34px rgba(0,0,0,.24), inset 3px 0 0 rgba(34,211,238,.58), inset 0 1px 0 rgba(207,250,254,.035) !important;
+                backdrop-filter: blur(12px);
+            }
+            :root:not([data-theme="light"]) #markets-page .ak-dashboard-card:hover {
+                border-color: rgba(103,232,249,.28) !important;
+                background: linear-gradient(145deg, rgba(17,38,59,.98), rgba(10,27,45,.97)) !important;
+                box-shadow: 0 18px 42px rgba(0,0,0,.30), 0 0 24px rgba(6,182,212,.075), inset 3px 0 0 #22d3ee !important;
+                transform: translateY(-1px);
+            }
+            :root:not([data-theme="light"]) #markets-page [class*="text-orange-"] { color: #67e8f9 !important; }
+            :root:not([data-theme="light"]) #markets-page [class*="bg-orange-"] { background-color: rgba(34,211,238,.10) !important; }
+            :root:not([data-theme="light"]) #markets-page [class*="border-orange-"] { border-color: rgba(34,211,238,.20) !important; }
+
+            :root[data-theme="light"] #markets-page .ak-dashboard-card {
+                position: relative;
+                border: 1px solid #d9e7e4 !important;
+                border-radius: 14px !important;
+                background: rgba(255,255,255,.94) !important;
+                box-shadow: 0 8px 22px rgba(35,72,67,.065), inset 3px 0 0 rgba(6,182,212,.58) !important;
+                backdrop-filter: blur(10px);
+            }
+            :root[data-theme="light"] #markets-page [class*="text-orange-"] { color: #0e7490 !important; }
+            :root[data-theme="light"] #markets-page [class*="bg-orange-"] { background-color: rgba(34,211,238,.10) !important; }
+            :root[data-theme="light"] #markets-page [class*="border-orange-"] { border-color: rgba(6,182,212,.20) !important; }
         </style>
 
         <script>

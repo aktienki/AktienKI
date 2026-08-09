@@ -32,7 +32,7 @@
                 <a href="{{ route('reviews.index') }}" class="hidden h-10 w-10 items-center justify-center rounded-xl text-[var(--ak-muted)] transition hover:bg-[var(--ak-surface-muted)] hover:text-[var(--ak-text)] lg:flex" title="{{ __('Bewertungen') }}" aria-label="{{ __('Bewertungen') }}"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke-linejoin="round"/></svg></a>
                 <x-preference-controls />
                 <a href="{{ route('login') }}" class="hidden w-24 justify-center rounded-xl px-3 py-2.5 text-sm font-semibold leading-5 text-slate-300 transition hover:text-white sm:inline-flex">{{ __('Anmelden') }}</a>
-                <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/25 bg-orange-400/15 px-3 py-2.5 text-sm font-bold leading-5 text-orange-400 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
+                <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/25 bg-orange-400/15 px-3 py-2.5 text-sm font-bold leading-5 text-orange-400 lg:inline-flex">{{ __('Als Tester registrieren') }}</a>
                 <x-public-mobile-menu />
             </div>
         </div>
@@ -55,9 +55,19 @@
                         </p>
                     </div>
                 @endif
+                @if (!empty($invite))
+                    <div class="mt-3 rounded-xl border {{ ($invitationValid ?? false) ? 'border-emerald-300/40 bg-emerald-300/[.09] text-emerald-100' : 'border-rose-300/40 bg-rose-300/[.09] text-rose-100' }} px-3 py-2.5 text-[11px] leading-4">
+                        @if ($invitationValid ?? false)
+                            <strong class="font-bold text-emerald-200">{{ __('Einladung erkannt') }}</strong><br>{{ __('Dein persönlicher Beta-Zugang wird nach der E-Mail-Bestätigung freigeschaltet.') }}
+                        @else
+                            <strong class="font-bold text-rose-200">{{ __('Einladungslink nicht gültig') }}</strong><br>{{ __('Bitte fordere einen neuen Link an.') }}
+                        @endif
+                    </div>
+                @endif
 
                 <form id="registration-form" method="POST" action="{{ route('register') }}" class="mt-5">
                     @csrf
+                    <input type="hidden" name="invite" value="{{ old('invite', $invite ?? request('invite')) }}">
                     <input type="hidden" name="risk_level" x-model="riskLevel">
                     <div class="mb-4 grid grid-cols-2 gap-2" aria-label="{{ __('Registrierungsfortschritt') }}">
                         @foreach ([1 => __('Konto'), 2 => __('Risikoprofil & Bestätigung')] as $number => $label)

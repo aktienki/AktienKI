@@ -21,7 +21,7 @@ class WelcomeController extends Controller
 
     private function renderWelcome(string $view, bool $showBetaNotice): View
     {
-        $betaTesterLimit = 50;
+        $betaTesterLimit = 25;
         $betaTesterCount = 0;
         $welcomeCountries = [];
         $welcomeStats = [

@@ -68,22 +68,15 @@
         @endforeach
     </div>
 
-    <div class="ak-market-primary-grid mt-4 grid gap-4 lg:grid-cols-12">
-        <div class="lg:col-span-7">
+    <div class="ak-market-primary-grid mt-4 grid items-stretch gap-4 lg:grid-cols-12">
+        <div class="lg:col-span-6">
             <x-dashboard.market-atlas :country-ai-scores="$countryAiScores" />
         </div>
-        <div class="grid gap-4 sm:grid-cols-2 lg:col-span-5 lg:grid-cols-1">
+        <div class="lg:col-span-3">
             <x-dashboard.overall-market-situation :assessment="$overallAssessment" />
-            <x-dashboard.market-ai-score :daily-ai-scores="$dailyAiScores" :assessment="$overallAssessment" />
         </div>
-    </div>
-
-    <div class="mt-4 grid gap-4 lg:grid-cols-12">
-        <div class="lg:col-span-7">
+        <div class="lg:col-span-3">
             <x-dashboard.signal-overview :stats="$signalTransitionStats" />
-        </div>
-        <div class="lg:col-span-5">
-            <x-dashboard.signal-transition-heatmap :stats="$signalTransitionStats" />
         </div>
     </div>
 

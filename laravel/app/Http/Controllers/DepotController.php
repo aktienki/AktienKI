@@ -623,7 +623,12 @@ final class DepotController extends Controller
                 'created_at' => now(), 'updated_at' => now(),
             ]);
             $sourceRunId = (int) DB::table('backtest_runs')->whereIn('status', ['completed', 'completed_with_errors'])
-                ->whereRaw("COALESCE(settings->>'run_type','system') <> 'user_filter'")->latest('id')->value('id');
+                ->whereRaw("COALESCE(settings->>'run_type','system') <> 'user_filter'")
+                // Some maintenance runs are completed without any trades.
+                // They are not valid simulation sources and would yield an
+                // apparently successful but completely empty depot run.
+                ->where('trades_count', '>', 0)
+                ->latest('id')->value('id');
             abort_if($sourceRunId < 1, 422, __('Kein Ausgangs-Backtest vorhanden.'));
             $runId = DB::table('portfolio_simulation_runs')->insertGetId([
                 'public_id' => $publicId, 'user_id' => $request->user()->id,
@@ -662,8 +667,88 @@ final class DepotController extends Controller
         $portfolio->loadMissing('strategies');
         $summary = is_string($run->summary) ? (json_decode($run->summary, true) ?: []) : (array) $run->summary;
         $transactions = $portfolio->transactions()->with('instrument')->orderBy('transaction_date')->orderBy('id')->get();
+        $rotationStrategies = $portfolio->strategies->filter(function ($strategy): bool {
+            $filters = is_string($strategy->filters) ? (json_decode($strategy->filters, true) ?: []) : (array) $strategy->filters;
+            return (bool) ($filters['sector_score_rotation'] ?? false) || (bool) ($filters['index_score_rotation'] ?? false);
+        });
+        $rotationFilters = $rotationStrategies->map(function ($strategy): array {
+            $filters = is_string($strategy->filters) ? (json_decode($strategy->filters, true) ?: []) : (array) $strategy->filters;
+            return [
+                'name' => (string) $strategy->name,
+                'sector' => (bool) ($filters['sector_score_rotation'] ?? false),
+                'index' => (bool) ($filters['index_score_rotation'] ?? false),
+            ];
+        })->values()->all();
+        $buyTransactions = $transactions->where('type', 'buy');
+        $sectorTradeCounts = $buyTransactions->groupBy(fn ($transaction): string => (string) ($transaction->instrument?->sector ?: 'Ohne Sektor'))
+            ->map(fn ($rows): int => $rows->count())->sortDesc()->all();
+        $backtestTradeIds = $buyTransactions->map(function ($transaction): ?int {
+            $meta = is_string($transaction->meta) ? (json_decode($transaction->meta, true) ?: []) : (array) $transaction->meta;
+            return is_numeric($meta['backtest_trade_id'] ?? null) ? (int) $meta['backtest_trade_id'] : null;
+        })->filter()->unique()->values();
+        $sectorScoreRows = $backtestTradeIds->isNotEmpty()
+            ? DB::table('backtest_trades as bt')->join('instruments as i', 'i.id', '=', 'bt.instrument_id')
+                ->whereIn('bt.id', $backtestTradeIds->all())->selectRaw("COALESCE(i.sector, 'Ohne Sektor') AS sector")
+                ->selectRaw('COUNT(*) AS trades')->selectRaw('AVG(bt.ki_score) AS average_score')
+                ->groupBy('i.sector')->orderByDesc('average_score')->get()->map(fn ($row): array => [
+                    'sector' => (string) $row->sector, 'trades' => (int) $row->trades, 'average_score' => (float) $row->average_score,
+                ])->all()
+            : [];
+        $backtestRows = $backtestTradeIds->isNotEmpty()
+            ? DB::table('backtest_trades')->whereIn('id', $backtestTradeIds->all())->get()->keyBy('id')
+            : collect();
+        $transactionRows = $transactions->map(function ($transaction) use ($backtestRows): array {
+            $meta = is_string($transaction->meta) ? (json_decode($transaction->meta, true) ?: []) : (array) $transaction->meta;
+            $trade = $backtestRows->get((int) ($meta['backtest_trade_id'] ?? 0));
+            return [
+                'id' => (int) $transaction->id,
+                'ki_score' => $trade?->ki_score,
+                'confidence' => $trade?->confidence,
+                'risk' => $trade?->max_drawdown !== null ? (float) $trade->max_drawdown * 100 : ($meta['max_drawdown'] ?? null),
+                'pnl' => $transaction->type === 'sell' ? ($meta['realized_profit'] ?? null) : null,
+            ];
+        })->keyBy('id')->all();
+        $stockRows = $transactions->groupBy(fn ($transaction): string => (string) ($transaction->instrument?->symbol ?: '—'))
+            ->map(function ($rows, $symbol): array {
+                $instrument = $rows->first()->instrument;
+                $buys = $rows->where('type', 'buy')->count();
+                $sells = $rows->where('type', 'sell')->count();
+                $pnl = $rows->sum(function ($transaction): float {
+                    $meta = is_string($transaction->meta) ? (json_decode($transaction->meta, true) ?: []) : (array) $transaction->meta;
+                    return (float) ($meta['realized_profit'] ?? 0);
+                });
+                return ['symbol' => $symbol, 'name' => (string) ($instrument?->name ?: ''), 'buys' => $buys, 'sells' => $sells, 'pnl' => $pnl];
+            })->sortByDesc('buys')->values()->all();
+        $indexRows = DB::table('index_memberships as im')->join('market_indices as mi', 'mi.id', '=', 'im.market_index_id')
+            ->whereIn('im.instrument_id', $transactions->pluck('instrument_id')->filter()->unique()->all())
+            ->select('mi.symbol', 'mi.name')->distinct()->orderBy('mi.name')->get();
+        $indexStats = $indexRows->map(fn ($row): array => [
+            'symbol' => (string) $row->symbol, 'name' => (string) $row->name,
+            'stocks' => $transactions->filter(fn ($transaction): bool => (int) $transaction->instrument_id > 0 && DB::table('index_memberships')->where('market_index_id', DB::table('market_indices')->where('symbol', $row->symbol)->value('id'))->where('instrument_id', $transaction->instrument_id)->exists())->pluck('instrument_id')->unique()->count(),
+            'trades' => $transactions->filter(fn ($transaction): bool => (int) $transaction->instrument_id > 0 && DB::table('index_memberships')->where('market_index_id', DB::table('market_indices')->where('symbol', $row->symbol)->value('id'))->where('instrument_id', $transaction->instrument_id)->exists())->count(),
+        ])->values()->all();
+        if ($indexStats === []) {
+            $fallbackIndices = ['DE' => ['symbol' => 'DAX', 'name' => 'DAX'], 'US' => ['symbol' => 'S&P 500', 'name' => 'S&P 500'], 'GB' => ['symbol' => 'FTSE 100', 'name' => 'FTSE 100'], 'JP' => ['symbol' => 'Nikkei 225', 'name' => 'Nikkei 225'], 'CA' => ['symbol' => 'S&P/TSX', 'name' => 'S&P/TSX Composite']];
+            $indexStats = $transactions->groupBy(fn ($transaction): string => (string) ($transaction->instrument?->country ?: ''))
+                ->filter(fn ($rows, $country): bool => isset($fallbackIndices[$country]))
+                ->map(function ($rows, $country) use ($fallbackIndices): array {
+                    return $fallbackIndices[$country] + ['stocks' => $rows->pluck('instrument_id')->filter()->unique()->count(), 'trades' => $rows->count()];
+                })->values()->all();
+        }
+        $rotation = [
+            'strategies' => $rotationFilters,
+            'sector_enabled' => collect($rotationFilters)->contains('sector', true),
+            'index_enabled' => collect($rotationFilters)->contains('index', true),
+            'sector_trade_counts' => $sectorTradeCounts,
+            'sector_trade_total' => array_sum($sectorTradeCounts),
+            'sector_score_rows' => $sectorScoreRows,
+            'index_stats' => $indexStats,
+            'stock_rows' => $stockRows,
+        ];
         $options = new Options(); $options->set('isRemoteEnabled', false);
-        $pdf = new Dompdf($options); $pdf->loadHtml(view('depots.simulation-report', compact('portfolio', 'run', 'summary', 'transactions'))->render());
+        $logoPath = public_path('brand/generated/bull-logo-light-clean.png');
+        $logoData = is_file($logoPath) ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath)) : null;
+        $pdf = new Dompdf($options); $pdf->loadHtml(view('depots.simulation-report', compact('portfolio', 'run', 'summary', 'transactions', 'rotation', 'transactionRows', 'logoData'))->render());
         $pdf->setPaper('a4', 'portrait'); $pdf->render();
         return response($pdf->output(), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'attachment; filename="Depot-Simulation-'.$portfolio->id.'.pdf"']);
     }

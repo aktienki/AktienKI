@@ -12,7 +12,7 @@
         .features-bg{--ak-accent:#fb923c;--ak-accent-soft:rgba(251,146,60,.10);--ak-card-strong:rgba(52,65,95,.60);--ak-border:rgba(251,146,60,.24);background-color:#090d22;background-image:radial-gradient(circle at 73% 34%,rgba(124,58,237,.16),transparent 34%),radial-gradient(circle at 28% 92%,rgba(251,146,60,.13),transparent 34%),radial-gradient(circle at 8% 16%,rgba(251,191,36,.04),transparent 22%),linear-gradient(135deg,#090d22 0%,#10162f 48%,#171033 100%)}
         .features-topbar{background:rgba(11,20,36,.96);border-bottom:1px solid rgba(251,146,60,.14);box-shadow:0 10px 30px rgba(2,6,23,.24),inset 0 -1px 0 rgba(251,146,60,.035);backdrop-filter:blur(18px) saturate(115%)}
         .feature-dashboard-card{background-color:rgba(52,65,95,.60);border-color:rgba(251,146,60,.30);box-shadow:0 12px 30px rgba(2,132,199,.10),inset 0 1px 0 rgba(251,146,60,.035);backdrop-filter:blur(8px)}
-        @media (min-width:1024px){.feature-card-grid{height:min(27.5rem,calc(100svh - 315px));min-height:25rem}.feature-dashboard-card{min-height:0;overflow:hidden}}
+        @media (min-width:1024px){.feature-card-grid{height:auto;min-height:27.5rem}.feature-dashboard-card{min-height:27.5rem;overflow:visible}}
         .feature-icon{color:#fbbf24;border-color:rgba(251,191,36,.34);background:linear-gradient(145deg,rgba(251,191,36,.16),rgba(245,158,11,.05));box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 24px rgba(245,158,11,.09)}
         .feature-icon svg{width:1.35rem;height:1.35rem}
         .feature-stat-icon{color:#fff}
@@ -21,7 +21,7 @@
         [data-theme="light"] .feature-icon{color:#b45309;border-color:rgba(217,119,6,.3);background:rgba(245,158,11,.11)}
     </style>
 </head>
-<body class="features-bg min-h-screen text-[var(--ak-text)] antialiased lg:h-full lg:min-h-0 lg:overflow-hidden">
+<body class="features-bg min-h-screen text-[var(--ak-text)] antialiased">
     <header class="ak-public-topbar features-topbar sticky top-0 z-30 h-[73px]">
         <div class="mx-auto flex h-full max-w-screen-2xl items-center justify-between px-3 sm:px-8 lg:px-12 xl:px-16">
             <a href="{{ route('welcome') }}" class="flex items-center gap-3" aria-label="{{ __('AktienKI Startseite') }}">
@@ -41,21 +41,21 @@
                     <a href="{{ route('dashboard') }}" class="hidden w-36 justify-center rounded-lg border border-orange-400/25 bg-orange-400/15 px-3 py-2.5 text-sm font-semibold leading-5 text-orange-400 sm:inline-flex">{{ __('Zum Dashboard') }}</a>
                 @else
                     <a href="{{ route('login') }}" class="hidden w-24 justify-center rounded-xl px-3 py-2.5 text-sm font-semibold leading-5 text-[var(--ak-muted)] hover:text-[var(--ak-text)] sm:inline-flex">{{ __('Anmelden') }}</a>
-                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/30 bg-orange-400/20 px-3 py-2.5 text-sm font-bold leading-5 text-orange-400 shadow-lg shadow-orange-400/20 transition hover:bg-orange-400/30 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
+                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/30 bg-orange-400/20 px-3 py-2.5 text-sm font-bold leading-5 text-orange-400 shadow-lg shadow-orange-400/20 transition hover:bg-orange-400/30 lg:inline-flex">{{ __('Als Tester registrieren') }}</a>
                 @endauth
                 <x-public-mobile-menu />
             </div>
         </div>
     </header>
 
-    <main class="mx-auto flex max-w-7xl flex-col px-5 py-10 sm:px-8 lg:h-[calc(100svh-73px)] lg:min-h-0 lg:overflow-hidden lg:px-10 lg:py-5">
+    <main class="mx-auto flex max-w-7xl flex-col px-5 py-5 sm:px-8 lg:px-10 lg:py-3">
         <section class="mx-auto max-w-3xl text-center">
             <p class="text-xs font-black uppercase tracking-[.22em] text-orange-400">{{ __('So funktioniert AktienKI') }}</p>
-            <h1 class="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{{ __('Von Marktdaten zu verständlichen Erkenntnissen.') }}</h1>
-            <p class="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[var(--ak-muted)]">{{ __('AktienKI verbindet strukturierte Finanzdaten mit künstlicher Intelligenz und bereitet komplexe Zusammenhänge nachvollziehbar auf.') }}</p>
+            <h1 class="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{{ __('Von Marktdaten zu verständlichen Erkenntnissen.') }}</h1>
+            <p class="mx-auto mt-1 max-w-2xl text-xs leading-5 text-[var(--ak-muted)]">{{ __('AktienKI verbindet strukturierte Finanzdaten mit künstlicher Intelligenz und bereitet komplexe Zusammenhänge nachvollziehbar auf.') }}</p>
         </section>
 
-        <section class="feature-card-grid relative mt-5 grid gap-4 md:grid-cols-2 lg:flex-none lg:grid-cols-4" aria-label="{{ __('Analyseprozess') }}">
+        <section class="feature-card-grid relative mt-3 grid gap-4 md:grid-cols-2 lg:flex-none lg:grid-cols-4" aria-label="{{ __('Analyseprozess') }}">
             @foreach ([
                 ['01', __('Daten zusammenführen'), __('Historische Kurse, Fundamentaldaten, Volumen und weitere Marktsignale werden gesammelt, geprüft und für die Analyse vorbereitet.'), 'database'],
                 ['02', __('Machine Learning'), __('Mehrere KI-Modelle analysieren Trends, Zusammenhänge und Abweichungen parallel. Ihre Prognosen konkurrieren miteinander, werden laufend verglichen und nach ihrer Qualität gewichtet.'), 'brain'],
@@ -79,6 +79,7 @@
                     </div>
                     <h2 class="mt-2 whitespace-nowrap text-base font-black xl:text-lg">{{ $title }}</h2>
                     @if ($number === '01')
+                        <span class="mt-2 inline-flex w-fit items-center rounded-full border border-amber-300/30 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[.08em] text-amber-300">{{ __('Ständig kommen neue Aktien dazu') }}</span>
                         <p class="mt-2 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Unsere Datenbasis wächst kontinuierlich und verbindet Märkte aus aller Welt:') }}</p>
                         <ul class="mt-2 grid gap-1.5 text-xs" aria-label="{{ __('Aktueller Datenbestand') }}">
                             @foreach ([
@@ -107,6 +108,23 @@
                             @endforeach
                         </ul>
                     @elseif ($number === '02')
+                        <p class="mt-2 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Training und Validierung laufen kontinuierlich auf einer breiten Datenbasis:') }}</p>
+                        <ul class="mt-3 grid gap-2 text-[11px] font-semibold leading-5 text-white" aria-label="{{ __('Trainings- und Validierungsumfang') }}">
+                            @foreach ([
+                                __('Training auf 30 Jahre Kurshistorie'),
+                                __('Umfangreiche Integration von Indikatoren und Makrodaten'),
+                                __('Modellvalidierung'),
+                                __('Backtest'),
+                                __('Walk-Forward-Test'),
+                            ] as $trainingFeature)
+                                <li class="flex items-start gap-2 rounded-lg bg-amber-400/[.035] px-3 py-1.5">
+                                    <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400"></span>
+                                    <span>{{ $trainingFeature }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                        <span class="mt-3 inline-flex w-fit items-center rounded-full border border-amber-300/30 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[.08em] text-amber-300">{{ __('Strenges Bewertungssystem und Kategorisierung') }}</span>
+                        @if (false)
                         <div class="flex flex-col">
                         <p class="order-1 mt-2 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Aktive Modelle analysieren Indikatoren und Makrodaten parallel und konkurrieren anhand ihrer Prognosequalität:') }}</p>
                         <div class="order-3 mt-2.5 grid grid-cols-2 gap-3 text-[11px] text-white">
@@ -168,6 +186,7 @@
                             </div>
                         </div>
                         </div>
+                        @endif
                     @elseif ($number === '03')
                         <p class="mt-2 text-xs leading-5 text-[var(--ak-muted)]">{{ $copy }}</p>
                         <ul class="mt-2.5 grid gap-2 text-xs font-semibold text-white" aria-label="{{ __('Research-Funktionen') }}">
@@ -177,7 +196,8 @@
                                 [__('Watchlist'), 'watchlist'],
                                 [__('Fundamentaldaten'), 'fundamentals'],
                                 [__('KI-Historie'), 'history'],
-                                [__('Aktienvergleich'), 'comparison'],
+                                [__('Aktien Labeling'), 'labeling'],
+                                [__('Strategietester'), 'strategy_tester'],
                                 [__('Frage unsere KI (je nach Abo)'), 'ai_chat'],
                             ] as [$researchFeature, $researchIcon])
                                 <li class="flex items-center gap-2.5">
@@ -197,6 +217,11 @@
                                         <svg class="h-4 w-4 shrink-0 text-amber-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6a1.5 1.5 0 0 1-1.5 1.5H7l-3.5 2.5V11A1.5 1.5 0 0 1 2 9.5v-6Z"/><path d="M5 6.5h.01M8 6.5h.01M11 6.5h.01"/></svg>
                                     @endif
                                     <span>{{ $researchFeature }}</span>
+                                    @if ($researchIcon === 'labeling')
+                                        <span class="ml-auto inline-flex w-10 justify-center rounded-md border border-cyan-300/30 bg-cyan-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-cyan-300">{{ __('Plus') }}</span>
+                                    @elseif ($researchIcon === 'strategy_tester')
+                                        <span class="ml-auto inline-flex w-10 justify-center rounded-md border border-amber-300/30 bg-amber-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-300">{{ __('Pro') }}</span>
+                                    @endif
                                 </li>
                             @endforeach
                         </ul>

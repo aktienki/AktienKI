@@ -28,7 +28,7 @@
         [data-theme="light"] .pricing-planned-badge { border-color:#b91c1c;background:linear-gradient(90deg,#991b1b,#dc2626 52%,#f87171);color:#fff; }
     </style>
 </head>
-<body class="pricing-bg min-h-screen text-[var(--ak-text)] antialiased lg:h-full lg:min-h-0 lg:overflow-hidden">
+<body class="pricing-bg min-h-screen text-[var(--ak-text)] antialiased">
     <header class="ak-public-topbar pricing-topbar sticky top-0 z-30 h-[73px]">
         <div class="mx-auto flex h-full max-w-screen-2xl items-center justify-between px-3 sm:px-8 lg:px-12 xl:px-16">
             <a href="{{ route('welcome') }}" class="flex items-center gap-3" aria-label="{{ __('AktienKI Startseite') }}">
@@ -48,106 +48,91 @@
                     <a href="{{ route('dashboard') }}" class="hidden w-36 justify-center rounded-lg border border-orange-400/25 bg-orange-400/15 px-3 py-2.5 text-sm font-bold text-orange-400 sm:inline-flex">{{ __('Dashboard') }}</a>
                 @else
                     <a href="{{ route('login') }}" class="hidden w-24 justify-center px-3 py-2.5 text-sm font-semibold text-[var(--ak-muted)] hover:text-[var(--ak-text)] sm:inline-flex">{{ __('Anmelden') }}</a>
-                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/30 bg-orange-400/20 px-3 py-2.5 text-sm font-bold text-orange-400 shadow-lg shadow-orange-400/20 transition hover:bg-orange-400/30 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
+                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/30 bg-orange-400/20 px-3 py-2.5 text-sm font-bold text-orange-400 shadow-lg shadow-orange-400/20 transition hover:bg-orange-400/30 lg:inline-flex">{{ __('Als Tester registrieren') }}</a>
                 @endauth
                 <x-public-mobile-menu />
             </div>
         </div>
     </header>
 
-    <main class="mx-auto flex max-w-7xl flex-col px-5 py-10 sm:px-8 lg:h-[calc(100svh-73px)] lg:min-h-0 lg:px-10 lg:py-5">
+    <main class="mx-auto flex max-w-7xl flex-col px-5 py-5 sm:px-8 lg:px-10 lg:py-3">
         <div class="mx-auto max-w-3xl text-center">
             <p class="text-xs font-black uppercase tracking-[.22em] text-orange-400">{{ __('Tarife') }}</p>
-            <h1 class="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{{ __('Der passende Zugang zu AktienKI.') }}</h1>
-            <p class="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[var(--ak-muted)]">{{ __('Beginne kostenlos und erweitere deinen Analyseumfang, wenn deine Anforderungen wachsen.') }}</p>
+            <h1 class="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{{ __('Der passende Zugang zu AktienKI.') }}</h1>
+            <p class="mx-auto mt-1 max-w-2xl text-xs leading-5 text-[var(--ak-muted)]">{{ __('Beginne kostenlos und erweitere deinen Analyseumfang, wenn deine Anforderungen wachsen.') }}</p>
         </div>
 
         @php
             $planFeatures = [
                 'market' => __('Marktübersicht und Basisanalysen'),
                 'predictions' => __('KI-Scores und Kursprognosen'),
-                'mail' => __('Mail-Benachrichtigungen'),
-                'watchlists' => __('Mehrere persönliche Watchlists'),
+                'stock_access' => __('Aktienzugriff'),
+                'watchlists' => __('Persönliche Watchlists'),
+                'depot' => __('Musterdepot'),
+                'mail' => __('Mail-Benachrichtigung bei Signalübergang'),
+                'fundamentals' => __('Fundamentaldaten'),
+                'smart' => __('Labeling'),
+                'research' => __('Analysen'),
+                'ai_questions' => __('AKI-Abfragen pro Monat'),
                 'tester' => __('Strategietester'),
-                'smart' => __('Smart Selection'),
+                'whatsapp' => __('WhatsApp-Messaging'),
                 'manager' => __('Strategie Manager'),
-                'quality' => __('Individuelles Quality Gate'),
-                'research' => __('Vollständige Modelle und Historie'),
             ];
             $plans = [
                 [
                     'name' => __('Free'), 'price' => '0 €', 'suffix' => __('dauerhaft'), 'featured' => false, 'planned' => false,
                     'description' => __('Für den Einstieg in datenbasierte Aktienanalysen.'),
-                    'enabled' => ['market', 'predictions', 'mail'],
+                    'enabled' => ['market', 'predictions', 'stock_access', 'watchlists', 'depot'],
                 ],
                 [
                     'name' => __('Plus'), 'price' => '9,90 €', 'suffix' => __('pro Monat'), 'featured' => false, 'planned' => false,
+                    'intro_old_price' => '14,90 €',
                     'description' => __('Für aktive Anleger und eigene Strategietests.'),
-                    'enabled' => ['market', 'predictions', 'mail', 'watchlists', 'tester', 'smart'],
+                    'enabled' => ['market', 'predictions', 'stock_access', 'mail', 'watchlists', 'depot', 'fundamentals', 'smart', 'ai_questions', 'research'],
                 ],
                 [
-                    'name' => __('Pro'), 'price' => '19 €', 'suffix' => __('pro Monat'), 'featured' => true, 'planned' => false,
+                    'name' => __('Pro'), 'price' => '19,90 €', 'suffix' => __('pro Monat'), 'featured' => true, 'planned' => false,
+                    'intro_old_price' => '29,90 €',
                     'description' => __('Für Anleger mit regelmäßigem Analysebedarf.'),
-                    'enabled' => ['market', 'predictions', 'watchlists', 'tester', 'smart', 'manager', 'mail'],
-                ],
-                [
-                    'name' => __('Premium'), 'price' => '49 €', 'suffix' => __('pro Monat'), 'featured' => false, 'planned' => true,
-                    'description' => __('Für intensive Recherche und umfassende Marktbeobachtung.'),
-                    'enabled' => array_keys($planFeatures),
+                    'enabled' => ['market', 'predictions', 'stock_access', 'watchlists', 'depot', 'fundamentals', 'tester', 'smart', 'ai_questions', 'manager', 'mail', 'whatsapp', 'research'],
                 ],
             ];
         @endphp
 
-        <div class="mt-7 grid items-stretch gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,3fr)_minmax(230px,.9fr)]">
-            <div class="grid items-stretch gap-5 md:grid-cols-2 md:gap-3 xl:grid-cols-4 lg:min-h-0 lg:gap-4">
+        <div class="mt-7 items-stretch">
+            <div class="grid items-stretch gap-5 md:grid-cols-3 md:gap-4">
                 @foreach ($plans as $plan)
-                    <article class="relative flex flex-col rounded-2xl border p-5 lg:min-h-0 {{ $plan['featured'] ? 'pricing-featured' : ($plan['planned'] ? 'pricing-planned' : 'pricing-dashboard-card') }}">
+                    <article class="relative flex h-full flex-col rounded-2xl border p-5 lg:min-h-0 {{ $plan['featured'] ? 'pricing-featured' : ($plan['planned'] ? 'pricing-planned' : 'pricing-dashboard-card') }}">
                         @if ($plan['featured'])
-                            <span class="pricing-popular-badge absolute right-5 top-5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider">{{ __('Beliebt') }}</span>
+                            <span class="pricing-popular-badge absolute right-5 top-5 rounded-md px-3 py-1 text-[10px] font-black uppercase tracking-wider">{{ __('Empfehlung') }}</span>
                         @elseif ($plan['planned'])
                             <span class="pricing-planned-badge absolute right-5 top-5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider" style="background: linear-gradient(90deg, #7f1d1d 0%, #dc2626 52%, #fb7185 100%); color: #fff; border-color: rgba(254, 202, 202, .9);">{{ __('In Planung') }}</span>
                         @endif
                         <h2 class="text-xl font-black">{{ $plan['name'] }}</h2>
                         <p class="mt-2 min-h-10 text-xs leading-5 text-[var(--ak-muted)]">{{ $plan['description'] }}</p>
-                        <div class="mt-3 flex items-end gap-2"><strong class="text-3xl font-black tracking-tight">{{ $plan['price'] }}</strong><span class="pb-1 text-[10px] text-[var(--ak-muted)]">{{ $plan['suffix'] }}</span></div>
+                        <div class="mt-3 flex items-end gap-2"><strong class="text-3xl font-black tracking-tight">{{ $plan['price'] }}</strong>@if (!empty($plan['intro_old_price']))<s class="pb-1 text-base font-bold text-[var(--ak-muted)]">{{ $plan['intro_old_price'] }}</s>@endif<span class="pb-1 text-[10px] text-[var(--ak-muted)]">{{ $plan['suffix'] }}</span></div>
+                        @if (!empty($plan['intro_old_price']))
+                            <span class="mt-2 inline-flex w-fit rounded-md border border-amber-300/30 bg-amber-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-amber-300">{{ __('Für die ersten 250 Nutzer') }}</span>
+                        @endif
                         <div class="my-3 h-px bg-[var(--ak-border)]"></div>
                         <ul class="flex-1 space-y-1.5">
                             @foreach ($planFeatures as $featureKey => $feature)
                                 @php($featureEnabled = in_array($featureKey, $plan['enabled'], true))
                                 <li class="flex min-h-5 items-center gap-2 text-[10px] leading-4 {{ $featureEnabled ? 'text-[var(--ak-text)]' : 'text-slate-500/75' }}">
                                     <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-md border text-[9px] font-black {{ $featureEnabled ? 'border-orange-400/30 bg-orange-400/10 text-orange-400' : 'border-slate-500/20 bg-slate-700/10 text-slate-600' }}">{{ $featureEnabled ? '✓' : '–' }}</span>
-                                    <span>{{ $feature }}</span>
+                                    <span>{{ $featureKey === 'stock_access' ? ($plan['name'] === __('Free') ? __('Zugriff auf 100 Aktien') : __('Zugriff auf alle Aktien')) : ($featureKey === 'watchlists' && $plan['name'] === __('Free') ? __('Eine Watchlist') : ($featureKey === 'research' && $plan['name'] === __('Pro') ? __('Erweiterte Analysen') : ($featureKey === 'ai_questions' ? ($plan['name'] === __('Plus') ? __('50 AKI-Fragen pro Monat') : ($plan['name'] === __('Pro') ? __('100 AKI-Abfragen pro Monat') : $feature)) : $feature))) }}</span>
                                 </li>
                             @endforeach
                         </ul>
                         @if ($plan['planned'])
                             <span class="pricing-planned-button mt-4 flex h-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold">{{ __('In Planung') }}</span>
                         @else
-                            <a href="{{ route('register') }}" class="mt-4 flex h-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold transition {{ $plan['featured'] ? 'pricing-featured-button' : 'border border-orange-400/20 bg-orange-400/[.07] text-orange-400 hover:bg-orange-400/15' }}">{{ __('Tarif auswählen') }}</a>
+                            <span class="mt-4 flex h-10 shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-slate-400/25 bg-slate-400/[.08] text-sm font-bold text-[var(--ak-muted)]" aria-disabled="true">{{ __('Während der Beta deaktiviert') }}</span>
                         @endif
                     </article>
                 @endforeach
             </div>
 
-            <aside class="pricing-dashboard-card flex flex-col rounded-2xl border p-4">
-                <div class="flex items-center gap-3 border-b border-[var(--ak-border)] pb-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-orange-400/25 bg-orange-400/15 text-xs font-black text-orange-400">KI</span>
-                    <div><h2 class="text-sm font-black">{{ __('Aki Chat-Assistent') }}</h2><p class="mt-0.5 text-[10px] text-[var(--ak-muted)]">{{ __('Flexibel zubuchbar') }}</p></div>
-                </div>
-                <div class="mt-3 grid flex-1 gap-2.5 sm:grid-cols-3 lg:grid-cols-1">
-                    @foreach ([
-                        [__('Free'), 3, false],
-                        [__('Basispaket'), 25, false],
-                        [__('Premium'), 100, true],
-                    ] as [$name, $questions, $featured])
-                        <article class="flex flex-col justify-center rounded-xl border px-3.5 py-3 {{ $featured ? 'border-orange-400/45 bg-orange-400/[.10]' : 'border-orange-400/15 bg-orange-400/[.035]' }}">
-                            <div class="flex items-center justify-between gap-2"><h3 class="text-xs font-black">{{ $name }}</h3>@if($featured)<span class="rounded-md bg-orange-400/15 px-2 py-0.5 text-[8px] font-black uppercase text-orange-400">{{ __('Maximal') }}</span>@endif</div>
-                            <p class="mt-1.5"><strong class="text-2xl font-black text-[var(--ak-text)]">{{ $questions }}</strong> <span class="text-[10px] leading-4 text-[var(--ak-muted)]">{{ __('Fragen pro Monat') }}</span></p>
-                        </article>
-                    @endforeach
-                </div>
-                <a href="{{ route('register') }}" class="mt-3 flex h-10 shrink-0 items-center justify-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-xs font-bold text-orange-400 transition hover:bg-orange-400/20">{{ __('Chat-Tarif wählen') }}</a>
-            </aside>
         </div>
 
         <p class="mx-auto mt-4 max-w-3xl shrink-0 text-center text-[10px] leading-4 text-[var(--ak-muted)]">{{ __('Alle Preise verstehen sich inklusive gesetzlicher Umsatzsteuer. AktienKI ist ein Analysewerkzeug und keine Anlageberatung. Tarife und Funktionsumfang können sich vor dem offiziellen Start noch ändern.') }}</p>

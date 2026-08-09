@@ -529,6 +529,11 @@ final class PredictionController extends Controller
         $sourceRun = DB::table('backtest_runs')
             ->whereIn('status', ['completed', 'completed_with_errors'])
             ->whereRaw("COALESCE(settings->>'run_type', 'system') <> 'user_filter'")
+            // Administrative/metadata runs can be marked completed without
+            // containing any trades.  They must never be used as the source
+            // for a user backtest, otherwise the job completes with zero
+            // candidates and the result table appears empty.
+            ->where('trades_count', '>', 0)
             ->orderByDesc('id')
             ->first();
         abort_if($sourceRun === null, 422, __('Es ist kein abgeschlossener Drei-Jahres-Ausgangslauf vorhanden.'));
@@ -1202,6 +1207,22 @@ final class PredictionController extends Controller
             ->whereRaw("COALESCE(settings->>'run_type', 'system') <> 'user_filter'")
             ->orderByDesc('id')
             ->value('id');
+        // Production quality data comes from the completed Triple Timeline
+        // walk-forward run. Keep the legacy id for label compatibility, but
+        // route prediction filters/statistics through this run.
+        $hasWalkForwardTables = DB::getSchemaBuilder()->hasTable('walk_forward_backtest_runs')
+            && DB::getSchemaBuilder()->hasTable('walk_forward_backtest_year_stats');
+        $walkForwardRunId = $hasWalkForwardTables
+            ? (int) (DB::table('walk_forward_backtest_runs')
+                ->where('id', 8)
+                ->where('status', 'completed')
+                ->exists()
+                ? 8
+                : (DB::table('walk_forward_backtest_runs')
+                    ->where('status', 'completed')
+                    ->orderByDesc('id')
+                    ->value('id') ?? 0))
+            : 0;
         $sortColumns = [
             'time' => 'prediction.prediction_time',
             'stock' => 'instrument.symbol',
@@ -1224,13 +1245,19 @@ final class PredictionController extends Controller
         $latestQualityRankings = DB::table('model_quality_rankings')
             ->selectRaw('trained_model_id, MAX(id) AS ranking_id')
             ->groupBy('trained_model_id');
-        $instrumentBacktestStats = DB::table('backtest_trades')
-            ->where('backtest_run_id', $labelBacktestRunId)
+        $instrumentBacktestStats = ($hasWalkForwardTables
+            ? DB::table('walk_forward_backtest_year_stats')->where('run_id', $walkForwardRunId)
+            : DB::table('backtest_trades')->where('backtest_run_id', $labelBacktestRunId))
             ->groupBy('instrument_id')
             ->select('instrument_id')
-            ->selectRaw('MAX(ABS(max_drawdown)) * 100 AS drawdown_percent')
-            ->selectRaw('SUM(CASE WHEN net_return > 0 THEN net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN net_return < 0 THEN net_return ELSE 0 END)), 0) AS profit_factor')
-            ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate');
+            ->when($hasWalkForwardTables, fn ($query) => $query
+                ->selectRaw('MAX(ABS(maximum_drawdown)) * 100 AS drawdown_percent')
+                ->selectRaw('AVG(NULLIF(profit_factor, 0)) AS profit_factor')
+                ->selectRaw('SUM(winning_trades)::numeric / NULLIF(SUM(trade_count), 0) * 100 AS hit_rate'))
+            ->when(! $hasWalkForwardTables, fn ($query) => $query
+                ->selectRaw('MAX(ABS(max_drawdown)) * 100 AS drawdown_percent')
+                ->selectRaw('SUM(CASE WHEN net_return > 0 THEN net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN net_return < 0 THEN net_return ELSE 0 END)), 0) AS profit_factor')
+                ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate'));
         $latestTechnicalIndicators = DB::table('technical_indicators')
             ->where('interval', '1d')
             ->groupBy('instrument_id')
@@ -1239,6 +1266,7 @@ final class PredictionController extends Controller
         $historicalBaseQuery = fn (): Builder => DB::table('predictions as prediction')
             ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
+            ->leftJoin('public_prediction_models as public_model', 'public_model.id', '=', 'prediction.id')
             ->leftJoin('trained_models as trained_model', 'trained_model.id', '=', 'prediction.trained_model_id')
             ->leftJoin('model_definitions as model_definition', 'model_definition.id', '=', 'trained_model.model_definition_id')
             ->leftJoinSub($latestQualityRankings, 'latest_quality', fn ($join) =>
@@ -1346,7 +1374,8 @@ final class PredictionController extends Controller
                 'instrument.sector',
                 'instrument.currency',
                 'exchange.code as exchange_code',
-                'model_definition.public_alias as model_alias',
+                DB::raw('COALESCE(public_model.public_alias, model_definition.public_alias) as model_alias'),
+                'public_model.ai_score as public_ai_score',
                 'model_quality.quality_score as model_quality_score',
                 'model_quality.eligible as model_quality_eligible',
                 'quality_tier.code as model_quality_tier_code',
@@ -1390,13 +1419,13 @@ final class PredictionController extends Controller
         $predictionInstrumentIds = $predictions->pluck('instrument_id')->map(fn ($id): int => (int) $id)->unique()->values();
         $smartLabelStats = $predictionInstrumentIds->isEmpty() || $smartLabels->isEmpty()
             ? collect()
-            : DB::table('backtest_trades as label_trade')
-                ->where('label_trade.backtest_run_id', $labelBacktestRunId)
+            : DB::table('walk_forward_backtest_year_stats as label_trade')
+                ->where('label_trade.run_id', $walkForwardRunId)
                 ->whereIn('label_trade.instrument_id', $predictionInstrumentIds)
                 ->groupBy('label_trade.instrument_id')
                 ->select('label_trade.instrument_id')
-                ->selectRaw('MAX(ABS(label_trade.max_drawdown)) * 100 AS drawdown')
-                ->selectRaw('SUM(CASE WHEN label_trade.net_return > 0 THEN label_trade.net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN label_trade.net_return < 0 THEN label_trade.net_return ELSE 0 END)), 0) AS profit_factor')
+                ->selectRaw('MAX(ABS(label_trade.maximum_drawdown)) * 100 AS drawdown')
+                ->selectRaw('AVG(NULLIF(label_trade.profit_factor, 0)) AS profit_factor')
                 ->get()->keyBy('instrument_id');
         $latestTechnicalIdsForLabels = $predictionInstrumentIds->isEmpty() || $smartLabels->isEmpty()
             ? collect()
@@ -1711,6 +1740,12 @@ final class PredictionController extends Controller
             ->filter(fn (object $preset): bool => $preset->id !== '' && $preset->name !== '')
             ->sortBy('name')
             ->values();
+        $reportRecords = DB::table('analysis_reports')
+            ->orderByDesc('id')
+            ->whereNotNull('prediction_id')
+            ->get(['id', 'prediction_id', 'symbol', 'signal_from', 'signal_to', 'pdf_path'])
+            ->unique('prediction_id')
+            ->keyBy('prediction_id');
 
         return view('predictions.index', compact(
             'predictions',
@@ -1733,6 +1768,7 @@ final class PredictionController extends Controller
             'canUseSmartLabels',
             'smartLabels',
             'savedPredictionFilters',
+            'reportRecords',
         ));
     }
 
@@ -1746,6 +1782,11 @@ final class PredictionController extends Controller
         return (int) DB::table('backtest_runs')
             ->whereIn('status', ['completed', 'completed_with_errors'])
             ->whereRaw("COALESCE(settings->>'run_type', 'system') <> 'user_filter'")
+            // Do not select an empty administrative run for the heatmap. The
+            // Triple Timeline run stores its aggregate scores/year statistics
+            // separately, so the legacy trade heatmap needs the newest
+            // completed run that actually contains trades.
+            ->where('trades_count', '>', 0)
             ->orderByDesc('id')
             ->value('id');
     }

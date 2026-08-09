@@ -92,7 +92,7 @@
                     >
                         <a href="{{ route('markets.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                             <x-heroicon-o-building-library class="h-5 w-5 text-teal-500" />
-                            {{ __('Marktübersicht') }}
+                            {{ __('Indizes') }}
                         </a>
                         <a href="{{ route('markets.situation') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                             <x-heroicon-o-globe-europe-africa class="h-5 w-5 text-teal-500" />
@@ -151,6 +151,10 @@
                         <a href="{{ route('predictions.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                             <x-heroicon-o-chart-bar-square class="h-5 w-5 text-teal-500" />
                             {{ __('Prognosetabelle') }}
+                        </a>
+                        <a href="{{ route('predictions.signal-history') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                            <x-heroicon-o-arrow-path class="h-5 w-5 text-amber-500" />
+                            {{ __('Signalwechsel-Historie') }}
                         </a>
                     </div>
                 </template>
@@ -382,6 +386,9 @@
                             @endif
                             <a href="{{ route('profile.edit', ['return_to' => request()->fullUrl()]) }}#darstellung" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-violet-500/15 hover:text-white"><x-heroicon-o-cog-6-tooth class="h-5 w-5 text-violet-300" />{{ __('Einstellungen') }}</a>
                             <a href="{{ route('integrations.index') }}" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-teal-500/15 hover:text-white"><x-heroicon-o-link class="h-5 w-5 text-teal-400" />{{ __('Broker & WhatsApp') }}</a>
+                            @if (auth()->user()->is_admin)
+                                <a href="{{ route('beta.invitations') }}" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-amber-200 transition hover:bg-amber-500/15 hover:text-white"><x-heroicon-o-sparkles class="h-5 w-5 text-amber-300" />{{ __('Beta-Einladungen') }}</a>
+                            @endif
                             <a href="{{ route('pricing') }}" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-violet-500/15 hover:text-white"><x-heroicon-o-credit-card class="h-5 w-5 text-violet-300" /><span>{{ __('Mein Abo') }}<small class="ml-2 text-[9px] font-black uppercase text-amber-300">{{ $topbarPlan?->name ?: __('Free') }}</small></span></a>
                         </div>
                         <div class="border-t border-white/10 p-2">

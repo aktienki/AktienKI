@@ -49,8 +49,8 @@
         @endif
         @if($errors->any())<div class="mb-4 rounded-xl border border-rose-300/25 bg-rose-400/[.08] px-4 py-3 text-sm font-bold text-rose-200">{{ $errors->first() }}</div>@endif
 
-        <section class="mb-1 grid items-start gap-3 xl:grid-cols-[minmax(380px,.8fr)_minmax(0,1.2fr)]">
-            <div class="ak-depot-detail-card ak-detail-panel relative overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+        <section class="mb-1 grid items-stretch gap-3 xl:grid-cols-[minmax(380px,.8fr)_minmax(0,1.2fr)]">
+            <div class="ak-depot-detail-card ak-detail-panel relative h-full overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
                 <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-500/30 via-cyan-400 to-amber-400/45"></div>
                 <div class="mb-2 flex items-center justify-between"><div><p class="text-[8px] font-black uppercase tracking-[.16em] text-teal-300">{{ __('Depotdaten') }}</p><h2 class="mt-0.5 text-sm font-black">{{ __('Kapital und Bestand') }}</h2></div><x-heroicon-o-banknotes class="h-5 w-5 text-teal-300" /></div>
                 <div class="grid grid-cols-2 gap-x-4 xl:grid-cols-3">
@@ -116,11 +116,11 @@
                     </form>
                 @endif
             </div>
-            <div class="ak-depot-detail-card ak-detail-panel relative flex min-h-[420px] min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+            <div class="ak-depot-detail-card ak-detail-panel relative flex h-full min-h-[420px] min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
                 <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400/35 via-cyan-400 to-teal-500/30"></div>
                 <div class="mb-1 flex items-center justify-between gap-3"><div><p class="text-[8px] font-black uppercase tracking-[.16em] text-orange-400">{{ __('Depotentwicklung') }}</p><h2 class="mt-0.5 text-sm font-black">{{ $simulationRun?->simulation_start_date && $simulationRun?->simulation_end_date ? $simulationRun->simulation_start_date.' – '.$simulationRun->simulation_end_date : __('Noch keine Simulation vorhanden') }}</h2></div>@if($simulationRun?->status === 'completed')<a href="{{ route('depots.simulation.report', [$portfolio, $simulationRun->public_id]) }}" title="{{ __('Bericht laden') }}" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-orange-400/25 bg-orange-400/10 px-2.5 text-[10px] font-black text-orange-400"><x-heroicon-o-arrow-down-tray class="h-4 w-4" />{{ __('Bericht') }}</a>@else<x-heroicon-o-chart-bar-square class="h-5 w-5 text-orange-400" />@endif</div>
                 @if($simulationRun?->status === 'completed' && !empty($simulationSummary['equity_curve']))
-                    <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-[var(--ak-surface-muted)]"><div id="portfolio-simulation-chart" class="ak-portfolio-line-chart min-h-[260px] flex-1"></div><div id="portfolio-profit-bars" class="relative mx-10 h-24 shrink-0 border-t border-slate-400/15"></div></div>
+                    <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-transparent"><div id="portfolio-simulation-chart" class="ak-portfolio-line-chart min-h-[260px] flex-1"></div><div id="portfolio-profit-bars" class="relative mx-10 h-24 shrink-0 border-t border-white/10 bg-transparent"></div></div>
                 @else
                     <div class="grid flex-1 place-items-center rounded-xl border border-dashed border-teal-500/25 bg-[linear-gradient(145deg,color-mix(in_srgb,var(--ak-surface-muted)_94%,#14b8a6_6%),var(--ak-surface-muted))] p-8 text-center">
                         <div class="max-w-md">
@@ -316,14 +316,50 @@
         box-shadow:var(--ak-shadow);
       }
       #strategy-depot-page .ak-depot-detail-card{
-        background:linear-gradient(155deg,color-mix(in srgb,var(--ak-card) 96%,#14b8a6 4%),var(--ak-card) 42%);
+        background:transparent !important;
+        border-color:rgba(255,255,255,.82) !important;
+        box-shadow:0 12px 30px rgba(2,132,199,.12),0 0 0 1px rgba(34,211,238,.10) inset,inset 0 1px 0 rgba(207,250,254,.08) !important;
       }
+      #strategy-depot-page .ak-depot-detail-card>.absolute:first-child{
+          background:linear-gradient(90deg,rgba(255,255,255,.25),#ffffff,rgba(255,255,255,.45)) !important;
+      }
+      #strategy-depot-page .ak-depot-metric{
+        background:rgba(10,45,65,.82) !important;
+        border-color:rgba(34,211,238,.26) !important;
+        box-shadow:inset 0 1px 0 rgba(207,250,254,.05);
+      }
+      #strategy-depot-page .ak-depot-metric:hover{background:rgba(16,61,82,.78) !important;border-color:rgba(34,211,238,.52) !important}
       #strategy-depot-page .ak-depot-metric{
         transition:border-color .18s ease,background-color .18s ease;
       }
       #strategy-depot-page .ak-depot-metric:hover{
         border-color:color-mix(in srgb,#14b8a6 30%,var(--ak-border));
       }
+      :root[data-theme="light"] #strategy-depot-page .ak-depot-detail-hero{
+        background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(236,254,255,.78)) !important;
+        box-shadow:0 14px 34px rgba(15,118,110,.12) !important;
+      }
+      :root[data-theme="light"] #strategy-depot-page .ak-depot-detail-card{
+        background:rgba(255,255,255,.78) !important;
+        border-color:rgba(14,116,144,.28) !important;
+        box-shadow:0 12px 28px rgba(15,118,110,.10),inset 0 1px 0 rgba(255,255,255,.9) !important;
+      }
+      :root[data-theme="light"] #strategy-depot-page .ak-depot-detail-card>.absolute:first-child{
+        background:linear-gradient(90deg,rgba(14,116,144,.28),#22d3ee,rgba(14,116,144,.2)) !important;
+      }
+      :root[data-theme="light"] #strategy-depot-page .ak-depot-metric{
+        background:rgba(240,249,250,.94) !important;
+        border-color:rgba(14,116,144,.24) !important;
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.9) !important;
+      }
+      :root[data-theme="light"] #strategy-depot-page .ak-depot-metric:hover{
+        background:rgba(224,247,250,.98) !important;
+        border-color:rgba(14,116,144,.42) !important;
+      }
+      :root[data-theme="light"] #strategy-depot-page .ak-depot-metric p:first-child,
+      :root[data-theme="light"] #strategy-depot-page .ak-depot-detail-card p.text-\[8px\]{color:#64748b !important}
+      :root[data-theme="light"] #strategy-depot-page .ak-depot-detail-card .bg-\[var\(--ak-surface-muted\)\],
+      :root[data-theme="light"] #strategy-depot-page .ak-depot-detail-card form{background:rgba(248,252,253,.88) !important;border-color:rgba(14,116,144,.2) !important}
       @media(max-width:1279px){
         #strategy-depot-page .ak-depot-detail-hero>div:last-child{justify-content:flex-start}
       }
@@ -334,7 +370,10 @@
       .ak-depot-sim-spinner{width:20px;height:20px;flex:0 0 auto;border:2px solid rgba(251,191,36,.2);border-top-color:#fbbf24;border-right-color:#2dd4bf;border-radius:999px;animation:ak-depot-sim-spin .9s linear infinite}
       .ak-depot-sim-dots{display:inline-flex;align-items:center;gap:3px;height:12px}.ak-depot-sim-dots i{width:3px;height:3px;border-radius:999px;background:#fbbf24;animation:ak-depot-sim-dot 1.2s ease-in-out infinite}.ak-depot-sim-dots i:nth-child(2){animation-delay:.16s}.ak-depot-sim-dots i:nth-child(3){animation-delay:.32s}
       .ak-depot-sim-progress{height:6px;overflow:hidden;border:1px solid rgba(251,191,36,.18);border-radius:999px;background:rgba(15,23,42,.62);box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}.ak-depot-sim-progress span{display:block;width:34%;height:100%;border-radius:999px;background:linear-gradient(90deg,transparent,rgba(45,212,191,.95),#fbbf24,transparent);box-shadow:0 0 8px rgba(251,191,36,.35);animation:ak-depot-sim-progress 1.8s ease-in-out infinite}.ak-depot-sim-progress span.is-determinate{animation:none;background:linear-gradient(90deg,rgba(45,212,191,.82),rgba(251,191,36,.9));transition:width .35s ease}
-      .ak-portfolio-line-chart path.apexcharts-line{filter:drop-shadow(0 0 2px rgba(251,146,60,.62)) drop-shadow(0 0 5px rgba(251,146,60,.2))}
+      .ak-portfolio-line-chart{background:transparent !important}
+      .ak-portfolio-line-chart .apexcharts-canvas,.ak-portfolio-line-chart svg{background:transparent !important}
+      .ak-portfolio-line-chart path.apexcharts-line{stroke:#fff !important;filter:drop-shadow(0 0 2px rgba(255,255,255,.72)) drop-shadow(0 0 7px rgba(125,211,252,.28))}
+      :root[data-theme="light"] .ak-portfolio-line-chart path.apexcharts-line{stroke:#0f766e !important;filter:drop-shadow(0 0 2px rgba(15,118,110,.35)) drop-shadow(0 0 6px rgba(34,211,238,.18))}
       @keyframes ak-depot-sim-spin{to{transform:rotate(360deg)}}@keyframes ak-depot-sim-dot{0%,65%,100%{opacity:.25;transform:translateY(0)}32%{opacity:1;transform:translateY(-2px)}}@keyframes ak-depot-sim-progress{from{transform:translateX(-110%)}to{transform:translateX(310%)}}
     </style>
     <script>
@@ -346,6 +385,7 @@
       const trades=@json($chartTrades);
       const chartNode=document.querySelector('#portfolio-simulation-chart');
       if(window.ApexCharts&&chartNode&&curve.length){
+        const isLightTheme=document.documentElement.dataset.theme==='light';
         const chartHeight=Math.max(260,Math.floor(chartNode.getBoundingClientRect().height));
         const escapeHtml=value=>String(value??'—').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
         const dateLabel=value=>value?new Intl.DateTimeFormat(document.documentElement.lang||'de-DE').format(new Date(value)):'—';
@@ -398,7 +438,7 @@
             },
           };
         });
-        new ApexCharts(chartNode,{chart:{type:'line',height:chartHeight,toolbar:{show:false},animations:{enabled:false},zoom:{enabled:false}},series,colors:['#fb923c'],stroke:{show:true,width:2.4,curve:'smooth',lineCap:'round'},markers:{size:0,hover:{sizeOffset:0}},dataLabels:{enabled:false},legend:{show:false},annotations:{xaxis:[...yearBoundaries,...yearBadges]},xaxis:{type:'datetime',min:chartMin,max:chartMax+rightOffset,labels:{show:true,datetimeUTC:false,format:'dd.MM.yy',style:{colors:'#7f93a8',fontSize:'8px'},hideOverlappingLabels:true},axisBorder:{show:true,color:'rgba(148,163,184,.18)'},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{show:true,min:chartValueMin,max:chartValueMax,forceNiceScale:false,decimalsInFloat:0,labels:{show:true,minWidth:34,style:{colors:'#7f93a8',fontSize:'8px'},formatter:value=>`${moneyLabel(value)} {{ $portfolio->currency }}`},axisBorder:{show:false}},grid:{borderColor:'rgba(148,163,184,.12)',padding:{top:20,bottom:0,left:2,right:10}},theme:{mode:'dark'},tooltip:{shared:false,intersect:true,custom:({seriesIndex,dataPointIndex,w})=>{
+        new ApexCharts(chartNode,{chart:{type:'line',height:chartHeight,toolbar:{show:false},animations:{enabled:false},zoom:{enabled:false},background:'transparent'},series,colors:[isLightTheme?'#0f766e':'#ffffff'],stroke:{show:true,width:2.6,curve:'smooth',lineCap:'round'},fill:{type:'gradient',gradient:{shade:isLightTheme?'light':'dark',type:'vertical',shadeIntensity:.15,gradientToColors:[isLightTheme?'rgba(15,118,110,0)':'rgba(255,255,255,0)'],inverseColors:false,opacityFrom:.16,opacityTo:0,stops:[0,100]}},markers:{size:0,hover:{sizeOffset:0}},dataLabels:{enabled:false},legend:{show:false},annotations:{xaxis:[...yearBoundaries,...yearBadges]},xaxis:{type:'datetime',min:chartMin,max:chartMax+rightOffset,labels:{show:true,datetimeUTC:false,format:'dd.MM.yy',style:{colors:'#7f93a8',fontSize:'8px'},hideOverlappingLabels:true},axisBorder:{show:true,color:isLightTheme?'rgba(15,118,110,.25)':'rgba(255,255,255,.18)'},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{show:true,min:chartValueMin,max:chartValueMax,forceNiceScale:false,decimalsInFloat:0,labels:{show:true,minWidth:34,style:{colors:'#7f93a8',fontSize:'8px'},formatter:value=>`${moneyLabel(value)} {{ $portfolio->currency }}`},axisBorder:{show:false}},grid:{borderColor:isLightTheme?'rgba(15,118,110,.12)':'rgba(255,255,255,.12)',padding:{top:20,bottom:0,left:2,right:10}},theme:{mode:isLightTheme?'light':'dark'},tooltip:{shared:false,intersect:true,custom:({seriesIndex,dataPointIndex,w})=>{
           const point=w.config.series[seriesIndex]?.data?.[dataPointIndex];
           if(!point?.trade){const value=Number(point?.y);const change=((value/baseValue)-1)*100;return `<div class="px-3 py-2 text-xs"><b>${escapeHtml(w.config.series[seriesIndex]?.name)}</b><div class="mt-1">${moneyLabel(value)} {{ $portfolio->currency }} · ${change>=0?'+':''}${change.toFixed(2)} %</div></div>`;}
           const trade=point.trade;const performance=Number(trade.performance);

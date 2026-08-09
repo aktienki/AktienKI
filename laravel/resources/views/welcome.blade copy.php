@@ -90,7 +90,7 @@
 
                 <div class="mt-10 flex gap-4">
                     <a href="{{ route('register') }}" class="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-semibold">
-                        Kostenlos starten
+                        Als Tester registrieren
                     </a>
                     <a href="#daten" class="px-6 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 font-semibold">
                         Mehr erfahren

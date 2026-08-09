@@ -2,7 +2,16 @@
 
 @section('content')
 <x-detail-page-theme />
-<div class="ak-detail-design mx-auto w-full max-w-screen-2xl space-y-4 py-4 text-[var(--ak-text)]" x-data="{ brokerOpen: false }">
+<style>
+    .integration-setup-page .ak-detail-hero,
+    .integration-setup-page .ak-dashboard-card,
+    .integration-setup-page .ak-detail-panel { border-radius:14px !important; }
+    .integration-setup-page .ak-detail-hero { border-left:3px solid #22d3ee !important; }
+    .integration-setup-page .ak-detail-card-head { background:linear-gradient(108deg,rgba(34,211,238,.14),rgba(20,184,166,.06) 52%,transparent) !important; }
+    :root:not([data-theme="light"]) .integration-setup-page .ak-input { background:rgba(8,28,45,.78) !important; border-color:rgba(34,211,238,.24) !important; color:#e7f6fb !important; }
+    :root[data-theme="light"] .integration-setup-page .ak-input { background:rgba(255,255,255,.82) !important; border-color:#cfe5e5 !important; }
+</style>
+<div class="integration-setup-page ak-detail-design mx-auto w-full max-w-screen-2xl space-y-4 py-4 text-[var(--ak-text)]" x-data="{ brokerOpen: false }">
     <header class="ak-detail-hero flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--ak-border)] p-5">
         <div class="flex items-center gap-3"><span class="grid h-12 w-12 place-items-center rounded-2xl border border-teal-400/30 bg-teal-400/10 text-teal-500"><x-heroicon-o-link class="h-6 w-6" /></span><div><p class="text-[10px] font-black uppercase tracking-[.18em] text-teal-500">{{ __('Trading & Nachrichten') }}</p><h1 class="mt-1 text-2xl font-black">{{ __('Integrationen') }}</h1><p class="mt-1 text-sm text-[var(--ak-muted)]">{{ __('Pepperstone cTrader, eToro und WhatsApp sicher verbinden.') }}</p></div></div>
         <button type="button" @click="brokerOpen=!brokerOpen" class="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-600 px-4 text-xs font-black text-white"><x-heroicon-o-plus class="h-4 w-4" />{{ __('Broker einrichten') }}</button>
@@ -11,10 +20,10 @@
     @if(session('status'))<div class="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm font-bold text-emerald-500">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-bold text-rose-500">{{ $errors->first() }}</div>@endif
 
-    <section x-show="brokerOpen || {{ $connections->isEmpty() ? 'true' : 'false' }}" class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] p-5">
+    <section x-show="brokerOpen || {{ $connections->isEmpty() ? 'true' : 'false' }}" class="ak-dashboard-card ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] p-5">
         <div class="ak-detail-card-head -mx-5 -mt-5 mb-4 px-5 py-4"><h2 class="font-black">{{ __('Neues Brokerkonto verbinden') }}</h2><p class="text-xs text-[var(--ak-muted)]">{{ __('Broker auswählen und anschließend die Angaben aus den Kontoeinstellungen des Brokers übernehmen.') }}</p></div>
         <form method="POST" action="{{ route('integrations.broker.store') }}" class="grid gap-3 md:grid-cols-2 xl:grid-cols-4" x-data="{ provider: 'pepperstone_ctrader', connectionType: 'openapi' }">@csrf
-            <label><span class="ak-label">{{ __('Broker') }}</span><select name="provider" x-model="provider" class="ak-input mt-1" required><option value="pepperstone_ctrader">Pepperstone · cTrader</option><option value="etoro">eToro</option></select></label>
+            <label><span class="ak-label">{{ __('Broker') }}</span><select name="provider" x-model="provider" class="ak-input mt-1" required><option value="pepperstone_ctrader">Pepperstone · cTrader</option><option value="etoro">eToro</option><option disabled>── In Vorbereitung ──</option><option disabled>comdirect</option><option disabled>Interactive Brokers (IBKR)</option><option disabled>Alpaca</option><option disabled>OANDA</option><option disabled>FXCM</option><option disabled>Trading 212</option></select><p class="mt-1 text-[9px] text-[var(--ak-muted)]">{{ __('Weitere Broker werden vorbereitet und später direkt hier freigeschaltet.') }}</p></label>
             <label><span class="ak-label">{{ __('Umgebung') }}</span><select name="environment" class="ak-input mt-1" required><option value="demo">Demo</option><option value="live">Live</option></select></label>
             <label x-show="provider === 'pepperstone_ctrader'"><span class="ak-label">{{ __('Verbindungstyp') }}</span><select name="connection_type" x-model="connectionType" class="ak-input mt-1"><option value="openapi">cTrader Open API</option><option value="fix">cTrader FIX API</option></select></label>
             <label><span class="ak-label">{{ __('Kontoname in AktienKI') }}</span><input name="name" class="ak-input mt-1" required placeholder="z. B. Pepperstone Demokonto"></label>
@@ -44,7 +53,7 @@
 
     <section class="grid gap-4 xl:grid-cols-2">
         @forelse($connections as $connection)
-        <article class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] p-5" x-data="{ editOpen: false }">
+        <article class="ak-dashboard-card ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] p-5" x-data="{ editOpen: false }">
             <div class="ak-detail-card-head -mx-5 -mt-5 mb-4 flex items-center justify-between gap-3 px-5 py-4"><div><p class="text-[9px] font-black uppercase tracking-[.15em] text-teal-500">{{ $connection->provider === 'etoro' ? 'eToro' : 'Pepperstone · cTrader · '.strtoupper(data_get($connection->credentials, 'connection_type', 'openapi')) }}</p><h2 class="mt-1 font-black">{{ $connection->name }}</h2></div><span class="rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase {{ $connection->environment === 'live' ? 'border-rose-400/30 bg-rose-400/10 text-rose-500' : 'border-teal-400/30 bg-teal-400/10 text-teal-500' }}">{{ $connection->environment }}</span></div>
             <div class="grid grid-cols-3 gap-2 text-center"><div class="rounded-xl bg-[var(--ak-surface-muted)] p-2"><small class="text-[9px] text-[var(--ak-muted)]">{{ __('Trading') }}</small><b class="block text-xs {{ $connection->trading_enabled ? 'text-emerald-500' : 'text-slate-500' }}">{{ $connection->trading_enabled ? __('Aktiv') : __('Aus') }}</b></div><div class="rounded-xl bg-[var(--ak-surface-muted)] p-2"><small class="text-[9px] text-[var(--ak-muted)]">{{ __('Not-Aus') }}</small><b class="block text-xs {{ $connection->emergency_stop ? 'text-rose-500' : 'text-emerald-500' }}">{{ $connection->emergency_stop ? __('Aktiv') : __('Aus') }}</b></div><div class="rounded-xl bg-[var(--ak-surface-muted)] p-2"><small class="text-[9px] text-[var(--ak-muted)]">{{ __('Orderlimit') }}</small><b class="block text-xs">{{ number_format($connection->max_order_value, 2, ',', '.') }}</b></div></div>
             <div class="mt-3 flex flex-wrap gap-2"><button type="button" @click="editOpen=!editOpen" class="h-9 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 text-[10px] font-black text-amber-500">{{ __('Konto verwalten') }}</button><form method="POST" action="{{ route('integrations.broker.test',$connection) }}">@csrf<button class="h-9 rounded-lg border border-teal-400/30 bg-teal-400/10 px-3 text-[10px] font-black text-teal-500">{{ __('Verbindung testen') }}</button></form>@if($connection->provider==='pepperstone_ctrader')@if(filled(data_get($connection->credentials,'client_id')) && filled(data_get($connection->credentials,'client_secret')))<a href="{{ route('integrations.ctrader.authorize',$connection) }}" class="inline-flex h-9 items-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 text-[10px] font-black text-cyan-500">{{ data_get($connection->credentials, 'connection_type', 'openapi') === 'fix' ? __('Live-Kontodaten autorisieren') : __('cTrader autorisieren') }}</a>@else<button type="button" @click="editOpen=true" class="h-9 rounded-lg border border-cyan-400/25 bg-cyan-400/[.06] px-3 text-[10px] font-black text-cyan-500">{{ __('Open API Zugangsdaten eintragen') }}</button>@endif @endif</div>
@@ -88,29 +97,9 @@
                 </form>
             </div>
 
-            <form method="POST" action="{{ route('integrations.orders.store',$connection) }}" class="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3">@csrf
-                <p class="col-span-2 text-[9px] font-black uppercase tracking-[.14em] text-amber-500">{{ __('Manuelle Order') }}</p>
-                <input name="symbol" class="ak-input" required placeholder="{{ $connection->provider==='etoro' ? 'AAPL' : (data_get($connection->credentials, 'connection_type', 'openapi') === 'fix' ? 'FIX-Symbol' : 'cTrader Symbol-ID') }}"><select name="side" class="ak-input"><option value="buy">BUY</option><option value="sell">SELL</option></select>
-                <select name="order_type" class="ak-input"><option value="market">Market</option><option value="limit">Limit</option><option value="stop">Stop</option></select><input name="currency" value="USD" maxlength="3" class="ak-input">
-                <input name="amount" type="number" min="0.01" step="0.01" class="ak-input" placeholder="{{ data_get($connection->credentials, 'connection_type', 'openapi') === 'fix' ? __('Geschätzter Orderwert (Limitprüfung)') : __('Betrag (eToro)') }}"><input name="quantity" type="number" min="0.01" step="0.01" class="ak-input" placeholder="{{ __('Einheiten (cTrader)') }}">
-                <input name="limit_price" type="number" min="0" step="any" class="ak-input" placeholder="Limit"><input name="stop_loss" type="number" min="0" step="any" class="ak-input" placeholder="Stop Loss">
-                <input name="take_profit" type="number" min="0" step="any" class="ak-input" placeholder="Take Profit"><input name="confirmation" class="ak-input" required placeholder="{{ $connection->environment==='live' ? 'LIVE ORDER' : 'DEMO ORDER' }}">
-                <button class="col-span-2 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 text-xs font-black text-white" onclick="return confirm(@js(__('Diese Order jetzt an den Broker senden?')))" @disabled(!$connection->trading_enabled || $connection->emergency_stop)>{{ __('Order verbindlich senden') }}</button>
-            </form>
         </article>
         @empty<div class="ak-detail-panel rounded-2xl border border-dashed border-[var(--ak-border)] p-10 text-center text-sm text-[var(--ak-muted)] xl:col-span-2">{{ __('Noch keine Brokerverbindung eingerichtet.') }}</div>@endforelse
     </section>
 
-    <section class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] p-5">
-        <div class="ak-detail-card-head -mx-5 -mt-5 mb-4 px-5 py-4"><p class="text-[9px] font-black uppercase tracking-[.15em] text-teal-500">Meta Cloud API</p><h2 class="mt-1 font-black">WhatsApp</h2></div>
-        <form method="POST" action="{{ route('integrations.whatsapp.store') }}" class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">@csrf
-            <label><span class="ak-label">Access Token</span><input type="password" name="access_token" class="ak-input mt-1" autocomplete="new-password" placeholder="{{ data_get($whatsapp->credentials,'access_token') ? __('Gespeichert') : '' }}"></label>
-            <label><span class="ak-label">Phone Number ID</span><input name="phone_number_id" class="ak-input mt-1" placeholder="{{ data_get($whatsapp->credentials,'phone_number_id') ? __('Gespeichert') : '' }}"></label>
-            <label><span class="ak-label">{{ __('Empfänger mit Ländervorwahl') }}</span><input name="recipient" value="{{ $whatsapp->recipient }}" class="ak-input mt-1" required placeholder="491701234567"></label>
-            <label class="flex items-center gap-2 pt-6"><input type="checkbox" name="enabled" value="1" @checked($whatsapp->enabled) class="h-4 w-4 accent-teal-500"><b class="text-xs">{{ __('Benachrichtigungen aktiv') }}</b></label>
-            <button class="h-10 rounded-xl bg-teal-600 px-4 text-xs font-black text-white">{{ __('WhatsApp speichern') }}</button>
-        </form>
-        @if($whatsapp->exists)<form method="POST" action="{{ route('integrations.whatsapp.test') }}" class="mt-2">@csrf<button class="h-9 rounded-lg border border-teal-400/30 bg-teal-400/10 px-3 text-[10px] font-black text-teal-500">{{ __('Testnachricht senden') }}</button></form>@endif
-    </section>
 </div>
 @endsection

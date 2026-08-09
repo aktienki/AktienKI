@@ -833,11 +833,11 @@
                         >
                             <span
                                 data-heatmap-score-line
-                                style="position: absolute; top: 0; bottom: 0; left: {{ max(1, min(99, $heatmapScoreFilter * 10)) }}%; display: block; width: 1px; background: repeating-linear-gradient(to bottom, rgba(34, 211, 238, .55) 0 4px, transparent 4px 8px);"
+                                style="position: absolute; top: 0; bottom: 0; left: {{ max(1, min(99, $heatmapScoreFilter * 10)) }}%; display: block; width: 2px; transform: translateX(-1px); background: repeating-linear-gradient(to bottom, rgba(34, 211, 238, .72) 0 4px, transparent 4px 8px);"
                             ></span>
                             <span
                                 data-heatmap-confidence-line
-                                style="position: absolute; right: 0; bottom: {{ max(1, min(99, $heatmapConfidenceFilter)) }}%; left: 0; display: block; height: 1px; background: repeating-linear-gradient(to right, rgba(34, 211, 238, .55) 0 4px, transparent 4px 8px);"
+                                style="position: absolute; right: 0; bottom: {{ max(1, min(99, $heatmapConfidenceFilter)) }}%; left: 0; display: block; height: 2px; transform: translateY(1px); background: repeating-linear-gradient(to right, rgba(34, 211, 238, .72) 0 4px, transparent 4px 8px);"
                             ></span>
                         </div>
                         @for ($confidenceBucket = 9; $confidenceBucket >= 0; $confidenceBucket--)

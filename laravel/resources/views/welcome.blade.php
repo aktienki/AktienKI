@@ -63,7 +63,7 @@
                     <a href="{{ route('dashboard') }}" class="hidden w-36 justify-center rounded-lg border border-orange-400/25 bg-orange-400/15 px-3 py-2.5 text-sm font-semibold text-orange-400 shadow-[0_8px_22px_rgba(251,146,60,.12)] transition hover:border-orange-400/40 hover:bg-orange-400/25 sm:inline-flex">{{ __('Zum Dashboard') }}</a>
                 @else
                     <a href="{{ route('login') }}" class="hidden w-24 justify-center rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-300 transition hover:text-white sm:inline-flex">{{ __('Anmelden') }}</a>
-                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/30 bg-orange-400/20 px-3 py-2.5 text-sm font-bold text-orange-400 shadow-[0_8px_24px_rgba(251,146,60,.14)] transition hover:border-orange-400/50 hover:bg-orange-400/30 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
+                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/30 bg-orange-400/20 px-3 py-2.5 text-sm font-bold text-orange-400 shadow-[0_8px_24px_rgba(251,146,60,.14)] transition hover:border-orange-400/50 hover:bg-orange-400/30 lg:inline-flex">{{ __('Als Tester registrieren') }}</a>
                 @endauth
                 <x-public-mobile-menu />
             </div>
@@ -75,7 +75,7 @@
                 <div class="welcome-dashboard-card mx-auto flex max-w-xl flex-col justify-start rounded-2xl border p-5 lg:mx-0 lg:min-h-0 lg:max-w-none lg:p-6">
                     @if ($showBetaNotice ?? false)
                         @php
-                            $betaTesterLimit = $betaTesterLimit ?? 50;
+                            $betaTesterLimit = $betaTesterLimit ?? 25;
                             $betaTesterCount = min($betaTesterLimit, $betaTesterCount ?? 0);
                             $betaOfferAvailable = $betaTesterCount < $betaTesterLimit;
                             $betaProgress = $betaTesterLimit > 0 ? ($betaTesterCount / $betaTesterLimit) * 100 : 100;
@@ -95,7 +95,7 @@
                                     @if ($betaOfferAvailable)
                                         <h2 class="mt-1.5 text-[13px] font-black text-white">{{ __('Unterstütze uns – werde Tester.') }}</h2>
                                         <p class="mt-0.5 text-[11px] leading-4 text-slate-300">{{ __('AktienKI wird laufend weiterentwickelt.') }}</p>
-                                        <p class="mt-0.5 text-[11px] font-semibold leading-4 text-amber-100">{{ __('Die ersten 50 registrierten Tester erhalten dauerhaft kostenlosen Zugang zum Pro-Modell.') }}</p>
+                                        <p class="mt-0.5 text-[11px] font-semibold leading-4 text-amber-100">{{ __('Die ersten 25 registrierten Tester erhalten dauerhaft kostenlosen Zugang zum Pro-Modell.') }}</p>
                                         <div class="mt-2">
                                             <div class="mb-1 flex items-center justify-between gap-3 text-[9px] font-bold">
                                                 <span class="text-slate-300">{{ __('Registrierte Tester') }}</span>

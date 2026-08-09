@@ -75,7 +75,7 @@
                 </p>
 
                 <div class="ak-hero-actions">
-                    <a href="{{ route('register') }}" class="ak-cta">Kostenlos starten</a>
+                    <a href="{{ route('register') }}" class="ak-cta">Als Tester registrieren</a>
                     <a href="#workflow" class="ak-ghost">Ablauf ansehen</a>
                 </div>
 

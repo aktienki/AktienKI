@@ -93,19 +93,17 @@ final class RecommendationController extends Controller
             ->where('status', 'current')
             ->selectRaw('instrument_id, MAX(id) AS quote_id')
             ->groupBy('instrument_id');
-        $backtestRunId = (int) DB::table('backtest_runs')
-            ->whereIn('status', ['completed', 'completed_with_errors'])
-            ->whereRaw("COALESCE(settings->>'run_type', 'system') <> 'user_filter'")
-            ->orderByDesc('id')
-            ->value('id');
-        $backtestRiskStats = DB::table('backtest_trades')
-            ->where('backtest_run_id', $backtestRunId)
-            ->whereNotNull('trained_model_id')
-            ->whereNotNull('max_drawdown')
-            ->select(['instrument_id', 'trained_model_id'])
-            ->selectRaw('COUNT(*) AS backtest_trade_count')
-            ->selectRaw('PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY ABS(max_drawdown)) * 100 AS backtest_drawdown_p90')
-            ->groupBy('instrument_id', 'trained_model_id');
+        $walkForwardRunId = (int) (DB::table('walk_forward_backtest_runs')
+            ->where('id', 8)->where('status', 'completed')->exists()
+            ? 8
+            : (DB::table('walk_forward_backtest_runs')->where('status', 'completed')->orderByDesc('id')->value('id') ?? 0));
+        $backtestRiskStats = DB::table('walk_forward_backtest_year_stats')
+            ->where('run_id', $walkForwardRunId)
+            ->whereNotNull('maximum_drawdown')
+            ->select(['instrument_id'])
+            ->selectRaw('SUM(trade_count) AS backtest_trade_count')
+            ->selectRaw('PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY ABS(maximum_drawdown)) * 100 AS backtest_drawdown_p90')
+            ->groupBy('instrument_id');
         $recommendations = DB::table('predictions as prediction')
             ->join('daily_top_stock_selections as daily_selection', function ($join) use ($selectionDate): void {
                 $join->on('daily_selection.prediction_id', '=', 'prediction.id')
@@ -120,8 +118,7 @@ final class RecommendationController extends Controller
             ->leftJoin('model_quality_rankings as model_quality', 'model_quality.id', '=', 'latest_quality.ranking_id')
             ->leftJoin('model_quality_tiers as model_tier', 'model_tier.id', '=', 'model_quality.tier_id')
             ->leftJoinSub($backtestRiskStats, 'backtest_risk', fn ($join) => $join
-                ->on('backtest_risk.instrument_id', '=', 'prediction.instrument_id')
-                ->on('backtest_risk.trained_model_id', '=', 'prediction.trained_model_id'))
+                ->on('backtest_risk.instrument_id', '=', 'prediction.instrument_id'))
             ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) =>
                 $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
             ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
@@ -190,8 +187,7 @@ final class RecommendationController extends Controller
                 ->leftJoin('model_quality_rankings as model_quality', 'model_quality.id', '=', 'latest_quality.ranking_id')
                 ->leftJoin('model_quality_tiers as model_tier', 'model_tier.id', '=', 'model_quality.tier_id')
                 ->leftJoinSub($backtestRiskStats, 'backtest_risk', fn ($join) => $join
-                    ->on('backtest_risk.instrument_id', '=', 'prediction.instrument_id')
-                    ->on('backtest_risk.trained_model_id', '=', 'prediction.trained_model_id'))
+                    ->on('backtest_risk.instrument_id', '=', 'prediction.instrument_id'))
                 ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) =>
                     $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
                 ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
@@ -200,6 +196,9 @@ final class RecommendationController extends Controller
                 ->whereNull('instrument.deleted_at')
                 ->whereNotNull('prediction.prediction_score')
                 ->whereNotNull('prediction.confidence')
+                ->where(function ($query): void {
+                    $query->whereNull('model_tier.code')->orWhere('model_tier.code', '<>', 'test');
+                })
                 ->whereRaw('COALESCE(current_quote.price, prediction.current_price) > 0')
                 ->when($recommendations->isNotEmpty(), fn ($query) =>
                     $query->whereNotIn('prediction.instrument_id', $recommendations->pluck('instrument_id')))
@@ -246,7 +245,8 @@ final class RecommendationController extends Controller
                 ->values()
                 ->map(function (object $row, int $index) use ($recommendations): object {
                     $row->selection_rank = $recommendations->count() + $index + 1;
-                    $row->is_test_candidate = true;
+                    // Fallbacks are real database-backed stocks, never demo/test cards.
+                    $row->is_test_candidate = false;
 
                     return $row;
                 });

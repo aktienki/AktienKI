@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
+use App\Models\MessagingConnection;
 
 class ProfileController extends Controller
 {
@@ -18,6 +19,7 @@ class ProfileController extends Controller
     {
         return view('profile.edit', [
             'user' => $request->user(),
+            'whatsapp' => MessagingConnection::query()->firstOrNew(['user_id' => $request->user()->id, 'provider' => 'whatsapp_cloud']),
         ]);
     }
 
@@ -65,6 +67,20 @@ class ProfileController extends Controller
         $user->preferences = $preferences;
         $user->meta = $meta;
         $user->save();
+
+        $existingMessaging = MessagingConnection::query()->where('user_id', $user->id)->where('provider', 'whatsapp_cloud')->first();
+        if ($existingMessaging || filled($request->input('whatsapp_access_token')) || filled($request->input('whatsapp_phone_number_id')) || filled($request->input('whatsapp_recipient'))) {
+            $messaging = $existingMessaging ?: new MessagingConnection(['user_id' => $user->id, 'provider' => 'whatsapp_cloud']);
+            $credentials = $messaging->credentials ?? [];
+            foreach (['access_token' => $request->input('whatsapp_access_token'), 'phone_number_id' => $request->input('whatsapp_phone_number_id')] as $key => $value) {
+                if (filled($value)) $credentials[$key] = $value;
+            }
+            $messaging->fill([
+                'credentials' => $credentials,
+                'recipient' => preg_replace('/[^0-9]/', '', (string) $request->input('whatsapp_recipient', $messaging->recipient)),
+                'enabled' => $request->boolean('whatsapp_enabled'),
+            ])->save();
+        }
 
         // Keep the current browser session bound to the updated user. This is
         // especially important after changing identity fields such as e-mail.

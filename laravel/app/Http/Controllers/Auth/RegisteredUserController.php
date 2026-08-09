@@ -16,17 +16,26 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use App\Models\BetaInvitationLink;
 
 class RegisteredUserController extends Controller
 {
-    private const BETA_TESTER_LIMIT = 50;
+    private const BETA_TESTER_LIMIT = 25;
 
     /**
      * Display the registration view.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('auth.register');
+        $invite = trim((string) $request->query('invite', ''));
+        $invitation = $invite !== ''
+            ? BetaInvitationLink::query()->where('token_hash', hash('sha256', $invite))->first()
+            : null;
+
+        return view('auth.register', [
+            'invite' => $invite,
+            'invitationValid' => $invitation?->isUsable() === true,
+        ]);
     }
 
     /**
@@ -70,16 +79,42 @@ class RegisteredUserController extends Controller
                 'required',
                 Rule::in(['cautious', 'normal', 'opportunity_oriented']),
             ],
+
+            'invite' => [
+                'nullable',
+                'string',
+                'max:128',
+            ],
         ]);
 
         $legalVersion = '1.0';
         $riskLevel = $request->string('risk_level')->toString();
         $betaCode = Str::upper(Str::random(4).'-'.Str::random(4));
 
-        $user = DB::transaction(function () use ($request, $legalVersion, $riskLevel, $betaCode) {
+        $inviteToken = trim((string) $request->input('invite', ''));
+
+        $user = DB::transaction(function () use ($request, $legalVersion, $riskLevel, $betaCode, $inviteToken) {
             if (DB::connection()->getDriverName() === 'pgsql') {
                 DB::statement('SELECT pg_advisory_xact_lock(?)', [24072026]);
             }
+
+            $invitation = null;
+            if ($inviteToken !== '') {
+                $invitation = BetaInvitationLink::query()
+                    ->where('token_hash', hash('sha256', $inviteToken))
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $invitation || ! $invitation->isUsable()) {
+                    throw ValidationException::withMessages([
+                        'invite' => __('Dieser Einladungslink ist ungültig, abgelaufen oder bereits vollständig genutzt.'),
+                    ]);
+                }
+            }
+
+            // A valid invitation always grants beta status, even if the public
+            // registration switch has meanwhile been disabled.
+            $betaEnabled = (bool) config('aktienki.beta.enabled', true) || $invitation !== null;
 
             $isBetaTester = DB::table('users')
                 ->where('account_status', 'tester')
@@ -89,8 +124,8 @@ class RegisteredUserController extends Controller
                 'name' => $request->name,
                 'email' => strtolower($request->email),
                 'password' => Hash::make($request->password),
-                'account_status' => (bool) config('aktienki.beta.enabled', true) ? 'pending_beta' : ($isBetaTester ? 'tester' : 'active'),
-                'is_beta_tester' => (bool) config('aktienki.beta.enabled', true),
+                'account_status' => $betaEnabled ? 'pending_beta' : ($isBetaTester ? 'tester' : 'active'),
+                'is_beta_tester' => $betaEnabled,
 
                 'legal_accepted' => true,
                 'legal_accepted_at' => now(),
@@ -116,13 +151,23 @@ class RegisteredUserController extends Controller
                         'permanent_pro_access' => true,
                     ] : null,
                     'beta_registration' => [
-                        'status' => (bool) config('aktienki.beta.enabled', true) ? 'pending_verification' : 'active',
+                        'status' => $betaEnabled ? 'pending_verification' : 'active',
                         'code_hash' => Hash::make($betaCode),
                         'code_encrypted' => Crypt::encryptString($betaCode),
                         'created_at' => now()->toIso8601String(),
                     ],
+                    'beta_invitation' => $invitation ? [
+                        'id' => $invitation->id,
+                        'label' => $invitation->label,
+                        'accepted_at' => now()->toIso8601String(),
+                    ] : null,
                 ],
             ]);
+
+            if ($invitation) {
+                $invitation->increment('uses_count');
+                $invitation->forceFill(['last_used_at' => now()])->save();
+            }
 
             $documents = DB::table('legal_documents')
                 ->where('active', true)

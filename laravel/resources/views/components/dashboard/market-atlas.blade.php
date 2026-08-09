@@ -3,10 +3,10 @@
 <x-dashboard.card id="market-atlas" class="ak-standard-card ak-card-static ak-dashboard-card ak-dashboard-atlas flex min-h-[260px] flex-col scroll-mt-24 p-4 lg:min-h-0">
     <div class="ak-standard-card-head flex flex-wrap items-start justify-between gap-2">
         <div>
-            <p class="text-xs font-black uppercase tracking-[.18em] text-orange-400">{{ __('Global Market Map') }}</p>
+            <p class="text-xs font-black uppercase tracking-[.18em] text-cyan-300">{{ __('Global Market Map') }}</p>
             <p class="mt-1 text-xs text-slate-400">{{ __('Wo der Markt heute Stärke zeigt – aggregiert nach Herkunftsland') }}</p>
         </div>
-        <span class="rounded-lg border border-orange-400/25 bg-orange-400/10 px-2.5 py-1 text-[10px] font-bold text-orange-400">
+        <span class="rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-bold text-cyan-300">
             {{ count($countryAiScores) }} {{ __('Länder') }}
         </span>
     </div>
@@ -29,7 +29,7 @@
             x-show="selectedCountry"
             x-transition.origin.top.right
             @click.outside="selectedCountry = null"
-            class="absolute right-2 top-2 w-60 rounded-xl border border-orange-400/30 bg-[#0b1830]/95 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl sm:right-4 sm:top-4">
+            class="absolute right-2 top-2 w-60 rounded-xl border border-cyan-300/30 bg-[#0b1830]/95 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl sm:right-4 sm:top-4">
             <button type="button" @click="selectedCountry = null" class="absolute right-2.5 top-2.5 text-slate-500 transition hover:text-white" aria-label="{{ __('Schließen') }}">
                 <x-heroicon-o-x-mark class="h-4 w-4" />
             </button>
@@ -37,7 +37,7 @@
                 <span x-text="selectedCountry?.flag" class="text-xl"></span>
                 <div class="min-w-0">
                     <p x-text="selectedCountry?.name" class="truncate text-sm font-black text-white"></p>
-                    <p x-text="selectedCountry?.code" class="text-[9px] font-bold uppercase tracking-widest text-orange-400"></p>
+                    <p x-text="selectedCountry?.code" class="text-[9px] font-bold uppercase tracking-widest text-cyan-300"></p>
                 </div>
             </div>
             <div class="mt-4 grid grid-cols-3 gap-2">
@@ -54,7 +54,7 @@
                     <p x-text="selectedCountry?.stocks" class="mt-1 text-lg font-black text-white"></p>
                 </div>
             </div>
-            <a :href="selectedCountry?.stocksUrl" class="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-orange-400/30 bg-orange-400/15 px-3 text-xs font-bold text-orange-400 transition hover:bg-orange-400/25">
+            <a :href="selectedCountry?.stocksUrl" class="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/30 bg-cyan-300/15 px-3 text-xs font-bold text-cyan-300 transition hover:bg-cyan-300/25">
                 {{ __('Aktien anzeigen') }}
                 <x-heroicon-o-arrow-right class="h-3.5 w-3.5" />
             </a>

@@ -39,6 +39,10 @@ final class RunFilteredBacktest implements ShouldQueue
             'started_at' => now(),
             'updated_at' => now(),
         ]);
+        // A retry of a partially completed run may already have copied some
+        // trades before a later step failed. Clear those rows so the retry is
+        // deterministic and cannot hit the unique trade constraint.
+        DB::table('backtest_trades')->where('backtest_run_id', $this->runId)->delete();
 
         $latestQuality = DB::table('model_quality_rankings')
             ->selectRaw('trained_model_id, MAX(id) AS ranking_id')
@@ -287,6 +291,15 @@ final class RunFilteredBacktest implements ShouldQueue
     private function calculateExitStrategies(): bool
     {
         $enginePath = rtrim((string) config('aktienki.python_engine.path', '/Users/silviotaubert/Downloads/python-engine'), '/');
+        // The fixed 20-trading-day exit is already present on the copied
+        // source trades.  The optional dynamic-exit model is not guaranteed
+        // to be installed on every host (e.g. after moving models to the
+        // Mac mini); in that case keep the valid fixed-exit result instead of
+        // failing the whole strategy test.
+        $dynamicExitModel = $enginePath.'/models_storage/exit/global/horizon_entry_exit_model.pkl';
+        if (! File::exists($dynamicExitModel)) {
+            return true;
+        }
         $python = (string) (config('aktienki.python_engine.executable') ?: $enginePath.'/.venv/bin/python');
         $process = new Process([
             $python,

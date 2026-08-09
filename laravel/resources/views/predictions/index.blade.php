@@ -230,6 +230,7 @@
                                 ['return_5d', __('5 Tage'), 'text-right'],
                                 ['return_20d', __('20 Tage'), 'text-right'],
                                 [null, 'MQ', 'text-center'],
+                                [null, __('Bericht'), 'text-center'],
                             ] as [$column, $heading, $alignment])
                                 <th class="border-b border-[var(--ak-border)] px-2 py-3 {{ $alignment }}">
                                     @if ($column)
@@ -242,7 +243,7 @@
                             @endforeach
                         </tr>
                         <tr class="ak-predictions-filter-row hidden bg-[#12343b]" aria-hidden="true">
-                            <th colspan="{{ $canUseSmartLabels ? 16 : 15 }}" class="border-b border-[var(--ak-border)] p-1.5 normal-case tracking-normal">
+                            <th colspan="{{ $canUseSmartLabels ? 17 : 16 }}" class="border-b border-[var(--ak-border)] p-1.5 normal-case tracking-normal">
                                 <div class="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
                                     <a href="{{ route('predictions.index') }}" class="inline-flex h-8 w-9 shrink-0 items-center justify-center rounded-[5px] border border-[var(--ak-border)] text-[var(--ak-muted)] hover:bg-teal-500/10 hover:text-teal-500" title="{{ __('Filter zurücksetzen') }}"><x-heroicon-o-arrow-path class="h-4 w-4" /></a>
                                     <label class="relative min-w-28 flex-[1.35]"><x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ak-muted)]" /><input form="prediction-table-filters" name="q" value="{{ request('q') }}" placeholder="{{ __('Aktie') }}" class="ak-input ak-table-filter h-8 w-full min-w-0 pl-7 pr-1 text-[10px]" oninput="window.clearTimeout(this._filterTimer);this._filterTimer=window.setTimeout(()=>this.form.requestSubmit(),450)"></label>
@@ -475,9 +476,19 @@
                                         </span>
                                     </div>
                                 </td>
+                                <td onclick="event.stopPropagation()" class="border-b border-[var(--ak-border)] px-1 py-1 text-center">
+                                    @if ($reportRecords->has($prediction->id))
+                                        @php $report = $reportRecords->get($prediction->id); @endphp
+                                        <a href="{{ route('analysis-reports.show', $report->id) }}" target="_blank" rel="noopener" title="{{ __('Signalwechsel-Bericht öffnen') }}" aria-label="{{ __('Signalwechsel-Bericht öffnen') }}" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/40 text-amber-500 transition hover:bg-amber-500/15">
+                                            <x-heroicon-o-document-text class="h-4 w-4" />
+                                        </a>
+                                    @else
+                                        <span class="text-[var(--ak-muted)]">—</span>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="{{ $canUseSmartLabels ? 16 : 15 }}" class="px-6 py-16 text-center text-sm text-[var(--ak-muted)]">{{ __('Keine Prognosen für diese Filter gefunden.') }}</td></tr>
+                            <tr><td colspan="{{ $canUseSmartLabels ? 17 : 16 }}" class="px-6 py-16 text-center text-sm text-[var(--ak-muted)]">{{ __('Keine Prognosen für diese Filter gefunden.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>

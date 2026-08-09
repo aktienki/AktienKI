@@ -30,15 +30,26 @@ use App\Http\Controllers\SmartSelectionLabelController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\AkiChatController;
+use App\Http\Controllers\BetaInvitationController;
+use App\Http\Controllers\EasyAccessController;
 use Illuminate\Http\Request;
 
 
 Route::get('/', WelcomeController::class)->name('welcome');
 Route::get('/welcome', WelcomeController::class)->name('welcome.page');
 Route::get('/welcome-copy', [WelcomeController::class, 'copy'])->name('welcome.copy');
-Route::view('/preise', 'pricing')->name('pricing');
+Route::get('/easy-access', [EasyAccessController::class, 'index'])->name('easy-access');
+Route::post('/easy-access', [EasyAccessController::class, 'store'])
+    ->middleware('throttle:10,1')
+    ->name('easy-access.store');
+Route::get('/preise', function () {
+    $registeredUsers = \Illuminate\Support\Facades\DB::table('users')->count();
+
+    return view('pricing', compact('registeredUsers'));
+})->name('pricing');
 Route::get('/features', function () {
-    $featureStats = \Illuminate\Support\Facades\Cache::remember('public.features.market-stats-v4', now()->addMinutes(15), function () {
+    // Keep the public feature counters in sync with the current database state.
+    $featureStats = (function () {
         $instruments = \Illuminate\Support\Facades\DB::table('instruments')
             ->whereNull('deleted_at')
             ->where('is_active', true);
@@ -69,16 +80,31 @@ Route::get('/features', function () {
                 ->values()
                 ->all(),
         ];
-    });
+    })();
 
-    return view('features', compact('featureStats'));
+    $registeredUsers = \Illuminate\Support\Facades\DB::table('users')->count();
+
+    return view('features', compact('featureStats', 'registeredUsers'));
 })->name('features');
-Route::view('/roadmap', 'roadmap')->name('roadmap');
+Route::get('/roadmap', function () {
+    $registeredUsers = \Illuminate\Support\Facades\DB::table('users')->count();
+
+    return view('roadmap', compact('registeredUsers'));
+})->name('roadmap');
 Route::get('/projektstatus', ProjectStatusController::class)
     ->middleware('auth')
     ->name('project-status');
-Route::get('/kontakt', [ContactController::class, 'create'])->middleware('auth')->name('contact');
-Route::post('/kontakt', [ContactController::class, 'store'])->middleware(['auth', 'throttle:5,1'])->name('contact.store');
+
+// Beta invitations are deliberately restricted to administrators. The raw token is
+// generated once and only its SHA-256 digest is stored in the database.
+Route::middleware('auth')->group(function (): void {
+    Route::get('/beta/einladungen', [BetaInvitationController::class, 'index'])
+        ->name('beta.invitations');
+    Route::post('/beta/einladungen', [BetaInvitationController::class, 'store'])
+        ->name('beta.invitations.store');
+});
+Route::get('/kontakt', [ContactController::class, 'create'])->name('contact');
+Route::post('/kontakt', [ContactController::class, 'store'])->middleware('throttle:5,1')->name('contact.store');
 Route::get('/bewertungen', [ReviewController::class, 'index'])->name('reviews.index');
 Route::post('/bewertungen', [ReviewController::class, 'store'])->middleware(['auth', 'throttle:3,1'])->name('reviews.store');
 
@@ -225,7 +251,10 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::get('/stocks', fn (Request $request) =>
         redirect()->route('predictions.index', $request->query())
     )->name('stocks.index');
-    Route::get('/predictions', [PredictionController::class, 'index'])->name('predictions.index');
+Route::get('/predictions', [PredictionController::class, 'index'])->name('predictions.index');
+Route::get('/predictions/signal-history', [\App\Http\Controllers\SignalTransitionController::class, 'index'])->name('predictions.signal-history');
+Route::get('/reports/{analysisReport}/pdf', [\App\Http\Controllers\AnalysisReportController::class, 'pdf'])->middleware(['auth', 'verified', 'beta'])->name('analysis-reports.pdf');
+Route::get('/reports/{analysisReport}', [\App\Http\Controllers\AnalysisReportController::class, 'show'])->middleware(['auth', 'verified', 'beta'])->name('analysis-reports.show');
     Route::post('/predictions/filters', [PredictionController::class, 'storeTableFilter'])->name('predictions.filters.store');
     Route::get('/predictions/heatmap', [PredictionController::class, 'heatmap'])->name('predictions.heatmap');
     Route::get('/predictions/heatmap/trades', [PredictionController::class, 'backtestTrades'])->name('predictions.heatmap.trades');

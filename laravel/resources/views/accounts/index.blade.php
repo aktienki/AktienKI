@@ -2,7 +2,16 @@
 
 @section('content')
 <x-detail-page-theme />
-<div class="ak-detail-design mx-auto w-full max-w-screen-2xl space-y-3 py-3 text-[var(--ak-text)]">
+<style>
+    .account-setup-page .ak-detail-hero,
+    .account-setup-page .ak-dashboard-card,
+    .account-setup-page .ak-detail-panel { border-radius:14px !important; }
+    .account-setup-page .ak-detail-hero { border-left:3px solid #22d3ee !important; }
+    .account-setup-page .ak-detail-card-head { background:linear-gradient(108deg,rgba(34,211,238,.14),rgba(20,184,166,.06) 52%,transparent) !important; }
+    .account-setup-page .account-metric { border:1px solid rgba(34,211,238,.18); background:rgba(34,211,238,.06); border-radius:10px; }
+    :root[data-theme="light"] .account-setup-page .account-metric { background:rgba(255,255,255,.72); border-color:#d6e7e7; }
+</style>
+<div class="account-setup-page ak-detail-design mx-auto w-full max-w-screen-2xl space-y-3 py-3 text-[var(--ak-text)]">
     <header class="ak-detail-hero flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--ak-border)] p-3">
         <div class="flex items-center gap-3">
             <span class="grid h-10 w-10 place-items-center rounded-xl border border-teal-400/30 bg-teal-400/10 text-teal-500"><x-heroicon-o-building-library class="h-5 w-5" /></span>
@@ -26,7 +35,7 @@
                 $hasOpenApiToken = filled(data_get($account->credentials, 'access_token'));
             @endphp
             <article
-                class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] p-3"
+                class="ak-dashboard-card ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] p-3 shadow-[var(--ak-shadow)]"
                 x-data="{
                     isFix: @js($isFix), positions: [], account: null, accountError: null, loading: true, error: null, updatedAt: null, timer: null,
                     money(value) { return value == null ? '–' : Number(value).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
@@ -59,14 +68,14 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8">
-                    <div class="rounded-lg bg-[var(--ak-surface-muted)] px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Kontostand') }}</small><b class="block text-sm" x-text="money(account?.balance)"></b></div>
-                    <div class="rounded-lg bg-[var(--ak-surface-muted)] px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Equity') }}</small><b class="block text-sm" x-text="money(account?.equity)"></b></div>
+                    <div class="account-metric px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Kontostand') }}</small><b class="block text-sm" x-text="money(account?.balance)"></b></div>
+                    <div class="account-metric px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Equity') }}</small><b class="block text-sm" x-text="money(account?.equity)"></b></div>
                     <div class="rounded-lg border border-cyan-400/20 bg-cyan-400/[.05] px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Freie Margin') }}</small><b class="block text-sm text-cyan-500" x-text="money(account?.free_margin)"></b></div>
-                    <div class="rounded-lg bg-[var(--ak-surface-muted)] px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Verwendete Margin') }}</small><b class="block text-sm" x-text="money(account?.used_margin)"></b></div>
+                    <div class="account-metric px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Verwendete Margin') }}</small><b class="block text-sm" x-text="money(account?.used_margin)"></b></div>
                     <div class="rounded-lg border border-emerald-400/20 bg-emerald-400/[.05] px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Gewinn') }}</small><b class="block text-sm text-emerald-500" x-text="money(account?.profit)"></b></div>
                     <div class="rounded-lg border border-rose-400/20 bg-rose-400/[.05] px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Verlust') }}</small><b class="block text-sm text-rose-500" x-text="money(account?.loss)"></b></div>
-                    <div class="rounded-lg bg-[var(--ak-surface-muted)] px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Netto P/L') }}</small><b class="block text-sm" :class="account?.net_pnl >= 0 ? 'text-emerald-500' : 'text-rose-500'" x-text="money(account?.net_pnl)"></b></div>
-                    <div class="rounded-lg bg-[var(--ak-surface-muted)] px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Positionen') }}</small><b class="block text-sm" x-text="positions.length"></b></div>
+                    <div class="account-metric px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Netto P/L') }}</small><b class="block text-sm" :class="account?.net_pnl >= 0 ? 'text-emerald-500' : 'text-rose-500'" x-text="money(account?.net_pnl)"></b></div>
+                    <div class="account-metric px-2.5 py-2"><small class="text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Positionen') }}</small><b class="block text-sm" x-text="positions.length"></b></div>
                 </div>
                 @if($hasOpenApiApp && !$hasOpenApiToken)
                     <div class="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cyan-400/30 bg-cyan-400/[.07] px-2.5 py-2 text-[10px] font-bold text-cyan-500"><span>{{ __('Client-Daten gespeichert – einmalige Kontofreigabe fehlt noch.') }}</span><a href="{{ route('integrations.ctrader.authorize', $account) }}" class="rounded-lg bg-cyan-600 px-3 py-1.5 text-white">{{ __('Jetzt bei cTrader autorisieren') }}</a></div>

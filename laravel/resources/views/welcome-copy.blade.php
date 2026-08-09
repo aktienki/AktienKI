@@ -54,7 +54,7 @@
                     <a href="{{ route('dashboard') }}" class="hidden w-36 justify-center rounded-xl border border-violet-300/20 bg-[linear-gradient(135deg,rgba(96,70,155,.74),rgba(56,91,150,.68))] px-3 py-2.5 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(24,38,88,.18)] transition hover:border-violet-200/30 hover:brightness-110 sm:inline-flex">{{ __('Zum Dashboard') }}</a>
                 @else
                     <a href="{{ route('login') }}" class="hidden w-24 justify-center rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-300 transition hover:text-white sm:inline-flex">{{ __('Anmelden') }}</a>
-                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-xl border border-violet-300/20 bg-[linear-gradient(135deg,rgba(96,70,155,.78),rgba(56,91,150,.72))] px-3 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(24,38,88,.20)] transition hover:-translate-y-0.5 hover:border-violet-200/30 hover:brightness-110 lg:inline-flex">{{ __('Kostenlos starten') }}</a>
+                    <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-xl border border-violet-300/20 bg-[linear-gradient(135deg,rgba(96,70,155,.78),rgba(56,91,150,.72))] px-3 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(24,38,88,.20)] transition hover:-translate-y-0.5 hover:border-violet-200/30 hover:brightness-110 lg:inline-flex">{{ __('Als Tester registrieren') }}</a>
                 @endauth
                 <x-public-mobile-menu />
             </div>
