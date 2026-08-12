@@ -56,7 +56,7 @@ final class StockPredictionsTable extends Component
 
         if ($this->signal === '' && request()->filled('signal')) {
             $signal = strtoupper(trim((string) request()->query('signal')));
-            $this->signal = in_array($signal, ['SELL', 'HOLD', 'WATCH', 'BUY'], true) ? $signal : '';
+            $this->signal = in_array($signal, ['SELL', 'HOLD', 'WATCH', 'WAIT', 'BUY'], true) ? $signal : '';
         }
     }
 
@@ -278,7 +278,7 @@ final class StockPredictionsTable extends Component
             'rows' => $query->get(),
             'countries' => $this->filterOptions('country'),
             'sectors' => $this->filterOptions('sector'),
-            'signals' => collect(['SELL', 'HOLD', 'WATCH', 'BUY']),
+            'signals' => collect(['SELL', 'HOLD', 'WATCH', 'WAIT', 'BUY']),
             'userWatchlists' => $userWatchlists,
             'watchlistMemberships' => $watchlistMemberships,
             'watchlistPickerInstrument' => $watchlistPickerInstrument,

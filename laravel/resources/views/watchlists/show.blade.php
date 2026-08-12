@@ -3,10 +3,10 @@
 @section('content')
     <x-detail-page-theme />
     <div class="ak-detail-design mx-auto w-full max-w-screen-2xl space-y-5 py-5">
-        <header class="ak-detail-hero sticky top-[73px] z-40 flex flex-col justify-between gap-4 rounded-2xl border border-[var(--ak-border)] px-4 py-3 sm:flex-row sm:items-end">
+        <header class="ak-detail-hero flex flex-col justify-between gap-4 rounded-2xl border border-cyan-400/25 bg-cyan-400/[.035] px-5 py-4 shadow-[0_18px_55px_rgba(6,182,212,.06)] sm:flex-row sm:items-center">
             <div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <p class="text-xs font-black uppercase tracking-[.2em] text-violet-300">{{ __('Watchlist') }}</p>
+                    <p class="text-xs font-black uppercase tracking-[.2em] text-cyan-400">{{ __('Watchlist') }}</p>
                     @if ($watchlist->is_default)
                         <span class="rounded-lg border border-violet-400/20 bg-violet-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-violet-300">{{ __('Standard') }}</span>
                     @endif
@@ -17,33 +17,33 @@
                 @endif
             </div>
             <div class="flex flex-wrap gap-2">
-                <a href="{{ route('stocks.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 text-xs font-bold text-[var(--ak-muted)] transition hover:border-violet-400/30 hover:text-[var(--ak-text)]">
+                <a href="{{ route('stocks.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-400/[.07] px-4 text-xs font-bold text-cyan-300 transition hover:border-cyan-300/50 hover:bg-cyan-400/15">
                     <x-heroicon-o-plus class="h-4 w-4" />{{ __('Aktien hinzufügen') }}
                 </a>
-                <a href="{{ route('watchlists.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 text-xs font-bold text-[var(--ak-muted)] transition hover:border-violet-400/30 hover:text-[var(--ak-text)]">
+                <a href="{{ route('watchlists.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/[.06] px-4 text-xs font-bold text-amber-200 transition hover:border-amber-300/45 hover:bg-amber-300/10">
                     <x-heroicon-o-cog-6-tooth class="h-4 w-4" />{{ __('Watchlists verwalten') }}
                 </a>
             </div>
         </header>
 
         <section class="grid gap-3 sm:grid-cols-3">
-            <article class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+            <article class="overflow-hidden rounded-2xl border border-cyan-400/20 bg-cyan-400/[.025] p-4">
                 <p class="text-[10px] font-black uppercase tracking-[.15em] text-[var(--ak-muted)]">{{ __('Aktien') }}</p>
                 <p class="mt-2 text-2xl font-black text-[var(--ak-text)]">{{ $watchlist->items->count() }}</p>
             </article>
-            <article class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+            <article class="overflow-hidden rounded-2xl border border-cyan-400/20 bg-cyan-400/[.025] p-4">
                 <p class="text-[10px] font-black uppercase tracking-[.15em] text-[var(--ak-muted)]">{{ __('Durchschnittlicher Profit') }}</p>
                 <p class="mt-2 text-2xl font-black {{ ($averageProfit ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">
                     {{ $averageProfit !== null ? (($averageProfit > 0 ? '+' : '').number_format($averageProfit, 2, ',', '.').' %') : '—' }}
                 </p>
             </article>
-            <article class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+            <article class="overflow-hidden rounded-2xl border border-cyan-400/20 bg-cyan-400/[.025] p-4">
                 <p class="text-[10px] font-black uppercase tracking-[.15em] text-[var(--ak-muted)]">{{ __('Berechnungsbasis') }}</p>
                 <p class="mt-2 text-sm font-black text-[var(--ak-text)]">{{ __('Seit Aufnahme in die Watchlist') }}</p>
             </article>
         </section>
 
-        <section class="ak-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
+        <section class="overflow-hidden rounded-[1.5rem] border border-cyan-400/25 bg-cyan-400/[.018] shadow-[0_18px_60px_rgba(6,182,212,.05)]">
             @if ($watchlist->items->isEmpty())
                 <div class="px-6 py-20 text-center">
                     <x-heroicon-o-star class="mx-auto h-10 w-10 text-violet-300/50" />
@@ -54,13 +54,15 @@
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[850px] border-collapse text-left">
                         <thead>
-                            <tr class="border-b border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">
+                            <tr class="border-b border-cyan-400/20 bg-cyan-400/[.045] text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">
                                 <th class="px-5 py-4">{{ __('Aktie') }}</th>
                                 <th class="px-4 py-4 text-right">{{ __('Einstiegskurs') }}</th>
                                 <th class="px-4 py-4 text-right">{{ __('Aktueller Kurs') }}</th>
-                                <th class="px-4 py-4 text-center">{{ __('KI-Score') }}</th>
+                                <th class="px-4 py-4 text-center">{{ __('KI-Bewertung') }}</th>
+                                @if ($canViewSignalChanges)<th class="px-4 py-4 text-center">{{ __('Signalwechsel') }}</th>@endif
                                 <th class="px-4 py-4 text-right">{{ __('Profit je Aktie') }}</th>
                                 <th class="px-4 py-4 text-right">{{ __('Profit') }}</th>
+                                <th class="px-4 py-4 text-center">{{ __('Verlauf') }}</th>
                                 <th class="w-16 px-4 py-4"><span class="sr-only">{{ __('Aktionen') }}</span></th>
                             </tr>
                         </thead>
@@ -77,6 +79,29 @@
                                             : null;
                                         $score = \App\Support\AiScore::toTen($prediction?->prediction_score);
                                         $scorePercent = \App\Support\AiScore::toPercent($prediction?->prediction_score);
+                                        $scoreDonutColor = is_numeric($scorePercent)
+                                            ? sprintf(
+                                                'hsl(%.1f 78%% 52%%)',
+                                                $scorePercent <= 50
+                                                    ? ($scorePercent / 50) * 48
+                                                    : 48 + (($scorePercent - 50) / 50) * 94,
+                                            )
+                                            : '#64748b';
+                                        $qualityDonutColor = static function (?float $percent): string {
+                                            if ($percent === null) return '#64748b';
+                                            $percent = max(0, min(100, $percent));
+                                            $hue = $percent <= 50 ? ($percent / 50) * 48 : 48 + (($percent - 50) / 50) * 94;
+                                            return sprintf('hsl(%.1f 78%% 52%%)', $hue);
+                                        };
+                                        $toPercent = static fn ($value): ?float => is_numeric($value)
+                                            ? max(0, min(100, (float) $value * ((float) $value <= 1 ? 100 : 1))) : null;
+                                        $confidencePercent = $toPercent($prediction?->confidence);
+                                        $stabilityPercent = $toPercent($prediction?->horizon_fusion_stability_score);
+                                        $riskPercent = \App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor);
+                                        $stats = $walkForwardStats->get($item->instrument_id);
+                                        $hitRatePercent = is_numeric($stats?->hit_rate) ? max(0, min(100, (float) $stats->hit_rate)) : null;
+                                        $profitPerTrade = is_numeric($stats?->average_profit_per_trade_percent) ? (float) $stats->average_profit_per_trade_percent : null;
+                                        $profitScale = $profitPerTrade !== null ? max(0, min(100, 50 + ($profitPerTrade * 25))) : null;
                                         $currency = $item->entry_currency ?: $item->instrument->currency ?: 'USD';
                                         $stockIconUrl = route('stocks.icon', $item->instrument->id);
                                         $countryCode = strtoupper((string) $item->instrument->country);
@@ -84,6 +109,28 @@
                                             ? mb_chr(127397 + ord($countryCode[0])).mb_chr(127397 + ord($countryCode[1]))
                                             : '🌐';
                                         $itemIndices = $instrumentIndices->get($item->instrument_id, collect());
+                                        $performancePoints = $performanceSeries->get($item->instrument_id, collect());
+                                        $chartValues = collect($performancePoints)->pluck('value')->filter(fn ($value) => is_numeric($value))->map(fn ($value) => (float) $value)->values();
+                                        $chartWidth = 130; $chartHeight = 38; $chartPad = 3;
+                                        $chartMin = $chartValues->isNotEmpty() ? min((float) $chartValues->min(), 0.0) : 0.0;
+                                        $chartMax = $chartValues->isNotEmpty() ? max((float) $chartValues->max(), 0.0) : 0.0;
+                                        $chartRange = max(0.01, $chartMax - $chartMin);
+                                        $chartPolyline = $chartValues->map(function (float $value, int $index) use ($chartValues, $chartWidth, $chartHeight, $chartPad, $chartMin, $chartRange): string {
+                                            $x = $chartPad + ($index / max(1, $chartValues->count() - 1)) * ($chartWidth - 2 * $chartPad);
+                                            $y = $chartPad + (($chartMin + $chartRange - $value) / $chartRange) * ($chartHeight - 2 * $chartPad);
+                                            return number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+                                        })->implode(' ');
+                                        $chartZeroY = $chartPad + (($chartMin + $chartRange) / $chartRange) * ($chartHeight - 2 * $chartPad);
+                                        $chartPositive = ($chartValues->last() ?? 0) >= 0;
+                                        $personalizedSignal = strtoupper((string) ($prediction?->personalized_signal ?: 'HOLD'));
+                                        $signalTone = match ($personalizedSignal) {
+                                            'BUY' => 'border-emerald-300/55 bg-emerald-400/15 text-emerald-300',
+                                            'WAIT' => 'border-emerald-300/45 bg-emerald-400/10 text-emerald-300',
+                                            'WATCH' => 'border-lime-300/40 bg-lime-400/10 text-lime-300',
+                                            'SELL' => 'border-rose-300/45 bg-rose-400/10 text-rose-300',
+                                            default => 'border-amber-300/40 bg-amber-400/10 text-amber-300',
+                                        };
+                                        $signalChange = $canViewSignalChanges ? $signalChanges->get($item->instrument_id) : null;
                                     @endphp
                                     <tr
                                         data-href="{{ route('stocks.show', ['symbol' => $item->instrument->symbol, 'prediction' => $prediction?->id, 'return_to' => request()->getRequestUri()]) }}"
@@ -91,12 +138,12 @@
                                         tabindex="0"
                                         onclick="if (!event.target.closest('a,button,input,select,label,form')) window.location.assign(this.dataset.href)"
                                         onkeydown="if (event.target === this && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); window.location.assign(this.dataset.href); }"
-                                        class="cursor-pointer transition hover:bg-violet-500/[.075] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-400/70"
+                                        class="cursor-pointer transition hover:bg-cyan-400/[.055] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400/70"
                                     >
                                         <td class="px-5 py-4">
                                             <a href="{{ route('stocks.show', ['symbol' => $item->instrument->symbol, 'prediction' => $prediction?->id, 'return_to' => request()->getRequestUri()]) }}" class="group flex min-w-0 items-center gap-3">
-                                                <span class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-violet-400/20 bg-white/[.06]">
-                                                    <span class="flex h-full w-full items-center justify-center bg-violet-500/10 text-xs font-black leading-none text-violet-300">
+                                                <span class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-cyan-400/25 bg-cyan-400/[.06]">
+                                                    <span class="flex h-full w-full items-center justify-center bg-cyan-400/[.08] text-xs font-black leading-none text-cyan-300">
                                                         {{ strtoupper(substr($item->instrument->symbol, 0, 2)) }}
                                                     </span>
                                                     <span class="absolute inset-0 z-10 flex items-center justify-center p-1.5" aria-hidden="true">
@@ -111,13 +158,13 @@
                                                     </span>
                                                 </span>
                                                 <span class="min-w-0">
-                                                    <strong class="block text-sm text-[var(--ak-text)] transition group-hover:text-violet-300">{{ $item->instrument->symbol }}</strong>
+                                                    <strong class="block text-sm text-[var(--ak-text)] transition group-hover:text-cyan-300">{{ $item->instrument->symbol }}</strong>
                                                     <span class="block max-w-64 truncate text-xs text-[var(--ak-muted)]">{{ $item->instrument->name }}</span>
                                                     <span class="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
                                                         <span class="inline-flex items-center gap-1 rounded-md bg-white/[.04] px-1.5 py-0.5 text-[9px] font-bold text-[var(--ak-muted)]" title="{{ __('Land') }}">
                                                             <span>{{ $countryFlag }}</span>{{ $countryCode ?: '—' }}
                                                         </span>
-                                                        <span class="inline-flex max-w-28 items-center gap-1 rounded-md bg-violet-500/[.08] px-1.5 py-0.5 text-[9px] font-bold text-violet-300" title="{{ __('Index') }}">
+                                                        <span class="inline-flex max-w-28 items-center gap-1 rounded-md bg-cyan-400/[.08] px-1.5 py-0.5 text-[9px] font-bold text-cyan-300" title="{{ __('Index') }}">
                                                             <x-heroicon-o-chart-bar class="h-3 w-3 shrink-0" />
                                                             <span class="truncate">{{ $itemIndices->isNotEmpty() ? $itemIndices->pluck('symbol')->join(', ') : '—' }}</span>
                                                         </span>
@@ -136,20 +183,34 @@
                                             {{ $currentPrice !== null ? number_format($currentPrice, 2, ',', '.').' '.$currency : '—' }}
                                         </td>
                                         <td class="px-4 py-4">
-                                            @if ($score !== null)
-                                                <div class="mx-auto w-28">
-                                                    <div class="mb-1 flex items-baseline justify-between">
-                                                        <span class="text-sm font-black text-violet-300">{{ number_format($score, 1, ',', '.') }}</span>
-                                                        <span class="text-[9px] text-[var(--ak-muted)]">/ 10</span>
+                                            <div class="flex min-w-[27rem] items-center justify-center gap-3">
+                                                <span class="inline-flex min-w-16 shrink-0 items-center justify-center rounded-lg border px-2.5 py-2 text-[10px] font-black tracking-wide {{ $signalTone }}">{{ $personalizedSignal }}</span>
+                                                @foreach ([
+                                                    ['KI-Score', $scorePercent, $score !== null ? number_format($score, 1, ',', '.') : '—', $scoreDonutColor],
+                                                    ['Konf.', $confidencePercent, $confidencePercent !== null ? number_format($confidencePercent, 0, ',', '.').'%' : '—', $qualityDonutColor($confidencePercent)],
+                                                    ['Hit-Rate', $hitRatePercent, $hitRatePercent !== null ? number_format($hitRatePercent, 0, ',', '.').'%' : '—', $qualityDonutColor($hitRatePercent)],
+                                                    ['Ø/Trade', $profitScale, $profitPerTrade !== null ? (($profitPerTrade > 0 ? '+' : '').number_format($profitPerTrade, 2, ',', '.').'%') : '—', $qualityDonutColor($profitScale)],
+                                                    ['Stabilität', $stabilityPercent, $stabilityPercent !== null ? number_format($stabilityPercent, 0, ',', '.').'%' : '—', $qualityDonutColor($stabilityPercent)],
+                                                    ['Risiko', $riskPercent, $riskPercent !== null ? number_format($riskPercent, 0, ',', '.').'%' : '—', $riskPercent !== null ? $qualityDonutColor(100 - $riskPercent) : '#64748b'],
+                                                ] as [$label, $value, $display, $color])
+                                                    <div class="screener-metric-donut {{ $label === 'KI-Score' ? 'screener-metric-donut-score' : '' }}" style="--donut-value: {{ number_format($value ?? 0, 2, '.', '') }}%; --donut-color: {{ $color }}" role="meter" aria-label="{{ __($label) }}" @if($value !== null) aria-valuenow="{{ number_format($value, 1, '.', '') }}" @endif>
+                                                        <span>{{ $display }}</span><small>{{ __($label) }}</small>
                                                     </div>
-                                                    <div class="h-1.5 overflow-hidden rounded-full bg-slate-500/15">
-                                                        <div class="h-full rounded-full bg-gradient-to-r from-rose-400 via-amber-300 to-emerald-400" style="width: {{ $scorePercent }}%"></div>
-                                                    </div>
-                                                </div>
-                                            @else
-                                                <span class="block text-center text-sm text-[var(--ak-muted)]">—</span>
-                                            @endif
+                                                @endforeach
+                                            </div>
                                         </td>
+                                        @if ($canViewSignalChanges)
+                                            <td class="px-4 py-4 text-center">
+                                                @if ($signalChange)
+                                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-cyan-400/25 bg-cyan-400/[.07] px-2 py-1.5 text-[9px] font-black text-cyan-300" title="{{ __('Letzter Signalwechsel') }}">
+                                                        {{ $signalChange['from'] }} <span aria-hidden="true">→</span> {{ $signalChange['to'] }}
+                                                        <time class="text-[var(--ak-muted)]" datetime="{{ \Illuminate\Support\Carbon::parse($signalChange['date'])->toDateString() }}">{{ \Illuminate\Support\Carbon::parse($signalChange['date'])->format('d.m.') }}</time>
+                                                    </span>
+                                                @else
+                                                    <span class="text-xs text-[var(--ak-muted)]">—</span>
+                                                @endif
+                                            </td>
+                                        @endif
                                         <td class="px-4 py-4 text-right text-sm font-bold {{ ($profitAbsolute ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">
                                             {{ $profitAbsolute !== null ? (($profitAbsolute > 0 ? '+' : '').number_format($profitAbsolute, 2, ',', '.').' '.$currency) : '—' }}
                                         </td>
@@ -157,6 +218,16 @@
                                             <span class="inline-flex min-w-24 justify-center rounded-lg border px-3 py-2 text-sm font-black {{ $profitPercent === null ? 'border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-[var(--ak-muted)]' : ($profitPercent >= 0 ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-400' : 'border-rose-400/25 bg-rose-400/10 text-rose-400') }}">
                                                 {{ $profitPercent !== null ? (($profitPercent > 0 ? '+' : '').number_format($profitPercent, 2, ',', '.').' %') : '—' }}
                                             </span>
+                                        </td>
+                                        <td class="px-4 py-4 text-center">
+                                            @if ($chartValues->count() >= 2)
+                                                <svg class="mx-auto h-10 w-32 overflow-visible" viewBox="0 0 {{ $chartWidth }} {{ $chartHeight }}" role="img" aria-label="{{ __('Performanceverlauf seit Aufnahme') }}">
+                                                    <line x1="{{ $chartPad }}" y1="{{ number_format($chartZeroY, 1, '.', '') }}" x2="{{ $chartWidth - $chartPad }}" y2="{{ number_format($chartZeroY, 1, '.', '') }}" stroke="currentColor" stroke-opacity=".16" stroke-width="1" />
+                                                    <polyline points="{{ $chartPolyline }}" fill="none" stroke="{{ $chartPositive ? '#34d399' : '#fb7185' }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                            @else
+                                                <span class="text-xs text-[var(--ak-muted)]">—</span>
+                                            @endif
                                         </td>
                                         <td class="px-4 py-4">
                                             <form method="POST" action="{{ route('watchlists.items.destroy', [$watchlist->id, $item->instrument->id]) }}">

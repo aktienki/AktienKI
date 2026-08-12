@@ -4,7 +4,7 @@
     <div class="ak-standard-card-head flex flex-wrap items-start justify-between gap-2">
         <div>
             <p class="text-xs font-black uppercase tracking-[.18em] text-cyan-300">{{ __('Global Market Map') }}</p>
-            <p class="mt-1 text-xs text-slate-400">{{ __('Wo der Markt heute Stärke zeigt – aggregiert nach Herkunftsland') }}</p>
+            <p class="mt-1 text-xs text-slate-400">{{ __('Tagesentwicklung der verfügbaren Indizes nach Land') }}</p>
         </div>
         <span class="rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-bold text-cyan-300">
             {{ count($countryAiScores) }} {{ __('Länder') }}
@@ -13,7 +13,7 @@
 
     <div
         class="relative min-h-0 flex-1 overflow-hidden"
-        x-data="worldMarketMap(@js($countryAiScores), @js(route('stocks.index')))">
+        x-data="worldMarketMap(@js($countryAiScores), @js(route('indices.index')))">
         <svg
             x-ref="map"
             class="h-full min-h-[80px] w-full text-slate-500"
@@ -46,16 +46,20 @@
                     <p class="mt-1 text-base font-black" :class="selectedCountry?.change > 0 ? 'text-emerald-400' : (selectedCountry?.change < 0 ? 'text-rose-400' : 'text-slate-400')"><span x-text="selectedCountry?.change === null ? '—' : `${selectedCountry.change >= 0 ? '+' : ''}${selectedCountry.change.toFixed(2)} %`"></span></p>
                 </div>
                 <div class="rounded-xl border border-white/5 bg-white/[.04] p-2.5">
-                    <p class="text-[9px] uppercase tracking-wide text-slate-500">{{ __('KI-Score') }}</p>
-                    <p class="mt-1 text-lg font-black text-white"><span x-text="selectedCountry?.scoreTen.toFixed(1)"></span><small class="ml-0.5 text-[9px] text-slate-500">/10</small></p>
+                    <p class="text-[9px] uppercase tracking-wide text-slate-500">{{ __('Indexstand') }}</p>
+                    <p x-text="selectedCountry?.priceFormatted" class="mt-1 text-sm font-black text-white"></p>
                 </div>
                 <div class="rounded-xl border border-white/5 bg-white/[.04] p-2.5">
-                    <p class="text-[9px] uppercase tracking-wide text-slate-500">{{ __('Aktien') }}</p>
-                    <p x-text="selectedCountry?.stocks" class="mt-1 text-lg font-black text-white"></p>
+                    <p class="text-[9px] uppercase tracking-wide text-slate-500">{{ __('Indizes') }}</p>
+                    <p x-text="selectedCountry?.indices" class="mt-1 text-lg font-black text-white"></p>
                 </div>
             </div>
-            <a :href="selectedCountry?.stocksUrl" class="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/30 bg-cyan-300/15 px-3 text-xs font-bold text-cyan-300 transition hover:bg-cyan-300/25">
-                {{ __('Aktien anzeigen') }}
+            <div class="mt-3 rounded-lg border border-white/5 bg-white/[.03] px-3 py-2 text-[10px] text-slate-400">
+                <p class="font-bold text-slate-200" x-text="`${selectedCountry?.indexName} (${selectedCountry?.indexSymbol})`"></p>
+                <p class="mt-0.5"><span>{{ __('Letzte Kurserhebung') }}:</span> <span x-text="selectedCountry?.latestAt ? `${selectedCountry.latestAt} Uhr` : '—'"></span></p>
+            </div>
+            <a :href="selectedCountry?.indexUrl" class="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/30 bg-cyan-300/15 px-3 text-xs font-bold text-cyan-300 transition hover:bg-cyan-300/25">
+                {{ __('Index anzeigen') }}
                 <x-heroicon-o-arrow-right class="h-3.5 w-3.5" />
             </a>
         </div>

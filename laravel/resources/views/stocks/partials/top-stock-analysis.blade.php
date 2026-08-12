@@ -5,7 +5,7 @@
                 @php
                     $factorRating = $topFactor['rating'];
                     $factorPalette = [
-                        '#2dd4bf', '#27c1b1', '#22afa3', '#4ca78c', '#7fa071',
+                        '#22d3ee', '#27c1b1', '#22afa3', '#4ca78c', '#7fa071',
                         '#b39758', '#d68b4d', '#e67855', '#e96868', '#e25569',
                     ];
                     $isDrawdownRisk = $topFactor['key'] === 'drawdown_risk';

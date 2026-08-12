@@ -492,7 +492,7 @@
                     : null;
                 const targetTimestamp = addTradingDays(lastTimestamp, 20);
                 const positiveForecast = Number.isFinite(forecastTarget) && forecastTarget >= lastClose;
-                const forecastColor = positiveForecast ? '#14b8a6' : '#e56b75';
+                const forecastColor = positiveForecast ? '#06b6d4' : '#e56b75';
                 const values = candles
                     .flatMap(candle => candle.y);
                 const minimum = Math.min(...values);

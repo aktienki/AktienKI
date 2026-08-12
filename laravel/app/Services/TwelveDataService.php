@@ -146,7 +146,7 @@ class TwelveDataService
 
     public function dailyHistory(string $symbol, int $tradingDays = 800): array
     {
-        $tradingDays = max(20, min(1200, $tradingDays));
+        $tradingDays = max(20, min(5000, $tradingDays));
 
         return Cache::remember(
             'twelve_data_daily_history_'.sha1(strtoupper($symbol))."_{$tradingDays}",

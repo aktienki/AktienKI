@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\PlanLevel;
 use App\Models\Portfolio;
 use App\Services\PlanAccessService;
+use App\Services\PersonalizedSignalService;
 use App\Support\AiScore;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -42,6 +43,103 @@ final class DepotController extends Controller
         $availableStrategies = $request->user()->savedPredictionFilters()->orderBy('name')->get(['id', 'name']);
 
         return view('depots.index', compact('portfolios', 'paperMode', 'stockInstrumentIds', 'strategyTemplates', 'availableStrategies'));
+    }
+
+    public function addInstrument(Request $request, Portfolio $portfolio, int $instrument): RedirectResponse
+    {
+        abort_unless((int) $portfolio->user_id === (int) $request->user()->id
+            && $portfolio->active && $portfolio->type === 'paper', 404);
+        $validated = $request->validate(['quantity' => ['required', 'integer', 'min:1', 'max:100000']]);
+
+        $stock = DB::table('instruments')->where('id', $instrument)->where('type', 'stock')
+            ->where('is_active', true)->whereNull('deleted_at')->first(['id', 'currency']);
+        abort_unless($stock, 404);
+        abort_if(strtoupper((string) $stock->currency) !== strtoupper((string) $portfolio->currency), 422, __('Aktien- und Depotwährung müssen übereinstimmen.'));
+
+        $price = DB::table('current_stock_quotes')->where('instrument_id', $instrument)->where('status', 'current')
+            ->orderByDesc('quote_time')->orderByDesc('id')->value('price')
+            ?? DB::table('predictions')->where('instrument_id', $instrument)->orderByDesc('prediction_time')->orderByDesc('id')->value('current_price');
+        abort_unless(is_numeric($price) && (float) $price > 0, 422, __('Kein aktueller Kurs verfügbar.'));
+
+        $prediction = DB::table('predictions')->where('instrument_id', $instrument)->orderByDesc('prediction_time')->orderByDesc('id')->first(['id', 'prediction_score', 'signal']);
+        $aiScore = AiScore::toPercent($prediction?->prediction_score);
+        DB::transaction(function () use ($portfolio, $instrument, $stock, $price, $validated, $prediction, $aiScore): void {
+            $quantity = (int) $validated['quantity'];
+            $price = (float) $price;
+            $cost = $quantity * $price;
+            $account = DB::table('portfolio_cash_accounts')->where('portfolio_id', $portfolio->id)
+                ->where('currency', $portfolio->currency)->lockForUpdate()->first();
+            abort_unless($account, 422, __('Kein Verrechnungskonto vorhanden.'));
+            abort_if(((float) $account->balance - (float) $account->reserved_balance) < $cost, 422, __('Das virtuelle Guthaben reicht für diesen Kauf nicht aus.'));
+
+            $position = DB::table('portfolio_positions')->where('portfolio_id', $portfolio->id)
+                ->where('instrument_id', $instrument)->lockForUpdate()->first();
+            $oldQuantity = (float) ($position->quantity ?? 0);
+            $newQuantity = $oldQuantity + $quantity;
+            $averagePrice = (($oldQuantity * (float) ($position->average_buy_price ?? 0)) + $cost) / $newQuantity;
+            if ($position) {
+                DB::table('portfolio_positions')->where('id', $position->id)->update([
+                    'quantity' => $newQuantity, 'average_buy_price' => $averagePrice,
+                    'current_price' => $price, 'updated_at' => now(),
+                ]);
+            } else {
+                DB::table('portfolio_positions')->insert([
+                    'portfolio_id' => $portfolio->id, 'instrument_id' => $instrument,
+                    'quantity' => $quantity, 'average_buy_price' => $price, 'current_price' => $price,
+                    'opened_at_date' => now()->toDateString(), 'meta' => json_encode(['source' => 'screener_manual', 'entry_ai_score' => $aiScore, 'entry_prediction_id' => $prediction?->id, 'entry_signal' => $prediction?->signal]),
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+
+            $transactionId = DB::table('portfolio_transactions')->insertGetId([
+                'portfolio_id' => $portfolio->id, 'instrument_id' => $instrument, 'type' => 'buy',
+                'transaction_date' => now()->toDateString(), 'quantity' => $quantity, 'price' => $price,
+                'fees' => 0, 'currency' => $stock->currency, 'meta' => json_encode(['source' => 'screener_manual', 'ai_score' => $aiScore, 'prediction_id' => $prediction?->id, 'signal' => $prediction?->signal]),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $balance = (float) $account->balance - $cost;
+            DB::table('portfolio_cash_accounts')->where('id', $account->id)->update(['balance' => $balance, 'updated_at' => now()]);
+            DB::table('portfolio_cash_ledger')->insert([
+                'portfolio_cash_account_id' => $account->id, 'portfolio_transaction_id' => $transactionId,
+                'type' => 'purchase_debit', 'amount' => -$cost, 'balance_after' => $balance,
+                'currency' => $account->currency, 'occurred_at' => now(),
+                'meta' => json_encode(['source' => 'screener_manual']), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        });
+
+        return back()->with('status', 'paper-depot-item-added');
+    }
+
+    public function sellInstrument(Request $request, Portfolio $portfolio, int $instrument): RedirectResponse
+    {
+        abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active && $portfolio->type === 'paper', 404);
+        $position = DB::table('portfolio_positions')->where('portfolio_id', $portfolio->id)->where('instrument_id', $instrument)->first();
+        abort_unless($position, 404);
+        $validated = $request->validate(['quantity' => ['required', 'numeric', 'min:0.0001', 'max:'.$position->quantity]]);
+        $price = DB::table('current_stock_quotes')->where('instrument_id', $instrument)->where('status', 'current')->orderByDesc('quote_time')->orderByDesc('id')->value('price')
+            ?? DB::table('predictions')->where('instrument_id', $instrument)->orderByDesc('prediction_time')->orderByDesc('id')->value('current_price');
+        abort_unless(is_numeric($price) && (float) $price > 0, 422, __('Kein aktueller Kurs verfügbar.'));
+        $prediction = DB::table('predictions')->where('instrument_id', $instrument)->orderByDesc('prediction_time')->orderByDesc('id')->first(['id', 'prediction_score', 'signal']);
+
+        DB::transaction(function () use ($portfolio, $instrument, $position, $validated, $price, $prediction): void {
+            $quantity = (float) $validated['quantity']; $price = (float) $price;
+            $proceeds = $quantity * $price; $costBasis = $quantity * (float) $position->average_buy_price;
+            $profit = $proceeds - $costBasis;
+            $account = DB::table('portfolio_cash_accounts')->where('portfolio_id', $portfolio->id)->where('currency', $portfolio->currency)->lockForUpdate()->firstOrFail();
+            $transactionId = DB::table('portfolio_transactions')->insertGetId([
+                'portfolio_id'=>$portfolio->id,'instrument_id'=>$instrument,'type'=>'sell','transaction_date'=>now()->toDateString(),
+                'quantity'=>$quantity,'price'=>$price,'fees'=>0,'currency'=>$portfolio->currency,
+                'meta'=>json_encode(['source'=>'manual','ai_score'=>AiScore::toPercent($prediction?->prediction_score),'prediction_id'=>$prediction?->id,'signal'=>$prediction?->signal,'realized_profit'=>$profit,'performance_percent'=>$costBasis > 0 ? ($profit/$costBasis)*100 : null]),
+                'created_at'=>now(),'updated_at'=>now(),
+            ]);
+            $remaining = (float) $position->quantity - $quantity;
+            if ($remaining <= 0.000001) DB::table('portfolio_positions')->where('id', $position->id)->delete();
+            else DB::table('portfolio_positions')->where('id', $position->id)->update(['quantity'=>$remaining,'current_price'=>$price,'updated_at'=>now()]);
+            $balance = (float) $account->balance + $proceeds;
+            DB::table('portfolio_cash_accounts')->where('id',$account->id)->update(['balance'=>$balance,'updated_at'=>now()]);
+            DB::table('portfolio_cash_ledger')->insert(['portfolio_cash_account_id'=>$account->id,'portfolio_transaction_id'=>$transactionId,'type'=>'sale_credit','amount'=>$proceeds,'balance_after'=>$balance,'currency'=>$portfolio->currency,'occurred_at'=>now(),'meta'=>json_encode(['source'=>'manual','realized_profit'=>$profit]),'created_at'=>now(),'updated_at'=>now()]);
+        });
+        return back()->with('status', __('Verkauf wurde im Musterdepot simuliert.'));
     }
 
     private function realStrategyTemplates(): array
@@ -281,6 +379,16 @@ final class DepotController extends Controller
             'trade_cost' => ['required_if:type,paper', 'nullable', 'numeric', 'between:0,1000'],
         ]);
 
+        $planLevel = app(PlanAccessService::class)->level($request->user());
+        if ($planLevel === PlanLevel::Plus) {
+            if ($validated['type'] !== 'paper') {
+                return back()->withErrors(['type' => __('Strategiedepots sind ab dem Pro-Tarif verfügbar.')]);
+            }
+            if (Portfolio::query()->where('user_id', $request->user()->id)->where('active', true)->exists()) {
+                return back()->withErrors(['name' => __('Im Plus-Tarif ist ein Musterdepot enthalten. Für weitere Depots ist Pro erforderlich.')]);
+            }
+        }
+
         $exists = Portfolio::query()
             ->where('user_id', $request->user()->id)
             ->whereRaw('LOWER(name) = ?', [mb_strtolower($validated['name'])])
@@ -368,6 +476,38 @@ final class DepotController extends Controller
                     $join->on('latest_quote.quote_id', '=', 'quote.id'))
                 ->get(['quote.instrument_id', 'quote.price', 'quote.quote_time'])
                 ->keyBy('instrument_id');
+        $signalSql = app(PersonalizedSignalService::class)->sql('prediction', $request->user());
+        $positionPredictions = $positionInstrumentIds->isEmpty() ? collect() : DB::table('predictions as prediction')
+            ->whereIn('prediction.id', $latestPredictionIds->only($positionInstrumentIds)->values())
+            ->select(['prediction.*'])->selectRaw($signalSql.' AS personalized_signal')->get()->keyBy('instrument_id');
+        $canViewSignalChanges = app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Pro);
+        $positionSignalChanges = collect();
+        if ($canViewSignalChanges) {
+            $positionSignalChanges = $positionInstrumentIds->mapWithKeys(function ($instrumentId) use ($signalSql): array {
+                $rows = DB::table('predictions as prediction')->where('instrument_id', $instrumentId)
+                    ->select(['prediction.id', 'prediction.prediction_time'])->selectRaw($signalSql.' AS personalized_signal')
+                    ->orderByDesc('prediction_time')->orderByDesc('id')->limit(30)->get();
+                $latest = $rows->first();
+                if (! $latest) return [$instrumentId => null];
+                $to = strtoupper((string) ($latest->personalized_signal ?: 'HOLD'));
+                $previous = $rows->skip(1)->first(fn ($row) => strtoupper((string) ($row->personalized_signal ?: 'HOLD')) !== $to);
+                return [$instrumentId => $previous ? ['from' => strtoupper((string) ($previous->personalized_signal ?: 'HOLD')), 'to' => $to, 'date' => $latest->prediction_time] : null];
+            });
+        }
+        $latestWalkForwardRunIds = DB::table('walk_forward_backtest_runs')->where('status', 'completed')
+            ->whereIn('horizon_days', [5, 10, 15, 20])->groupBy('horizon_days')->selectRaw('MAX(id) AS id')->pluck('id');
+        $positionWalkForwardStats = $positionInstrumentIds->isEmpty() || $latestWalkForwardRunIds->isEmpty() ? collect()
+            : DB::table('walk_forward_backtest_trades')->whereIn('instrument_id', $positionInstrumentIds)->whereIn('run_id', $latestWalkForwardRunIds)
+                ->groupBy('instrument_id')->selectRaw('instrument_id, AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
+                ->selectRaw('AVG(net_return) * 100 AS average_profit_per_trade_percent')->get()->keyBy('instrument_id');
+        $positionPerformanceSeries = $portfolio->positions->mapWithKeys(function ($position): array {
+            $entry = (float) $position->average_buy_price;
+            if ($entry <= 0) return [$position->instrument_id => collect()];
+            $points = DB::table('price_bars')->where('instrument_id', $position->instrument_id)->where('interval', '1d')->where('close', '>', 0)
+                ->orderByDesc('bar_time')->limit(60)->get(['bar_time', 'close'])->reverse()->values()
+                ->map(fn ($bar) => ['date' => (string) $bar->bar_time, 'value' => (((float) $bar->close - $entry) / $entry) * 100]);
+            return [$position->instrument_id => $points];
+        });
         $currentValue = $portfolio->positions->sum(
             fn ($position) => (float) $position->quantity * (float) (
                 $positionQuotes->get($position->instrument_id)?->price
@@ -470,6 +610,23 @@ final class DepotController extends Controller
                 ?? $position->current_price
                 ?? $position->average_buy_price),
         ])->values();
+        $positionEntryData = DB::table('portfolio_transactions')->where('portfolio_id', $portfolio->id)->where('type', 'buy')
+            ->whereIn('instrument_id', $positionInstrumentIds)->orderByDesc('transaction_date')->orderByDesc('id')->get()
+            ->groupBy('instrument_id')->map(function ($rows): array {
+                $latest = $rows->first(); $meta = is_string($latest?->meta) ? (json_decode($latest->meta, true) ?: []) : (array) ($latest?->meta ?? []);
+                return ['ai_score' => $meta['ai_score'] ?? null, 'signal' => $meta['signal'] ?? null, 'date' => $latest?->transaction_date];
+            });
+        $positionHistoryByInstrument = $positionInstrumentIds->isEmpty() ? collect() : DB::table('price_bars')
+            ->whereIn('instrument_id', $positionInstrumentIds)->where('interval', '1d')->where('close', '>', 0)
+            ->orderByDesc('bar_time')->limit(max(60, $positionInstrumentIds->count() * 60))->get(['instrument_id','bar_time','close'])
+            ->groupBy('instrument_id')->map(fn($rows) => $rows->take(60)->keyBy(fn($row) => substr((string)$row->bar_time,0,10)));
+        $portfolioValueCurve = collect($positionHistoryByInstrument)->flatMap(fn($rows) => $rows->keys())->unique()->sort()->values()->map(function($date) use($portfolio, $positionHistoryByInstrument, $cashBalance) {
+            $positionsValue = $portfolio->positions->sum(function($position) use($date,$positionHistoryByInstrument) {
+                $rows=$positionHistoryByInstrument->get($position->instrument_id,collect()); $bar=$rows->get($date) ?? $rows->filter(fn($row,$day)=>$day <= $date)->last();
+                return (float)$position->quantity * (float)($bar?->close ?? $position->average_buy_price);
+            });
+            return ['x'=>$date,'y'=>round($cashBalance+$positionsValue,2)];
+        })->values();
 
         return view('depots.show', compact(
             'portfolio', 'invested', 'currentValue', 'cashBalance', 'totalValue', 'capitalUtilization',
@@ -478,6 +635,9 @@ final class DepotController extends Controller
             'canActivateStrategyAccount',
             'livePortfolioPositions',
             'latestPredictionIds',
+            'positionPredictions', 'positionWalkForwardStats', 'positionPerformanceSeries',
+            'canViewSignalChanges', 'positionSignalChanges',
+            'positionEntryData', 'portfolioValueCurve',
             'performance', 'backUrl', 'backLabel', 'availableStrategies', 'strategyNames', 'strategyPerformance',
             'simulationRun', 'simulationSummary', 'chartTrades'
         ));

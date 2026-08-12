@@ -12,9 +12,22 @@ final class SignalTransitionController extends Controller
     public function index(Request $request): View
     {
         $days = max(7, min(365, (int) $request->query('days', 90)));
+        // Keep the history aligned with the currently deployed Triple
+        // Timeline universe.  Older prediction rows can still exist in the
+        // database, but their transitions must not be mixed with the new
+        // walk-forward results.
+        $latestTripleRunId = DB::table('walk_forward_backtest_runs')
+            ->where('status', 'completed')
+            ->whereRaw("parameters->>'procedure_version' = ?", ['triple-timeline-v1'])
+            ->orderByDesc('id')
+            ->value('id');
+        $tripleInstrumentIds = $latestTripleRunId
+            ? DB::table('walk_forward_backtest_scores')->where('run_id', $latestTripleRunId)->pluck('instrument_id')
+            : collect();
         $history = DB::table('predictions as p')
             ->join('instruments as instrument', 'instrument.id', '=', 'p.instrument_id')
             ->where('instrument.type', 'stock')
+            ->when($tripleInstrumentIds->isNotEmpty(), fn ($query) => $query->whereIn('p.instrument_id', $tripleInstrumentIds->all()))
             ->where('p.prediction_time', '>=', now()->subDays($days))
             ->select([
                 'p.id', 'p.instrument_id', 'p.prediction_time', 'p.signal', 'p.current_price',

@@ -8,7 +8,7 @@
             'score' => 10, 'confidence' => 100, 'drawdown' => 50, 'profit_factor' => 3,
             'volatility' => 100, 'predicted_return' => 20, 'pe' => 100,
             'dividend_yield' => 10, 'market_cap' => 3000, 'revenue_growth' => 100,
-            'hit_rate' => 100,
+            'hit_rate' => 100, 'trades' => 100,
         ], $rangeMaxima ?? []);
         $rangeMaxima['volatility'] = min(100, (float) ($rangeMaxima['volatility'] ?? 100));
         $rangeValue = static fn (string $name, float $default, float $minimum, string $maximumKey): float =>
@@ -160,6 +160,7 @@
                 marketCap: Number({{ $rangeValue('market_cap_min', 0, 0, 'market_cap') }}),
                 revenueGrowth: Number({{ $rangeValue('revenue_growth_min', -50, -50, 'revenue_growth') }}),
                 hitRate: Number({{ $rangeValue('hit_rate_min', 0, 0, 'hit_rate') }}),
+                minimumTrades: Number({{ $rangeValue('minimum_trades', 0, 0, 'trades') }}),
                 loading: false,
                 searchTimer: null,
                 submitSearch() {
@@ -301,7 +302,7 @@
                     <div class="mb-2 flex items-center gap-2"><span class="text-[10px] font-black uppercase tracking-[.15em] text-amber-300">{{ __('Label-Faktoren') }}</span><span class="h-px flex-1 bg-amber-300/15"></span><button type="button" @click="$dispatch('open-save-filter')" class="inline-flex shrink-0 items-center gap-1 rounded-md border border-teal-300/30 bg-teal-400/[.10] px-2 py-1 text-[8px] font-black uppercase tracking-[.08em] text-teal-200 transition hover:bg-teal-400/[.18]"><x-heroicon-o-bookmark class="h-3 w-3" />{{ __('Label speichern') }}</button><a href="{{ route('setup.quality', ['reset' => 1]) }}" class="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300/25 bg-amber-300/[.08] px-2 py-1 text-[8px] font-black uppercase tracking-[.08em] text-amber-200 transition hover:border-amber-200/50 hover:bg-amber-300/[.16]" title="{{ __('Alle Filter auf Standardwerte zurücksetzen') }}"><x-heroicon-o-arrow-path class="h-3 w-3" />{{ __('Reset') }}</a></div>
                     <div class="grid grid-cols-1 gap-3">
             @else
-            <div class="grid grid-cols-5 gap-1">
+            <div class="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-6">
             @endif
             <label class="ak-heatmap-range">
                 <span>{{ __('KI-Score') }} ≥ <b x-text="score.toFixed(1).replace('.', ',')">{{ number_format((float) request('score_min', 0), 1, ',', '.') }}</b></span>
@@ -322,6 +323,10 @@
             <label class="ak-heatmap-range">
                 <span>{{ __('Volatilität') }} ≤ <b x-text="volatility >= {{ $rangeMaxima['volatility'] }} ? '{{ __('Alle') }}' : `${volatility}%`">{{ $rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility') >= $rangeMaxima['volatility'] ? __('Alle') : number_format($rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility'), 0, ',', '.').'%' }}</b></span>
                 <input name="volatility_max" type="range" min="0" max="{{ $rangeMaxima['volatility'] }}" step="5" value="{{ $rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility') }}" x-model.number="volatility" onchange="this.form.requestSubmit()">
+            </label>
+            <label class="ak-heatmap-range">
+                <span>{{ __('Historische Trades') }} ≥ <b x-text="minimumTrades <= 0 ? '{{ __('Alle') }}' : minimumTrades">{{ (int) request('minimum_trades', 0) <= 0 ? __('Alle') : number_format((int) request('minimum_trades'), 0, ',', '.') }}</b></span>
+                <input name="minimum_trades" type="range" min="0" max="{{ (int) $rangeMaxima['trades'] }}" step="5" value="{{ $rangeValue('minimum_trades', 0, 0, 'trades') }}" x-model.number="minimumTrades" onchange="this.form.requestSubmit()">
             </label>
             @if ($qualitySetupMode)
             <label class="ak-heatmap-range">
@@ -350,11 +355,13 @@
                     @php
                         $hitRateValue = max(0, min(100, (float) ($heatmapSummary?->hit_rate ?? 0)));
                         $drawdownValue = max(0, min(100, (float) ($heatmapSummary?->drawdown ?? 0)));
-                        $profitFactorValue = max(0, min(100, ((float) ($heatmapSummary?->profit_factor ?? 0) / 2) * 100));
+                        $profitPerTrade = (float) ($heatmapSummary?->normalized_profit_per_trade ?? 0);
+                        $profitPerTradeValue = max(0, min(100, 50 + ($profitPerTrade * 25)));
+                        $profitPerTradeColor = $profitPerTrade > 0 ? '#34d399' : ($profitPerTrade < 0 ? '#fb7185' : '#fbbf24');
                         $donut = static fn (float $value, string $color): string => "background:conic-gradient({$color} {$value}%, rgba(148,163,184,.18) {$value}% 100%);";
                     @endphp
                     <div class="grid grid-cols-2 gap-2">
-                        @foreach ([['Gewonnene Trades', (int) ($heatmapSummary?->winning_trades ?? 0), 'text-emerald-300'],['Trades gesamt',(int) ($heatmapSummary?->trades ?? 0),'text-white'],['Trades/Monat',number_format((float) ($heatmapSummary?->trades_per_month ?? 0), 1, ',', '.'),'text-teal-300'],['Profitfaktor',number_format((float) ($heatmapSummary?->profit_factor ?? 0), 2, ',', '.'),'text-amber-300'],['Volatilität',number_format((float) ($heatmapSummary?->volatility ?? 0), 1, ',', '.').' %','text-orange-300']] as [$label,$value,$tone])
+                        @foreach ([['Gewonnene Trades', (int) ($heatmapSummary?->winning_trades ?? 0), 'text-emerald-300'],['Trades gesamt',(int) ($heatmapSummary?->trades ?? 0),'text-white'],['Trades/Monat',number_format((float) ($heatmapSummary?->trades_per_month ?? 0), 1, ',', '.'),'text-teal-300'],['Ø Profit je Trade · 3J WF',($profitPerTrade > 0 ? '+' : '').number_format($profitPerTrade, 2, ',', '.').' ATR',$profitPerTrade >= 0 ? 'text-emerald-300' : 'text-rose-300'],['Volatilität',number_format((float) ($heatmapSummary?->volatility ?? 0), 1, ',', '.').' %','text-orange-300']] as [$label,$value,$tone])
                             <div class="rounded-lg border border-white/[.07] bg-white/[.035] p-2"><strong class="block text-base font-black tabular-nums {{ $tone }}">{{ $value }}</strong><span class="text-[8px] font-bold uppercase text-slate-400">{{ __($label) }}</span></div>
                         @endforeach
                         <div class="flex items-center gap-2 rounded-lg border border-cyan-300/15 bg-white/[.035] p-2">
@@ -366,12 +373,12 @@
                             <span class="text-[8px] font-bold uppercase text-slate-400">{{ __('Max. Drawdown') }}</span>
                         </div>
                         <div class="flex items-center gap-2 rounded-lg border border-amber-300/15 bg-white/[.035] p-2">
-                            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full p-1" style="{{ $donut($profitFactorValue, '#fbbf24') }}"><span class="grid h-full w-full place-items-center rounded-full bg-[var(--ak-card)] text-[10px] font-black text-amber-300">{{ number_format((float) ($heatmapSummary?->profit_factor ?? 0), 2, ',', '.') }}</span></span>
-                            <span class="text-[8px] font-bold uppercase text-slate-400">{{ __('Profitfaktor') }}</span>
+                            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full p-1" style="{{ $donut($profitPerTradeValue, $profitPerTradeColor) }}"><span class="grid h-full w-full place-items-center rounded-full bg-[var(--ak-card)] text-[9px] font-black" style="color:{{ $profitPerTradeColor }}">{{ ($profitPerTrade > 0 ? '+' : '').number_format($profitPerTrade, 2, ',', '.') }}</span></span>
+                            <span class="text-[8px] font-bold uppercase text-slate-400">{{ __('Ø ATR/Trade') }}</span>
                         </div>
                     </div>
-                    @php $pf = min(100, max(5, (float) ($heatmapSummary?->profit_factor ?? 0) * 25)); $hit = min(100, max(5, (float) ($heatmapSummary?->hit_rate ?? 0))); @endphp
-                    <div class="mt-3 space-y-2"><div><div class="mb-1 flex justify-between text-[8px] font-bold uppercase text-slate-400"><span>{{ __('Profitfaktor') }}</span><span>{{ number_format((float) ($heatmapSummary?->profit_factor ?? 0), 2, ',', '.') }}</span></div><div class="h-2 overflow-hidden rounded-full bg-white/[.08]"><div class="h-full rounded-full bg-amber-300 transition-[width] duration-500 ease-out" style="width: {{ $pf }}%"></div></div></div><div><div class="mb-1 flex justify-between text-[8px] font-bold uppercase text-slate-400"><span>{{ __('Trefferquote') }}</span><span>{{ number_format((float) ($heatmapSummary?->hit_rate ?? 0), 1, ',', '.') }} %</span></div><div class="h-2 overflow-hidden rounded-full bg-white/[.08]"><div class="h-full rounded-full bg-cyan-300 transition-[width] duration-500 ease-out" style="width: {{ $hit }}%"></div></div></div></div>
+                    @php $profitBar = max(5, $profitPerTradeValue); $hit = min(100, max(5, (float) ($heatmapSummary?->hit_rate ?? 0))); @endphp
+                    <div class="mt-3 space-y-2"><div><div class="mb-1 flex justify-between text-[8px] font-bold uppercase text-slate-400"><span>{{ __('Volatilitätsnorm. Profit je Trade') }}</span><span>{{ ($profitPerTrade > 0 ? '+' : '').number_format($profitPerTrade, 2, ',', '.') }} ATR</span></div><div class="h-2 overflow-hidden rounded-full bg-white/[.08]"><div class="h-full rounded-full transition-[width] duration-500 ease-out" style="width: {{ $profitBar }}%;background:{{ $profitPerTradeColor }}"></div></div></div><div><div class="mb-1 flex justify-between text-[8px] font-bold uppercase text-slate-400"><span>{{ __('Trefferquote') }}</span><span>{{ number_format((float) ($heatmapSummary?->hit_rate ?? 0), 1, ',', '.') }} %</span></div><div class="h-2 overflow-hidden rounded-full bg-white/[.08]"><div class="h-full rounded-full bg-cyan-300 transition-[width] duration-500 ease-out" style="width: {{ $hit }}%"></div></div></div></div>
                     <p class="mt-3 text-[9px] leading-4 text-slate-400">{{ __('Die Statistik aktualisiert sich mit den Reglern und hilft, einen robusten Filter zu finden.') }}</p>
                 </aside>
             </div>
@@ -424,7 +431,7 @@
             @php
                 $selectedExitStrategy = (string) request('exit_strategy', $editingSavedFilter?->filters['exit_strategy'] ?? 'fixed_20d');
             @endphp
-            <section x-data="{ saveOpen: false, exitStrategy: @js($selectedExitStrategy), visibility: @js(old('visibility', $editingSavedFilter?->visibility ?? 'private')) }" @open-save-filter.window="saveOpen = true" class="contents">
+            <section x-data="{ saveOpen: false, exitStrategy: @js($selectedExitStrategy), visibility: @js(old('visibility', $editingSavedFilter?->visibility ?? 'private')), automationEnabled: @js(request()->boolean('automatic_optimization')) }" @open-save-filter.window="saveOpen = true" class="contents">
                 <div class="hidden">
                     <x-heroicon-o-bookmark class="h-4 w-4" />
                     {{ __('Gespeicherte Filter') }}
@@ -513,9 +520,9 @@
                                 <input name="name" value="{{ $editingSavedFilter?->name }}" maxlength="80" required autofocus class="ak-input mt-2 h-11 w-full rounded-lg px-3 text-sm font-bold text-white" placeholder="{{ $qualitySetupMode ? __('z. B. Momentum Favorit') : __('z. B. Quality Europa') }}">
                             </label>
                             @if ($qualitySetupMode)
-                            <label x-data="{ color: '#14b8a6' }" class="block text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Labelfarbe') }}
+                            <label x-data="{ color: '#06b6d4' }" class="block text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Labelfarbe') }}
                                 <span class="mt-2 flex h-11 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/40 px-2">
-                                    <input name="color" type="color" value="#14b8a6" x-model="color" required class="h-7 w-10 cursor-pointer rounded border-0 bg-transparent p-0">
+                                    <input name="color" type="color" value="#06b6d4" x-model="color" required class="h-7 w-10 cursor-pointer rounded border-0 bg-transparent p-0">
                                     <span class="min-w-0 truncate font-mono text-[10px] normal-case tracking-normal text-slate-300" x-text="color.toUpperCase()"></span>
                                 </span>
                             </label>
@@ -530,6 +537,39 @@
                                     <label class="cursor-pointer rounded-lg border p-3 transition" :class="visibility === 'private' ? 'border-teal-300/40 bg-teal-400/[.10]' : 'border-white/10 bg-slate-950/25'"><div class="flex items-start gap-2"><input type="radio" name="visibility" value="private" x-model="visibility" required class="mt-0.5 h-4 w-4 border-slate-500 bg-slate-900 text-teal-500"><span><b class="block text-xs text-white">{{ __('Privat') }}</b><small class="mt-1 block text-[9px] leading-4 text-slate-400">{{ __('Nur du kannst diese Strategie sehen und verwenden.') }}</small></span></div></label>
                                     <label class="cursor-pointer rounded-lg border p-3 transition" :class="visibility === 'pro_public' ? 'border-amber-300/45 bg-amber-300/[.10]' : 'border-white/10 bg-slate-950/25'"><div class="flex items-start gap-2"><input type="radio" name="visibility" value="pro_public" x-model="visibility" required class="mt-0.5 h-4 w-4 border-slate-500 bg-slate-900 text-amber-500"><span><b class="block text-xs text-white">{{ __('Öffentlich für Pro') }}</b><small class="mt-1 block text-[9px] leading-4 text-slate-400">{{ __('Pro-Nutzer können eine eigene Kopie importieren. Nur du bearbeitest das Original.') }}</small></span></div></label>
                                 </div></fieldset>
+                            </div>
+                            <div class="mt-4 rounded-xl border border-cyan-300/25 bg-cyan-400/[.07] p-4">
+                                <label class="flex cursor-pointer items-start gap-3">
+                                    <input type="checkbox" name="automation_enabled" value="1" x-model="automationEnabled" class="mt-1 h-4 w-4 rounded border-cyan-300/40 bg-slate-900 text-cyan-400 focus:ring-cyan-400">
+                                    <span><strong class="block text-xs text-cyan-200">{{ __('Strategie automatisch im Depot ausführen') }}</strong><small class="mt-1 block text-[10px] leading-4 text-slate-300">{{ __('Nach neuen Predictions wird geprüft, ob sich das Strategiedepot ändern muss.') }}</small></span>
+                                </label>
+                                <div x-show="automationEnabled" x-cloak class="mt-4 border-t border-cyan-300/15 pt-4">
+                                    <div class="flex items-start gap-3">
+                                        <x-heroicon-o-arrow-path-rounded-square class="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" />
+                                        <div><p class="text-xs font-black text-cyan-200">{{ __('Automatisches Strategiedepot') }}</p><p class="mt-1 text-[10px] leading-4 text-slate-300">{{ __('Die optimierte Strategie wird nach jeder neuen Prediction auf das gewählte Depot angewendet. Käufe und spätere Depotänderungen werden protokolliert.') }}</p></div>
+                                    </div>
+                                    <div class="mt-4 grid gap-3 md:grid-cols-3">
+                                        <label class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Depot') }}
+                                            <select name="portfolio_id" :disabled="!automationEnabled" class="ak-input mt-2 h-11 w-full rounded-lg px-3 text-xs font-bold text-white">
+                                                <option value="">{{ __('Neues Depot automatisch erstellen') }}</option>
+                                                @foreach (($automationPortfolios ?? collect()) as $automationPortfolio)
+                                                    <option value="{{ $automationPortfolio->id }}">{{ $automationPortfolio->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                        <label class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Verfügbares Kapital') }}
+                                            <div class="relative mt-2"><input name="automation_initial_capital" type="number" min="1000" max="1000000" step="100" value="{{ request('initial_capital', 10000) }}" :disabled="!automationEnabled" required class="ak-input h-11 w-full rounded-lg pr-8 text-sm font-bold text-white"><span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">€</span></div>
+                                        </label>
+                                        <label class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Kosten je Trade') }}
+                                            <div class="relative mt-2"><input name="automation_trade_cost" type="number" min="0" max="1000" step="0.01" value="{{ request('trade_cost', 10) }}" :disabled="!automationEnabled" required class="ak-input h-11 w-full rounded-lg pr-8 text-sm font-bold text-white"><span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">€</span></div>
+                                        </label>
+                                    </div>
+                                    <label class="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-amber-300/20 bg-amber-300/[.06] px-3 py-2.5">
+                                        <input type="hidden" name="transaction_email_enabled" value="0">
+                                        <input type="checkbox" name="transaction_email_enabled" value="1" checked :disabled="!automationEnabled" class="mt-0.5 h-4 w-4 rounded border-amber-300/40 bg-slate-900 text-amber-400 focus:ring-amber-400">
+                                        <span class="text-[10px] leading-4 text-slate-300"><strong class="block text-amber-200">{{ __('E-Mail bei Depotänderungen') }}</strong>{{ __('Du erhältst nur dann eine Nachricht, wenn die Strategie tatsächlich einen Kauf, eine Aufstockung oder einen Verkauf im Depot ausführt.') }}</span>
+                                    </label>
+                                </div>
                             </div>
                         @endif
                         @if ($qualitySetupMode)
@@ -574,7 +614,7 @@
                 ];
             @endphp
             @if (! $qualitySetupMode)
-            <section x-data="{ capitalOpen: false, capital: 10000, positions: Number({{ max(1, min(50, (int) request('max_positions', 5))) }}), positionFactor: Number({{ request('exit_strategy') === 'buy_and_hold' ? 1 : max(1, (int) request('position_factor', 1)) }}), tradeCost: 10, moneyManagerEnabled: @js(request('exit_strategy') !== 'buy_and_hold') }" class="ak-backtest-strip relative mb-3 flex shrink-0 items-center justify-between gap-3 overflow-hidden rounded-xl border border-amber-300/20 bg-amber-300/[.055] px-3 py-2 {{ $backtestIsActive ? 'pb-4' : '' }}">
+            <section x-data="{ capitalOpen: false, optimizeOpen: false, capital: 10000, positions: Number({{ max(1, min(50, (int) request('max_positions', 5))) }}), positionFactor: Number({{ request('exit_strategy') === 'buy_and_hold' ? 1 : max(1, (int) request('position_factor', 1)) }}), tradeCost: 10, moneyManagerEnabled: @js(request('exit_strategy') !== 'buy_and_hold') }" class="ak-backtest-strip relative mb-3 flex shrink-0 items-center justify-between gap-3 overflow-hidden rounded-xl border border-amber-300/20 bg-amber-300/[.055] px-3 py-2 {{ $backtestIsActive ? 'pb-4' : '' }}">
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">
                         @if ($backtestIsActive)
@@ -621,6 +661,9 @@
                     </form>
                 @elseif ($backtestIsComplete)
                     <div class="flex shrink-0 items-center gap-2">
+                        <button type="button" @click="optimizeOpen = true" class="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-400/[.08] px-3 text-[10px] font-black uppercase tracking-[.06em] text-cyan-200 transition hover:bg-cyan-400/[.15]">
+                            <x-heroicon-o-sparkles class="h-4 w-4" />{{ __('Automatisch optimieren') }}
+                        </button>
                         <button type="button" onclick="window.dispatchEvent(new CustomEvent('open-save-filter'))" class="ak-backtest-save-action inline-flex h-9 items-center gap-2 rounded-lg border border-teal-300/25 bg-teal-400/[.09] px-3 text-[10px] font-black uppercase tracking-[.06em] text-teal-200 transition hover:bg-teal-400/[.16]">
                             <x-heroicon-o-bookmark class="h-4 w-4" />{{ $qualitySetupMode ? __('Smart Selection speichern') : ($editingSavedFilter ? __('Änderungen speichern') : __('Strategie speichern')) }}
                         </button>
@@ -642,10 +685,79 @@
                         </button>
                     </div>
                 @else
+                    <div class="flex shrink-0 items-center gap-2">
+                        <button type="button" @click="optimizeOpen = true" class="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-400/[.08] px-4 text-[10px] font-black uppercase tracking-[.07em] text-cyan-200 transition hover:bg-cyan-400/[.15]">
+                            <x-heroicon-o-sparkles class="h-4 w-4" />
+                            {{ __('Automatisch optimieren') }}
+                        </button>
                         <button type="button" @click="capitalOpen = true" class="ak-backtest-primary-action inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/12 px-4 text-[10px] font-black uppercase tracking-[.08em] text-amber-200 transition hover:bg-amber-300/20">
                             <x-heroicon-o-play class="h-4 w-4" />
                             {{ __('Backtest starten') }}
-                    </button>
+                        </button>
+                    </div>
+                @endif
+                    <div x-show="optimizeOpen" x-cloak class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" @keydown.escape.window="optimizeOpen = false">
+                        <form method="POST" action="{{ route('setup.filter.optimize') }}" x-data="{ tradeCapacity: 10, optimizationGoal: 'reduce_drawdown', capital: 10000, tradeCost: 10, submitting: false }" @submit="submitting = true" class="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-cyan-300/25 bg-[#15243a]/95 p-5 shadow-2xl" @click.outside="optimizeOpen = false">
+                            @csrf
+                            @foreach ($backtestFilters as $filter)
+                                @if (request()->filled($filter))
+                                    @if (is_array(request($filter)))
+                                        @foreach (request($filter) as $item)<input type="hidden" name="{{ $filter }}[]" value="{{ $item }}">@endforeach
+                                    @else
+                                        <input type="hidden" name="{{ $filter }}" value="{{ request($filter) }}">
+                                    @endif
+                                @endif
+                            @endforeach
+                            <div class="flex items-start justify-between gap-4">
+                                <div><p class="text-[10px] font-black uppercase tracking-[.14em] text-cyan-300">{{ __('Automatische Optimierung') }}</p><h2 class="mt-1 text-xl font-black text-white">{{ __('Was soll verbessert werden?') }}</h2><p class="mt-1 text-xs leading-5 text-slate-300">{{ __('Zuerst werden Modelle mit negativer Netto-Performance ausgeschlossen. Danach kombiniert die Automatik die aktuellen dreijährigen Walk-Forward-Ergebnisse für 5, 10, 15 und 20 Tage. Gleichmäßig gute Ergebnisse über mehrere Horizonte erhalten einen Konsistenzbonus.') }}</p></div>
+                                <button type="button" @click="optimizeOpen = false" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
+                            </div>
+                            @php
+                                $optimizationRiskProfile = app(\App\Services\PersonalizedSignalService::class)
+                                    ->profileLabel(auth()->user());
+                            @endphp
+                            <div class="mt-4 flex items-start gap-3 rounded-xl border border-amber-300/25 bg-amber-300/[.07] p-3">
+                                <x-heroicon-o-user-circle class="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+                                <p class="text-xs leading-5 text-slate-200">{{ __('Die Optimierung richtet sich nach deinem Risikoprofil „:profile“. Dadurch werden die vier Zeithorizonte sowie Risiko, Drawdown und Performance passend zu deinem Profil gewichtet.', ['profile' => $optimizationRiskProfile]) }}</p>
+                            </div>
+                            <fieldset class="mt-5">
+                                <legend class="text-xs font-black text-white">{{ __('Wie viele Positionen möchtest du gleichzeitig verwalten?') }}</legend>
+                                <p class="mt-1 text-[10px] leading-4 text-slate-400">{{ __('Die Automatik bevorzugt eine entsprechend überschaubare Aktienauswahl und übernimmt den Wert als Positionslimit für den Backtest.') }}</p>
+                                <div class="mt-3 grid grid-cols-3 gap-2">
+                                    @foreach ([5 => __('Wenige'), 10 => __('Mittel'), 20 => __('Viele') ] as $capacity => $label)
+                                        <label class="cursor-pointer rounded-xl border p-3 text-center transition" :class="tradeCapacity === {{ $capacity }} ? 'border-cyan-300/60 bg-cyan-400/[.14] ring-1 ring-cyan-300/25' : 'border-white/10 bg-white/[.035] hover:border-white/25'">
+                                            <input type="radio" name="trade_capacity" value="{{ $capacity }}" x-model.number="tradeCapacity" required class="sr-only">
+                                            <b class="block text-sm text-white">{{ $capacity }}</b>
+                                            <small class="mt-0.5 block text-[10px] text-slate-400">{{ $label }}</small>
+                                            <span x-show="tradeCapacity === {{ $capacity }}" class="mt-1 inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide text-cyan-300"><x-heroicon-o-check-circle class="h-3.5 w-3.5" />{{ __('Ausgewählt') }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </fieldset>
+                            <fieldset class="mt-5">
+                                <legend class="text-xs font-black text-white">{{ __('Kapital und Handelskosten') }}</legend>
+                                <p class="mt-1 text-[10px] leading-4 text-slate-400">{{ __('Die Automatik berücksichtigt die Kosten für Kauf und Verkauf bereits in der historischen Netto-Rendite.') }}</p>
+                                <div class="mt-3 grid grid-cols-2 gap-3">
+                                    <label class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Verfügbares Kapital') }}<div class="relative mt-2"><input name="initial_capital" type="number" min="1000" max="1000000" step="100" x-model.number="capital" required class="ak-input h-11 w-full rounded-lg pr-8 text-sm font-bold text-white"><span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">€</span></div></label>
+                                    <label class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Kosten je Trade') }}<div class="relative mt-2"><input name="trade_cost" type="number" min="0" max="1000" step="0.01" x-model.number="tradeCost" required class="ak-input h-11 w-full rounded-lg pr-8 text-sm font-bold text-white"><span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">€</span></div></label>
+                                </div>
+                                <p class="mt-2 text-[10px] text-slate-400">{{ __('Kapital je Position') }}: <b class="text-cyan-200" x-text="`${Math.max(0, capital / Math.max(1, tradeCapacity)).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}`"></b></p>
+                            </fieldset>
+                            <div class="mt-5 grid gap-2">
+                                @foreach ([
+                                    ['reduce_drawdown', 'heroicon-o-shield-check', __('Drawdown verringern'), __('Bevorzugt stabilere Aktien und begrenzt historische Verlustphasen.')],
+                                    ['fewer_trades', 'heroicon-o-funnel', __('Anzahl Trades reduzieren'), __('Sucht eine selektivere Strategie mit mindestens fünf Aktien.')],
+                                    ['maximize_performance', 'heroicon-o-arrow-trending-up', __('Performance optimieren'), __('Gewichtet Rendite, Profitfaktor und Trefferquote bei begrenztem Drawdown.')],
+                                ] as [$goal, $icon, $title, $description])
+                                    <label class="group cursor-pointer rounded-xl border p-3 transition" :class="optimizationGoal === @js($goal) ? 'border-cyan-300/60 bg-cyan-400/[.10]' : 'border-white/10 bg-white/[.035] hover:border-white/20'">
+                                        <span class="flex items-start gap-3"><input type="radio" name="optimization_goal" value="{{ $goal }}" x-model="optimizationGoal" required class="mt-1 h-4 w-4 border-slate-500 bg-slate-900 text-cyan-500 focus:ring-cyan-500/30"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-400/10 text-cyan-300"><x-dynamic-component :component="$icon" class="h-5 w-5" /></span><span><b class="block text-sm text-white">{{ $title }}</b><small class="mt-1 block text-[10px] leading-4 text-slate-400">{{ $description }}</small></span></span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            <div class="sticky -bottom-5 -mx-5 mt-5 flex justify-end gap-2 border-t border-white/10 bg-[#15243a] px-5 py-4"><button type="button" @click="optimizeOpen = false" :disabled="submitting" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-bold text-slate-300 disabled:opacity-50">{{ __('Abbrechen') }}</button><button type="submit" :disabled="submitting" class="inline-flex h-10 items-center gap-2 rounded-lg border border-cyan-300/30 bg-cyan-400/15 px-5 text-xs font-black text-cyan-100 hover:bg-cyan-400/20 disabled:cursor-wait disabled:opacity-60"><span x-show="submitting" class="ak-backtest-spinner h-4 w-4" aria-hidden="true"></span><x-heroicon-o-sparkles x-show="!submitting" class="h-4 w-4" /><span x-text="submitting ? @js(__('Wird optimiert …')) : @js(__('Optimierung berechnen'))"></span></button></div>
+                        </form>
+                    </div>
+                @if (! $backtestIsActive && ! $backtestIsComplete)
                     <div x-show="capitalOpen" x-cloak class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" @keydown.escape.window="capitalOpen = false">
                         <form method="POST" action="{{ route('setup.filter.backtest') }}" x-data="{ submitting: false }" @submit="submitting = true" class="ak-backtest-config-dialog w-full max-w-lg rounded-2xl border border-teal-300/20 bg-[#15243a]/90 p-5 shadow-2xl" @click.outside="capitalOpen = false">
                             @csrf
@@ -797,7 +909,7 @@
         @endphp
 
         @if (! $qualitySetupMode)
-        <section class="grid min-h-0 w-full flex-1 grid-cols-4 items-start gap-3 overflow-hidden">
+        <section class="ak-heatmap-metric-grid grid min-h-0 w-full flex-1 grid-cols-4 items-start gap-3 overflow-hidden">
             @foreach ($heatmapMetrics as $metric)
                 @php $bar = $averageBars[$metric['key']]; @endphp
                 <article class="flex aspect-square min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]">
@@ -960,7 +1072,7 @@
                                             : number_format($rawValue, 0, ',', '.').$metric['suffix']);
                                 @endphp
                                 <div class="ak-heatmap-cell flex aspect-square min-h-0 min-w-0 cursor-default items-center justify-center self-center rounded-[4px] border {{ $outsideSelectedArea ? 'border-white/[.05] bg-slate-500/[.07] text-slate-500' : $cellClass.($hasValue && $metric['key'] !== 'drawdown' ? ' !border-teal-400/10' : '') }}"
-                                     @if (! $outsideSelectedArea && $hasValue) style="background-color: color-mix(in srgb, {{ $metricCellHex }} 24%, transparent); color: color-mix(in srgb, {{ $metricCellHex }} 42%, white); border-color: rgba(45, 212, 191, .10);" @endif
+                                     @if (! $outsideSelectedArea && $hasValue) style="background-color: color-mix(in srgb, {{ $metricCellHex }} 24%, transparent); color: color-mix(in srgb, {{ $metricCellHex }} 42%, white); border-color: rgba(34, 211, 238, .10);" @endif
                                      title="{{ __('Score :scoreFrom–:scoreTo · Konfidenz :confidenceFrom–:confidenceTo % · :metric: :value · :samples Trades', [
                                          'scoreFrom' => $scoreBucket,
                                          'scoreTo' => $scoreBucket + 1,
@@ -1049,7 +1161,7 @@
                         [__('Übersprungen'), '…', 'filtered-backtest-skipped-trades'],
                         [__('Gesamtkosten'), '…', 'filtered-backtest-total-costs'],
                         [__('Hitrate'), '…', 'filtered-backtest-hit-rate'],
-                        [__('Profitfaktor'), '…', 'filtered-backtest-profit-factor'],
+                        [__('Ø Profit je Trade (ATR · 3J WF)'), '…', 'filtered-backtest-profit-per-trade'],
                         [__('Max. Drawdown'), '…', 'filtered-backtest-drawdown'],
                     ] as $index => $metric)
                         @php [$label, $value, $metricId] = array_pad($metric, 3, ''); @endphp
@@ -1068,7 +1180,7 @@
                         [__('Ø Gewinnfaktor'), 'filtered-backtest-average-gain-factor', 'text-teal-200'],
                         [__('Min. Drawdown'), 'filtered-backtest-minimum-drawdown', 'text-emerald-200'],
                         [__('Max. Drawdown'), 'filtered-backtest-quality-maximum-drawdown', 'text-rose-200'],
-                        [__('Ø Rendite'), 'filtered-backtest-average-return', 'text-orange-400'],
+                        [__('Ø Profit/Trade (ATR)'), 'filtered-backtest-average-return', 'text-orange-400'],
                         [__('Gesamtkapital'), 'filtered-backtest-quality-total-capital', 'text-white'],
                         [__('Gewinn/Verlust-Ratio'), 'filtered-backtest-win-loss-ratio', 'text-violet-200'],
                         [__('Gesamt-Investmentdauer'), 'filtered-backtest-investment-days', 'text-amber-200'],
@@ -1108,7 +1220,7 @@
                 const skippedTrades = document.querySelector('#filtered-backtest-skipped-trades');
                 const totalCosts = document.querySelector('#filtered-backtest-total-costs');
                 const hitRate = document.querySelector('#filtered-backtest-hit-rate');
-                const profitFactor = document.querySelector('#filtered-backtest-profit-factor');
+                const profitPerTrade = document.querySelector('#filtered-backtest-profit-per-trade');
                 const drawdown = document.querySelector('#filtered-backtest-drawdown');
                 const predictionReached = document.querySelector('#filtered-backtest-prediction-reached');
                 const winnerTrades = document.querySelector('#filtered-backtest-winner-trades');
@@ -1134,7 +1246,7 @@
                 if (skippedTrades) skippedTrades.textContent = Number(result.skipped_trades).toLocaleString('de-DE');
                 if (totalCosts) totalCosts.textContent = Number(result.total_costs).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
                 if (hitRate) hitRate.textContent = `${Number(result.hit_rate).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
-                if (profitFactor) profitFactor.textContent = result.profit_factor === null ? '∞' : Number(result.profit_factor).toLocaleString('de-DE', { maximumFractionDigits: 2 });
+                if (profitPerTrade) profitPerTrade.textContent = `${Number(result.average_trade_return || 0) >= 0 ? '+' : ''}${Number(result.average_trade_return || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} ATR`;
                 if (drawdown) drawdown.textContent = `${Number(result.max_drawdown).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
                 if (predictionReached) predictionReached.textContent = Number(result.prediction_reached_trades || 0).toLocaleString('de-DE');
                 if (winnerTrades) winnerTrades.textContent = Number(result.winner_trades || 0).toLocaleString('de-DE');
@@ -1142,7 +1254,7 @@
                 if (averageGainFactor) averageGainFactor.textContent = result.average_gain_factor === null ? '∞' : Number(result.average_gain_factor).toLocaleString('de-DE', { maximumFractionDigits: 2 });
                 if (minimumDrawdown) minimumDrawdown.textContent = `${Number(result.minimum_trade_drawdown || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %`;
                 if (qualityMaximumDrawdown) qualityMaximumDrawdown.textContent = `${Number(result.max_drawdown || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %`;
-                if (averageReturn) averageReturn.textContent = `${Number(result.average_trade_return || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %`;
+                if (averageReturn) averageReturn.textContent = `${Number(result.average_trade_return || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} ATR`;
                 if (qualityTotalCapital) qualityTotalCapital.textContent = Number(result.final_capital || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
                 if (winLossRatio) winLossRatio.textContent = result.win_loss_ratio === null ? '∞' : Number(result.win_loss_ratio).toLocaleString('de-DE', { maximumFractionDigits: 2 });
                 if (investmentDays) investmentDays.textContent = `${Number(result.total_investment_days || 0).toLocaleString('de-DE')} {{ __('Tage') }}`;
@@ -1157,7 +1269,7 @@
                 if (target._akChart) await target._akChart.destroy();
                 const isLightTheme = document.documentElement.dataset.theme === 'light';
                 const chartLabelColor = isLightTheme ? '#475569' : '#94a3b8';
-                const chartGridColor = isLightTheme ? 'rgba(15, 118, 110, .14)' : 'rgba(148,163,184,.10)';
+                const chartGridColor = isLightTheme ? 'rgba(14, 116, 144, .14)' : 'rgba(148,163,184,.10)';
                 const benchmarkColor = isLightTheme ? '#b45309' : '#f59e0b';
                 const chart = new window.ApexCharts(target, {
                     chart: { type: 'line', height: 360, background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false } },
@@ -1166,7 +1278,7 @@
                         { name: '{{ __('Smart Selection') }}', data: result.strategy_chart },
                         { name: `S&P 500 (${Number(result.benchmark_performance) >= 0 ? '+' : ''}${Number(result.benchmark_performance).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %)`, data: result.benchmark_chart },
                     ],
-                    colors: ['#0d9488', benchmarkColor],
+                    colors: ['#0891b2', benchmarkColor],
                     stroke: { width: [3, 3], curve: 'straight', dashArray: [0, 4] },
                     @else
                     series: [
@@ -1177,7 +1289,7 @@
                         { name: 'Buy and Hold', data: result.buy_and_hold_chart },
                         { name: `S&P 500 Buy & Hold (${Number(result.benchmark_performance) >= 0 ? '+' : ''}${Number(result.benchmark_performance).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %)`, data: result.benchmark_chart },
                     ],
-                    colors: ['#0d9488', '#6366f1', '#e11d48', '#16a34a', '#0284c7', benchmarkColor],
+                    colors: ['#0891b2', '#6366f1', '#e11d48', '#16a34a', '#0284c7', benchmarkColor],
                     stroke: { width: [3, 3, 3, 3, 2.5, 3], curve: 'straight', dashArray: [0, 0, 0, 0, 0, 4] },
                     @endif
                     xaxis: { type: 'datetime', min: result.period_start, max: result.period_end, labels: { style: { colors: chartLabelColor, fontSize: '10px' } }, axisBorder: { color: chartGridColor }, axisTicks: { color: chartGridColor } },
@@ -1225,10 +1337,10 @@
         }
 
         #prediction-heatmap-filters .ak-position-factor input:checked + span {
-            background: rgba(45, 212, 191, .22) !important;
-            color: #5eead4 !important;
-            -webkit-text-fill-color: #5eead4 !important;
-            box-shadow: inset 0 0 0 1px rgba(45, 212, 191, .32), 0 1px 3px rgba(15, 118, 110, .18);
+            background: rgba(34, 211, 238, .22) !important;
+            color: #67e8f9 !important;
+            -webkit-text-fill-color: #67e8f9 !important;
+            box-shadow: inset 0 0 0 1px rgba(34, 211, 238, .32), 0 1px 3px rgba(14, 116, 144, .18);
         }
 
         #prediction-heatmap-filters .ak-input {
@@ -1249,7 +1361,7 @@
             height: 13px;
             flex: 0 0 auto;
             border: 2px solid rgba(34, 211, 238, .18);
-            border-top-color: rgba(45, 212, 191, .95);
+            border-top-color: rgba(34, 211, 238, .95);
             border-right-color: rgba(34, 211, 238, .92);
             border-radius: 999px;
             animation: ak-backtest-spin .9s linear infinite;
@@ -1281,24 +1393,24 @@
             width: 34%;
             height: 100%;
             border-radius: 999px;
-            background: linear-gradient(90deg, transparent, rgba(45, 212, 191, .95), rgba(34, 211, 238, 1), transparent);
+            background: linear-gradient(90deg, transparent, rgba(34, 211, 238, .95), rgba(34, 211, 238, 1), transparent);
             box-shadow: 0 0 8px rgba(34, 211, 238, .32);
             animation: ak-backtest-progress 1.8s ease-in-out infinite;
         }
         .ak-backtest-progress span.is-determinate {
             transform: none;
             animation: none;
-            background: linear-gradient(90deg, rgba(45, 212, 191, .82), rgba(34, 211, 238, .9));
+            background: linear-gradient(90deg, rgba(34, 211, 238, .82), rgba(34, 211, 238, .9));
             transition: width .35s ease;
         }
         @keyframes ak-backtest-spin { to { transform: rotate(360deg); } }
         .ak-smart-calc-orbit { position: relative; width: 48px; height: 48px; border: 2px solid rgb(245 158 11 / 25%); border-radius: 999px; animation: ak-backtest-spin 1.8s linear infinite; }
         .ak-smart-calc-orbit::before, .ak-smart-calc-orbit::after { content: ''; position: absolute; inset: 7px; border: 2px solid transparent; border-top-color: #fbbf24; border-right-color: #22d3ee; border-radius: 999px; }
-        .ak-smart-calc-orbit::after { inset: 15px; border-top-color: #2dd4bf; border-right-color: transparent; animation: ak-backtest-spin .9s linear reverse infinite; }
+        .ak-smart-calc-orbit::after { inset: 15px; border-top-color: #22d3ee; border-right-color: transparent; animation: ak-backtest-spin .9s linear reverse infinite; }
         .ak-smart-calc-orbit span, .ak-smart-calc-orbit i, .ak-smart-calc-orbit b { position: absolute; width: 5px; height: 5px; border-radius: 999px; background: #fbbf24; box-shadow: 0 0 12px rgb(251 191 36 / 80%); }
         .ak-smart-calc-orbit span { top: -3px; left: 20px; }
         .ak-smart-calc-orbit i { right: -3px; top: 20px; background: #22d3ee; box-shadow: 0 0 12px rgb(34 211 238 / 80%); }
-        .ak-smart-calc-orbit b { bottom: -3px; left: 20px; background: #2dd4bf; box-shadow: 0 0 12px rgb(45 212 191 / 80%); }
+        .ak-smart-calc-orbit b { bottom: -3px; left: 20px; background: #22d3ee; box-shadow: 0 0 12px rgb(45 212 191 / 80%); }
         @keyframes ak-backtest-dot {
             0%, 65%, 100% { opacity: .25; transform: translateY(0); }
             32% { opacity: 1; transform: translateY(-2px); }
@@ -1393,7 +1505,7 @@
             cursor: pointer;
             opacity: 1 !important;
             pointer-events: auto !important;
-            accent-color: #14b8a6;
+            accent-color: #06b6d4;
         }
 
         #prediction-heatmap-filters input.ak-input:not([type="range"]):not([type="hidden"]) {
@@ -1501,11 +1613,11 @@
         :root[data-theme="light"] #fundamental-heatmap-filters .ak-input {
             color: #0f172a !important;
             -webkit-text-fill-color: #0f172a !important;
-            background-color: #f0fdfa !important;
+            background-color: #ecfeff !important;
         }
 
         :root[data-theme="light"] #fundamental-heatmap-filters .ak-fundamental-range {
-            background: #f0fdfa;
+            background: #ecfeff;
         }
 
         :root[data-theme="light"] #fundamental-heatmap-filters .ak-fundamental-range span {
@@ -1524,7 +1636,7 @@
             appearance: auto !important;
             -webkit-appearance: auto !important;
             padding-right: 6px !important;
-            background-color: #f0fdfa !important;
+            background-color: #ecfeff !important;
             background-image: none !important;
             color: #0f172a !important;
             -webkit-text-fill-color: unset !important;
@@ -1594,7 +1706,7 @@
         }
 
         :root[data-theme="light"] #prediction-heatmap-filters .ak-heatmap-range {
-            background: #f0fdfa;
+            background: #ecfeff;
         }
 
         :root[data-theme="light"] #prediction-heatmap-filters .ak-heatmap-range span {
@@ -1717,7 +1829,7 @@
         }
 
         :root[data-theme="light"] .ak-backtest-strip #ak-backtest-status-count {
-            color: #0f766e !important;
+            color: #0e7490 !important;
         }
 
         :root[data-theme="light"] .ak-backtest-strip .ak-backtest-primary-action {
@@ -1746,15 +1858,15 @@
         }
 
         :root[data-theme="light"] .ak-backtest-strip .ak-backtest-smart-action {
-            border-color: #0f766e !important;
-            background: #0f766e !important;
+            border-color: #0e7490 !important;
+            background: #0e7490 !important;
             color: #ffffff !important;
             -webkit-text-fill-color: #ffffff !important;
             box-shadow: 0 5px 14px rgb(15 118 110 / 18%);
         }
 
         :root[data-theme="light"] .ak-backtest-strip .ak-backtest-smart-action:hover {
-            background: #115e59 !important;
+            background: #155e75 !important;
         }
 
         :root[data-theme="light"] .ak-backtest-strip .ak-backtest-smart-disabled-action {
@@ -1791,7 +1903,7 @@
         :root[data-theme="light"] .ak-strategy-page .ak-dashboard-card {
             background: rgba(255, 255, 255, .62) !important;
             border-color: #d9e7e4 !important;
-            box-shadow: 0 8px 22px rgba(35, 72, 67, .065), inset 3px 0 0 rgba(20, 184, 166, .48) !important;
+            box-shadow: 0 8px 22px rgba(35, 72, 67, .065), inset 3px 0 0 rgba(6, 182, 212, .48) !important;
         }
 
         :root:not([data-theme="light"]) body:not(.welcome-background) .ak-strategy-page .ak-dashboard-card {
@@ -1817,7 +1929,7 @@
         :root[data-theme="light"] .ak-strategy-page .ak-dashboard-card {
             background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(240,253,250,.92)) !important;
             border-color: #b8d8d5 !important;
-            box-shadow: 0 10px 26px rgba(15, 118, 110, .10), inset 3px 0 0 rgba(20,184,166,.55) !important;
+            box-shadow: 0 10px 26px rgba(14, 116, 144, .10), inset 3px 0 0 rgba(6, 182, 212,.55) !important;
         }
         :root[data-theme="light"] .ak-strategy-page .text-white,
         :root[data-theme="light"] .ak-strategy-page .text-slate-100,
@@ -1862,7 +1974,7 @@
         :root[data-theme="light"] .ak-strategy-page .ak-prediction-filterboard {
             background: rgba(255,255,255,.94) !important;
             border-color: #b8d8d5 !important;
-            box-shadow: 0 8px 22px rgba(15,118,110,.08) !important;
+            box-shadow: 0 8px 22px rgba(14, 116, 144,.08) !important;
         }
     </style>
 </x-app-layout>

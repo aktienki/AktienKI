@@ -4,7 +4,7 @@
     $normalized = max(0, min(100, (float) $percent));
     $activeSegments = (int) ceil($normalized / 10);
     $colors = match ($palette) {
-        'teal' => ['#277c77', '#258983', '#22968f', '#1fa39b', '#1db0a7', '#20bdb3', '#2ccbbf', '#43d7ca', '#65e3d5', '#99f6e4'],
+        'teal' => ['#277c77', '#258983', '#22968f', '#1fa39b', '#1db0a7', '#20bdb3', '#2ccbbf', '#43d7ca', '#65e3d5', '#a5f3fc'],
         'cyan' => ['#fb923c', '#fb923c', '#fb923c', '#087f9c', '#fb923c', '#06a6c4', '#fb923c', '#fb923c', '#fb923c', '#fb923c'],
         'violet' => ['#382d59', '#423468', '#4c3b78', '#574387', '#624b97', '#6d54a6', '#7860b4', '#866ec2', '#967fd0', '#a991de'],
         default => [
@@ -22,7 +22,7 @@
         default => 'transparent',
     };
     $paletteGlow = match ($palette) {
-        'teal' => '0 0 7px rgba(45,212,191,.38)',
+        'teal' => '0 0 7px rgba(34, 211, 238,.38)',
         'cyan' => '0 0 7px rgba(251,146,60,.36)',
         'violet' => '0 0 7px rgba(139,92,246,.32)',
         default => 'none',

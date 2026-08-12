@@ -5,7 +5,7 @@
     --ak-cyan:#38bdf8;
     --ak-cyan-soft:#fb923c;
     --ak-purple:#a855f7;
-    --ak-teal:#2dd4bf;
+    --ak-teal:#22d3ee;
     --ak-green:#22c55e;
     --ak-yellow:#facc15;
     --ak-red:#ef4444;
@@ -22,7 +22,7 @@ html{scroll-behavior:smooth}
     background:
         radial-gradient(circle at 45% 12%,rgba(56,189,248,.25),transparent 28%),
         radial-gradient(circle at 14% 78%,rgba(168,85,247,.22),transparent 28%),
-        radial-gradient(circle at 88% 70%,rgba(45,212,191,.15),transparent 28%),
+        radial-gradient(circle at 88% 70%,rgba(34, 211, 238,.15),transparent 28%),
         linear-gradient(135deg,#020617 0%,#071527 48%,#020617 100%);
     overflow-x:hidden;
 }
@@ -55,7 +55,7 @@ html{scroll-behavior:smooth}
 }
 .ak-orb-one{width:460px;height:460px;left:34%;top:-210px;background:rgba(56,189,248,.25)}
 .ak-orb-two{width:420px;height:420px;left:-180px;bottom:40px;background:rgba(168,85,247,.22)}
-.ak-orb-three{width:360px;height:360px;right:-130px;bottom:110px;background:rgba(45,212,191,.16)}
+.ak-orb-three{width:360px;height:360px;right:-130px;bottom:110px;background:rgba(34, 211, 238,.16)}
 .ak-page{max-width:1540px;margin:0 auto;padding:28px}
 .ak-nav{
     display:flex;
@@ -461,7 +461,7 @@ html{scroll-behavior:smooth}
     position:relative;
     min-height:420px;
     border-radius:26px;
-    background:radial-gradient(circle at center,rgba(45,212,191,.12),transparent 44%);
+    background:radial-gradient(circle at center,rgba(34, 211, 238,.12),transparent 44%);
 }
 .ak-market-orbit svg{
     position:absolute;
@@ -482,17 +482,17 @@ html{scroll-behavior:smooth}
     min-width:126px;
     padding:12px 14px;
     border-radius:16px;
-    color:#ccfbf1;
+    color:#cffafe;
     background:rgba(6,78,59,.46);
     border:1px solid rgba(94,234,212,.25);
-    box-shadow:0 0 28px rgba(45,212,191,.12);
+    box-shadow:0 0 28px rgba(34, 211, 238,.12);
     font-size:12px;
     font-weight:950;
     text-transform:uppercase;
 }
 .ak-satellite span{
     display:block;
-    color:#5eead4;
+    color:#67e8f9;
     text-transform:none;
     font-weight:800;
     margin-top:4px;
@@ -506,14 +506,14 @@ html{scroll-behavior:smooth}
     border-radius:24px;
     background:rgba(3,15,32,.78);
     border:1px solid rgba(94,234,212,.24);
-    box-shadow:0 0 44px rgba(45,212,191,.12);
+    box-shadow:0 0 44px rgba(34, 211, 238,.12);
 }
 .ak-score-head{
     display:flex;
     justify-content:space-between;
     align-items:center;
     margin-bottom:13px;
-    color:#99f6e4;
+    color:#a5f3fc;
     text-transform:uppercase;
     letter-spacing:.08em;
     font-size:12px;

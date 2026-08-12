@@ -21,11 +21,25 @@ return [
         'executable' => env('AKTIENKI_PYTHON_EXECUTABLE'),
         'backtests' => (bool) env('PYTHON_ENGINE_BACKTESTS', false),
     ],
+    'portfolio_automation' => [
+        // Keep disabled throughout the test phase. Enabling this switch starts
+        // both depot changes and their transaction notifications.
+        'enabled' => (bool) env('PORTFOLIO_AUTOMATION_ENABLED', false),
+    ],
+    'production_models' => [
+        'version' => env('AKTIENKI_PRODUCTION_MODEL_VERSION', 'horizon-fusion-v1'),
+        'root' => env('AKTIENKI_PRODUCTION_MODEL_ROOT', '/var/lib/aktienki/models/horizon-fusion-v1'),
+        'status' => env('AKTIENKI_PRODUCTION_MODEL_STATUS', 'canary'),
+    ],
     'default_plan' => env('AKTIENKI_DEFAULT_PLAN', 'free'),
 
     'signals' => [
         'buy_threshold' => (float) env('AKTIENKI_BUY_THRESHOLD', 2.0),
         'sell_threshold' => (float) env('AKTIENKI_SELL_THRESHOLD', -2.0),
+        // Gesamtkosten für Kauf und Verkauf einschließlich angenommener
+        // Slippage. Alle Signalrenditen werden nach diesem Abzug bewertet.
+        'round_trip_cost_percent' => (float) env('AKTIENKI_SIGNAL_ROUND_TRIP_COST_PERCENT', 0.5),
+        'minimum_net_return_percent' => (float) env('AKTIENKI_SIGNAL_MINIMUM_NET_RETURN_PERCENT', 1.0),
     ],
 
     'dashboard' => [

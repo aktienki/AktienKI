@@ -111,7 +111,7 @@ class GenerateSignalChangeReport extends Command
         $values = array_column($bars, 'c'); $min = min($values); $max = max($values); $range = max(0.0001, $max-$min); $w=720; $h=220; $points=[];
         foreach ($values as $i=>$v) $points[] = round(20+$i*($w-40)/(count($values)-1),1).','.round($h-20-($v-$min)/$range*($h-40),1);
         $targetY = $h-20-($target-$min)/$range*($h-40);
-        return '<svg xmlns="http://www.w3.org/2000/svg" width="720" height="220" viewBox="0 0 720 220"><rect width="720" height="220" fill="#f7fafc"/><polyline fill="none" stroke="#0f766e" stroke-width="3" points="'.implode(' ',$points).'"/><line x1="20" x2="700" y1="'.$targetY.'" y2="'.$targetY.'" stroke="#f59e0b" stroke-dasharray="7 5"/><text x="30" y="22" fill="#334155" font-size="13">Kursverlauf · 100 Handelstage</text><text x="535" y="'.max(16,min(210,$targetY-6)).'" fill="#b45309" font-size="12">Prognose 20T</text></svg>';
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="720" height="220" viewBox="0 0 720 220"><rect width="720" height="220" fill="#f7fafc"/><polyline fill="none" stroke="#0e7490" stroke-width="3" points="'.implode(' ',$points).'"/><line x1="20" x2="700" y1="'.$targetY.'" y2="'.$targetY.'" stroke="#f59e0b" stroke-dasharray="7 5"/><text x="30" y="22" fill="#334155" font-size="13">Kursverlauf · 100 Handelstage</text><text x="535" y="'.max(16,min(210,$targetY-6)).'" fill="#b45309" font-size="12">Prognose 20T</text></svg>';
     }
 
     private function markdownHtml(string $markdown): string

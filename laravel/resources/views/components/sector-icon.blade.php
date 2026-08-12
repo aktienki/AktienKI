@@ -55,7 +55,7 @@
         str_contains($normalizedSector, 'retail'),
         str_contains($normalizedSector, 'handel') => ['heroicon-o-shopping-bag', '#f9a8d4'],
 
-        default => ['heroicon-o-squares-2x2', '#5eead4'],
+        default => ['heroicon-o-squares-2x2', '#67e8f9'],
     };
 
     $iconAttributes = $attributes->getAttributes();

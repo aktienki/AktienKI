@@ -5,11 +5,12 @@ namespace App\Http\Controllers;
 use App\Services\PersonalizedSignalService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class SectorController extends Controller
 {
-    public function index(PersonalizedSignalService $personalizedSignals): View
+    public function index(Request $request, PersonalizedSignalService $personalizedSignals): View
     {
         $signalSql = $personalizedSignals->sql('prediction', auth()->user());
         $latestPredictions = DB::table('predictions')
@@ -26,6 +27,7 @@ class SectorController extends Controller
             ->groupBy('instrument_id');
 
         $sectors = DB::table('instruments as instrument')
+            ->leftJoin('market_sectors as market_sector', fn ($join) => $join->whereRaw('LOWER(market_sector.name) = LOWER(instrument.sector)'))
             ->leftJoinSub($latestPredictions, 'latest', fn ($join) =>
                 $join->on('latest.instrument_id', '=', 'instrument.id'))
             ->leftJoin('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
@@ -40,8 +42,15 @@ class SectorController extends Controller
             ->whereNull('instrument.deleted_at')
             ->whereNotNull('instrument.sector')
             ->where('instrument.sector', '<>', '')
-            ->groupBy('instrument.sector')
+            ->when($request->filled('q'), function ($query) use ($request): void {
+                $term = '%'.mb_strtolower(trim((string) $request->query('q'))).'%';
+                $query->whereRaw('LOWER(instrument.sector) LIKE ?', [$term]);
+            })
+            ->groupBy('instrument.sector', 'market_sector.description', 'market_sector.rating', 'market_sector.assessment')
             ->selectRaw('instrument.sector')
+            ->selectRaw('market_sector.description AS description')
+            ->selectRaw('market_sector.rating AS stored_rating')
+            ->selectRaw('market_sector.assessment AS assessment')
             ->selectRaw('COUNT(*) AS stocks_count')
             ->selectRaw('COUNT(prediction.id) AS analyzed_count')
             ->selectRaw('AVG(prediction.prediction_score) AS average_score')
@@ -108,6 +117,19 @@ class SectorController extends Controller
             ->get()
             ->keyBy('sector'));
         $sectors->each(fn ($sector) => $sector->highest_score_stock = $topSectorStocks->get($sector->sector));
+
+        $sectorEtfCharts = DB::table('market_sectors as market_sector')
+            ->join('price_bars as bar', 'bar.instrument_id', '=', 'market_sector.reference_instrument_id')
+            ->where('bar.interval', '1d')
+            ->where('bar.bar_time', '>=', now()->subYear())
+            ->orderBy('bar.bar_time')
+            ->get(['market_sector.name as sector', 'bar.bar_time', 'bar.close'])
+            ->groupBy('sector')
+            ->map(fn ($bars) => $bars->map(fn ($bar) => [
+                'date' => (string) $bar->bar_time,
+                'close' => (float) $bar->close,
+            ])->values());
+        $sectors->each(fn ($sector) => $sector->etf_chart_points = $sectorEtfCharts->get($sector->sector, collect()));
 
         $latestAnalysis = DB::table('daily_market_ai_analyses')
             ->orderByDesc('analysis_date')

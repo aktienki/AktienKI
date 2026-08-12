@@ -4,6 +4,18 @@
         navOverflow: false,
         canScrollLeft: false,
         canScrollRight: false,
+        mobileNavigation: @js(data_get(auth()->user()?->preferences ?? [], 'mobile_navigation', ['order' => [], 'hidden' => []])),
+        applyMobileNavigation() {
+            const items = [...this.$refs.navigation.querySelectorAll('[data-nav-key]')];
+            const defaults = ['welcome','features','roadmap','dashboard','screener','predictions','depots','accounts','setup','news','pricing','contact','community'];
+            const order = [...(this.mobileNavigation.order || []), ...defaults].filter((key, index, all) => all.indexOf(key) === index);
+            const hidden = new Set(this.mobileNavigation.hidden || []);
+            const mobile = window.innerWidth < 768;
+            items.forEach((item) => {
+                item.style.order = mobile ? String(order.indexOf(item.dataset.navKey) + 1) : '';
+                item.style.display = mobile && hidden.has(item.dataset.navKey) ? 'none' : '';
+            });
+        },
         updateNavigation() {
             const nav = this.$refs.navigation;
             if (!nav) return;
@@ -19,6 +31,8 @@
         updateNavigation();
         new ResizeObserver(() => updateNavigation()).observe($refs.navigation);
         window.addEventListener('resize', () => updateNavigation());
+        window.addEventListener('resize', () => applyMobileNavigation());
+        applyMobileNavigation();
     })"
 >
     <div class="ak-container flex h-full items-center gap-2 sm:gap-4 lg:gap-5">
@@ -48,64 +62,24 @@
             class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
             @guest
-                <a href="{{ route('welcome') }}" class="ak-top-link"><x-heroicon-o-home /><span>{{ __('Startseite') }}</span></a>
-                <a href="{{ route('features') }}" class="{{ request()->routeIs('features') ? 'ak-top-link-active' : 'ak-top-link' }}"><x-heroicon-o-sparkles /><span>{{ __('Features') }}</span></a>
-                <a href="{{ route('roadmap') }}" class="{{ request()->routeIs('roadmap') ? 'ak-top-link-active' : 'ak-top-link' }}"><x-heroicon-o-map /><span>{{ __('Roadmap') }}</span></a>
+                <a data-nav-key="welcome" href="{{ route('welcome') }}" class="ak-top-link"><x-heroicon-o-home /><span>{{ __('Startseite') }}</span></a>
+                <a data-nav-key="features" href="{{ route('features') }}" class="{{ request()->routeIs('features') ? 'ak-top-link-active' : 'ak-top-link' }}"><x-heroicon-o-sparkles /><span>{{ __('Features') }}</span></a>
+                <a data-nav-key="roadmap" href="{{ route('roadmap') }}" class="{{ request()->routeIs('roadmap') ? 'ak-top-link-active' : 'ak-top-link' }}"><x-heroicon-o-map /><span>{{ __('Roadmap') }}</span></a>
             @endguest
-            <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'ak-top-link-active' : 'ak-top-link' }}">
+            <a data-nav-key="dashboard" href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'ak-top-link-active' : 'ak-top-link' }}">
                 <x-heroicon-o-squares-2x2 /><span>Dashboard</span>
             </a>
-            <div
-                x-data="{
-                    open: false,
-                    left: 0,
-                    top: 0,
-                    toggle() {
-                        const bounds = this.$refs.trigger.getBoundingClientRect();
-                        this.left = bounds.left;
-                        this.top = bounds.bottom + 8;
-                        this.open = !this.open;
-                    }
-                }"
-                @click.outside="open = false"
-                class="relative shrink-0"
-            >
-                <button
-                    x-ref="trigger"
-                    type="button"
-                    @click="toggle()"
-                    class="{{ request()->routeIs('markets.*', 'daily-market-analysis', 'sectors.*') ? 'ak-top-link-active' : 'ak-top-link' }}"
-                    :aria-expanded="open"
-                >
-                    <x-heroicon-o-globe-alt />
-                    <span>{{ __('Märkte') }}</span>
-                    <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition" x-bind:class="{ 'rotate-180': open }" />
+            <div x-data="{open:false,left:0,top:0,toggle(){const b=this.$refs.trigger.getBoundingClientRect();this.left=b.left;this.top=b.bottom+8;this.open=!this.open}}" @click.outside="open=false" data-nav-key="screener" class="relative shrink-0">
+                <button x-ref="trigger" type="button" @click="toggle()" class="{{ request()->routeIs('screener.*', 'indices.*', 'sectors.*', 'markets.situation', 'daily-market-analysis') ? 'ak-top-link-active' : 'ak-top-link' }}" :aria-expanded="open">
+                    <x-heroicon-o-funnel /><span>{{ __('Screener') }}</span><x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition" x-bind:class="{'rotate-180':open}" />
                 </button>
                 <template x-teleport="body">
-                    <div
-                        x-cloak
-                        x-show="open"
-                        @keydown.escape.window="open = false"
-                        x-transition.origin.top.left
-                        class="ak-topbar-menu fixed z-[100] w-64 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
-                        :style="`left: ${left}px; top: ${top}px`"
-                    >
-                        <a href="{{ route('markets.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
-                            <x-heroicon-o-building-library class="h-5 w-5 text-teal-500" />
-                            {{ __('Indizes') }}
-                        </a>
-                        <a href="{{ route('markets.situation') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
-                            <x-heroicon-o-globe-europe-africa class="h-5 w-5 text-teal-500" />
-                            {{ __('Marktlage') }}
-                        </a>
-                        <a href="{{ route('sectors.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
-                            <x-heroicon-o-building-office-2 class="h-5 w-5 text-teal-500" />
-                            {{ __('Sektorübersicht') }}
-                        </a>
-                        <a href="{{ route('daily-market-analysis') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
-                            <x-heroicon-o-scale class="h-5 w-5 text-amber-500" />
-                            {{ __('Chancen & Risiken') }}
-                        </a>
+                    <div x-cloak x-show="open" @keydown.escape.window="open=false" x-transition.origin.top.left class="ak-topbar-menu fixed z-[100] w-56 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl" :style="`left:${left}px;top:${top}px`">
+                        <a href="{{ route('markets.situation') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-globe-europe-africa class="h-5 w-5 text-cyan-500" />{{ __('Marktlage') }}</a>
+                        <a href="{{ route('screener.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-chart-bar-square class="h-5 w-5 text-cyan-500" />{{ __('Aktien') }}</a>
+                        <a href="{{ route('indices.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-globe-alt class="h-5 w-5 text-cyan-500" />{{ __('Indizes') }}</a>
+                        <a href="{{ route('sectors.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-building-office-2 class="h-5 w-5 text-cyan-500" />{{ __('Sektoren') }}</a>
+                        <a href="{{ route('daily-market-analysis') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-scale class="h-5 w-5 text-amber-500" />{{ __('Chancen & Risiken') }}</a>
                     </div>
                 </template>
             </div>
@@ -122,7 +96,7 @@
                     }
                 }"
                 @click.outside="open = false"
-                class="relative shrink-0"
+                data-nav-key="predictions" class="relative shrink-0"
             >
                 <button
                     x-ref="trigger"
@@ -188,7 +162,7 @@
                         }
                     }"
                     @click.outside="open = false"
-                    class="relative shrink-0"
+                    data-nav-key="depots" class="relative shrink-0"
                 >
                     <button
                         x-ref="trigger"
@@ -240,7 +214,7 @@
                 </div>
             @endauth
             @auth
-                <a href="{{ route('accounts.index') }}" class="{{ request()->routeIs('accounts.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
+                <a data-nav-key="accounts" href="{{ route('accounts.index') }}" class="{{ request()->routeIs('accounts.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
                     <x-heroicon-o-building-library /><span>{{ __('Konten') }}</span>
                 </a>
             @endauth
@@ -258,7 +232,7 @@
                         }
                     }"
                     @click.outside="open = false"
-                    class="relative shrink-0"
+                    data-nav-key="setup" class="relative shrink-0"
                 >
                     <button
                         x-ref="trigger"
@@ -301,6 +275,15 @@
                             <span class="{{ $lockedMenuClass }}" title="{{ __('Verfügbar ab Plus') }}" aria-disabled="true"><x-heroicon-o-shield-check class="h-5 w-5" />{{ __('Label') }}<span class="ml-auto text-[8px] font-black uppercase">PLUS</span></span>
                             @endif
                             @if($canUseStrategies)
+                            <a href="{{ route('setup.research-lab') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-cyan-500/10 hover:text-cyan-300">
+                                <x-heroicon-o-beaker class="h-5 w-5 text-cyan-300" />
+                                {{ __('Research Lab') }}
+                                <span class="ml-auto rounded-md border border-cyan-300/25 bg-cyan-300/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-cyan-300">PRO</span>
+                            </a>
+                            @else
+                            <span class="{{ $lockedMenuClass }}" title="{{ __('Verfügbar ab Pro') }}" aria-disabled="true"><x-heroicon-o-beaker class="h-5 w-5" />{{ __('Research Lab') }}<span class="ml-auto text-[8px] font-black uppercase">PRO</span></span>
+                            @endif
+                            @if($canUseStrategies)
                             <a href="{{ route('setup.filter') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                                 <x-heroicon-o-funnel class="h-5 w-5 text-teal-500" />
                                 {{ __('Strategie') }}
@@ -322,13 +305,13 @@
                     </template>
                 </div>
             @endauth
-            <a href="#" class="ak-top-link"><x-heroicon-o-newspaper /><span>News</span></a>
+            <a data-nav-key="news" href="#" class="ak-top-link"><x-heroicon-o-newspaper /><span>News</span></a>
             @guest
-                <a href="{{ route('pricing') }}" class="{{ request()->routeIs('pricing') ? 'ak-top-link-active' : 'ak-top-link' }}"><x-heroicon-o-banknotes /><span>{{ __('Preise') }}</span></a>
+                <a data-nav-key="pricing" href="{{ route('pricing') }}" class="{{ request()->routeIs('pricing') ? 'ak-top-link-active' : 'ak-top-link' }}"><x-heroicon-o-banknotes /><span>{{ __('Preise') }}</span></a>
             @endguest
-            <a href="{{ route('contact') }}" class="{{ request()->routeIs('contact') ? 'ak-top-link-active' : 'ak-top-link' }}"><x-heroicon-o-envelope /><span>{{ __('Kontakt') }}</span></a>
+            <a data-nav-key="contact" href="{{ route('contact') }}" class="{{ request()->routeIs('contact') ? 'ak-top-link-active' : 'ak-top-link' }}"><x-heroicon-o-envelope /><span>{{ __('Kontakt') }}</span></a>
             @auth
-                <a href="{{ route('community.index') }}" class="{{ request()->routeIs('community.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
+                <a data-nav-key="community" href="{{ route('community.index') }}" class="{{ request()->routeIs('community.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
                     <x-heroicon-o-user-group /><span>{{ __('Community') }}</span>
                 </a>
             @endauth

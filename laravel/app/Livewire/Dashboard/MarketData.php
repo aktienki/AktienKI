@@ -108,26 +108,9 @@ class MarketData extends Component
             $this->dailyAiScores,
             (string) $riskLevel,
         );
-        $dailyMarketAnalysis = Cache::remember('dashboard_daily_market_analysis', now()->addMinute(), fn () =>
-            DB::table('daily_market_ai_analyses')
-                ->orderByDesc('analysis_date')
-                ->orderByDesc('id')
-                ->first());
-        $this->marketComment = $dailyMarketAnalysis?->executive_summary;
-        $this->marketAnalysis = $dailyMarketAnalysis ? [
-            'date' => $dailyMarketAnalysis->analysis_date,
-            'model' => $dailyMarketAnalysis->model,
-            'outlook' => $dailyMarketAnalysis->market_outlook,
-            'confidence' => (int) $dailyMarketAnalysis->confidence,
-            'riskLevel' => $dailyMarketAnalysis->risk_level,
-            'headline' => $dailyMarketAnalysis->headline,
-            'summary' => $dailyMarketAnalysis->executive_summary,
-            'breadth' => $dailyMarketAnalysis->breadth_analysis,
-            'sectors' => $this->decodeJson($dailyMarketAnalysis->sector_analysis),
-            'opportunities' => $this->decodeJson($dailyMarketAnalysis->opportunities),
-            'risks' => $this->decodeJson($dailyMarketAnalysis->risks),
-            'watchlist' => $this->decodeJson($dailyMarketAnalysis->watchlist),
-        ] : [];
+        $ruleBasedAnalysis = $this->loadRuleBasedMarketAnalysis();
+        $this->marketAnalysis = $this->loadExternalMarketAnalysis($ruleBasedAnalysis) ?? $ruleBasedAnalysis;
+        $this->marketComment = $this->marketAnalysis['summary'] ?? null;
 
         $this->sentiment = $marketService->sentiment($this->markets);
         $this->signalTransitionStats = $this->loadSignalTransitionStats();
@@ -172,6 +155,14 @@ class MarketData extends Component
             ->where('instrument.symbol', '^GDAXI')->where('bar.interval', '1d')
             ->where('bar.bar_time', '>=', now()->subYear())
             ->orderBy('bar.bar_time')->get(['bar.close', 'bar.bar_time']);
+        $daxMedian = (float) $daxLevels->pluck('close')->filter(fn ($value) => is_numeric($value) && (float) $value > 0)->median();
+        if ($daxMedian > 0) {
+            $daxLevels = $daxLevels->filter(fn (object $row): bool =>
+                is_numeric($row->close)
+                && (float) $row->close >= $daxMedian * .5
+                && (float) $row->close <= $daxMedian * 1.5
+            )->values();
+        }
         $daxSeries = $series($daxLevels);
         $aiSeries = DB::table('backtest_trades as trade')
             ->join('backtest_runs as run', 'run.id', '=', 'trade.backtest_run_id')
@@ -188,16 +179,27 @@ class MarketData extends Component
             return ['label' => $point['label'], 'value' => round((float) ($window->median() ?? $point['value']), 2)];
         })->values()->all();
         $daxCompareSeries = count($aiSeries) > 0 ? array_slice($daxSeries, -count($aiSeries)) : [];
-        $volatility = DB::table('market_snapshots')->whereNotNull('volatility')->orderByDesc('snapshot_time')->limit(30)->get(['snapshot_time', 'volatility'])->sortBy('snapshot_time')->map(fn (object $row): array => [
-            'label' => Carbon::parse($row->snapshot_time)->format('d.m.'), 'value' => (float) $row->volatility,
-        ])->values()->all();
+        $vdaxId = DB::table('instruments')
+            ->where('isin', 'A0DMX9')
+            ->orWhere('symbol', 'VDAX')
+            ->value('id');
+        $volatility = $vdaxId
+            ? DB::table('price_bars')
+                ->where('instrument_id', $vdaxId)
+                ->where('interval', '1d')
+                ->where('bar_time', '>=', now()->subYear())
+                ->orderBy('bar_time')
+                ->get(['close', 'bar_time'])
+                ->map(fn (object $row): array => [
+                    'label' => Carbon::parse($row->bar_time)->format('d.m.'),
+                    'value' => is_numeric($row->close) ? (float) $row->close : null,
+                ])
+                ->filter(fn (array $point): bool => $point['value'] !== null && $point['value'] > 0 && $point['value'] < 150)
+                ->values()
+                ->all()
+            : [];
         if ($volatility === []) {
-            $daxId = DB::table('instruments as instrument')
-                ->where('instrument.symbol', '^GDAXI')
-                ->whereExists(fn ($query) => $query->selectRaw('1')->from('price_bars as available_bar')->whereColumn('available_bar.instrument_id', 'instrument.id')->where('available_bar.interval', '1d'))
-                ->value('instrument.id')
-                ?: DB::table('instruments')->where('symbol', '^GSPC')->value('id');
-            $dax = $daxId ? DB::table('price_bars')->where('instrument_id', $daxId)->where('interval', '1d')->where('bar_time', '>=', now()->subYear())->orderByDesc('bar_time')->limit(320)->get(['close', 'bar_time'])->sortBy('bar_time')->values() : collect();
+            $dax = $daxLevels->values();
             $prices = $dax->map(fn (object $row): ?float => is_numeric($row->close) ? (float) $row->close : null)->filter(fn ($value) => $value !== null)->values();
             $returns = collect();
             for ($index = 1; $index < $prices->count(); $index++) $returns->push($prices[$index - 1] > 0 ? ($prices[$index] / $prices[$index - 1]) - 1 : null);
@@ -215,7 +217,7 @@ class MarketData extends Component
         }
         return [
             ['key' => 'ai-dax', 'title' => __('KI-Score vs. DAX'), 'subtitle' => __('letzte 1 Jahr · Median-KI-Score und DAX-Kurs'), 'unit' => '', 'series' => [['name' => __('Median KI-Score'), 'color' => '#22d3ee', 'points' => $aiSeries], ['name' => __('DAX Kurs'), 'color' => '#fbbf24', 'points' => $daxCompareSeries]]],
-            ['key' => 'vdax', 'title' => __('VDAX'), 'subtitle' => __('letzte 1 Jahr · DAX links · VDAX Sekundärachse rechts'), 'unit' => '%', 'series' => [['name' => __('VDAX'), 'color' => '#fb7185', 'points' => $volatility], ['name' => __('DAX Kurs'), 'color' => '#fbbf24', 'points' => $daxSeries]]],
+            ['key' => 'vdax', 'title' => __('Volatilität'), 'subtitle' => __('VDAX · letzte 1 Jahr · VDAX links · DAX-Kurs rechts'), 'unit' => '%', 'series' => [['name' => __('VDAX'), 'color' => '#fb7185', 'points' => $volatility], ['name' => __('DAX Kurs'), 'color' => '#fbbf24', 'points' => $daxSeries]]],
             ['key' => 'bonds', 'title' => __('Anleihen'), 'subtitle' => __('Tageswerte · letzte 3 Jahre · AGG Bond-Index-Proxy'), 'unit' => '$', 'series' => [['name' => 'AGG', 'color' => '#34d399', 'points' => $agg]]],
         ];
     }
@@ -303,6 +305,192 @@ class MarketData extends Component
                 'distribution_max' => max([0, ...array_values($distribution)]),
             ];
         });
+    }
+
+    private function loadRuleBasedMarketAnalysis(): array
+    {
+        return Cache::remember('markets.rule-based-analysis.v1', now()->addMinutes(2), function (): array {
+            $latestPredictions = DB::table('predictions as prediction')
+                ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+                ->join('trained_models as model', 'model.id', '=', 'prediction.trained_model_id')
+                ->where('instrument.type', 'stock')
+                ->where('instrument.is_active', true)
+                ->whereNull('instrument.deleted_at')
+                ->where('prediction.ai_type', 'horizon')
+                ->where('prediction.position_side', 'long')
+                ->where('model.feature_set_version', 'triple_daily_macro_v1')
+                ->where('prediction.prediction_time', '>=', now()->subDays(7))
+                ->selectRaw('DISTINCT ON (prediction.instrument_id) prediction.instrument_id')
+                ->addSelect([
+                    'instrument.symbol', 'instrument.name', 'instrument.sector',
+                    'prediction.prediction_time', 'prediction.recommendation_class',
+                    'prediction.signal', 'prediction.quality_gate_passed',
+                    'prediction.confidence', 'prediction.prediction_score',
+                    'prediction.risk_score', 'prediction.drawdown_risk_factor',
+                ])
+                ->selectRaw('COALESCE(prediction.market_return_20d, prediction.market_return_10d, prediction.market_return_5d) * 100 AS expected_return_percent')
+                ->orderBy('prediction.instrument_id')
+                ->orderByDesc('prediction.prediction_time')
+                ->orderByDesc('prediction.id')
+                ->get();
+
+            $count = $latestPredictions->count();
+            $returns = $latestPredictions->pluck('expected_return_percent')
+                ->filter(fn ($value): bool => is_numeric($value))
+                ->map(fn ($value): float => (float) $value);
+            $positive = $returns->filter(fn (float $value): bool => $value > 0)->count();
+            $negative = $returns->filter(fn (float $value): bool => $value < 0)->count();
+            $averageReturn = (float) ($returns->avg() ?? 0);
+            $qualityCount = $latestPredictions->filter(fn (object $row): bool => (bool) $row->quality_gate_passed)->count();
+            $qualityRate = $count > 0 ? $qualityCount / $count * 100 : 0;
+            $positiveRate = $returns->count() > 0 ? $positive / $returns->count() * 100 : 0;
+            $outlook = $qualityRate >= 50 && $averageReturn >= 1
+                ? 'BULLISH'
+                : ($averageReturn <= -1 ? 'BEARISH' : 'NEUTRAL');
+            $riskLevel = $qualityRate < 25 ? 'HIGH' : ($qualityRate < 50 ? 'MEDIUM' : 'LOW');
+
+            $sectors = $latestPredictions->groupBy(fn (object $row): string => (string) ($row->sector ?: __('Unbekannt')))
+                ->map(function ($items, string $sector): array {
+                    $values = $items->pluck('expected_return_percent')->filter(fn ($value): bool => is_numeric($value));
+
+                    return [
+                        'sector' => $sector,
+                        'count' => $items->count(),
+                        'return' => (float) ($values->avg() ?? 0),
+                        'quality' => $items->filter(fn (object $row): bool => (bool) $row->quality_gate_passed)->count(),
+                    ];
+                })
+                ->sortByDesc('return')
+                ->values();
+            $bestSector = $sectors->first();
+            $weakestSector = $sectors->last();
+            $ranked = $latestPredictions->filter(fn (object $row): bool => is_numeric($row->expected_return_percent))
+                ->sortByDesc(fn (object $row): float => (float) $row->expected_return_percent)
+                ->values();
+            $formatStock = static fn (object $row): string => sprintf(
+                '%s (%s): erwartete 20-Tage-Rendite %+.1f %%, KI-Score %.1f, Konfidenz %.0f %%.',
+                $row->name ?: $row->symbol,
+                $row->symbol,
+                (float) $row->expected_return_percent,
+                (float) ($row->prediction_score <= 1 ? $row->prediction_score * 100 : ($row->prediction_score <= 10 ? $row->prediction_score * 10 : $row->prediction_score)),
+                (float) ($row->confidence > 1 ? $row->confidence : $row->confidence * 100),
+            );
+            $formatRisk = static fn (object $row): string => sprintf(
+                '%s (%s): erwartete 20-Tage-Rendite %+.1f %%; Quality Gate %s.',
+                $row->name ?: $row->symbol,
+                $row->symbol,
+                (float) $row->expected_return_percent,
+                $row->quality_gate_passed ? 'bestanden' : 'nicht bestanden',
+            );
+
+            $opportunities = $ranked->take(5)->map($formatStock)->values()->all();
+            $risks = $ranked->reverse()->take(5)->map($formatRisk)->values()->all();
+            $watchlist = collect();
+            if ($bestSector) {
+                $watchlist->push([
+                    'symbol' => __('Sektor'),
+                    'reason' => sprintf('%s führt mit einer durchschnittlichen Erwartung von %+.1f %% bei %d Aktien.', $bestSector['sector'], $bestSector['return'], $bestSector['count']),
+                ]);
+            }
+            if ($weakestSector) {
+                $watchlist->push([
+                    'symbol' => __('Sektor-Risiko'),
+                    'reason' => sprintf('%s ist mit durchschnittlich %+.1f %% derzeit der schwächste Sektor.', $weakestSector['sector'], $weakestSector['return']),
+                ]);
+            }
+            $watchlist->push([
+                'symbol' => __('Modellqualität'),
+                'reason' => sprintf('%d von %d aktuellen Prognosen bestehen das Quality Gate (%s %%).', $qualityCount, $count, number_format($qualityRate, 0, ',', '.')),
+            ]);
+
+            $headline = match ($outlook) {
+                'BULLISH' => __('Positive Marktbreite mit bestätigter Modellqualität'),
+                'BEARISH' => __('Negative Renditeerwartung prägt das aktuelle Lagebild'),
+                default => __('Gemischte Marktbreite ohne belastbaren Richtungskonsens'),
+            };
+            $summary = sprintf(
+                '%d von %d aktuellen Prognosen weisen eine positive Renditeerwartung auf, %d eine negative. Die durchschnittliche 20-Tage-Erwartung liegt bei %+.1f %%. Da nur %d von %d Prognosen das Quality Gate bestehen, bleibt die Einordnung %s bei %s Modellrisiko.',
+                $positive, $count, $negative, $averageReturn, $qualityCount, $count,
+                match ($outlook) { 'BULLISH' => 'positiv', 'BEARISH' => 'negativ', default => 'neutral' },
+                match ($riskLevel) { 'LOW' => 'niedrigem', 'MEDIUM' => 'erhöhtem', default => 'hohem' },
+            );
+            $breadth = $bestSector && $weakestSector
+                ? sprintf('Stärkster Sektor: %s (%+.1f %%). Schwächster Sektor: %s (%+.1f %%). Berechnet aus dem aktuellen Modellstand triple_daily_macro_v1.', $bestSector['sector'], $bestSector['return'], $weakestSector['sector'], $weakestSector['return'])
+                : __('Für den Sektorvergleich liegen noch nicht genügend aktuelle Prognosen vor.');
+
+            return [
+                'date' => now()->toDateTimeString(),
+                'model' => 'Regelbasiert · ohne OpenAI',
+                'outlook' => $outlook,
+                'confidence' => (int) round($qualityRate),
+                'riskLevel' => $riskLevel,
+                'headline' => $headline,
+                'summary' => $summary,
+                'breadth' => $breadth,
+                'sectors' => $sectors->all(),
+                'opportunities' => $opportunities,
+                'risks' => $risks,
+                'watchlist' => $watchlist->all(),
+                'metrics' => [
+                    ['label' => __('Abdeckung'), 'value' => (string) $count, 'detail' => __('aktuelle Aktien')],
+                    ['label' => __('Positive Breite'), 'value' => number_format($positiveRate, 0, ',', '.').' %', 'detail' => "{$positive} von {$returns->count()}"],
+                    ['label' => __('Ø Erwartung'), 'value' => sprintf('%+.1f %%', $averageReturn), 'detail' => __('20 Tage')],
+                    ['label' => __('Quality Gate'), 'value' => number_format($qualityRate, 0, ',', '.').' %', 'detail' => "{$qualityCount} von {$count}"],
+                ],
+            ];
+        });
+    }
+
+    private function loadExternalMarketAnalysis(array $ruleBasedAnalysis): ?array
+    {
+        $analysis = DB::table('daily_market_ai_analyses')
+            ->orderByDesc('analysis_date')
+            ->orderByDesc('id')
+            ->first();
+        if (! $analysis) {
+            return null;
+        }
+
+        $raw = is_string($analysis->raw_response ?? null)
+            ? json_decode($analysis->raw_response, true)
+            : (array) ($analysis->raw_response ?? []);
+        if (! data_get($raw, 'external_research', false)) {
+            return null;
+        }
+
+        $payloadSources = collect(data_get($raw, 'output.sources', []));
+        $toolSources = collect(data_get($raw, 'web_sources', []));
+        $sources = $payloadSources->concat($toolSources)
+            ->filter(fn ($source): bool => is_array($source) && filter_var($source['url'] ?? null, FILTER_VALIDATE_URL) !== false)
+            ->unique('url')
+            ->take(16)
+            ->map(fn (array $source): array => [
+                'title' => (string) ($source['title'] ?? parse_url((string) $source['url'], PHP_URL_HOST)),
+                'publisher' => (string) ($source['publisher'] ?? parse_url((string) $source['url'], PHP_URL_HOST)),
+                'url' => (string) $source['url'],
+                'published_at' => $source['published_at'] ?? null,
+                'used_for' => (string) ($source['used_for'] ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'date' => $analysis->analysis_date,
+            'model' => $analysis->model,
+            'is_external_ai' => true,
+            'outlook' => $analysis->market_outlook,
+            'confidence' => (int) $analysis->confidence,
+            'riskLevel' => $analysis->risk_level,
+            'headline' => $analysis->headline,
+            'summary' => $analysis->executive_summary,
+            'breadth' => $analysis->breadth_analysis,
+            'sectors' => $this->decodeJson($analysis->sector_analysis),
+            'opportunities' => $this->decodeJson($analysis->opportunities),
+            'risks' => $this->decodeJson($analysis->risks),
+            'watchlist' => $this->decodeJson($analysis->watchlist),
+            'sources' => $sources,
+            'metrics' => $ruleBasedAnalysis['metrics'] ?? [],
+        ];
     }
 
     private function decodeJson(mixed $value): array

@@ -2,6 +2,218 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Screener filters should read as compact controls, not pill badges. */
+.screener-filter-bar .ak-input,
+.screener-filter-bar .screener-filter-reset {
+    border-radius: 10px;
+}
+
+.screener-border-title {
+    position: absolute;
+    top: -1px;
+    left: .75rem;
+    z-index: 2;
+    padding: 0 .4rem;
+    background: color-mix(in srgb, var(--ak-card) 94%, #fbbf24 6%);
+    font-size: .56rem;
+    font-weight: 900;
+    line-height: 1rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.screener-border-title strong {
+    margin-left: .25rem;
+    color: #fde68a;
+    font-size: .68rem;
+}
+
+.screener-ranking-donuts {
+    position: absolute;
+    top: .65rem;
+    left: .75rem;
+    right: .75rem;
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(.25rem, .55vw, .7rem);
+}
+
+.screener-metric-donut {
+    position: relative;
+    display: grid;
+    width: 3.2rem;
+    height: 3.2rem;
+    place-items: center;
+    border-radius: 999px;
+    background: conic-gradient(var(--donut-color) var(--donut-value), rgba(148, 163, 184, .16) 0);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--donut-color) 16%, transparent);
+}
+
+.screener-metric-donut::after {
+    position: absolute;
+    inset: 3px;
+    border-radius: inherit;
+    background: color-mix(in srgb, var(--ak-card) 94%, #fbbf24 6%);
+    content: '';
+}
+
+.screener-metric-donut span {
+    position: relative;
+    z-index: 1;
+    margin-top: -.24rem;
+    color: var(--donut-color);
+    font-size: .66rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.screener-metric-donut small {
+    position: absolute;
+    bottom: .64rem;
+    z-index: 1;
+    color: var(--ak-muted);
+    font-size: .4rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.screener-metric-donut-score {
+    width: 4.5rem;
+    height: 4.5rem;
+    box-shadow: 0 0 18px rgba(251, 191, 36, .22);
+}
+
+.screener-metric-donut-score span {
+    font-size: .92rem;
+}
+
+.screener-metric-donut-score::after {
+    inset: 5px;
+}
+
+.screener-metric-donut-score small {
+    bottom: 1rem;
+    font-size: .46rem;
+}
+
+@media (min-width: 1280px) and (max-width: 1535px) {
+    .screener-metric-donut {
+        width: 2.85rem;
+        height: 2.85rem;
+    }
+
+    .screener-metric-donut-score {
+        width: 4rem;
+        height: 4rem;
+    }
+}
+
+:root[data-theme="light"] .screener-page {
+    --ak-muted: #52627a;
+}
+
+:root[data-theme="light"] .screener-page .text-amber-300 {
+    color: #a16207 !important;
+}
+
+:root[data-theme="light"] .screener-page .text-amber-200 {
+    color: #92400e !important;
+}
+
+:root[data-theme="light"] .screener-page .text-cyan-300,
+:root[data-theme="light"] .screener-page .text-cyan-200 {
+    color: #0e7490 !important;
+}
+
+:root[data-theme="light"] .screener-page .text-violet-300 {
+    color: #6d28d9 !important;
+}
+
+:root[data-theme="light"] .screener-page .text-emerald-300 {
+    color: #047857 !important;
+}
+
+:root[data-theme="light"] .screener-page .text-rose-300 {
+    color: #be123c !important;
+}
+
+:root[data-theme="light"] .screener-page .border-amber-400\/25,
+:root[data-theme="light"] .screener-page .border-amber-400\/30,
+:root[data-theme="light"] .screener-page .border-amber-400\/35,
+:root[data-theme="light"] .screener-page .border-amber-400\/40 {
+    border-color: rgba(180, 120, 10, .42) !important;
+}
+
+:root[data-theme="light"] .screener-border-title {
+    background: #fffdf7;
+    color: #92400e !important;
+}
+
+:root[data-theme="light"] .screener-metric-donut small {
+    color: #475569;
+}
+
+/* Match the light screener to the calm teal dashboard workspace. */
+:root[data-theme="light"] .screener-page [class*="text-amber-"],
+:root[data-theme="light"] .screener-page [class*="text-violet-"] {
+    color: #0e7490 !important;
+}
+
+:root[data-theme="light"] .screener-page [class*="border-amber-"],
+:root[data-theme="light"] .screener-page [class*="border-violet-"] {
+    border-color: rgba(6, 182, 212, .22) !important;
+}
+
+:root[data-theme="light"] .screener-stock-card > .grid > div:first-child,
+:root[data-theme="light"] .screener-stock-card > .grid > div:nth-child(2) > div,
+:root[data-theme="light"] .screener-stock-card > .grid > div:nth-child(2) > details,
+:root[data-theme="light"] .screener-stock-card > .grid > div:nth-child(3) > details {
+    border-color: #d9e7e4 !important;
+    background: rgba(255, 255, 255, .94) !important;
+    box-shadow: 0 8px 22px rgba(35, 72, 67, .065);
+}
+
+:root[data-theme="light"] .screener-border-title {
+    background: #ffffff;
+    color: #0e7490 !important;
+}
+
+:root[data-theme="light"] .screener-border-title strong {
+    color: #0e7490;
+}
+
+:root[data-theme="light"] .screener-page .screener-filter-reset {
+    border-color: rgba(6, 182, 212, .25) !important;
+    background: rgba(34, 211, 238, .10) !important;
+    color: #0e7490 !important;
+}
+
+@media (min-width: 1024px) {
+    .screener-page {
+        display: flex;
+        height: calc(100dvh - 4.5rem);
+        min-height: 0;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .screener-page > header,
+    .screener-page > .screener-filter-bar,
+    .screener-page > .screener-filter-bar + div {
+        flex: none;
+    }
+
+    .screener-results-scroll {
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-right: .25rem;
+    }
+}
+
 @layer components {
     .ak-top3-title {
         font-size: clamp(1.55rem, 2.1vw, 2rem);
@@ -41,9 +253,9 @@
             linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(244, 250, 249, .96));
         box-shadow:
             0 1px 0 rgba(255, 255, 255, .95) inset,
-            0 0 0 1px rgba(15, 118, 110, .055),
+            0 0 0 1px rgba(14, 116, 144, .055),
             0 14px 34px rgba(15, 23, 42, .105),
-            0 4px 12px rgba(15, 118, 110, .07);
+            0 4px 12px rgba(14, 116, 144, .07);
         transform: translateZ(0);
         transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
     }
@@ -62,11 +274,11 @@
         position: relative;
         background:
             radial-gradient(circle at 5% 0%, rgba(34, 211, 238, .24), transparent 39%),
-            linear-gradient(108deg, rgba(13, 148, 136, .21) 0%, rgba(20, 184, 166, .14) 38%, rgba(6, 182, 212, .10) 68%, rgba(255, 255, 255, .48) 100%);
-        border-bottom-color: rgba(13, 148, 136, .32);
+            linear-gradient(108deg, rgba(8, 145, 178, .21) 0%, rgba(6, 182, 212, .14) 38%, rgba(6, 182, 212, .10) 68%, rgba(255, 255, 255, .48) 100%);
+        border-bottom-color: rgba(8, 145, 178, .32);
         box-shadow:
             0 1px 0 rgba(255, 255, 255, .82) inset,
-            0 5px 14px rgba(15, 118, 110, .055);
+            0 5px 14px rgba(14, 116, 144, .055);
     }
 
     .ak-top3-card .ak-top3-card-head::after {
@@ -75,14 +287,14 @@
         inset: 0 18% auto;
         height: 2px;
         border-radius: 0 0 999px 999px;
-        background: linear-gradient(90deg, transparent, rgba(13, 148, 136, .62), rgba(34, 211, 238, .72), transparent);
+        background: linear-gradient(90deg, transparent, rgba(8, 145, 178, .62), rgba(34, 211, 238, .72), transparent);
         pointer-events: none;
     }
 
     :root:not([data-theme="light"]) .ak-top3-card .ak-top3-card-head {
         background:
             radial-gradient(circle at 5% 0%, rgba(34, 211, 238, .22), transparent 40%),
-            linear-gradient(108deg, rgba(13, 148, 136, .27) 0%, rgba(20, 184, 166, .17) 40%, rgba(6, 182, 212, .105) 70%, rgba(15, 23, 42, .24) 100%);
+            linear-gradient(108deg, rgba(8, 145, 178, .27) 0%, rgba(6, 182, 212, .17) 40%, rgba(6, 182, 212, .105) 70%, rgba(15, 23, 42, .24) 100%);
         border-bottom-color: rgba(34, 211, 238, .26);
         box-shadow:
             0 1px 0 rgba(255, 255, 255, .04) inset,
@@ -92,17 +304,17 @@
     .ak-top3-card .ak-top3-card-footer {
         background:
             radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .22), transparent 38%),
-            linear-gradient(108deg, rgba(255, 255, 255, .48) 0%, rgba(6, 182, 212, .09) 34%, rgba(20, 184, 166, .15) 66%, rgba(13, 148, 136, .22) 100%);
-        border-top-color: rgba(13, 148, 136, .30);
+            linear-gradient(108deg, rgba(255, 255, 255, .48) 0%, rgba(6, 182, 212, .09) 34%, rgba(6, 182, 212, .15) 66%, rgba(8, 145, 178, .22) 100%);
+        border-top-color: rgba(8, 145, 178, .30);
         box-shadow:
             0 1px 0 rgba(255, 255, 255, .75) inset,
-            0 -5px 14px rgba(15, 118, 110, .055);
+            0 -5px 14px rgba(14, 116, 144, .055);
     }
 
     :root:not([data-theme="light"]) .ak-top3-card .ak-top3-card-footer {
         background:
             radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .20), transparent 40%),
-            linear-gradient(108deg, rgba(15, 23, 42, .24) 0%, rgba(6, 182, 212, .10) 34%, rgba(20, 184, 166, .17) 66%, rgba(13, 148, 136, .27) 100%);
+            linear-gradient(108deg, rgba(15, 23, 42, .24) 0%, rgba(6, 182, 212, .10) 34%, rgba(6, 182, 212, .17) 66%, rgba(8, 145, 178, .27) 100%);
         border-top-color: rgba(34, 211, 238, .24);
         box-shadow: 0 -6px 16px rgba(0, 0, 0, .12);
     }
@@ -115,7 +327,7 @@
             var(--ak-card-strong);
         box-shadow:
             0 0 0 1px rgba(245, 158, 11, .10),
-            0 18px 45px rgba(15, 118, 110, .11),
+            0 18px 45px rgba(14, 116, 144, .11),
             0 8px 24px rgba(245, 158, 11, .10);
     }
 
@@ -134,14 +346,14 @@
     .ak-top3-winner .ak-top3-card-head {
         background:
             radial-gradient(circle at 5% 0%, rgba(245, 158, 11, .28), transparent 40%),
-            linear-gradient(108deg, rgba(245, 158, 11, .22) 0%, rgba(251, 191, 36, .13) 34%, rgba(20, 184, 166, .12) 67%, rgba(6, 182, 212, .09) 100%);
+            linear-gradient(108deg, rgba(245, 158, 11, .22) 0%, rgba(251, 191, 36, .13) 34%, rgba(6, 182, 212, .12) 67%, rgba(6, 182, 212, .09) 100%);
         border-bottom-color: rgba(245, 158, 11, .36);
     }
 
     .ak-top3-winner .ak-top3-card-footer {
         background:
             radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .18), transparent 38%),
-            linear-gradient(108deg, rgba(245, 158, 11, .20) 0%, rgba(251, 191, 36, .13) 34%, rgba(20, 184, 166, .13) 68%, rgba(6, 182, 212, .10) 100%);
+            linear-gradient(108deg, rgba(245, 158, 11, .20) 0%, rgba(251, 191, 36, .13) 34%, rgba(6, 182, 212, .13) 68%, rgba(6, 182, 212, .10) 100%);
         border-top-color: rgba(245, 158, 11, .34);
     }
 
@@ -214,15 +426,15 @@
     }
 
     .ak-model-tier-unqualified {
-        color: #99f6e4;
-        border-color: rgba(45, 212, 191, .48);
-        background: rgba(13, 148, 136, .2);
+        color: #a5f3fc;
+        border-color: rgba(34, 211, 238, .48);
+        background: rgba(8, 145, 178, .2);
     }
 
     :root[data-theme="light"] .ak-model-tier-unqualified {
-        color: #115e59;
-        border-color: rgba(13, 148, 136, .42);
-        background: rgba(20, 184, 166, .12);
+        color: #155e75;
+        border-color: rgba(8, 145, 178, .42);
+        background: rgba(6, 182, 212, .12);
     }
 
     :root[data-theme="light"] .ak-model-tier-test {
@@ -240,8 +452,8 @@
     }
 
     .ak-sector-icon {
-        color: var(--ak-sector-icon-color, #5eead4) !important;
-        stroke: var(--ak-sector-icon-color, #5eead4) !important;
+        color: var(--ak-sector-icon-color, #67e8f9) !important;
+        stroke: var(--ak-sector-icon-color, #67e8f9) !important;
         stroke-width: 1.9 !important;
         opacity: 1 !important;
         filter: none !important;
@@ -367,7 +579,7 @@
 
     --ak-violet: #8b5cf6;
     --ak-violet-soft: #c4b5fd;
-    --ak-cyan: #fb923c;
+    --ak-cyan: #22d3ee;
     --ak-green: #22c55e;
     --ak-amber: #f59e0b;
     --ak-red: #fb7185;
@@ -384,20 +596,20 @@
     --ak-card-hover: rgba(255, 255, 255, .98);
     --ak-card-strong: rgba(255, 255, 255, .96);
     --ak-border: rgba(51, 65, 85, .15);
-    --ak-border-strong: rgba(13, 148, 136, .38);
+    --ak-border-strong: rgba(8, 145, 178, .38);
     --ak-text: #1f2937;
     --ak-muted: #64748b;
     --ak-surface: #ffffff;
     --ak-surface-muted: rgba(241, 245, 244, .90);
-    --ak-accent: #0f766e;
-    --ak-accent-soft: rgba(20, 184, 166, .10);
-    --ak-violet: #14b8a6;
-    --ak-violet-soft: #0f766e;
+    --ak-accent: #0e7490;
+    --ak-accent-soft: rgba(6, 182, 212, .10);
+    --ak-violet: #06b6d4;
+    --ak-violet-soft: #0e7490;
     --ak-cyan: #06b6d4;
     --ak-warm: #b7791f;
     --ak-warm-soft: rgba(198, 146, 62, .10);
     --ak-shadow: 0 16px 42px rgba(31, 41, 55, .09);
-    --ak-shadow-hover: 0 20px 52px rgba(15, 118, 110, .14);
+    --ak-shadow-hover: 0 20px 52px rgba(14, 116, 144, .14);
 }
 
 /* Use cyan as the primary orange accent in light mode. */
@@ -609,7 +821,7 @@ body:not(.welcome-background) :is(
 
 :root[data-theme="light"] body {
     background:
-        radial-gradient(circle at 78% 28%, rgba(20,184,166,.10), transparent 32%),
+        radial-gradient(circle at 78% 28%, rgba(6, 182, 212,.10), transparent 32%),
         radial-gradient(circle at 16% 88%, rgba(71,85,105,.07), transparent 27%),
         linear-gradient(135deg, #f7f7f8 0%, #eef1f1 56%, #f1f5f4 100%);
 }
@@ -628,15 +840,15 @@ body:not(.welcome-background) :is(
 /* Vollständige Light-Kompatibilität für ältere, dunkel definierte Komponenten. */
 :root[data-theme="light"] .ak-background {
     background:
-        radial-gradient(circle at 78% 28%, rgba(20,184,166,.10), transparent 32%),
+        radial-gradient(circle at 78% 28%, rgba(6, 182, 212,.10), transparent 32%),
         radial-gradient(circle at 16% 88%, rgba(71,85,105,.07), transparent 27%),
         linear-gradient(135deg, #f7f7f8 0%, #eef1f1 56%, #f1f5f4 100%);
 }
 
 :root[data-theme="light"] .ak-background::before {
     background-image:
-        linear-gradient(rgba(15,118,110,.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(15,118,110,.04) 1px, transparent 1px);
+        linear-gradient(rgba(14, 116, 144,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14, 116, 144,.04) 1px, transparent 1px);
 }
 
 :root[data-theme="light"] .ak-page-shell {
@@ -675,9 +887,9 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-input:focus {
-    border-color: rgba(13,148,136,.55);
+    border-color: rgba(8, 145, 178,.55);
     background: white;
-    box-shadow: 0 0 0 4px rgba(20,184,166,.12);
+    box-shadow: 0 0 0 4px rgba(6, 182, 212,.12);
 }
 
 :root[data-theme="light"] .ak-top-link {
@@ -689,24 +901,24 @@ body:not(.welcome-background) :is(
 
 :root[data-theme="light"] .ak-top-link:hover {
     color: #1f2937;
-    border-color: rgba(20,184,166,.28);
-    background: rgba(20,184,166,.10);
+    border-color: rgba(6, 182, 212,.28);
+    background: rgba(6, 182, 212,.10);
 }
 
 :root[data-theme="light"] .ak-top-link-active {
-    color: #134e4a;
-    border-color: rgba(13,148,136,.34);
-    background: linear-gradient(135deg, rgba(20,184,166,.17), rgba(15,118,110,.10));
+    color: #164e63;
+    border-color: rgba(8, 145, 178,.34);
+    background: linear-gradient(135deg, rgba(6, 182, 212,.17), rgba(14, 116, 144,.10));
     box-shadow: none;
     font-weight: 750;
 }
 
 :root[data-theme="light"] .ak-top-link svg {
-    color: #0f766e;
+    color: #0e7490;
 }
 
 :root[data-theme="light"] .ak-top-link-active svg {
-    color: #0d9488;
+    color: #0891b2;
 }
 
 :root[data-theme="light"] .ak-brand-logo-dark {
@@ -747,7 +959,7 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-brand-link .ak-brand-logo-light {
-    filter: drop-shadow(0 2px 3px rgba(15, 118, 110, .14));
+    filter: drop-shadow(0 2px 3px rgba(14, 116, 144, .14));
 }
 
 :root:not([data-theme="light"]) .ak-brand-link {
@@ -755,7 +967,7 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-brand-link {
-    background: radial-gradient(circle at 38% 50%, rgba(20, 184, 166, .06), transparent 68%);
+    background: radial-gradient(circle at 38% 50%, rgba(6, 182, 212, .06), transparent 68%);
 }
 
 :root:not([data-theme="light"]) .ak-brand-wordmark-dark {
@@ -768,7 +980,7 @@ body:not(.welcome-background) :is(
 }
 
 .ak-brand-wordmark-light {
-    filter: drop-shadow(0 2px 3px rgba(15, 118, 110, .14));
+    filter: drop-shadow(0 2px 3px rgba(14, 116, 144, .14));
 }
 
 :root:not([data-theme="light"]) .ak-brand-icon {
@@ -776,7 +988,7 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-brand-icon {
-    filter: drop-shadow(0 2px 3px rgba(15, 118, 110, .12));
+    filter: drop-shadow(0 2px 3px rgba(14, 116, 144, .12));
 }
 
 @media (min-width: 480px) {
@@ -786,36 +998,36 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="text-violet-"] {
-    color: #0f766e !important;
+    color: #0e7490 !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="text-purple-"],
 :root[data-theme="light"] body:not(.welcome-background) [class*="text-fuchsia-"],
 :root[data-theme="light"] body:not(.welcome-background) [class*="text-indigo-"] {
-    color: #0f766e !important;
+    color: #0e7490 !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="hover:text-violet-"]:hover {
-    color: #115e59 !important;
+    color: #155e75 !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="bg-violet-"] {
-    background-color: rgba(20,184,166,.11) !important;
+    background-color: rgba(6, 182, 212,.11) !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="bg-purple-"],
 :root[data-theme="light"] body:not(.welcome-background) [class*="bg-fuchsia-"],
 :root[data-theme="light"] body:not(.welcome-background) [class*="bg-indigo-"] {
-    background-color: rgba(20,184,166,.11) !important;
+    background-color: rgba(6, 182, 212,.11) !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) .bg-violet-500,
 :root[data-theme="light"] body:not(.welcome-background) .bg-violet-600 {
-    background-color: #0d9488 !important;
+    background-color: #0891b2 !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="hover:bg-violet-"]:hover {
-    background-color: rgba(20,184,166,.15) !important;
+    background-color: rgba(6, 182, 212,.15) !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="border-violet-"],
@@ -823,39 +1035,39 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] body:not(.welcome-background) [class*="border-fuchsia-"],
 :root[data-theme="light"] body:not(.welcome-background) [class*="border-indigo-"],
 :root[data-theme="light"] body:not(.welcome-background) [class*="hover:border-violet-"]:hover {
-    border-color: rgba(13,148,136,.34) !important;
+    border-color: rgba(8, 145, 178,.34) !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="ring-violet-"] {
-    --tw-ring-color: rgba(20,184,166,.30) !important;
+    --tw-ring-color: rgba(6, 182, 212,.30) !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="shadow-violet-"] {
-    --tw-shadow-color: rgba(15,118,110,.18) !important;
+    --tw-shadow-color: rgba(14, 116, 144,.18) !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="accent-violet-"] {
-    accent-color: #0d9488 !important;
+    accent-color: #0891b2 !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="from-violet-"] {
-    --tw-gradient-from: #0f766e var(--tw-gradient-from-position) !important;
+    --tw-gradient-from: #0e7490 var(--tw-gradient-from-position) !important;
     --tw-gradient-to: rgb(15 118 110 / 0) var(--tw-gradient-to-position) !important;
     --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="via-violet-"] {
     --tw-gradient-to: rgb(20 184 166 / 0) var(--tw-gradient-to-position) !important;
-    --tw-gradient-stops: var(--tw-gradient-from), #14b8a6 var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), #06b6d4 var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="to-violet-"] {
-    --tw-gradient-to: #14b8a6 var(--tw-gradient-to-position) !important;
+    --tw-gradient-to: #06b6d4 var(--tw-gradient-to-position) !important;
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="rgba(139,92,246"],
 :root[data-theme="light"] body:not(.welcome-background) [class*="rgba(167,139,250"] {
-    background-image: linear-gradient(135deg, rgba(20,184,166,.15), rgba(241,245,244,.92)) !important;
+    background-image: linear-gradient(135deg, rgba(6, 182, 212,.15), rgba(241,245,244,.92)) !important;
 }
 
 :root[data-theme="light"] .ak-app-topbar > .ak-container > .ml-auto > div > button {
@@ -892,15 +1104,15 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] #personal-dashboard {
     background-color: #f5f9f8;
     background-image:
-        linear-gradient(rgba(15, 118, 110, .025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(15, 118, 110, .025) 1px, transparent 1px),
+        linear-gradient(rgba(14, 116, 144, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14, 116, 144, .025) 1px, transparent 1px),
         radial-gradient(circle at 88% 4%, rgba(34, 211, 238, .08), transparent 26%);
     background-size: 32px 32px, 32px 32px, auto;
 }
 
 :root[data-theme="light"] #personal-dashboard > .ak-container > header {
     margin-bottom: 1rem;
-    border-bottom: 1px solid rgba(15, 118, 110, .13);
+    border-bottom: 1px solid rgba(14, 116, 144, .13);
     padding: .15rem .25rem .9rem;
 }
 
@@ -916,15 +1128,15 @@ body:not(.welcome-background) :is(
     background: rgba(255, 255, 255, .94) !important;
     box-shadow:
         0 8px 22px rgba(35, 72, 67, .065),
-        inset 3px 0 0 rgba(20, 184, 166, .58) !important;
+        inset 3px 0 0 rgba(6, 182, 212, .58) !important;
     backdrop-filter: blur(10px);
 }
 
 :root[data-theme="light"] #personal-dashboard .ak-dashboard-card:hover {
-    border-color: rgba(13, 148, 136, .32) !important;
+    border-color: rgba(8, 145, 178, .32) !important;
     background: #ffffff !important;
     box-shadow:
-        0 12px 28px rgba(15, 118, 110, .10),
+        0 12px 28px rgba(14, 116, 144, .10),
         inset 3px 0 0 #06b6d4 !important;
     transform: translateY(-1px);
 }
@@ -934,11 +1146,11 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] #personal-dashboard [class*="bg-orange-"] {
-    background-color: rgba(45, 212, 191, .10) !important;
+    background-color: rgba(34, 211, 238, .10) !important;
 }
 
 :root[data-theme="light"] #personal-dashboard [class*="border-orange-"] {
-    border-color: rgba(20, 184, 166, .20) !important;
+    border-color: rgba(6, 182, 212, .20) !important;
 }
 
 :root[data-theme="light"] #personal-dashboard [class*="shadow-[0_0_"] {
@@ -960,7 +1172,7 @@ body:not(.welcome-background) :is(
         linear-gradient(rgba(34, 211, 238, .022) 1px, transparent 1px),
         linear-gradient(90deg, rgba(34, 211, 238, .022) 1px, transparent 1px),
         radial-gradient(circle at 86% 2%, rgba(6, 182, 212, .12), transparent 28%),
-        radial-gradient(circle at 8% 92%, rgba(20, 184, 166, .07), transparent 24%);
+        radial-gradient(circle at 8% 92%, rgba(6, 182, 212, .07), transparent 24%);
     background-size: 36px 36px, 36px 36px, auto, auto;
 }
 
@@ -971,9 +1183,9 @@ body:not(.welcome-background) :is(
 }
 
 :root:not([data-theme="light"]) #personal-dashboard > .ak-container > header h1 {
-    color: #f0fdfa;
+    color: #ecfeff;
     letter-spacing: -.035em;
-    text-shadow: 0 0 24px rgba(45, 212, 191, .08);
+    text-shadow: 0 0 24px rgba(34, 211, 238, .08);
 }
 
 :root:not([data-theme="light"]) #personal-dashboard .ak-dashboard-card {
@@ -1028,8 +1240,8 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] #community-page {
     background-color: #f5f9f8;
     background-image:
-        linear-gradient(rgba(15, 118, 110, .025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(15, 118, 110, .025) 1px, transparent 1px),
+        linear-gradient(rgba(14, 116, 144, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14, 116, 144, .025) 1px, transparent 1px),
         radial-gradient(circle at 88% 4%, rgba(34, 211, 238, .08), transparent 26%);
     background-size: 32px 32px, 32px 32px, auto;
 }
@@ -1040,7 +1252,7 @@ body:not(.welcome-background) :is(
         linear-gradient(rgba(34, 211, 238, .022) 1px, transparent 1px),
         linear-gradient(90deg, rgba(34, 211, 238, .022) 1px, transparent 1px),
         radial-gradient(circle at 86% 2%, rgba(6, 182, 212, .12), transparent 28%),
-        radial-gradient(circle at 8% 92%, rgba(20, 184, 166, .07), transparent 24%);
+        radial-gradient(circle at 8% 92%, rgba(6, 182, 212, .07), transparent 24%);
     background-size: 36px 36px, 36px 36px, auto, auto;
 }
 
@@ -1066,7 +1278,7 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] #community-page .ak-dashboard-card {
     border: 1px solid #d9e7e4 !important;
     background: rgba(255, 255, 255, .94) !important;
-    box-shadow: 0 8px 22px rgba(35, 72, 67, .065), inset 3px 0 0 rgba(20, 184, 166, .58) !important;
+    box-shadow: 0 8px 22px rgba(35, 72, 67, .065), inset 3px 0 0 rgba(6, 182, 212, .58) !important;
 }
 
 :root:not([data-theme="light"]) #community-page .ak-dashboard-card {
@@ -1089,8 +1301,8 @@ body:not(.welcome-background) :is(
 
 :root[data-theme="light"] #community-page {
     --community-accent: #0e7490;
-    --community-accent-bg: rgba(45, 212, 191, .10);
-    --community-accent-border: rgba(20, 184, 166, .20);
+    --community-accent-bg: rgba(34, 211, 238, .10);
+    --community-accent-border: rgba(6, 182, 212, .20);
 }
 
 :root:not([data-theme="light"]) #community-page {
@@ -1105,7 +1317,7 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] #community-page .community-topic.bg-orange-400 {
-    background: #14b8a6 !important;
+    background: #06b6d4 !important;
     color: #ffffff !important;
 }
 
@@ -1130,12 +1342,12 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] #markets-page {
     --markets-accent: #0e7490;
     --markets-accent-bright: #06b6d4;
-    --markets-accent-bg: rgba(45, 212, 191, .09);
-    --markets-accent-border: rgba(20, 184, 166, .20);
+    --markets-accent-bg: rgba(34, 211, 238, .09);
+    --markets-accent-border: rgba(6, 182, 212, .20);
     background-color: #f5f9f8;
     background-image:
-        linear-gradient(rgba(15, 118, 110, .025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(15, 118, 110, .025) 1px, transparent 1px),
+        linear-gradient(rgba(14, 116, 144, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14, 116, 144, .025) 1px, transparent 1px),
         radial-gradient(circle at 88% 4%, rgba(34, 211, 238, .08), transparent 26%);
     background-size: 32px 32px, 32px 32px, auto;
 }
@@ -1150,12 +1362,12 @@ body:not(.welcome-background) :is(
         linear-gradient(rgba(34, 211, 238, .022) 1px, transparent 1px),
         linear-gradient(90deg, rgba(34, 211, 238, .022) 1px, transparent 1px),
         radial-gradient(circle at 86% 2%, rgba(6, 182, 212, .12), transparent 28%),
-        radial-gradient(circle at 8% 92%, rgba(20, 184, 166, .07), transparent 24%);
+        radial-gradient(circle at 8% 92%, rgba(6, 182, 212, .07), transparent 24%);
     background-size: 36px 36px, 36px 36px, auto, auto;
 }
 
 :root[data-theme="light"] #markets-page-heading {
-    border-color: rgba(15, 118, 110, .13);
+    border-color: rgba(14, 116, 144, .13);
     background: rgba(245, 249, 248, .88);
 }
 
@@ -1180,7 +1392,7 @@ body:not(.welcome-background) :is(
     border: 1px solid #d9e7e4 !important;
     border-radius: 12px !important;
     background: rgba(255, 255, 255, .96) !important;
-    box-shadow: 0 8px 20px rgba(35, 72, 67, .07), inset 3px 0 0 rgba(20, 184, 166, .60) !important;
+    box-shadow: 0 8px 20px rgba(35, 72, 67, .07), inset 3px 0 0 rgba(6, 182, 212, .60) !important;
 }
 
 :root:not([data-theme="light"]) #markets-page .ak-market-card-prominent {
@@ -1225,7 +1437,7 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] #sectors-page .ak-sector-overview-card {
-    border-color: rgba(13, 148, 136, .16) !important;
+    border-color: rgba(8, 145, 178, .16) !important;
     background: linear-gradient(155deg, rgba(255, 255, 255, .98), rgba(242, 249, 248, .94)) !important;
     box-shadow: 0 10px 24px rgba(35, 72, 67, .08), inset 0 3px 0 rgba(6, 182, 212, .56) !important;
 }
@@ -1236,9 +1448,9 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] #markets-page .ak-market-card-head {
-    border-color: rgba(20, 184, 166, .16) !important;
+    border-color: rgba(6, 182, 212, .16) !important;
     background: linear-gradient(105deg, rgba(204, 251, 241, .58), rgba(236, 254, 255, .25)), #f8fbfb !important;
-    box-shadow: inset 0 -1px 0 rgba(20, 184, 166, .10) !important;
+    box-shadow: inset 0 -1px 0 rgba(6, 182, 212, .10) !important;
 }
 
 :root:not([data-theme="light"]) #markets-page .ak-market-card-head {
@@ -1329,7 +1541,7 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] #markets-page .ak-market-dashboard-card {
     border: 1px solid #d9e7e4 !important;
     background: rgba(255, 255, 255, .95) !important;
-    box-shadow: 0 10px 26px rgba(35, 72, 67, .07), inset 3px 0 0 rgba(20, 184, 166, .58) !important;
+    box-shadow: 0 10px 26px rgba(35, 72, 67, .07), inset 3px 0 0 rgba(6, 182, 212, .58) !important;
 }
 
 :root:not([data-theme="light"]) #markets-page .ak-market-dashboard-card {
@@ -1339,7 +1551,7 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] #markets-page .ak-market-card-prominent [class*="bg-black"] {
-    background-color: rgba(15, 118, 110, .04) !important;
+    background-color: rgba(14, 116, 144, .04) !important;
 }
 
 :root[data-theme="light"] .ak-dashboard-panel {
@@ -1374,14 +1586,14 @@ body:not(.welcome-background) :is(
     position: absolute;
     inset: 0 0 auto;
     height: 3px;
-    background: linear-gradient(90deg, #0f766e, #14b8a6 58%, rgba(94,234,212,.38));
+    background: linear-gradient(90deg, #0e7490, #06b6d4 58%, rgba(94,234,212,.38));
 }
 
 :root[data-theme="light"] .ak-dashboard-market-card:hover {
-    border-color: rgba(13,148,136,.40);
+    border-color: rgba(8, 145, 178,.40);
     background: #ffffff;
     box-shadow:
-        0 18px 38px rgba(15,118,110,.15),
+        0 18px 38px rgba(14, 116, 144,.15),
         0 1px 0 rgba(255,255,255,.95) inset;
 }
 
@@ -1402,7 +1614,7 @@ body:not(.welcome-background) :is(
     background: rgba(248,250,250,.94);
     box-shadow:
         0 -12px 32px rgba(31,41,55,.10),
-        0 -2px 0 rgba(20,184,166,.06);
+        0 -2px 0 rgba(6, 182, 212,.06);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1452,22 +1664,22 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-bottom-status-icon {
-    border-color: rgba(13,148,136,.22);
-    background: rgba(20,184,166,.10);
-    color: #0f766e;
+    border-color: rgba(8, 145, 178,.22);
+    background: rgba(6, 182, 212,.10);
+    color: #0e7490;
 }
 
 :root[data-theme="light"] .ak-bottom-chat {
-    border-color: rgba(13,148,136,.30) !important;
-    background: linear-gradient(145deg, rgba(20,184,166,.17), rgba(15,118,110,.10)) !important;
-    color: #0f766e !important;
-    box-shadow: 0 8px 22px rgba(15,118,110,.16);
+    border-color: rgba(8, 145, 178,.30) !important;
+    background: linear-gradient(145deg, rgba(6, 182, 212,.17), rgba(14, 116, 144,.10)) !important;
+    color: #0e7490 !important;
+    box-shadow: 0 8px 22px rgba(14, 116, 144,.16);
 }
 
 :root[data-theme="light"] .ak-bottom-chat-badge {
-    background: #0f766e !important;
+    background: #0e7490 !important;
     color: #ffffff !important;
-    box-shadow: 0 3px 9px rgba(15,118,110,.22);
+    box-shadow: 0 3px 9px rgba(14, 116, 144,.22);
 }
 
 :root[data-theme="light"] .ak-dashboard-atlas svg {
@@ -1477,35 +1689,35 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] .ak-dashboard-viewport .text-violet-200,
 :root[data-theme="light"] .ak-dashboard-viewport .text-violet-300,
 :root[data-theme="light"] .ak-dashboard-viewport .text-violet-400 {
-    color: #0f766e;
+    color: #0e7490;
 }
 
 :root[data-theme="light"] .ak-dashboard-viewport .border-violet-400\/20,
 :root[data-theme="light"] .ak-dashboard-viewport .border-violet-400\/25 {
-    border-color: rgba(13,148,136,.24);
+    border-color: rgba(8, 145, 178,.24);
 }
 
 :root[data-theme="light"] .ak-dashboard-viewport [class*="bg-violet-"] {
-    background-color: rgba(20,184,166,.11) !important;
+    background-color: rgba(6, 182, 212,.11) !important;
 }
 
 :root[data-theme="light"] .ak-dashboard-viewport [class*="border-violet-"] {
-    border-color: rgba(13,148,136,.28) !important;
+    border-color: rgba(8, 145, 178,.28) !important;
 }
 
 :root[data-theme="light"] .ak-dashboard-viewport [class*="shadow-violet-"] {
-    --tw-shadow-color: rgba(15,118,110,.16) !important;
+    --tw-shadow-color: rgba(14, 116, 144,.16) !important;
 }
 
 :root[data-theme="light"] .ak-market-assessment {
-    border-color: rgba(13,148,136,.24);
-    background: linear-gradient(135deg, rgba(20,184,166,.11), rgba(241,245,244,.92));
-    color: #0f766e;
+    border-color: rgba(8, 145, 178,.24);
+    background: linear-gradient(135deg, rgba(6, 182, 212,.11), rgba(241,245,244,.92));
+    color: #0e7490;
     box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
 }
 
 :root[data-theme="light"] .ak-market-assessment-title {
-    color: #0f766e;
+    color: #0e7490;
 }
 
 :root[data-theme="light"] .ak-market-assessment-copy {
@@ -1521,9 +1733,9 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-market-assessment-status {
-    border-color: rgba(13,148,136,.25);
+    border-color: rgba(8, 145, 178,.25);
     background: rgba(255,255,255,.72);
-    color: #115e59;
+    color: #155e75;
 }
 
 :root[data-theme="light"] .ak-market-assessment[data-tone="positive"] {
@@ -1561,7 +1773,7 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-table th {
-    color: #0f766e;
+    color: #0e7490;
     background: rgba(238,242,242,.95);
 }
 
@@ -1575,10 +1787,10 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-stocks-table thead {
-    background: linear-gradient(135deg, #115e59, #0f766e 62%, #0d9488);
+    background: linear-gradient(135deg, #155e75, #0e7490 62%, #0891b2);
     box-shadow:
-        0 1px 0 rgba(15,118,110,.55),
-        0 8px 18px rgba(15,118,110,.16);
+        0 1px 0 rgba(14, 116, 144,.55),
+        0 8px 18px rgba(14, 116, 144,.16);
 }
 
 :root[data-theme="light"] .ak-stocks-table thead th {
@@ -1590,7 +1802,7 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] .ak-stocks-table thead svg,
 :root[data-theme="light"] .ak-stocks-table thead [class*="text-teal-"],
 :root[data-theme="light"] .ak-stocks-table thead [class*="text-slate-"] {
-    color: #ccfbf1 !important;
+    color: #cffafe !important;
 }
 
 :root[data-theme="light"] .ak-stocks-table tbody tr {
@@ -1610,7 +1822,7 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-stocks-table tbody tr:hover {
-    background-color: #ccfbf1 !important;
+    background-color: #cffafe !important;
 }
 
 :root[data-theme="light"] .ak-stock-pagination nav a,
@@ -2168,10 +2380,10 @@ body:not(.welcome-background) :is(
 
     :root[data-theme="light"] .ak-badge,
     :root[data-theme="light"] .ak-light-teal-badge {
-        border-color: rgba(13, 148, 136, .22) !important;
-        background: rgba(45, 212, 191, .12) !important;
-        color: #0f766e !important;
-        box-shadow: inset 0 0 0 1px rgba(20, 184, 166, .08) !important;
+        border-color: rgba(8, 145, 178, .22) !important;
+        background: rgba(34, 211, 238, .12) !important;
+        color: #0e7490 !important;
+        box-shadow: inset 0 0 0 1px rgba(6, 182, 212, .08) !important;
     }
 
     .ak-muted {
@@ -2315,16 +2527,16 @@ body:not(.welcome-background) :is(
 }
 
 .ak-transition-matrix-card {
-    border-color: rgba(45, 212, 191, .18) !important;
+    border-color: rgba(34, 211, 238, .18) !important;
     background:
-        radial-gradient(circle at 88% 10%, rgba(20, 184, 166, .10), transparent 34%),
+        radial-gradient(circle at 88% 10%, rgba(6, 182, 212, .10), transparent 34%),
         color-mix(in srgb, var(--ak-card) 90%, transparent) !important;
 }
 
 .ak-transition-icon {
-    border-color: rgba(45, 212, 191, .22);
-    background: rgba(20, 184, 166, .10);
-    color: #5eead4;
+    border-color: rgba(34, 211, 238, .22);
+    background: rgba(6, 182, 212, .10);
+    color: #67e8f9;
 }
 
 .ak-transition-legend {
@@ -2407,9 +2619,9 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-transition-matrix-card {
-    border-color: rgba(15, 118, 110, .18) !important;
+    border-color: rgba(14, 116, 144, .18) !important;
     background:
-        radial-gradient(circle at 88% 10%, rgba(20, 184, 166, .10), transparent 35%),
+        radial-gradient(circle at 88% 10%, rgba(6, 182, 212, .10), transparent 35%),
         rgba(255,255,255,.92) !important;
 }
 
@@ -2441,16 +2653,16 @@ body:not(.welcome-background) :is(
 }
 
 .ak-signal-distribution-card {
-    border-color: rgba(45, 212, 191, .18) !important;
+    border-color: rgba(34, 211, 238, .18) !important;
     background:
-        radial-gradient(circle at 90% 8%, rgba(20,184,166,.10), transparent 35%),
+        radial-gradient(circle at 90% 8%, rgba(6, 182, 212,.10), transparent 35%),
         color-mix(in srgb, var(--ak-card) 90%, transparent) !important;
 }
 
 .ak-signal-overview-card {
-    border-color: rgba(45, 212, 191, .18) !important;
+    border-color: rgba(34, 211, 238, .18) !important;
     background:
-        radial-gradient(circle at 94% 5%, rgba(20,184,166,.11), transparent 34%),
+        radial-gradient(circle at 94% 5%, rgba(6, 182, 212,.11), transparent 34%),
         radial-gradient(circle at 4% 100%, rgba(56,189,248,.06), transparent 32%),
         color-mix(in srgb, var(--ak-card) 91%, transparent) !important;
 }
@@ -2495,16 +2707,16 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] .ak-signal-distribution-card {
-    border-color: rgba(15,118,110,.18) !important;
+    border-color: rgba(14, 116, 144,.18) !important;
     background:
-        radial-gradient(circle at 90% 8%, rgba(20,184,166,.09), transparent 35%),
+        radial-gradient(circle at 90% 8%, rgba(6, 182, 212,.09), transparent 35%),
         rgba(255,255,255,.92) !important;
 }
 
 :root[data-theme="light"] .ak-signal-overview-card {
-    border-color: rgba(15,118,110,.18) !important;
+    border-color: rgba(14, 116, 144,.18) !important;
     background:
-        radial-gradient(circle at 94% 5%, rgba(20,184,166,.10), transparent 34%),
+        radial-gradient(circle at 94% 5%, rgba(6, 182, 212,.10), transparent 34%),
         radial-gradient(circle at 4% 100%, rgba(56,189,248,.05), transparent 32%),
         rgba(255,255,255,.93) !important;
 }
@@ -2717,7 +2929,7 @@ body:not(.welcome-background) :is(
     background:
         radial-gradient(circle at 88% 15%, rgba(34, 211, 238, .13), transparent 31%),
         linear-gradient(135deg, rgba(255, 255, 255, .99), rgba(240, 253, 250, .96));
-    box-shadow: 0 18px 42px rgba(15, 118, 110, .08);
+    box-shadow: 0 18px 42px rgba(14, 116, 144, .08);
 }
 
 :root[data-theme="light"] .ak-market-command-hero::after {
@@ -2727,7 +2939,7 @@ body:not(.welcome-background) :is(
 
 :root[data-theme="light"] .ak-market-eyebrow { color: #0891b2; }
 :root[data-theme="light"] .ak-market-hero-stat {
-    border-color: rgba(15, 118, 110, .10);
+    border-color: rgba(14, 116, 144, .10);
     background: rgba(255, 255, 255, .72);
 }
 :root[data-theme="light"] .ak-market-hero-stat strong { color: #0f172a; }
@@ -2736,9 +2948,9 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] .ak-market-tape {
     border-color: rgba(8, 145, 178, .13);
     background: rgba(255, 255, 255, .94);
-    box-shadow: 0 10px 28px rgba(15, 118, 110, .07);
+    box-shadow: 0 10px 28px rgba(14, 116, 144, .07);
 }
-:root[data-theme="light"] .ak-market-tape-item { border-color: rgba(15, 118, 110, .08); }
+:root[data-theme="light"] .ak-market-tape-item { border-color: rgba(14, 116, 144, .08); }
 :root[data-theme="light"] .ak-market-change.is-positive { color: #047857; }
 :root[data-theme="light"] .ak-market-change.is-negative { color: #be123c; }
 :root[data-theme="light"] .ak-market-briefing-note {
@@ -2747,12 +2959,40 @@ body:not(.welcome-background) :is(
     color: #475569;
 }
 :root[data-theme="light"] .ak-market-list {
-    border-color: rgba(15, 118, 110, .10);
+    border-color: rgba(14, 116, 144, .10);
     background: rgba(255, 255, 255, .70);
 }
 :root[data-theme="light"] .ak-market-list p { color: #64748b; }
 :root[data-theme="light"] .ak-market-list.is-opportunity h3 { color: #047857; }
 :root[data-theme="light"] .ak-market-list.is-risk h3 { color: #be123c; }
+
+.ak-analysis-copy {
+    color: color-mix(in srgb, var(--ak-text) 86%, var(--ak-muted) 14%);
+}
+.ak-analysis-panel {
+    border-color: color-mix(in srgb, var(--ak-border) 76%, var(--analysis-accent) 24%) !important;
+}
+.ak-analysis-panel::before {
+    background: linear-gradient(90deg, transparent, var(--analysis-accent), transparent) !important;
+}
+.ak-analysis-panel-opportunity { --analysis-accent: #10b981; }
+.ak-analysis-panel-risk { --analysis-accent: #f43f5e; }
+.ak-analysis-panel-watch { --analysis-accent: #eab308; }
+.ak-analysis-panel .ak-analysis-card-head {
+    border-bottom-color: color-mix(in srgb, var(--analysis-accent) 30%, var(--ak-border)) !important;
+    background: radial-gradient(circle at 4% 0, color-mix(in srgb, var(--analysis-accent) 19%, transparent), transparent 42%), linear-gradient(108deg, color-mix(in srgb, var(--analysis-accent) 13%, transparent), transparent 76%) !important;
+}
+.ak-analysis-icon,
+.ak-analysis-number {
+    border-color: color-mix(in srgb, var(--analysis-accent) 35%, var(--ak-border));
+    background: color-mix(in srgb, var(--analysis-accent) 10%, transparent);
+}
+.ak-analysis-panel .ak-analysis-copy {
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--analysis-accent) 48%, transparent);
+}
+:root[data-theme="light"] .ak-analysis-panel .ak-analysis-copy {
+    background: color-mix(in srgb, #fff 92%, var(--analysis-accent) 8%);
+}
 
 @media (min-width: 1024px) {
     .ak-market-command .ak-market-primary-grid > div:first-child > .ak-dashboard-card {
@@ -2906,8 +3146,8 @@ body:not(.welcome-background) :is(
     --ak-workspace-border: #d9e7e4;
     --ak-workspace-accent: #0e7490;
     --ak-workspace-accent-bright: #06b6d4;
-    --ak-workspace-accent-soft: rgba(45, 212, 191, .10);
-    --ak-workspace-accent-border: rgba(20, 184, 166, .22);
+    --ak-workspace-accent-soft: rgba(34, 211, 238, .10);
+    --ak-workspace-accent-border: rgba(6, 182, 212, .22);
     --ak-workspace-shadow: 0 8px 22px rgba(35, 72, 67, .065);
 }
 
@@ -2938,9 +3178,9 @@ body:not(.welcome-background) :is(
     background-color: #f5f9f8 !important;
     background-image:
         radial-gradient(circle at 82% 12%, rgba(6, 182, 212, .11), transparent 28%),
-        radial-gradient(circle at 12% 86%, rgba(20, 184, 166, .08), transparent 25%),
-        linear-gradient(rgba(15, 118, 110, .028) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(15, 118, 110, .028) 1px, transparent 1px) !important;
+        radial-gradient(circle at 12% 86%, rgba(6, 182, 212, .08), transparent 25%),
+        linear-gradient(rgba(14, 116, 144, .028) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14, 116, 144, .028) 1px, transparent 1px) !important;
     background-size: auto, auto, 36px 36px, 36px 36px !important;
 }
 
@@ -2949,7 +3189,7 @@ body:not(.welcome-background) :is(
     background-color: #07111f !important;
     background-image:
         radial-gradient(circle at 84% 10%, rgba(6, 182, 212, .15), transparent 28%),
-        radial-gradient(circle at 10% 88%, rgba(20, 184, 166, .08), transparent 26%),
+        radial-gradient(circle at 10% 88%, rgba(6, 182, 212, .08), transparent 26%),
         linear-gradient(rgba(34, 211, 238, .022) 1px, transparent 1px),
         linear-gradient(90deg, rgba(34, 211, 238, .022) 1px, transparent 1px) !important;
     background-size: auto, auto, 38px 38px, 38px 38px !important;
@@ -2961,6 +3201,33 @@ body:not(.welcome-background) :is(
     box-shadow: var(--ak-workspace-shadow), inset 3px 0 0 color-mix(in srgb, var(--ak-workspace-accent-bright) 58%, transparent) !important;
     backdrop-filter: blur(12px);
 }
+
+/* Keep dashboard cards visually identical on every page, including the screener.
+   The generic .ak-card rule must not fall back to the legacy purple surface. */
+:root body:not(.welcome-background) .ak-dashboard-card {
+    border-color: var(--ak-workspace-border) !important;
+    background: var(--ak-workspace-card-hover) !important;
+    box-shadow: var(--ak-workspace-shadow), inset 3px 0 0 color-mix(in srgb, var(--ak-workspace-accent-bright) 58%, transparent) !important;
+    backdrop-filter: blur(12px);
+}
+
+:root body:not(.welcome-background) .ak-dashboard-card:hover {
+    background: var(--ak-workspace-card-hover) !important;
+    border-color: color-mix(in srgb, var(--ak-workspace-accent-bright) 30%, transparent) !important;
+    box-shadow: var(--ak-workspace-shadow), inset 3px 0 0 var(--ak-workspace-accent-bright) !important;
+}
+
+/* The legacy dark .ak-card selector is more specific; keep the screener on
+   the same dark gradient as the dashboard even without :hover. */
+:root:not([data-theme="light"]) body:not(.welcome-background) .ak-dashboard-card,
+:root:not([data-theme="light"]) body:not(.welcome-background) .ak-dashboard-card:hover {
+    background: var(--ak-workspace-card-hover) !important;
+}
+
+/* Medal treatment must win over the shared card border rule. */
+.ak-dashboard-card[data-ranking="1"] { border-color: #fcd34d !important; box-shadow: 0 0 26px rgba(251,191,36,.22), inset 3px 0 0 #f59e0b !important; }
+.ak-dashboard-card[data-ranking="2"] { border-color: #e2e8f0 !important; box-shadow: 0 0 22px rgba(226,232,240,.16), inset 3px 0 0 #cbd5e1 !important; }
+.ak-dashboard-card[data-ranking="3"] { border-color: #c2410c !important; box-shadow: 0 0 22px rgba(194,65,12,.20), inset 3px 0 0 #ea580c !important; }
 
 :root body:not(.welcome-background) :is(.ak-card, .ak-card-soft, .ak-panel, .ak-signal-card):hover {
     border-color: color-mix(in srgb, var(--ak-workspace-accent-bright) 30%, transparent) !important;
@@ -3062,12 +3329,12 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] #sectors-page {
     --sectors-accent: #0e7490;
     --sectors-accent-bright: #06b6d4;
-    --sectors-accent-soft: rgba(45, 212, 191, .09);
-    --sectors-accent-border: rgba(20, 184, 166, .20);
+    --sectors-accent-soft: rgba(34, 211, 238, .09);
+    --sectors-accent-border: rgba(6, 182, 212, .20);
     background-color: #f5f9f8;
     background-image:
-        linear-gradient(rgba(15, 118, 110, .025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(15, 118, 110, .025) 1px, transparent 1px),
+        linear-gradient(rgba(14, 116, 144, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14, 116, 144, .025) 1px, transparent 1px),
         radial-gradient(circle at 88% 4%, rgba(34, 211, 238, .08), transparent 26%);
     background-size: 32px 32px, 32px 32px, auto;
 }
@@ -3086,7 +3353,7 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] #sectors-page-heading {
-    border-color: rgba(15, 118, 110, .13);
+    border-color: rgba(14, 116, 144, .13);
     background: rgba(245, 249, 248, .88);
 }
 
@@ -3112,10 +3379,10 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] #sectors-page .ak-market-card-prominent {
-    border: 1px solid rgba(13, 148, 136, .28) !important;
+    border: 1px solid rgba(8, 145, 178, .28) !important;
     border-radius: 14px 14px 20px 20px !important;
     background: linear-gradient(155deg, #ffffff, rgba(238, 248, 246, .98)) !important;
-    box-shadow: 0 12px 28px rgba(35, 72, 67, .14), 0 2px 6px rgba(15, 118, 110, .08), inset 0 4px 0 rgba(6, 182, 212, .72) !important;
+    box-shadow: 0 12px 28px rgba(35, 72, 67, .14), 0 2px 6px rgba(14, 116, 144, .08), inset 0 4px 0 rgba(6, 182, 212, .72) !important;
 }
 
 :root:not([data-theme="light"]) #sectors-page .ak-market-card-prominent {
@@ -3132,9 +3399,9 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] #sectors-page .ak-market-card-head {
-    border-color: rgba(20, 184, 166, .25) !important;
+    border-color: rgba(6, 182, 212, .25) !important;
     background: linear-gradient(112deg, rgba(6, 182, 212, .14), transparent 58%, rgba(251, 146, 60, .08)), #eef8f7 !important;
-    box-shadow: inset 0 -1px 0 rgba(20, 184, 166, .20) !important;
+    box-shadow: inset 0 -1px 0 rgba(6, 182, 212, .20) !important;
 }
 
 :root:not([data-theme="light"]) #sectors-page .ak-market-card-head {
@@ -3144,7 +3411,7 @@ body:not(.welcome-background) :is(
 }
 
 :root[data-theme="light"] #sectors-page .ak-market-card-prominent [class*="bg-black"] {
-    background-color: rgba(15, 118, 110, .04) !important;
+    background-color: rgba(14, 116, 144, .04) !important;
 }
 
 /* Prediction table: dense analysis grid with clear numeric hierarchy. */
@@ -3165,7 +3432,7 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] #predictions-page .ak-predictions-card-surface {
     border: 1px solid #d9e7e4 !important;
     background: rgba(255, 255, 255, .94) !important;
-    box-shadow: 0 6px 16px rgba(35, 72, 67, .055), inset 2px 0 0 rgba(20, 184, 166, .56) !important;
+    box-shadow: 0 6px 16px rgba(35, 72, 67, .055), inset 2px 0 0 rgba(6, 182, 212, .56) !important;
 }
 
 :root:not([data-theme="light"]) #predictions-page .ak-predictions-card-surface {
@@ -3211,7 +3478,7 @@ body:not(.welcome-background) :is(
 :root[data-theme="light"] #predictions-page .ak-stocks-table .ak-predictions-filter-row th {
     background: #e8f5f3 !important;
     color: #335e59 !important;
-    box-shadow: 0 1px 0 rgba(15, 118, 110, .16), 0 7px 16px rgba(35, 72, 67, .07) !important;
+    box-shadow: 0 1px 0 rgba(14, 116, 144, .16), 0 7px 16px rgba(35, 72, 67, .07) !important;
 }
 
 :root:not([data-theme="light"]) #predictions-page .ak-stocks-table thead,
@@ -3296,9 +3563,16 @@ body:not(.welcome-background) :is(
 }
 
 #predictions-page .ak-prediction-signal-badge[data-signal="buy"] {
-    border-color: #0f766e;
+    border-color: #0e7490;
     background: #137f73;
     color: #fff;
+}
+
+#predictions-page .ak-prediction-signal-badge[data-signal="wait"] {
+    border-color: rgba(52, 211, 153, .72);
+    background: rgba(16, 185, 129, .34);
+    color: #d1fae5;
+    box-shadow: 0 0 14px rgba(16, 185, 129, .28);
 }
 
 #predictions-page .ak-prediction-signal-badge[data-signal="watch"] {
@@ -3383,3 +3657,232 @@ body:not(.welcome-background) :is(
     box-shadow: 0 8px 22px rgba(35,72,67,.065), inset 3px 0 0 rgba(6,182,212,.58) !important;
 }
 :root[data-theme="light"] .ak-market-situation-page .ak-market-eyebrow { color: #0891b2 !important; }
+
+/* Mobile workspace: keep the dashboard language while giving every page a
+   predictable single-column flow, touch-sized controls and safe data scroll. */
+@media (max-width: 767px) {
+    html, body { min-width: 320px; overflow-x: hidden; }
+    .ak-container { padding-inline: .75rem !important; }
+    .ak-app-topbar { height: 58px !important; }
+    .ak-app-topbar > .ak-container { gap: .35rem !important; padding-inline: .5rem !important; }
+    .ak-brand-link { width: 2.9rem !important; }
+    .ak-brand-logo { height: 2.8rem !important; max-width: 8.5rem !important; }
+    .ak-app-topbar nav { gap: .25rem !important; }
+    .ak-app-topbar nav .ak-top-link,
+    .ak-app-topbar nav .ak-top-link-active { min-width: 2.55rem !important; height: 2.45rem; padding-inline: .62rem !important; border-radius: .8rem; }
+    .ak-app-topbar nav .ak-top-link svg,
+    .ak-app-topbar nav .ak-top-link-active svg { width: 1.15rem; height: 1.15rem; }
+    .ak-nav-scroll-button { width: 2.3rem !important; height: 2.3rem !important; }
+    main.ak-container { padding-top: .55rem !important; }
+    .ak-detail-design { width: 100% !important; max-width: none !important; padding-top: .35rem !important; padding-bottom: 1rem !important; }
+    .ak-detail-design :is(.ak-detail-hero, .ak-detail-panel, .ak-dashboard-card, .ak-standard-card) { border-radius: 1rem !important; }
+    .ak-detail-design :is(.ak-detail-hero, .ak-detail-panel, .ak-dashboard-card, .ak-standard-card) { padding: .85rem !important; }
+    .ak-detail-design .ak-detail-card-head { margin: -.85rem -.85rem .75rem !important; padding: .75rem .85rem !important; }
+    .ak-detail-design h1 { font-size: 1.45rem !important; line-height: 1.12; }
+    .ak-detail-design h2 { font-size: 1rem !important; }
+    .ak-detail-design h3 { font-size: .9rem !important; }
+    .ak-detail-design :is(button, a.inline-flex, input, select, textarea) { min-height: 2.65rem; }
+    .ak-detail-design .grid { gap: .65rem !important; }
+    .ak-detail-design .grid.grid-cols-2,
+    .ak-detail-design .grid.grid-cols-3,
+    .ak-detail-design .grid.grid-cols-4,
+    .ak-detail-design .grid.md\:grid-cols-2,
+    .ak-detail-design .grid.lg\:grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
+    .ak-detail-design .overflow-x-auto { max-width: 100%; -webkit-overflow-scrolling: touch; }
+    .ak-detail-design table { font-size: .72rem; }
+    .ak-detail-design table:not(.w-full) { min-width: 620px; }
+    .ak-stocks-table, .ak-predictions-table, .ak-table-wrap { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .ak-stocks-table table, .ak-predictions-table table { min-width: 760px; }
+    .ak-chart, .ak-chart-card canvas, .ak-detail-design canvas, .ak-detail-design svg { max-width: 100%; }
+    .ak-detail-design .modal, .ak-detail-design [role="dialog"] { width: calc(100vw - 1.25rem) !important; max-width: calc(100vw - 1.25rem) !important; max-height: calc(100dvh - 1.25rem) !important; overflow-y: auto; }
+    .ak-topbar-menu { width: min(18rem, calc(100vw - 1rem)) !important; max-width: calc(100vw - 1rem); }
+    .ak-prediction-filters, #prediction-filterboard { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    #prediction-filterboard > * { min-width: 0; }
+    .ak-market-tape, .ak-market-command-hero { overflow-x: auto; }
+    .ak-market-tape > * { min-width: 8.5rem; }
+    /* The heatmap page used a viewport-height flex shell and square cards.
+       On phones that combination made the following cards paint over the
+       previous one. Let the page grow naturally and provide one contained
+       scroll area for the stacked heatmaps so the filter row stays above it. */
+    .ak-strategy-page { height: auto !important; min-height: calc(100dvh - 89px) !important; overflow: visible !important; }
+    .ak-heatmap-metric-grid {
+        display: flex !important;
+        flex: none !important;
+        width: 100% !important;
+        height: auto !important;
+        max-height: calc(100dvh - 13rem) !important;
+        min-height: 0 !important;
+        flex-direction: column !important;
+        gap: .85rem !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+        padding: .1rem .25rem .75rem .05rem;
+        -webkit-overflow-scrolling: touch;
+    }
+    .ak-heatmap-metric-grid > article {
+        display: flex !important;
+        flex: none !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 30rem !important;
+        aspect-ratio: auto !important;
+        overflow: visible !important;
+    }
+    .ak-heatmap-metric-grid > article > .grid {
+        display: grid !important;
+        flex: none !important;
+        width: 100% !important;
+        height: 22rem !important;
+        min-height: 22rem !important;
+        grid-template-rows: repeat(10, minmax(0, 1fr)) 1.35rem !important;
+        gap: .3rem !important;
+    }
+    .ak-heatmap-metric-grid .ak-heatmap-cell {
+        aspect-ratio: auto !important;
+        width: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+        padding: .15rem !important;
+        line-height: 1 !important;
+    }
+    .ak-heatmap-metric-grid .ak-heatmap-cell > span {
+        display: block !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        font-size: .68rem !important;
+        line-height: 1 !important;
+        text-overflow: clip !important;
+        white-space: nowrap !important;
+    }
+
+    /* Predictions: preserve column geometry and let the dense table scroll
+       horizontally instead of squeezing donuts, badges and numbers into one
+       another. Non-essential metadata is hidden on phones. */
+    #predictions-page #predictions-table-scroll {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+    #predictions-page #predictions-table-scroll .ak-stocks-table {
+        width: max-content !important;
+        min-width: 980px !important;
+        table-layout: fixed !important;
+    }
+    #predictions-page #predictions-table-scroll .ak-stocks-table th,
+    #predictions-page #predictions-table-scroll .ak-stocks-table td {
+        white-space: nowrap !important;
+        vertical-align: middle !important;
+    }
+    #predictions-page #predictions-table-scroll .ak-prediction-donut {
+        width: 42px !important;
+        height: 42px !important;
+        flex-basis: 42px !important;
+    }
+    #predictions-page #predictions-table-scroll .ak-prediction-donut span { font-size: 10px !important; }
+    #predictions-page #predictions-table-scroll .ak-prediction-signal-badge { min-width: 5.5rem !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="1"] :is(th:nth-child(2), td:nth-child(2)),
+    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="1"] :is(th:nth-child(6), td:nth-child(6)),
+    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="1"] :is(th:nth-child(7), td:nth-child(7)),
+    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="1"] :is(th:nth-child(16), td:nth-child(16)),
+    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="0"] :is(th:nth-child(5), td:nth-child(5)),
+    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="0"] :is(th:nth-child(6), td:nth-child(6)),
+    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="0"] :is(th:nth-child(15), td:nth-child(15)) {
+        display: none !important;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .ak-container { padding-inline: 1rem !important; }
+    .ak-detail-design { max-width: 100% !important; }
+    .ak-detail-design .grid.xl\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ak-detail-design .overflow-x-auto { max-width: 100%; -webkit-overflow-scrolling: touch; }
+    .ak-predictions-table table, .ak-stocks-table table { min-width: 900px; }
+}
+.company-description-card:not([open]) .company-description {
+    display: none;
+}
+
+.company-description-card:not([open]) .company-preview {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 10;
+}
+
+.company-description-card[open] .company-preview { display: none; }
+.company-description-card:not([open]) { max-height: 240px; overflow: hidden; }
+.company-description-card[open] { max-height: none; overflow: visible; }
+
+.company-description-card > summary::-webkit-details-marker { display: none; }
+
+.assessment-details-card:not([open]) .assessment-full { display: none; }
+.assessment-details-card:not([open]) .assessment-preview {
+    overflow: hidden;
+}
+.assessment-details-card:not([open]) { overflow: hidden; }
+.assessment-details-card:not([open]) > summary { height: 100%; min-height: 0; overflow: hidden; }
+.assessment-details-card[open] { height: auto !important; max-height: none !important; overflow: visible; }
+.assessment-details-card[open] .assessment-preview { display: none; }
+.assessment-details-card > summary::-webkit-details-marker { display: none; }
+.assessment-details-card > summary:focus,
+.simple-assessment-card > summary:focus {
+    outline: none;
+}
+
+.simple-assessment-card:not([open]) .simple-assessment-full { display: none; }
+.simple-assessment-card:not([open]) { overflow: hidden; }
+.simple-assessment-card:not([open]) > summary { height: 100%; min-height: 0; overflow: hidden; }
+.simple-assessment-card[open] { height: auto !important; max-height: none !important; overflow: visible; }
+.simple-assessment-card[open] .simple-assessment-preview { display: none; }
+.simple-assessment-card > summary::-webkit-details-marker { display: none; }
+
+@media (min-width: 1280px) {
+    .screener-stock-card {
+        height: 25rem;
+    }
+
+    .screener-stock-card.screener-stock-card-long-name {
+        height: 29rem;
+    }
+
+    .screener-stock-card:has(details[open]) {
+        height: auto;
+        min-height: 25rem;
+    }
+
+    .screener-stock-card.screener-stock-card-long-name:has(details[open]) {
+        min-height: 29rem;
+    }
+}
+
+@media (min-width: 640px) {
+    .screener-company-card:not([open]) {
+        min-height: 148px;
+        max-height: none;
+    }
+
+    .screener-company-card:not([open]) .company-preview {
+        -webkit-line-clamp: 6;
+    }
+}
+
+/* Tablet: Kerndaten und KI-Auswertung nebeneinander, Bewertung in voller Breite. */
+@media (min-width: 768px) and (max-width: 1279px) {
+    .screener-stock-card > .grid {
+        align-items: stretch;
+    }
+
+    .screener-stock-card > .grid > div:nth-child(3) {
+        min-height: 13rem;
+    }
+
+    .screener-stock-card > .grid > div:nth-child(3) > details:not([open]) {
+        min-height: 13rem;
+        max-height: 13rem;
+    }
+}

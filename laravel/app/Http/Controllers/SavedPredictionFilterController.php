@@ -21,6 +21,7 @@ final class SavedPredictionFilterController extends Controller
         'predicted_return_min',
         'pe_max', 'dividend_yield_min', 'market_cap_min', 'revenue_growth_min', 'hit_rate_min',
         'gate_mode', 'sector_score_rotation', 'index_score_rotation', 'max_positions', 'position_factor', 'exit_strategy',
+        'automatic_optimization', 'optimization_goal',
     ];
 
     public const FILTER_DEFAULTS = [
@@ -33,7 +34,7 @@ final class SavedPredictionFilterController extends Controller
         'revenue_growth_min' => -50, 'hit_rate_min' => 0,
         'gate_mode' => 'system',
         'sector_score_rotation' => 0, 'index_score_rotation' => 0, 'max_positions' => 5, 'position_factor' => 1,
-        'exit_strategy' => 'fixed_20d',
+        'exit_strategy' => 'fixed_20d', 'automatic_optimization' => 0, 'optimization_goal' => '',
     ];
 
     public function index(Request $request, SavedFilterLimitService $limits): View
@@ -102,8 +103,18 @@ final class SavedPredictionFilterController extends Controller
             'exit_strategy' => ['required', 'in:fixed_20d,winner_runner,prediction_target,buy_and_hold'],
             'visibility' => ['required', 'in:private,pro_public'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'automation_enabled' => ['nullable', 'boolean'],
+            'portfolio_id' => ['nullable', 'integer'],
+            'automation_initial_capital' => ['nullable', 'numeric', 'between:1000,1000000'],
+            'automation_trade_cost' => ['nullable', 'numeric', 'between:0,1000'],
+            'transaction_email_enabled' => ['nullable', 'boolean'],
         ]);
         $user = $request->user();
+        $automationEnabled = $request->boolean('automation_enabled');
+        $portfolio = $automationEnabled && $request->filled('portfolio_id')
+            ? $user->portfolios()->where('type', 'paper')->where('active', true)
+                ->whereKey($request->integer('portfolio_id'))->firstOrFail()
+            : null;
         $editedFilter = isset($validated['saved_filter'])
             ? $user->savedPredictionFilters()->whereKey($validated['saved_filter'])->firstOrFail()
             : null;
@@ -159,6 +170,68 @@ final class SavedPredictionFilterController extends Controller
                 'description' => filled($validated['description'] ?? null) ? trim($validated['description']) : null,
                 'published_at' => $validated['visibility'] === 'pro_public' ? now() : null,
             ]);
+        }
+        if ($automationEnabled) {
+            $initialCapital = round((float) ($validated['automation_initial_capital'] ?? 10000), 2);
+            $tradeCost = round((float) ($validated['automation_trade_cost'] ?? 10), 2);
+            if ($portfolio === null) {
+                $baseName = trim($validated['name']).' Depot';
+                $portfolioName = $baseName;
+                $suffix = 2;
+                while ($user->portfolios()->whereRaw('LOWER(name) = ?', [mb_strtolower($portfolioName)])->exists()) {
+                    $portfolioName = $baseName.' '.$suffix++;
+                }
+                $isFirst = ! $user->portfolios()->where('active', true)->exists();
+                $portfolio = $user->portfolios()->create([
+                    'name' => $portfolioName,
+                    'type' => 'paper',
+                    'currency' => 'EUR',
+                    'description' => __('Automatisches Depot für :strategy', ['strategy' => $savedFilter->name]),
+                    'is_default' => $isFirst,
+                    'active' => true,
+                    'meta' => ['automation' => ['initial_capital' => $initialCapital, 'trade_cost' => $tradeCost]],
+                ]);
+                $accountId = DB::table('portfolio_cash_accounts')->insertGetId([
+                    'portfolio_id' => $portfolio->id,
+                    'currency' => 'EUR',
+                    'balance' => $initialCapital,
+                    'reserved_balance' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                DB::table('portfolio_cash_ledger')->insert([
+                    'portfolio_cash_account_id' => $accountId,
+                    'type' => 'initial_deposit',
+                    'amount' => $initialCapital,
+                    'balance_after' => $initialCapital,
+                    'currency' => 'EUR',
+                    'occurred_at' => now(),
+                    'meta' => json_encode(['source' => 'automatic_strategy'], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+            $meta = (array) $portfolio->meta;
+            data_set($meta, 'automation.initial_capital', $initialCapital);
+            data_set($meta, 'automation.trade_cost', $tradeCost);
+            data_set($meta, 'automation.live_enabled', true);
+            data_set($meta, 'automation.transaction_email_enabled', $request->boolean('transaction_email_enabled'));
+            data_set($meta, 'automation.label', 'Strategie');
+            data_set($meta, 'automation.activated_at', now()->toIso8601String());
+            $portfolio->forceFill(['meta' => $meta])->save();
+
+            DB::table('portfolio_strategy_assignments')->where('saved_prediction_filter_id', $savedFilter->id)->delete();
+            DB::table('portfolio_strategy_assignments')->insert([
+                'portfolio_id' => $portfolio->id,
+                'saved_prediction_filter_id' => $savedFilter->id,
+                'enabled' => true,
+                'priority' => 10,
+                'capital_weight' => 1,
+                'settings' => json_encode(['source' => 'automatic_optimization'], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $savedFilter->forceFill(['automatic_portfolio_enabled' => true])->save();
         }
         $request->session()->put('setup_filter_state', $filters);
 

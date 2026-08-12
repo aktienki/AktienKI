@@ -8,12 +8,12 @@
         body { margin: 0; font-family: DejaVu Sans, sans-serif; color: #18263a; font-size: 7.7px; line-height: 1.22; }
         h1, h2, p { margin: 0; }
         .header { padding: 11px 15px; background: #101e33; color: #fff; border-radius: 8px; }
-        .brand { color: #2dd4bf; font-weight: 800; font-size: 9px; letter-spacing: 1px; }
+        .brand { color: #22d3ee; font-weight: 800; font-size: 9px; letter-spacing: 1px; }
         h1 { margin-top: 3px; font-size: 17px; }
         .subtitle { margin-top: 3px; color: #bdcadb; }
         .meta { margin-top: 6px; color: #e1e8f1; }
         .section { margin-top: 9px; page-break-inside: avoid; }
-        .section-title { margin-bottom: 4px; color: #0f766e; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
+        .section-title { margin-bottom: 4px; color: #0e7490; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
         table { width: 100%; border-collapse: collapse; }
         th { background: #dce7ef; color: #314258; font-size: 7px; text-align: left; padding: 4px 5px; }
         td { padding: 3.5px 5px; border-bottom: 1px solid #dce4ec; vertical-align: top; }
@@ -32,7 +32,7 @@
         .report-page { page-break-before: always; }
         .model-summary { margin-top: 8px; }
         .model-summary td { width: 25%; padding: 7px 8px; border: 2px solid #fff; background: #eef3f7; }
-        .model-summary strong { display: block; margin-top: 2px; color: #0f766e; font-size: 13px; }
+        .model-summary strong { display: block; margin-top: 2px; color: #0e7490; font-size: 13px; }
         .model-table th:not(:first-child), .model-table td:not(:first-child) { text-align: right; }
         .model-table td:first-child { font-weight: 800; color: #1f3046; }
         .tier { display: inline-block; min-width: 74px; padding: 2px 5px; border-radius: 4px; background: #dce7ef; color: #314258; font-weight: 800; text-align: center; }
@@ -41,7 +41,7 @@
         .exit-matrix strong, .exit-matrix span { display: block; }
         .exit-matrix span { margin-top: 1px; color: #66758a; font-size: 6.3px; }
         .stock-table th:not(:nth-child(2)), .stock-table td:not(:nth-child(2)) { text-align: center; }
-        .stock-table td:first-child { font-weight: 800; color: #0f766e; }
+        .stock-table td:first-child { font-weight: 800; color: #0e7490; }
         .stock-table td:nth-child(2) { color: #1f3046; }
         .footer { position: fixed; bottom: -20px; left: 0; right: 0; color: #7a8797; font-size: 7px; text-align: center; }
     </style>
@@ -78,6 +78,9 @@
     ];
     $selectedExitStrategyLabel = $exitStrategyLabels[$selectedExitStrategy] ?? $selectedExitStrategy;
     $moneyManagerEnabled = $selectedExitStrategy !== 'buy_and_hold';
+    $executionHorizon = (int) ($run->horizon_days ?? 20);
+    $optimizationWeights = (array) data_get($settings, 'optimization.horizon_weights', []);
+    $multiHorizonOptimization = data_get($settings, 'optimization.mode') === 'automatic_multi_horizon';
     $benchmarkStartDate = ! empty($result['benchmark']) ? date('d.m.Y', (int) ($result['benchmark'][0]['x'] / 1000)) : '—';
     $benchmarkEndDate = ! empty($result['benchmark']) ? date('d.m.Y', (int) (end($result['benchmark'])['x'] / 1000)) : '—';
 @endphp
@@ -85,8 +88,37 @@
 <div class="header">
     <div class="brand">aktienKI.com</div>
     <h1>Persönlicher 3-Jahres-Backtest</h1>
-    <p class="subtitle">20-Tage-Exit, Winner Runner, Prognoseziel, Buy and Hold, adaptive Marktrotation und S&amp;P 500 im direkten Vergleich</p>
+    <p class="subtitle">Ausführungshorizont {{ $executionHorizon }} Tage · Winner Runner, Prognoseziel, Buy and Hold, adaptive Marktrotation und S&amp;P 500 im direkten Vergleich</p>
     <p class="meta">Bericht erstellt am {{ now()->timezone('Europe/Berlin')->format('d.m.Y H:i') }} Uhr · Lauf {{ $run->public_id }}</p>
+</div>
+
+<div class="section">
+    <div class="section-title">Verwendeter Horizont und Gesamtstatistik</div>
+    <div class="note">
+        <strong>Tatsächlich gehandelt:</strong> {{ $executionHorizon }}-Tage-Horizont.
+        @if ($multiHorizonOptimization)
+            Für die automatische Vorauswahl wurden zusätzlich 5, 10, 15 und 20 Tage ausgewertet. Diese Horizonte beeinflussen die Auswahl, werden in diesem Lauf aber nicht gleichzeitig gehandelt.
+        @endif
+    </div>
+    <table style="margin-top:5px" class="comparison">
+        <thead><tr><th>Horizont</th><th>Gewichtung</th><th>Aktien</th><th>Trades</th><th>Hitrate</th><th>Ø Netto-Rendite/Trade</th><th>Profitfaktor</th></tr></thead>
+        <tbody>
+        @forelse ($horizonStatistics as $horizon)
+            @php($days = $horizon['horizon_days'])
+            <tr>
+                <td><strong>{{ $days === null ? 'Gesamt' : $days.' Tage' }}</strong>{{ $days === $executionHorizon ? ' · gehandelt' : '' }}</td>
+                <td>{{ $days !== null && isset($optimizationWeights[$days]) ? number_format((float) $optimizationWeights[$days], 0, ',', '.').' %' : ($days === $executionHorizon && ! $multiHorizonOptimization ? '100 %' : '—') }}</td>
+                <td>{{ number_format((int) $horizon['instruments'], 0, ',', '.') }}</td>
+                <td>{{ number_format((int) $horizon['trades'], 0, ',', '.') }}</td>
+                <td class="{{ (float) $horizon['hit_rate'] >= 50 ? 'positive' : 'negative' }}">{{ $formatPercent($horizon['hit_rate']) }}</td>
+                <td class="{{ (float) $horizon['average_return'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($horizon['average_return']) }}</td>
+                <td>{{ $horizon['profit_factor'] === null ? '∞' : number_format((float) $horizon['profit_factor'], 2, ',', '.') }}</td>
+            </tr>
+        @empty
+            <tr><td colspan="7">Für die verwendeten Horizonte ist keine Walk-Forward-Gesamtstatistik verfügbar.</td></tr>
+        @endforelse
+        </tbody>
+    </table>
 </div>
 
 <div class="section">

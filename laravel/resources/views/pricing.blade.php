@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="lg:h-full lg:overflow-hidden">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="min-h-full">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -20,6 +20,11 @@
         .pricing-planned { border-style:dashed;border-color:rgba(248,113,113,.45);background:linear-gradient(145deg,rgba(153,27,27,.25),rgba(190,24,93,.10) 55%,rgba(15,23,42,.22));box-shadow:0 20px 48px rgba(127,29,29,.18),inset 0 1px 0 rgba(254,202,202,.07); }
         .pricing-planned-badge { border:1px solid rgba(252,165,165,.82);background:linear-gradient(90deg,#991b1b,#dc2626 52%,#f87171);color:#fff;box-shadow:0 0 24px rgba(239,68,68,.38),0 6px 18px rgba(127,29,29,.3); }
         .pricing-planned-button { border:1px dashed rgba(148,163,184,.28);background:rgba(148,163,184,.06);color:#94a3b8;cursor:not-allowed; }
+        .pricing-developer { border:2px solid rgba(251,191,36,.78);background:linear-gradient(145deg,rgba(8,47,73,.98),rgba(15,23,42,.84));box-shadow:0 22px 56px rgba(8,47,73,.38),0 0 34px rgba(251,191,36,.20),0 0 70px rgba(34,211,238,.10),inset 0 1px 0 rgba(254,243,199,.22);transform:translateY(-.35rem); }
+        .pricing-developer:hover { border-color:rgba(253,230,138,.98);box-shadow:0 26px 64px rgba(8,47,73,.46),0 0 42px rgba(251,191,36,.30),0 0 82px rgba(34,211,238,.16),inset 0 1px 0 rgba(255,255,255,.28); }
+        .pricing-developer-badge { border:1px solid rgba(254,243,199,.78);background:linear-gradient(90deg,rgba(180,83,9,.72),rgba(251,191,36,.35));color:#fff7d6;box-shadow:0 0 18px rgba(251,191,36,.24); }
+        [data-theme="light"] .pricing-developer { border-color:rgba(217,119,6,.68);background:linear-gradient(145deg,rgba(254,249,195,.96),rgba(236,254,255,.94) 48%,rgba(255,255,255,.96));box-shadow:0 22px 52px rgba(180,83,9,.18),0 0 34px rgba(251,191,36,.22),inset 0 1px 0 rgba(255,255,255,.9); }
+        [data-theme="light"] .pricing-developer-badge { color:#92400e;background:rgba(251,191,36,.18); }
         [data-theme="light"] .pricing-bg { background-color:#f8fafc; background-image:radial-gradient(circle at 75% 15%,rgba(139,92,246,.13),transparent 30%),radial-gradient(circle at 15% 80%,rgba(251,146,60,.1),transparent 28%),linear-gradient(rgba(124,58,237,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,.07) 1px,transparent 1px); }
         [data-theme="light"] .pricing-topbar { background:rgba(255,255,255,.82);border-color:rgba(124,58,237,.16); }
         [data-theme="light"] .pricing-featured { border-color:rgba(217,119,6,.48);background:linear-gradient(145deg,rgba(251,191,36,.28),rgba(255,255,255,.78)); }
@@ -100,9 +105,9 @@
         @endphp
 
         <div class="mt-7 items-stretch">
-            <div class="grid items-stretch gap-5 md:grid-cols-3 md:gap-4">
+            <div class="grid items-start gap-5 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
                 @foreach ($plans as $plan)
-                    <article class="relative flex h-full flex-col rounded-2xl border p-5 lg:min-h-0 {{ $plan['featured'] ? 'pricing-featured' : ($plan['planned'] ? 'pricing-planned' : 'pricing-dashboard-card') }}">
+                    <article class="pricing-plan-card relative flex min-h-[520px] flex-col rounded-2xl border p-5 lg:min-h-0 xl:h-[560px] xl:min-h-0 {{ $plan['featured'] ? 'pricing-featured' : ($plan['planned'] ? 'pricing-planned' : 'pricing-dashboard-card') }}">
                         @if ($plan['featured'])
                             <span class="pricing-popular-badge absolute right-5 top-5 rounded-md px-3 py-1 text-[10px] font-black uppercase tracking-wider">{{ __('Empfehlung') }}</span>
                         @elseif ($plan['planned'])
@@ -131,6 +136,33 @@
                         @endif
                     </article>
                 @endforeach
+
+                <article x-data="{ developerDetails: false }" class="pricing-developer relative flex flex-col rounded-2xl p-5">
+                    <span class="pricing-developer-badge absolute right-5 top-5 rounded-md px-3 py-1 text-[10px] font-black uppercase tracking-wider">{{ __('Limitiert auf 10 User pro Monat') }}</span>
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-300"><x-heroicon-o-code-bracket class="h-6 w-6" /></div>
+                    <h2 class="mt-4 text-xl font-black">{{ __('Werde Developer') }}</h2>
+                    <p class="mt-2 min-h-10 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Werde Entwickler für die Community und entwickle eine Strategie, die unseren Qualitätsstandard erfüllt.') }}</p>
+                    <div class="mt-3 flex items-end gap-2"><strong class="text-3xl font-black tracking-tight">59,90 €</strong><span class="pb-1 text-[10px] text-[var(--ak-muted)]">{{ __('pro Monat') }}</span></div>
+                    <span class="mt-2 inline-flex w-fit rounded-md border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-cyan-200">{{ __('Nur 1 Monat gültig') }}</span>
+                    <div class="my-3 h-px bg-cyan-300/15"></div>
+                    <ul class="flex-1 space-y-2 text-[10px] leading-4 text-[var(--ak-text)]">
+                        <li class="flex gap-2"><span class="text-cyan-300">✓</span><span>{{ __('Entwickle mindestens eine Strategie, die unseren veröffentlichten Qualitätskriterien entspricht und mindestens 5 Aktien enthält, die derzeit noch nicht in unserer Aktienliste geführt werden.') }}</span></li>
+                        <li class="flex gap-2"><span class="text-cyan-300">✓</span><span>{{ __('Erstelle zusätzlich mindestens 5 Modelle für weitere bisher nicht enthaltene Aktien. Jedes Modell muss unser dokumentiertes Quality Gate bestehen.') }}</span></li>
+                        <li class="flex gap-2"><span class="text-cyan-300">✓</span><span>{{ __('Stelle deine Strategie der Pro-Community zur Verfügung.') }}</span></li>
+                        <li class="flex gap-2"><span class="text-amber-300">✓</span><span>{{ __('Nach vollständiger Prüfung und Übernahme der Beiträge erstatten wir die Differenz zum gültigen Pro-Tarif.') }}</span></li>
+                        <li class="flex gap-2"><span class="text-amber-300">✓</span><span>{{ __('Für alle Teilnehmer gelten dieselben technischen und qualitativen Kriterien. Eine erfolgreiche Teilnahme oder Erstattung ist nicht garantiert und setzt die vollständige Prüfung voraus.') }}</span></li>
+                        <li class="flex gap-2"><span class="text-cyan-300">✓</span><span>{{ __('Einmalige Teilnahmegebühr: 59,90 € für einen Monat; keine automatische Verlängerung.') }}</span></li>
+                        <li class="flex gap-2"><span class="text-cyan-300">✓</span><span>{{ __('AktienKI bleibt ein Analysewerkzeug und stellt keine Anlageberatung dar.') }}</span></li>
+                    </ul>
+                    <button type="button" @click="developerDetails = true" class="mt-4 inline-flex h-10 items-center justify-center rounded-lg border border-amber-300/35 bg-amber-300/10 px-4 text-sm font-black text-amber-200 transition hover:bg-amber-300/20">{{ __('Details') }}</button>
+                    <a href="{{ route('contact') }}" class="mt-2 inline-flex h-10 items-center justify-center rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-4 text-sm font-black text-cyan-200 transition hover:bg-cyan-300/20">{{ __('Interesse bekunden') }}</a>
+                    <div x-cloak x-show="developerDetails" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" @keydown.escape.window="developerDetails = false" @click.self="developerDetails = false">
+                        <div class="w-full max-w-lg rounded-2xl border border-amber-300/35 bg-slate-900 p-5 text-left shadow-2xl shadow-amber-950/30">
+                            <div class="flex items-start justify-between gap-4"><div><p class="text-[10px] font-black uppercase tracking-[.16em] text-amber-300">{{ __('Developer-Programm') }}</p><h3 class="mt-1 text-lg font-black text-white">{{ __('Transparente Teilnahmebedingungen') }}</h3></div><button type="button" @click="developerDetails = false" class="text-xl leading-none text-slate-400 hover:text-white" aria-label="{{ __('Schließen') }}">×</button></div>
+                            <ul class="mt-4 space-y-2 text-xs leading-5 text-slate-200"><li>• {{ __('Mindestens eine Strategie mit mindestens 5 derzeit nicht enthaltenen Aktien.') }}</li><li>• {{ __('Zusätzlich mindestens 5 neue Modelle, die das dokumentierte Quality Gate bestehen.') }}</li><li>• {{ __('Die geprüfte Strategie wird der Pro-Community zur Verfügung gestellt.') }}</li><li>• {{ __('Erstattung der Differenz zum gültigen Pro-Tarif erst nach vollständiger Prüfung und Übernahme der Beiträge.') }}</li><li>• {{ __('Für alle Teilnehmer gelten dieselben veröffentlichten Kriterien; eine Erstattung ist nicht garantiert.') }}</li><li>• {{ __('Einmalige Teilnahmegebühr von 59,90 € für einen Monat, ohne automatische Verlängerung.') }}</li><li>• {{ __('Maximal 10 Teilnehmer pro Kalendermonat.') }}</li></ul>
+                        </div>
+                    </div>
+                </article>
             </div>
 
         </div>

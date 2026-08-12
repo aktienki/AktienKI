@@ -139,7 +139,7 @@
                         $score = \App\Support\AiScore::toTen($row->prediction_score);
                         $scorePercent = \App\Support\AiScore::toPercent($row->prediction_score);
                         $confidencePercent = is_numeric($row->confidence) ? max(0, min(100, (float) $row->confidence <= 1 ? (float) $row->confidence * 100 : (float) $row->confidence)) : null;
-                        $riskPercent = is_numeric($row->risk_score) ? max(0, min(100, (float) $row->risk_score <= 1 ? (float) $row->risk_score * 100 : (float) $row->risk_score)) : null;
+                        $riskPercent = \App\Support\RiskScore::toPercent($row->risk_score, $row->drawdown_risk_factor ?? null);
                         $confidenceColor = match (true) {
                             $confidencePercent === null => '#64748b',
                             $confidencePercent < 40 => '#ef4444',

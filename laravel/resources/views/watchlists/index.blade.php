@@ -7,14 +7,14 @@
         @keydown.escape.window="setupOpen = false"
         class="ak-detail-design mx-auto w-full max-w-screen-2xl space-y-5 py-5"
     >
-        <header class="ak-detail-hero sticky top-[73px] z-40 flex flex-col justify-between gap-4 rounded-2xl border border-[var(--ak-border)] px-4 py-3 sm:flex-row sm:items-end">
+        <header class="ak-detail-hero flex flex-col justify-between gap-4 rounded-2xl border border-cyan-400/25 bg-cyan-400/[.035] px-5 py-4 shadow-[0_18px_55px_rgba(6,182,212,.06)] sm:flex-row sm:items-center">
             <div>
-                <p class="text-xs font-black uppercase tracking-[.2em] text-violet-300">{{ __('Persönliche Auswahl') }}</p>
+                <p class="text-xs font-black uppercase tracking-[.2em] text-cyan-400">{{ __('Persönliche Auswahl') }}</p>
                 <h1 class="mt-2 text-3xl font-black text-[var(--ak-text)]">{{ __('Watchlists') }}</h1>
                 <p class="mt-2 text-sm text-[var(--ak-muted)]">{{ __('Erstelle zuerst eine Watchlist und füge anschließend Aktien über den Stern in der Aktientabelle hinzu.') }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                <button type="button" @click="setupOpen = true" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-black text-white shadow-lg shadow-violet-950/30 transition hover:bg-violet-500">
+                <button type="button" @click="setupOpen = true" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-400/10 px-4 text-xs font-black text-cyan-300 shadow-lg shadow-cyan-950/20 transition hover:border-cyan-300/55 hover:bg-cyan-400/20 hover:text-cyan-200">
                     <x-heroicon-o-cog-6-tooth class="h-4 w-4" />{{ __('Watchlist einrichten') }}
                 </button>
                 <a href="{{ route('stocks.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 text-xs font-bold text-[var(--ak-muted)] transition hover:border-violet-400/30 hover:text-[var(--ak-text)]">
@@ -73,7 +73,7 @@
                     <textarea id="watchlist-description" name="description" rows="4" maxlength="500" class="ak-input mt-2 resize-none" placeholder="{{ __('Notizen zum Zweck dieser Watchlist') }}">{{ old('description') }}</textarea>
                     @error('description')<p class="mt-2 text-xs text-rose-400">{{ $message }}</p>@enderror
                 </div>
-                <button type="submit" class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-black text-white shadow-lg shadow-violet-950/30 transition hover:bg-violet-500">
+                <button type="submit" class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-400/10 px-5 text-sm font-black text-cyan-300 shadow-lg shadow-cyan-950/20 transition hover:border-cyan-300/55 hover:bg-cyan-400/20 hover:text-cyan-200">
                     <x-heroicon-o-plus-circle class="h-5 w-5" />{{ __('Watchlist erstellen') }}
                 </button>
             </form>
@@ -100,7 +100,7 @@
                                 @if ($watchlist->description)<p class="mt-1 text-xs text-[var(--ak-muted)]">{{ $watchlist->description }}</p>@endif
                             </div>
                             <div class="flex items-center gap-2">
-                                <a href="{{ route('watchlists.show', $watchlist->id) }}" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-violet-400/25 bg-violet-500/10 px-3 text-xs font-black text-violet-300 transition hover:bg-violet-500/20">
+                                <a href="{{ route('watchlists.show', $watchlist->id) }}" class="relative z-10 inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-cyan-400/35 bg-cyan-400/10 px-3 text-xs font-black text-cyan-300 transition hover:border-cyan-300/55 hover:bg-cyan-400/20">
                                     <x-heroicon-o-eye class="h-4 w-4" />{{ __('Öffnen') }}
                                 </a>
                                 <span

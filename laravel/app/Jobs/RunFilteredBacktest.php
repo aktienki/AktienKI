@@ -115,12 +115,56 @@ final class RunFilteredBacktest implements ShouldQueue
 
         $this->applyFilters($query, $fundamentalNumber);
 
-        $candidates = $query->select('trade.*')
+        $candidates = $query->select('trade.*', 'instrument.sector as rotation_sector')
             ->orderBy('trade.entry_date')
             ->orderByDesc('trade.ki_score')
             ->orderByDesc('trade.confidence')
             ->orderBy('trade.id')
             ->get();
+        $sectorRotation = filter_var($this->filters['sector_score_rotation'] ?? false, FILTER_VALIDATE_BOOL);
+        $indexRotation = filter_var($this->filters['index_score_rotation'] ?? false, FILTER_VALIDATE_BOOL);
+        if ($sectorRotation || $indexRotation) {
+            $sectorAverages = $sectorRotation
+                ? $candidates->groupBy(fn (object $trade): string => $trade->entry_date.'|'.($trade->rotation_sector ?? ''))
+                    ->map(fn ($group): float => (float) $group->avg('ki_score'))
+                : collect();
+            $memberships = $indexRotation
+                ? DB::table('index_memberships')->whereNull('removed_at')
+                    ->whereIn('instrument_id', $candidates->pluck('instrument_id')->unique())
+                    ->get(['instrument_id', 'market_index_id'])->groupBy('instrument_id')
+                : collect();
+            $indexBuckets = [];
+            if ($indexRotation) {
+                foreach ($candidates as $trade) {
+                    foreach ($memberships->get($trade->instrument_id, collect()) as $membership) {
+                        $key = $trade->entry_date.'|'.$membership->market_index_id;
+                        $indexBuckets[$key][] = (float) $trade->ki_score;
+                    }
+                }
+            }
+            foreach ($candidates as $trade) {
+                $trade->sector_rotation_score = $sectorRotation
+                    ? (float) ($sectorAverages->get($trade->entry_date.'|'.($trade->rotation_sector ?? '')) ?? 0)
+                    : 0.0;
+                $trade->index_rotation_score = $indexRotation
+                    ? (float) collect($memberships->get($trade->instrument_id, collect()))
+                        ->map(fn ($membership): float => (float) (isset($indexBuckets[$trade->entry_date.'|'.$membership->market_index_id]) ? array_sum($indexBuckets[$trade->entry_date.'|'.$membership->market_index_id]) / count($indexBuckets[$trade->entry_date.'|'.$membership->market_index_id]) : 0))
+                        ->max()
+                    : 0.0;
+                $activeRotationScores = array_filter([
+                    $sectorRotation ? $trade->sector_rotation_score : null,
+                    $indexRotation ? $trade->index_rotation_score : null,
+                ], fn ($score): bool => $score !== null);
+                $trade->rotation_score = $activeRotationScores === [] ? 0.0 : array_sum($activeRotationScores) / count($activeRotationScores);
+            }
+            $candidates = $candidates->sort(function (object $left, object $right): int {
+                return strcmp((string) $left->entry_date, (string) $right->entry_date)
+                    ?: ((float) $right->ki_score <=> (float) $left->ki_score)
+                    ?: ((float) $right->rotation_score <=> (float) $left->rotation_score)
+                    ?: ((float) $right->confidence <=> (float) $left->confidence)
+                    ?: ((int) $left->id <=> (int) $right->id);
+            })->values();
+        }
         $rows = $candidates;
         $initialCapital = $this->initialCapital();
         $positionCapital = $this->positionCapital();
@@ -130,9 +174,10 @@ final class RunFilteredBacktest implements ShouldQueue
                 $this->clearCancellationMarker();
                 return;
             }
-            DB::table('backtest_trades')->insert($chunk->map(function (object $trade) use ($positionCapital, $tradeCost): array {
+            DB::table('backtest_trades')->insertOrIgnore($chunk->map(function (object $trade) use ($positionCapital, $tradeCost): array {
                 $row = (array) $trade;
                 unset($row['id']);
+                unset($row['rotation_sector'], $row['sector_rotation_score'], $row['index_rotation_score'], $row['rotation_score']);
                 $row['backtest_run_id'] = $this->runId;
                 $row['transaction_cost'] = $positionCapital > 0 ? $tradeCost / $positionCapital : 0;
                 $row['net_return'] = (float) $trade->gross_return - (float) $row['transaction_cost'];
@@ -240,7 +285,7 @@ final class RunFilteredBacktest implements ShouldQueue
             $query->whereIn('quality_tier.code', $minimumQualityTiers[(string) $filter('quality_tier')]);
         }
         if ($filter('quality_tier') === 'unqualified') $query->whereNull('quality_tier.code');
-        if (in_array(strtoupper((string) $filter('signal')), ['BUY', 'WATCH', 'HOLD', 'SELL'], true)) $query->where('trade.signal', strtoupper((string) $filter('signal')));
+        if (in_array(strtoupper((string) $filter('signal')), ['BUY', 'WAIT', 'WATCH', 'HOLD', 'SELL'], true)) $query->where('trade.signal', strtoupper((string) $filter('signal')));
         if (is_numeric($filter('score_min'))) $query->where('trade.ki_score', '>=', max(0, min(10, (float) $filter('score_min'))));
         if (is_numeric($filter('confidence_min'))) $query->where('trade.confidence', '>=', max(0, min(100, (float) $filter('confidence_min'))));
         if (is_numeric($filter('risk_max')) && (float) $filter('risk_max') < 100) {

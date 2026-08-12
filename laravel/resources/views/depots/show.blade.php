@@ -122,7 +122,7 @@
                 @if($simulationRun?->status === 'completed' && !empty($simulationSummary['equity_curve']))
                     <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-transparent"><div id="portfolio-simulation-chart" class="ak-portfolio-line-chart min-h-[260px] flex-1"></div><div id="portfolio-profit-bars" class="relative mx-10 h-24 shrink-0 border-t border-white/10 bg-transparent"></div></div>
                 @else
-                    <div class="grid flex-1 place-items-center rounded-xl border border-dashed border-teal-500/25 bg-[linear-gradient(145deg,color-mix(in_srgb,var(--ak-surface-muted)_94%,#14b8a6_6%),var(--ak-surface-muted))] p-8 text-center">
+                    <div class="grid flex-1 place-items-center rounded-xl border border-dashed border-teal-500/25 bg-[linear-gradient(145deg,color-mix(in_srgb,var(--ak-surface-muted)_94%,#06b6d4_6%),var(--ak-surface-muted))] p-8 text-center">
                         <div class="max-w-md">
                             <span class="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-teal-500/25 bg-teal-500/10 text-teal-500"><x-heroicon-o-chart-bar-square class="h-7 w-7" /></span>
                             <h3 class="mt-4 text-base font-black text-[var(--ak-text)]">{{ __('Depotentwicklung berechnen') }}</h3>
@@ -142,6 +142,11 @@
             </section>
         @endif
 
+        <section class="mt-4 overflow-hidden rounded-2xl border border-cyan-400/25 bg-cyan-400/[.018] p-4">
+            <div class="mb-3 flex items-center justify-between"><div><p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-400">{{ __('Musterdepot-Verlauf') }}</p><h2 class="mt-1 font-black">{{ __('Entwicklung des simulierten Depotwerts') }}</h2></div><span class="text-xs font-black text-amber-300">{{ number_format($totalValue,2,',','.') }} {{ $portfolio->currency }}</span></div>
+            @if($portfolioValueCurve->count() >= 2)<div id="manual-portfolio-value-chart" class="h-56 w-full"></div>@else<div class="grid h-32 place-items-center rounded-xl border border-dashed border-cyan-400/20 text-xs text-[var(--ak-muted)]">{{ __('Der Chart erscheint, sobald genügend Kursdaten für Positionen vorhanden sind.') }}</div>@endif
+        </section>
+
         <div x-show="automationOpen" x-cloak class="fixed inset-0 z-[125] grid place-items-center bg-slate-950/80 p-4 backdrop-blur-sm" @keydown.escape.window="automationOpen=false">
             <form method="POST" action="{{ route('depots.automation.update', $portfolio) }}" class="w-full max-w-lg rounded-2xl border border-orange-400/25 bg-[#16253a]/90 p-6 shadow-2xl" @click.outside="automationOpen=false">
                 @csrf @method('PUT')
@@ -158,8 +163,7 @@
             </form>
         </div>
 
-        @if(false)
-        <section class="ak-detail-panel overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
+        <section class="mt-4 overflow-hidden rounded-2xl border border-cyan-400/25 bg-cyan-400/[.018] shadow-[0_18px_60px_rgba(6,182,212,.05)]">
             <div class="ak-detail-card-head flex items-center justify-between border-b border-[var(--ak-border)] px-4 py-3">
                 <div>
                     <h2 class="font-black">{{ __('Depotpositionen') }}</h2>
@@ -178,9 +182,10 @@
                 </div>
             @else
                 <div class="overflow-x-auto">
-                    <table class="ak-stocks-table w-full min-w-[820px] text-left text-xs">
+                    <table class="ak-stocks-table w-full min-w-[1450px] text-left text-xs">
                         <thead><tr>
-                            @foreach ([__('Aktie'), __('Stückzahl'), __('Einstieg'), __('Aktueller Kurs'), __('Wert'), __('Performance')] as $heading)
+                            @foreach ([__('Aktie'), __('Positionsgröße'), __('Kaufkurs'), __('Kauf-KI'), __('Aktueller Kurs'), __('KI-Bewertung'), __('Signalwechsel'), __('Wert'), __('Performance'), __('Verlauf'), __('Handel')] as $heading)
+                                @if($heading === __('Signalwechsel') && !$canViewSignalChanges) @continue @endif
                                 <th class="border-b border-[var(--ak-border)] px-4 py-3 text-[10px] font-black uppercase tracking-wide">{{ $heading }}</th>
                             @endforeach
                         </tr></thead>
@@ -191,14 +196,36 @@
                                     $current = (float) ($position->current_price ?? $entry);
                                     $value = (float) $position->quantity * $current;
                                     $positionPerformance = $entry > 0 ? (($current - $entry) / $entry) * 100 : 0;
+                                    $prediction = $positionPredictions->get($position->instrument_id);
+                                    $entryData = $positionEntryData->get($position->instrument_id, []);
+                                    $scorePercent = \App\Support\AiScore::toPercent($prediction?->prediction_score);
+                                    $toPercent = static fn ($number) => is_numeric($number) ? max(0,min(100,(float)$number*((float)$number<=1?100:1))) : null;
+                                    $confidence = $toPercent($prediction?->confidence); $stability = $toPercent($prediction?->horizon_fusion_stability_score);
+                                    $risk = \App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor);
+                                    $stats = $positionWalkForwardStats->get($position->instrument_id);
+                                    $hitRate = is_numeric($stats?->hit_rate) ? (float)$stats->hit_rate : null;
+                                    $profitTrade = is_numeric($stats?->average_profit_per_trade_percent) ? (float)$stats->average_profit_per_trade_percent : null;
+                                    $profitScale = $profitTrade !== null ? max(0,min(100,50+$profitTrade*25)) : null;
+                                    $color = static function($percent) { if(!is_numeric($percent)) return '#64748b'; $percent=max(0,min(100,(float)$percent)); $h=$percent<=50?($percent/50)*48:48+(($percent-50)/50)*94; return sprintf('hsl(%.1f 78%% 52%%)',$h); };
+                                    $signal = strtoupper((string)($prediction?->personalized_signal ?: 'HOLD'));
+                                    $signalTone = match($signal) {'BUY'=>'border-emerald-300/55 bg-emerald-400/15 text-emerald-300','WAIT'=>'border-emerald-300/45 bg-emerald-400/10 text-emerald-300','WATCH'=>'border-lime-300/40 bg-lime-400/10 text-lime-300','SELL'=>'border-rose-300/45 bg-rose-400/10 text-rose-300',default=>'border-amber-300/40 bg-amber-400/10 text-amber-300'};
+                                    $change = $canViewSignalChanges ? $positionSignalChanges->get($position->instrument_id) : null;
+                                    $series = collect($positionPerformanceSeries->get($position->instrument_id, collect()))->pluck('value')->map(fn($v)=>(float)$v)->values();
+                                    $cw=130;$ch=38;$cp=3;$cmin=$series->isNotEmpty()?min((float)$series->min(),0):0;$cmax=$series->isNotEmpty()?max((float)$series->max(),0):0;$cr=max(.01,$cmax-$cmin);
+                                    $poly=$series->map(fn($v,$i)=>number_format($cp+($i/max(1,$series->count()-1))*($cw-2*$cp),1,'.','').','.number_format($cp+(($cmin+$cr-$v)/$cr)*($ch-2*$cp),1,'.',''))->implode(' ');
                                 @endphp
                                 <tr>
                                     <td class="px-4 py-3"><a href="{{ route('stocks.show', ['symbol' => $position->instrument->symbol, 'prediction' => $latestPredictionIds->get($position->instrument_id), 'return_to' => request()->getRequestUri()]) }}" class="font-black text-teal-700">{{ $position->instrument->symbol }}</a><p class="mt-0.5 text-[10px] text-[var(--ak-muted)]">{{ $position->instrument->name }}</p></td>
                                     <td class="px-4 py-3 font-bold tabular-nums">{{ number_format($position->quantity, 4, ',', '.') }}</td>
                                     <td class="px-4 py-3 font-bold tabular-nums">{{ number_format($entry, 2, ',', '.') }} {{ $portfolio->currency }}</td>
+                                    <td class="px-4 py-3"><strong class="text-amber-300">{{ is_numeric($entryData['ai_score'] ?? null) ? number_format((float)$entryData['ai_score'],0,',','.') : '—' }}</strong><p class="mt-0.5 text-[9px] text-[var(--ak-muted)]">{{ $entryData['signal'] ?? '—' }} @if($entryData['date'] ?? null)· {{ \Illuminate\Support\Carbon::parse($entryData['date'])->format('d.m.Y') }}@endif</p></td>
                                     <td class="px-4 py-3 font-bold tabular-nums">{{ number_format($current, 2, ',', '.') }} {{ $portfolio->currency }}</td>
+                                    <td class="px-4 py-3"><div class="flex min-w-[27rem] items-center gap-2"><span class="inline-flex min-w-16 justify-center rounded-lg border px-2 py-2 text-[10px] font-black {{ $signalTone }}">{{ $signal }}</span>@foreach([['KI-Score',$scorePercent,$scorePercent!==null?number_format($scorePercent/10,1,',','.'):'—',$color($scorePercent),true],['Konf.',$confidence,$confidence!==null?number_format($confidence,0,',','.').'%':'—',$color($confidence),false],['Hit-Rate',$hitRate,$hitRate!==null?number_format($hitRate,0,',','.').'%':'—',$color($hitRate),false],['Ø/Trade',$profitScale,$profitTrade!==null?(($profitTrade>0?'+':'').number_format($profitTrade,2,',','.').'%'):'—',$color($profitScale),false],['Stabilität',$stability,$stability!==null?number_format($stability,0,',','.').'%':'—',$color($stability),false],['Risiko',$risk,$risk!==null?number_format($risk,0,',','.').'%':'—',$risk!==null?$color(100-$risk):'#64748b',false]] as [$label,$dv,$display,$dc,$large])<div class="screener-metric-donut {{ $large?'screener-metric-donut-score':'' }}" style="--donut-value:{{ number_format($dv??0,2,'.','') }}%;--donut-color:{{ $dc }}"><span>{{ $display }}</span><small>{{ $label }}</small></div>@endforeach</div></td>
+                                    @if($canViewSignalChanges)<td class="px-4 py-3 text-center">@if($change)<span class="whitespace-nowrap rounded-md border border-cyan-400/25 bg-cyan-400/[.07] px-2 py-1.5 text-[9px] font-black text-cyan-300">{{ $change['from'] }} → {{ $change['to'] }} · {{ \Illuminate\Support\Carbon::parse($change['date'])->format('d.m.') }}</span>@else — @endif</td>@endif
                                     <td class="px-4 py-3 font-black tabular-nums">{{ number_format($value, 2, ',', '.') }} {{ $portfolio->currency }}</td>
                                     <td class="px-4 py-3 font-black tabular-nums {{ $positionPerformance > 0 ? 'text-emerald-400' : ($positionPerformance < 0 ? 'text-rose-400' : 'text-[var(--ak-muted)]') }}">{{ $positionPerformance > 0 ? '+' : '' }}{{ number_format($positionPerformance, 2, ',', '.') }} %</td>
+                                    <td class="px-4 py-3">@if($series->count()>=2)<svg class="h-10 w-32" viewBox="0 0 {{ $cw }} {{ $ch }}"><polyline points="{{ $poly }}" fill="none" stroke="{{ $positionPerformance>=0?'#34d399':'#fb7185' }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>@else — @endif</td>
+                                    <td class="px-4 py-3"><form method="POST" action="{{ route('paper-depots.instruments.sell', [$portfolio, $position->instrument_id]) }}" class="flex items-center gap-1.5" onsubmit="return confirm(@js(__('Verkauf im Musterdepot ausführen?'))) ">@csrf<input name="quantity" type="number" min="0.0001" max="{{ $position->quantity }}" step="0.0001" value="{{ rtrim(rtrim(number_format((float)$position->quantity,4,'.',''),'0'),'.') }}" required class="ak-input h-8 w-20 px-2 text-[10px]"><button class="h-8 rounded-lg border border-rose-400/30 bg-rose-400/10 px-2.5 text-[9px] font-black text-rose-300">{{ __('Verkaufen') }}</button></form></td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -259,7 +286,6 @@
                 </div>
             @endif
         </section>
-        @endif
 
         <div x-show="simulationOpen" x-cloak class="fixed inset-0 z-[120] grid place-items-center bg-slate-950/80 p-4 backdrop-blur-sm" @keydown.escape.window="simulationOpen=false">
             <form method="POST" action="{{ route('depots.simulation.start', $portfolio) }}" class="w-full max-w-lg rounded-2xl border border-amber-300/25 bg-[#16253a]/90 p-6 shadow-2xl" @click.outside="if(!simulationSubmitting) simulationOpen=false" @submit="simulationSubmitting=true">
@@ -311,8 +337,8 @@
     <style>
       #strategy-depot-page .ak-depot-detail-hero{
         background:
-          radial-gradient(circle at 82% 0%,color-mix(in srgb,#14b8a6 10%,transparent),transparent 34%),
-          linear-gradient(135deg,color-mix(in srgb,var(--ak-card) 95%,#0d9488 5%),var(--ak-card));
+          radial-gradient(circle at 82% 0%,color-mix(in srgb,#06b6d4 10%,transparent),transparent 34%),
+          linear-gradient(135deg,color-mix(in srgb,var(--ak-card) 95%,#0891b2 5%),var(--ak-card));
         box-shadow:var(--ak-shadow);
       }
       #strategy-depot-page .ak-depot-detail-card{
@@ -333,16 +359,16 @@
         transition:border-color .18s ease,background-color .18s ease;
       }
       #strategy-depot-page .ak-depot-metric:hover{
-        border-color:color-mix(in srgb,#14b8a6 30%,var(--ak-border));
+        border-color:color-mix(in srgb,#06b6d4 30%,var(--ak-border));
       }
       :root[data-theme="light"] #strategy-depot-page .ak-depot-detail-hero{
         background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(236,254,255,.78)) !important;
-        box-shadow:0 14px 34px rgba(15,118,110,.12) !important;
+        box-shadow:0 14px 34px rgba(14, 116, 144,.12) !important;
       }
       :root[data-theme="light"] #strategy-depot-page .ak-depot-detail-card{
         background:rgba(255,255,255,.78) !important;
         border-color:rgba(14,116,144,.28) !important;
-        box-shadow:0 12px 28px rgba(15,118,110,.10),inset 0 1px 0 rgba(255,255,255,.9) !important;
+        box-shadow:0 12px 28px rgba(14, 116, 144,.10),inset 0 1px 0 rgba(255,255,255,.9) !important;
       }
       :root[data-theme="light"] #strategy-depot-page .ak-depot-detail-card>.absolute:first-child{
         background:linear-gradient(90deg,rgba(14,116,144,.28),#22d3ee,rgba(14,116,144,.2)) !important;
@@ -365,15 +391,27 @@
       }
     </style>
 
+    @if($portfolioValueCurve->count() >= 2)
+    <script>
+    document.addEventListener('DOMContentLoaded',()=>{
+      const node=document.querySelector('#manual-portfolio-value-chart');
+      const curve=@json($portfolioValueCurve);
+      if(!node||!window.ApexCharts||curve.length<2)return;
+      const light=document.documentElement.dataset.theme==='light';
+      new ApexCharts(node,{chart:{type:'area',height:224,toolbar:{show:false},zoom:{enabled:false},background:'transparent'},series:[{name:@json(__('Depotwert')),data:curve.map(p=>({x:new Date(p.x).getTime(),y:Number(p.y)}))}],colors:['#22d3ee'],stroke:{curve:'smooth',width:2.3},fill:{type:'gradient',gradient:{opacityFrom:.28,opacityTo:.02,stops:[0,100]}},dataLabels:{enabled:false},markers:{size:0},legend:{show:false},grid:{borderColor:light?'rgba(14,116,144,.12)':'rgba(148,163,184,.10)'},xaxis:{type:'datetime',labels:{style:{colors:'#7f93a8',fontSize:'9px'}},axisBorder:{show:false},axisTicks:{show:false}},yaxis:{labels:{style:{colors:'#7f93a8',fontSize:'9px'},formatter:v=>`${new Intl.NumberFormat(document.documentElement.lang||'de-DE',{maximumFractionDigits:0}).format(v)} {{ $portfolio->currency }}`}},tooltip:{x:{format:'dd.MM.yyyy'},y:{formatter:v=>`${new Intl.NumberFormat(document.documentElement.lang||'de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v)} {{ $portfolio->currency }}`}},theme:{mode:light?'light':'dark'}}).render();
+    });
+    </script>
+    @endif
+
     @if($simulationRun)
     <style>
-      .ak-depot-sim-spinner{width:20px;height:20px;flex:0 0 auto;border:2px solid rgba(251,191,36,.2);border-top-color:#fbbf24;border-right-color:#2dd4bf;border-radius:999px;animation:ak-depot-sim-spin .9s linear infinite}
+      .ak-depot-sim-spinner{width:20px;height:20px;flex:0 0 auto;border:2px solid rgba(251,191,36,.2);border-top-color:#fbbf24;border-right-color:#22d3ee;border-radius:999px;animation:ak-depot-sim-spin .9s linear infinite}
       .ak-depot-sim-dots{display:inline-flex;align-items:center;gap:3px;height:12px}.ak-depot-sim-dots i{width:3px;height:3px;border-radius:999px;background:#fbbf24;animation:ak-depot-sim-dot 1.2s ease-in-out infinite}.ak-depot-sim-dots i:nth-child(2){animation-delay:.16s}.ak-depot-sim-dots i:nth-child(3){animation-delay:.32s}
-      .ak-depot-sim-progress{height:6px;overflow:hidden;border:1px solid rgba(251,191,36,.18);border-radius:999px;background:rgba(15,23,42,.62);box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}.ak-depot-sim-progress span{display:block;width:34%;height:100%;border-radius:999px;background:linear-gradient(90deg,transparent,rgba(45,212,191,.95),#fbbf24,transparent);box-shadow:0 0 8px rgba(251,191,36,.35);animation:ak-depot-sim-progress 1.8s ease-in-out infinite}.ak-depot-sim-progress span.is-determinate{animation:none;background:linear-gradient(90deg,rgba(45,212,191,.82),rgba(251,191,36,.9));transition:width .35s ease}
+      .ak-depot-sim-progress{height:6px;overflow:hidden;border:1px solid rgba(251,191,36,.18);border-radius:999px;background:rgba(15,23,42,.62);box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}.ak-depot-sim-progress span{display:block;width:34%;height:100%;border-radius:999px;background:linear-gradient(90deg,transparent,rgba(34, 211, 238,.95),#fbbf24,transparent);box-shadow:0 0 8px rgba(251,191,36,.35);animation:ak-depot-sim-progress 1.8s ease-in-out infinite}.ak-depot-sim-progress span.is-determinate{animation:none;background:linear-gradient(90deg,rgba(34, 211, 238,.82),rgba(251,191,36,.9));transition:width .35s ease}
       .ak-portfolio-line-chart{background:transparent !important}
       .ak-portfolio-line-chart .apexcharts-canvas,.ak-portfolio-line-chart svg{background:transparent !important}
       .ak-portfolio-line-chart path.apexcharts-line{stroke:#fff !important;filter:drop-shadow(0 0 2px rgba(255,255,255,.72)) drop-shadow(0 0 7px rgba(125,211,252,.28))}
-      :root[data-theme="light"] .ak-portfolio-line-chart path.apexcharts-line{stroke:#0f766e !important;filter:drop-shadow(0 0 2px rgba(15,118,110,.35)) drop-shadow(0 0 6px rgba(34,211,238,.18))}
+      :root[data-theme="light"] .ak-portfolio-line-chart path.apexcharts-line{stroke:#0e7490 !important;filter:drop-shadow(0 0 2px rgba(14, 116, 144,.35)) drop-shadow(0 0 6px rgba(34,211,238,.18))}
       @keyframes ak-depot-sim-spin{to{transform:rotate(360deg)}}@keyframes ak-depot-sim-dot{0%,65%,100%{opacity:.25;transform:translateY(0)}32%{opacity:1;transform:translateY(-2px)}}@keyframes ak-depot-sim-progress{from{transform:translateX(-110%)}to{transform:translateX(310%)}}
     </style>
     <script>
@@ -392,7 +430,7 @@
         const baseValue=Number(curve[0]?.equity)||1;
         const moneyLabel=value=>new Intl.NumberFormat(document.documentElement.lang||'de-DE',{notation:'compact',maximumFractionDigits:1}).format(Number(value));
         const depotData=curve.map(point=>({x:new Date(point.date).getTime(),y:Number(point.equity)}));
-        const profitBars=trades.filter(trade=>trade.sell_date&&Number.isFinite(Number(trade.realized_profit))).map(trade=>({x:new Date(trade.sell_date).getTime(),y:Number(trade.realized_profit),trade,fillColor:Number(trade.realized_profit)>=0?'#2dd4bf':'#fb7185'}));
+        const profitBars=trades.filter(trade=>trade.sell_date&&Number.isFinite(Number(trade.realized_profit))).map(trade=>({x:new Date(trade.sell_date).getTime(),y:Number(trade.realized_profit),trade,fillColor:Number(trade.realized_profit)>=0?'#22d3ee':'#fb7185'}));
         const profitSeriesName=@json(__('Gewinn / Verlust'));
         const series=[{name:@json(__('Depot gesamt')),data:depotData,type:'line'}];
         const chartMin=depotData[0].x;
@@ -433,16 +471,16 @@
               position:'top',
               orientation:'horizontal',
               offsetY:2,
-              borderColor:positive?'rgba(45,212,191,.38)':'rgba(251,113,133,.38)',
-              style:{background:positive?'rgba(13,148,136,.22)':'rgba(190,24,93,.2)',color:positive?'#99f6e4':'#fecdd3',fontSize:'8px',fontWeight:800,padding:{left:5,right:5,top:2,bottom:2}},
+              borderColor:positive?'rgba(34, 211, 238,.38)':'rgba(251,113,133,.38)',
+              style:{background:positive?'rgba(8, 145, 178,.22)':'rgba(190,24,93,.2)',color:positive?'#a5f3fc':'#fecdd3',fontSize:'8px',fontWeight:800,padding:{left:5,right:5,top:2,bottom:2}},
             },
           };
         });
-        new ApexCharts(chartNode,{chart:{type:'line',height:chartHeight,toolbar:{show:false},animations:{enabled:false},zoom:{enabled:false},background:'transparent'},series,colors:[isLightTheme?'#0f766e':'#ffffff'],stroke:{show:true,width:2.6,curve:'smooth',lineCap:'round'},fill:{type:'gradient',gradient:{shade:isLightTheme?'light':'dark',type:'vertical',shadeIntensity:.15,gradientToColors:[isLightTheme?'rgba(15,118,110,0)':'rgba(255,255,255,0)'],inverseColors:false,opacityFrom:.16,opacityTo:0,stops:[0,100]}},markers:{size:0,hover:{sizeOffset:0}},dataLabels:{enabled:false},legend:{show:false},annotations:{xaxis:[...yearBoundaries,...yearBadges]},xaxis:{type:'datetime',min:chartMin,max:chartMax+rightOffset,labels:{show:true,datetimeUTC:false,format:'dd.MM.yy',style:{colors:'#7f93a8',fontSize:'8px'},hideOverlappingLabels:true},axisBorder:{show:true,color:isLightTheme?'rgba(15,118,110,.25)':'rgba(255,255,255,.18)'},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{show:true,min:chartValueMin,max:chartValueMax,forceNiceScale:false,decimalsInFloat:0,labels:{show:true,minWidth:34,style:{colors:'#7f93a8',fontSize:'8px'},formatter:value=>`${moneyLabel(value)} {{ $portfolio->currency }}`},axisBorder:{show:false}},grid:{borderColor:isLightTheme?'rgba(15,118,110,.12)':'rgba(255,255,255,.12)',padding:{top:20,bottom:0,left:2,right:10}},theme:{mode:isLightTheme?'light':'dark'},tooltip:{shared:false,intersect:true,custom:({seriesIndex,dataPointIndex,w})=>{
+        new ApexCharts(chartNode,{chart:{type:'line',height:chartHeight,toolbar:{show:false},animations:{enabled:false},zoom:{enabled:false},background:'transparent'},series,colors:[isLightTheme?'#0e7490':'#ffffff'],stroke:{show:true,width:2.6,curve:'smooth',lineCap:'round'},fill:{type:'gradient',gradient:{shade:isLightTheme?'light':'dark',type:'vertical',shadeIntensity:.15,gradientToColors:[isLightTheme?'rgba(14, 116, 144,0)':'rgba(255,255,255,0)'],inverseColors:false,opacityFrom:.16,opacityTo:0,stops:[0,100]}},markers:{size:0,hover:{sizeOffset:0}},dataLabels:{enabled:false},legend:{show:false},annotations:{xaxis:[...yearBoundaries,...yearBadges]},xaxis:{type:'datetime',min:chartMin,max:chartMax+rightOffset,labels:{show:true,datetimeUTC:false,format:'dd.MM.yy',style:{colors:'#7f93a8',fontSize:'8px'},hideOverlappingLabels:true},axisBorder:{show:true,color:isLightTheme?'rgba(14, 116, 144,.25)':'rgba(255,255,255,.18)'},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{show:true,min:chartValueMin,max:chartValueMax,forceNiceScale:false,decimalsInFloat:0,labels:{show:true,minWidth:34,style:{colors:'#7f93a8',fontSize:'8px'},formatter:value=>`${moneyLabel(value)} {{ $portfolio->currency }}`},axisBorder:{show:false}},grid:{borderColor:isLightTheme?'rgba(14, 116, 144,.12)':'rgba(255,255,255,.12)',padding:{top:20,bottom:0,left:2,right:10}},theme:{mode:isLightTheme?'light':'dark'},tooltip:{shared:false,intersect:true,custom:({seriesIndex,dataPointIndex,w})=>{
           const point=w.config.series[seriesIndex]?.data?.[dataPointIndex];
           if(!point?.trade){const value=Number(point?.y);const change=((value/baseValue)-1)*100;return `<div class="px-3 py-2 text-xs"><b>${escapeHtml(w.config.series[seriesIndex]?.name)}</b><div class="mt-1">${moneyLabel(value)} {{ $portfolio->currency }} · ${change>=0?'+':''}${change.toFixed(2)} %</div></div>`;}
           const trade=point.trade;const performance=Number(trade.performance);
-          return `<div class="min-w-56 p-3 text-xs"><div class="font-black text-white">${escapeHtml(trade.name||trade.symbol)} <span class="text-orange-400">${escapeHtml(trade.symbol)}</span></div><div class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-slate-300"><span>${escapeHtml(@json(__('Kaufdatum')))}</span><b>${dateLabel(trade.buy_date)}</b><span>${escapeHtml(@json(__('Verkaufsdatum')))}</span><b>${dateLabel(trade.sell_date)}</b><span>${escapeHtml(@json(__('Kaufkurs')))}</span><b>${trade.buy_price==null?'—':Number(trade.buy_price).toFixed(2)} {{ $portfolio->currency }}</b><span>${escapeHtml(@json(__('Verkaufskurs')))}</span><b>${Number(trade.sell_price).toFixed(2)} {{ $portfolio->currency }}</b><span>${escapeHtml(@json(__('Performance')))}</span><b style="color:${performance>=0?'#2dd4bf':'#fb7185'}">${performance>=0?'+':''}${Number.isFinite(performance)?performance.toFixed(2):'—'} %</b><span>${escapeHtml(@json(__('Strategie')))}</span><b>${escapeHtml(trade.strategies.join(', ')||'—')}</b></div></div>`;
+          return `<div class="min-w-56 p-3 text-xs"><div class="font-black text-white">${escapeHtml(trade.name||trade.symbol)} <span class="text-orange-400">${escapeHtml(trade.symbol)}</span></div><div class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-slate-300"><span>${escapeHtml(@json(__('Kaufdatum')))}</span><b>${dateLabel(trade.buy_date)}</b><span>${escapeHtml(@json(__('Verkaufsdatum')))}</span><b>${dateLabel(trade.sell_date)}</b><span>${escapeHtml(@json(__('Kaufkurs')))}</span><b>${trade.buy_price==null?'—':Number(trade.buy_price).toFixed(2)} {{ $portfolio->currency }}</b><span>${escapeHtml(@json(__('Verkaufskurs')))}</span><b>${Number(trade.sell_price).toFixed(2)} {{ $portfolio->currency }}</b><span>${escapeHtml(@json(__('Performance')))}</span><b style="color:${performance>=0?'#22d3ee':'#fb7185'}">${performance>=0?'+':''}${Number.isFinite(performance)?performance.toFixed(2):'—'} %</b><span>${escapeHtml(@json(__('Strategie')))}</span><b>${escapeHtml(trade.strategies.join(', ')||'—')}</b></div></div>`;
         }}}).render();
         const profitNode=document.querySelector('#portfolio-profit-bars');
         if(profitNode&&profitBars.length){
@@ -451,7 +489,7 @@
             const bar=document.createElement('span');
             const position=((point.x-chartMin)/(chartMax+rightOffset-chartMin))*100;
             const height=Math.max(4,(Math.abs(point.y)/maxProfit)*42);
-            bar.style.cssText=`position:absolute;left:${position}%;width:4px;height:${height}px;background:${point.y>=0?'#2dd4bf':'#fb7185'};opacity:.62;border-radius:1px;${point.y>=0?'bottom:50%':'top:50%'}`;
+            bar.style.cssText=`position:absolute;left:${position}%;width:4px;height:${height}px;background:${point.y>=0?'#22d3ee':'#fb7185'};opacity:.62;border-radius:1px;${point.y>=0?'bottom:50%':'top:50%'}`;
             bar.title=`${point.trade.symbol} · ${point.y>=0?'+':''}${point.y.toFixed(2)} {{ $portfolio->currency }}`;
             profitNode.appendChild(bar);
           });

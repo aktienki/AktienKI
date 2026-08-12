@@ -62,10 +62,10 @@
                                 $daxValues = collect($daxAxis)->pluck('value')->filter(fn ($value) => is_numeric($value));
                                 $compareValues = collect($compareAxis)->pluck('value')->filter(fn ($value) => is_numeric($value));
                             @endphp
-                            <text x="8" y="10" fill="currentColor" fill-opacity=".55" font-size="7">{{ number_format((float) (($macroCard['key'] ?? null) === 'ai-dax' ? ($compareValues->max() ?? 0) : ($daxValues->max() ?? 0)), 1, ',', '.') }}</text>
-                            <text x="8" y="88" fill="currentColor" fill-opacity=".55" font-size="7">{{ number_format((float) (($macroCard['key'] ?? null) === 'ai-dax' ? ($compareValues->min() ?? 0) : ($daxValues->min() ?? 0)), 1, ',', '.') }}</text>
-                            <text x="312" y="10" text-anchor="end" fill="#fbbf24" fill-opacity=".9" font-size="7">{{ number_format((float) (($macroCard['key'] ?? null) === 'ai-dax' ? ($daxValues->max() ?? 0) : ($compareValues->max() ?? 0)), 1, ',', '.') }}{{ ($macroCard['key'] ?? null) === 'ai-dax' ? '' : '%' }}</text>
-                            <text x="312" y="88" text-anchor="end" fill="#fbbf24" fill-opacity=".9" font-size="7">{{ number_format((float) (($macroCard['key'] ?? null) === 'ai-dax' ? ($daxValues->min() ?? 0) : ($compareValues->min() ?? 0)), 1, ',', '.') }}{{ ($macroCard['key'] ?? null) === 'ai-dax' ? '' : '%' }}</text>
+                            <text x="8" y="10" fill="{{ ($macroCard['key'] ?? null) === 'vdax' ? '#fb7185' : '#22d3ee' }}" fill-opacity=".9" font-size="7">{{ number_format((float) ($compareValues->max() ?? 0), 1, ',', '.') }}{{ ($macroCard['key'] ?? null) === 'vdax' ? '%' : '' }}</text>
+                            <text x="8" y="88" fill="{{ ($macroCard['key'] ?? null) === 'vdax' ? '#fb7185' : '#22d3ee' }}" fill-opacity=".9" font-size="7">{{ number_format((float) ($compareValues->min() ?? 0), 1, ',', '.') }}{{ ($macroCard['key'] ?? null) === 'vdax' ? '%' : '' }}</text>
+                            <text x="312" y="10" text-anchor="end" fill="#fbbf24" fill-opacity=".9" font-size="7">{{ number_format((float) ($daxValues->max() ?? 0), 1, ',', '.') }}</text>
+                            <text x="312" y="88" text-anchor="end" fill="#fbbf24" fill-opacity=".9" font-size="7">{{ number_format((float) ($daxValues->min() ?? 0), 1, ',', '.') }}</text>
                         @endif
                         <line x1="8" y1="14" x2="312" y2="14" stroke="currentColor" stroke-opacity=".10" stroke-dasharray="3 4" />
                         <line x1="8" y1="46" x2="312" y2="46" stroke="currentColor" stroke-opacity=".10" stroke-dasharray="3 4" />
@@ -85,7 +85,7 @@
                     @if (($macroCard['key'] ?? null) === 'ai-dax')
                         <p class="mt-0.5 text-right text-[8px] font-bold text-[var(--ak-muted)]">{{ __('KI-Score links / DAX-Punkte rechts') }}</p>
                     @elseif (($macroCard['key'] ?? null) === 'vdax')
-                        <p class="mt-0.5 text-right text-[8px] font-bold text-[var(--ak-muted)]">{{ __('VDAX in Prozentpunkten · DAX in Punkten') }}</p>
+                        <p class="mt-0.5 text-right text-[8px] font-bold text-[var(--ak-muted)]">{{ __('VDAX links in Prozentpunkten · DAX rechts in Punkten') }}</p>
                     @elseif (($macroCard['key'] ?? null) === 'rates')
                         <p class="mt-0.5 text-right text-[8px] font-bold text-[var(--ak-muted)]">{{ __('Tageswert in Prozentpunkten') }}</p>
                     @elseif (($macroCard['key'] ?? null) === 'bonds')

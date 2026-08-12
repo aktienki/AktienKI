@@ -112,7 +112,7 @@
                                 </linearGradient>
                                 <linearGradient id="lineTeal" x1="0" x2="1">
                                     <stop offset="0%" stop-color="#fb923c" stop-opacity="0"/>
-                                    <stop offset="50%" stop-color="#2dd4bf" stop-opacity=".85"/>
+                                    <stop offset="50%" stop-color="#22d3ee" stop-opacity=".85"/>
                                     <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
                                 </linearGradient>
                             </defs>
@@ -253,18 +253,18 @@
                                 <svg viewBox="0 0 500 360" aria-hidden="true">
                                     <defs>
                                         <radialGradient id="planetFill">
-                                            <stop offset="0%" stop-color="#5eead4" stop-opacity=".75"/>
-                                            <stop offset="55%" stop-color="#0f766e" stop-opacity=".45"/>
+                                            <stop offset="0%" stop-color="#67e8f9" stop-opacity=".75"/>
+                                            <stop offset="55%" stop-color="#0e7490" stop-opacity=".45"/>
                                             <stop offset="100%" stop-color="#020617" stop-opacity=".9"/>
                                         </radialGradient>
                                     </defs>
-                                    <circle cx="250" cy="180" r="98" fill="url(#planetFill)" stroke="#5eead4" stroke-width="2"/>
+                                    <circle cx="250" cy="180" r="98" fill="url(#planetFill)" stroke="#67e8f9" stroke-width="2"/>
                                     <ellipse cx="250" cy="180" rx="170" ry="42" fill="none" stroke="rgba(94,234,212,.45)" stroke-width="2" transform="rotate(-13 250 180)"/>
                                     <ellipse cx="250" cy="180" rx="150" ry="68" fill="none" stroke="rgba(56,189,248,.25)" stroke-width="2" transform="rotate(18 250 180)"/>
                                     <circle class="ak-orbit-dot" cx="92" cy="142" r="7" fill="#fb923c"/>
                                     <circle class="ak-orbit-dot delay" cx="390" cy="225" r="7" fill="#22c55e"/>
                                     <text x="250" y="174" text-anchor="middle" fill="#e0f2fe" font-size="22" font-weight="900">MARKT</text>
-                                    <text x="250" y="199" text-anchor="middle" fill="#99f6e4" font-size="13">Daily Scan</text>
+                                    <text x="250" y="199" text-anchor="middle" fill="#a5f3fc" font-size="13">Daily Scan</text>
                                 </svg>
 
                                 <div class="ak-satellite s1">Aktien<span>1.250+</span></div>

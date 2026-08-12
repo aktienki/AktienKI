@@ -12,8 +12,20 @@ final class PlanAccessService
     {
         if ((bool) $user->is_admin || strtolower((string) ($user->role ?? '')) === 'admin') return true;
         if ((bool) $user->beta_access_exempt) return true;
+        return $this->allowsTariff($user, $required);
+    }
+
+    /** Check the purchased tariff itself without admin or beta overrides. */
+    public function allowsTariff(User $user, PlanLevel|string $required): bool
+    {
         $requiredLevel = $required instanceof PlanLevel ? $required : PlanLevel::tryFrom(strtolower($required));
         if (! $requiredLevel) return false;
+
+        return $this->level($user)->includes($requiredLevel);
+    }
+
+    public function level(User $user): PlanLevel
+    {
 
         $directPlan = DB::table('tariff_plans')->where('id', $user->tariff_plan_id)->first(['code']);
         $code = $directPlan?->code;
@@ -36,7 +48,6 @@ final class PlanAccessService
             'expert', 'ultimate' => 'premium',
             default => strtolower((string) ($code ?: 'free')),
         };
-        $level = PlanLevel::tryFrom($normalized) ?? PlanLevel::Free;
-        return $level->includes($requiredLevel);
+        return PlanLevel::tryFrom($normalized) ?? PlanLevel::Free;
     }
 }

@@ -36,7 +36,7 @@ window.sparkline = (series = []) => ({
                 width: 2.4
             },
 
-            colors: [lightTheme ? "#14B8A6" : "#8B5CF6"],
+            colors: [lightTheme ? "#06B6D4" : "#22D3EE"],
 
             fill: {
                 type: "gradient",
@@ -162,7 +162,7 @@ window.candlestick = (series = []) => ({
     },
 });
 
-window.worldMarketMap = (countryScores = {}, stocksUrl = '/stocks') => ({
+window.worldMarketMap = (countryScores = {}, indicesUrl = '/indices') => ({
     error: false,
     selectedCountry: null,
 
@@ -181,8 +181,7 @@ window.worldMarketMap = (countryScores = {}, stocksUrl = '/stocks') => ({
                 const countryData = Object.prototype.hasOwnProperty.call(countryScores, iso)
                     ? countryScores[iso]
                     : null;
-                const score = countryData === null ? null : Number(countryData.score);
-                const scoreTen = score === null ? null : (score <= 1 ? score * 10 : (score <= 10 ? score : score / 10));
+                const available = countryData !== null;
                 const change = countryData === null || countryData.change === null
                     ? null
                     : Number(countryData.change);
@@ -199,14 +198,14 @@ window.worldMarketMap = (countryScores = {}, stocksUrl = '/stocks') => ({
 
                 path.setAttribute('d', this.geometryPath(feature.geometry));
                 path.setAttribute('fill', color);
-                path.setAttribute('fill-opacity', score === null ? '0' : restingOpacity);
-                path.setAttribute('stroke', score === null ? inactiveStroke : activeStroke);
-                path.setAttribute('stroke-opacity', score === null ? (lightTheme ? '0.78' : '0.68') : '1');
-                path.setAttribute('stroke-width', score === null ? (lightTheme ? '0.9' : '0.85') : (lightTheme ? '1.8' : '1.5'));
+                path.setAttribute('fill-opacity', available ? restingOpacity : '0');
+                path.setAttribute('stroke', available ? activeStroke : inactiveStroke);
+                path.setAttribute('stroke-opacity', available ? '1' : (lightTheme ? '0.78' : '0.68'));
+                path.setAttribute('stroke-width', available ? (lightTheme ? '1.8' : '1.5') : (lightTheme ? '0.9' : '0.85'));
                 path.setAttribute('vector-effect', 'non-scaling-stroke');
                 path.setAttribute('stroke-linejoin', 'round');
 
-                if (score !== null) {
+                if (available) {
                     path.style.cursor = 'pointer';
                     path.style.transition = 'fill-opacity 160ms ease, stroke-width 160ms ease';
                     path.addEventListener('mouseenter', () => {
@@ -223,20 +222,22 @@ window.worldMarketMap = (countryScores = {}, stocksUrl = '/stocks') => ({
                             code: iso,
                             flag: this.countryFlag(iso),
                             name: german ? (feature.properties.NAME_DE || feature.properties.NAME) : feature.properties.NAME,
-                            score,
-                            scoreTen,
                             change,
-                            stocks: Number(countryData.stocks),
-                            stocksUrl: `${stocksUrl}?country=${encodeURIComponent(iso)}`,
+                            indices: Number(countryData.indices),
+                            indexName: countryData.index_name,
+                            indexSymbol: countryData.index_symbol,
+                            priceFormatted: new Intl.NumberFormat(german ? 'de-DE' : 'en-US', { maximumFractionDigits: 2 }).format(Number(countryData.price)),
+                            latestAt: countryData.latest_at,
+                            indexUrl: `${indicesUrl}?q=${encodeURIComponent(countryData.index_symbol)}`,
                         };
                     });
                 }
 
                 const title = document.createElementNS(namespace, 'title');
-                const stockLabel = document.documentElement.lang.startsWith('en') ? 'stocks' : 'Aktien';
-                title.textContent = score === null
+                const indexLabel = document.documentElement.lang.startsWith('en') ? 'indices' : 'Indizes';
+                title.textContent = !available
                     ? feature.properties.NAME
-                    : `${feature.properties.NAME}: ${change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(2)} %`} · KI ${scoreTen.toFixed(1)} / 10 · ${countryData.stocks} ${stockLabel}`;
+                    : `${feature.properties.NAME}: ${change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(2)} %`} · ${countryData.indices} ${indexLabel} · ${countryData.latest_at || '—'}`;
                 path.appendChild(title);
                 this.$refs.map.appendChild(path);
             });
@@ -371,7 +372,7 @@ window.dailyAiScoreChart = (series = []) => ({
         const lightTheme = document.documentElement.dataset.theme === 'light';
         const accent = lightTheme ? '#0891b2' : '#fb923c';
         const accentSoft = lightTheme ? '#22d3ee' : '#fdba74';
-        const gridColor = lightTheme ? 'rgba(15,118,110,.10)' : 'rgba(251,146,60,.10)';
+        const gridColor = lightTheme ? 'rgba(14, 116, 144,.10)' : 'rgba(251,146,60,.10)';
         const axisColor = lightTheme ? '#64748b' : '#94a3b8';
         const labelBackground = lightTheme ? '#ecfeff' : '#172033';
         const labelText = lightTheme ? '#0e7490' : '#fed7aa';
@@ -441,7 +442,7 @@ window.dailyAiScoreChart = (series = []) => ({
             annotations: {
                 yaxis: [{
                     y: 5,
-                    borderColor: lightTheme ? 'rgba(15,118,110,.24)' : 'rgba(148,163,184,.20)',
+                    borderColor: lightTheme ? 'rgba(14, 116, 144,.24)' : 'rgba(148,163,184,.20)',
                     strokeDashArray: 5,
                     borderWidth: 1,
                 }],

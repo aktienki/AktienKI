@@ -129,7 +129,7 @@
                                             $holdAngle = $sellAngle + ($signalTotal > 0 ? ($signalCounts['HOLD'] / $signalTotal) * 360 : 0);
                                             $watchAngle = $holdAngle + ($signalTotal > 0 ? ($signalCounts['WATCH'] / $signalTotal) * 360 : 0);
                                             $signalPieStyle = $signalTotal > 0
-                                                ? 'background:conic-gradient(#f43f5e 0deg '.number_format($sellAngle, 2, '.', '').'deg,#facc15 '.number_format($sellAngle, 2, '.', '').'deg '.number_format($holdAngle, 2, '.', '').'deg,var(--ak-watch-surface) '.number_format($holdAngle, 2, '.', '').'deg '.number_format($watchAngle, 2, '.', '').'deg,#14b8a6 '.number_format($watchAngle, 2, '.', '').'deg 360deg)'
+                                                ? 'background:conic-gradient(#f43f5e 0deg '.number_format($sellAngle, 2, '.', '').'deg,#facc15 '.number_format($sellAngle, 2, '.', '').'deg '.number_format($holdAngle, 2, '.', '').'deg,var(--ak-watch-surface) '.number_format($holdAngle, 2, '.', '').'deg '.number_format($watchAngle, 2, '.', '').'deg,#06b6d4 '.number_format($watchAngle, 2, '.', '').'deg 360deg)'
                                                 : 'background:#cbd5e1';
                                             $indexAnalysis = $exchange->index_analysis ?? null;
                                             $indexOutlook = strtoupper((string) ($indexAnalysis['outlook'] ?? 'NEUTRAL'));
@@ -203,7 +203,7 @@
                                                         $stockRiskDonutStyle = '--ak-score-angle:'.number_format(($stockRisk ?? 0) * 3.6, 2, '.', '').'deg;--ak-score-color:'.$stockRiskColor;
                                                         $stockSignal = strtoupper((string) ($stock?->personalized_signal ?: 'HOLD'));
                                                         $stockSignalClass = match ($stockSignal) {
-                                                            'BUY' => 'border-[#14b8a6] bg-[#14b8a6] text-white',
+                                                            'BUY' => 'border-[#06b6d4] bg-[#06b6d4] text-white',
                                                             'WATCH' => 'border-[#b9c3b7] bg-[#b9c3b7] text-slate-800',
                                                             'SELL' => 'border-[#f43f5e] bg-[#f43f5e] text-white',
                                                             default => 'border-[#facc15] bg-[#facc15] text-slate-900',
@@ -541,28 +541,28 @@
 
             /* Einheitliches Kartenbild der Detail- und Depotansichten. */
             #markets-page.ak-detail-design .ak-standard-card.ak-market-card-prominent {
-                border-color: color-mix(in srgb, var(--ak-border) 68%, #14b8a6 32%) !important;
+                border-color: color-mix(in srgb, var(--ak-border) 68%, #06b6d4 32%) !important;
                 background:
                     radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .10), transparent 31%),
                     linear-gradient(145deg, rgba(255,255,255,.99), rgba(242,250,249,.97)) !important;
-                box-shadow: inset 0 1px 0 #fff, 0 12px 28px rgba(15,23,42,.11), 0 3px 10px rgba(15,118,110,.07) !important;
+                box-shadow: inset 0 1px 0 #fff, 0 12px 28px rgba(15,23,42,.11), 0 3px 10px rgba(14, 116, 144,.07) !important;
             }
 
             #markets-page.ak-detail-design .ak-standard-card .ak-standard-market-head {
-                border-bottom-color: rgba(13,148,136,.24) !important;
+                border-bottom-color: rgba(8, 145, 178,.24) !important;
                 background:
                     radial-gradient(circle at 4% 0, rgba(34,211,238,.22), transparent 42%),
-                    linear-gradient(105deg, rgba(13,148,136,.18), rgba(20,184,166,.08) 58%, transparent) !important;
-                box-shadow: inset 0 -1px 0 rgba(13,148,136,.16), inset 0 1px 0 rgba(255,255,255,.65) !important;
+                    linear-gradient(105deg, rgba(8, 145, 178,.18), rgba(6, 182, 212,.08) 58%, transparent) !important;
+                box-shadow: inset 0 -1px 0 rgba(8, 145, 178,.16), inset 0 1px 0 rgba(255,255,255,.65) !important;
             }
 
             #markets-page.ak-detail-design .ak-standard-card :is(.text-orange-200,.text-orange-300,.text-orange-400) { color: #0f9f98 !important; }
-            #markets-page.ak-detail-design .ak-standard-card :is(.border-orange-200\/25,.border-orange-200\/30) { border-color: rgba(20,184,166,.24) !important; }
-            #markets-page.ak-detail-design .ak-standard-card :is(.bg-orange-200\/10,.bg-orange-400\/10) { background-color: rgba(20,184,166,.09) !important; }
+            #markets-page.ak-detail-design .ak-standard-card :is(.border-orange-200\/25,.border-orange-200\/30) { border-color: rgba(6, 182, 212,.24) !important; }
+            #markets-page.ak-detail-design .ak-standard-card :is(.bg-orange-200\/10,.bg-orange-400\/10) { background-color: rgba(6, 182, 212,.09) !important; }
 
             #markets-page.ak-detail-design .ak-standard-card.ak-market-card-prominent:hover {
-                border-color: color-mix(in srgb, var(--ak-border) 68%, #14b8a6 32%) !important;
-                box-shadow: inset 0 1px 0 #fff, 0 12px 28px rgba(15,23,42,.11), 0 3px 10px rgba(15,118,110,.07) !important;
+                border-color: color-mix(in srgb, var(--ak-border) 68%, #06b6d4 32%) !important;
+                box-shadow: inset 0 1px 0 #fff, 0 12px 28px rgba(15,23,42,.11), 0 3px 10px rgba(14, 116, 144,.07) !important;
                 transform: none !important;
             }
 
@@ -576,7 +576,7 @@
             :root:not([data-theme="light"]) #markets-page.ak-detail-design .ak-standard-card .ak-standard-market-head {
                 background:
                     radial-gradient(circle at 4% 0, rgba(34,211,238,.18), transparent 42%),
-                    linear-gradient(105deg, rgba(13,148,136,.24), rgba(20,184,166,.08) 58%, rgba(13,25,34,.15)) !important;
+                    linear-gradient(105deg, rgba(8, 145, 178,.24), rgba(6, 182, 212,.08) 58%, rgba(13,25,34,.15)) !important;
                 box-shadow: inset 0 -1px 0 rgba(34,211,238,.18), inset 0 1px 0 rgba(255,255,255,.035) !important;
             }
 

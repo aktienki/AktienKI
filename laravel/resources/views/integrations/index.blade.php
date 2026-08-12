@@ -7,7 +7,7 @@
     .integration-setup-page .ak-dashboard-card,
     .integration-setup-page .ak-detail-panel { border-radius:14px !important; }
     .integration-setup-page .ak-detail-hero { border-left:3px solid #22d3ee !important; }
-    .integration-setup-page .ak-detail-card-head { background:linear-gradient(108deg,rgba(34,211,238,.14),rgba(20,184,166,.06) 52%,transparent) !important; }
+    .integration-setup-page .ak-detail-card-head { background:linear-gradient(108deg,rgba(34,211,238,.14),rgba(6, 182, 212,.06) 52%,transparent) !important; }
     :root:not([data-theme="light"]) .integration-setup-page .ak-input { background:rgba(8,28,45,.78) !important; border-color:rgba(34,211,238,.24) !important; color:#e7f6fb !important; }
     :root[data-theme="light"] .integration-setup-page .ak-input { background:rgba(255,255,255,.82) !important; border-color:#cfe5e5 !important; }
 </style>

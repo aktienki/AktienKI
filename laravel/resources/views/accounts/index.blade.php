@@ -7,7 +7,7 @@
     .account-setup-page .ak-dashboard-card,
     .account-setup-page .ak-detail-panel { border-radius:14px !important; }
     .account-setup-page .ak-detail-hero { border-left:3px solid #22d3ee !important; }
-    .account-setup-page .ak-detail-card-head { background:linear-gradient(108deg,rgba(34,211,238,.14),rgba(20,184,166,.06) 52%,transparent) !important; }
+    .account-setup-page .ak-detail-card-head { background:linear-gradient(108deg,rgba(34,211,238,.14),rgba(6, 182, 212,.06) 52%,transparent) !important; }
     .account-setup-page .account-metric { border:1px solid rgba(34,211,238,.18); background:rgba(34,211,238,.06); border-radius:10px; }
     :root[data-theme="light"] .account-setup-page .account-metric { background:rgba(255,255,255,.72); border-color:#d6e7e7; }
 </style>

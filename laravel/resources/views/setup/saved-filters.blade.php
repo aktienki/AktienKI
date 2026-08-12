@@ -33,7 +33,7 @@
         <section id="saved-filter-management" class="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3">
             <div class="grid gap-2 xl:grid-cols-2">
                 @forelse ($savedFilters as $savedFilter)
-                    <article x-data="{ rename: false }" @if ((int) request('highlight') === (int) $savedFilter->id) id="saved-filter-highlight" @endif class="rounded-xl border {{ (int) request('highlight') === (int) $savedFilter->id ? 'border-teal-300/45 bg-teal-400/[.09] shadow-[0_0_28px_rgba(45,212,191,.10)]' : 'border-white/[.08] bg-white/[.035]' }} p-4">
+                    <article x-data="{ rename: false }" @if ((int) request('highlight') === (int) $savedFilter->id) id="saved-filter-highlight" @endif class="rounded-xl border {{ (int) request('highlight') === (int) $savedFilter->id ? 'border-teal-300/45 bg-teal-400/[.09] shadow-[0_0_28px_rgba(34, 211, 238,.10)]' : 'border-white/[.08] bg-white/[.035]' }} p-4">
                         @php
                             $metrics = $filterMetrics->get($savedFilter->id);
                             $assignedPortfolios = $savedFilter->portfolios;

@@ -3,8 +3,8 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;background:#07111f;color:#edf6f7;font-family:Inter,Arial,sans-serif;padding:28px 12px">
 @php
-    $accent = $isSale ? '#f08a8a' : '#2dd4bf';
-    $soft = $isSale ? 'rgba(240,138,138,.13)' : 'rgba(45,212,191,.13)';
+    $accent = $isSale ? '#f08a8a' : '#22d3ee';
+    $soft = $isSale ? 'rgba(240,138,138,.13)' : 'rgba(34, 211, 238,.13)';
     $actionLabel = $isSale ? __('Verkauf ausgeführt') : ($trade['action'] === 'increase' ? __('Position aufgestockt') : __('Kauf ausgeführt'));
     if ($trade['simulation'] ?? false) $actionLabel = __('Simulation') . ' · ' . $actionLabel;
 @endphp
@@ -31,14 +31,14 @@
             <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('KI-Score') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:#edf6f7;font-weight:700">{{ number_format($trade['score'], 1, ',', '.') }} / 10</td></tr>
             <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Modellqualität') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:#edf6f7;font-weight:700">{{ number_format($trade['confidence'], 1, ',', '.') }} %</td></tr>
             @if($trade['target_price'])
-            <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Zielkurs 20 Tage') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:#edf6f7;font-weight:700">{{ number_format($trade['target_price'], 2, ',', '.') }} {{ $trade['currency'] }} @if($trade['expected_return'] !== null)<span style="color:{{ $trade['expected_return'] >= 0 ? '#2dd4bf' : '#f08a8a' }}">({{ $trade['expected_return'] >= 0 ? '+' : '' }}{{ number_format($trade['expected_return'], 2, ',', '.') }} %)</span>@endif</td></tr>
+            <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Zielkurs 20 Tage') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:#edf6f7;font-weight:700">{{ number_format($trade['target_price'], 2, ',', '.') }} {{ $trade['currency'] }} @if($trade['expected_return'] !== null)<span style="color:{{ $trade['expected_return'] >= 0 ? '#22d3ee' : '#f08a8a' }}">({{ $trade['expected_return'] >= 0 ? '+' : '' }}{{ number_format($trade['expected_return'], 2, ',', '.') }} %)</span>@endif</td></tr>
             @endif
             <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Gebühren') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:#edf6f7;font-weight:700">{{ number_format($trade['fees'], 2, ',', '.') }} {{ $trade['currency'] }}</td></tr>
             @if($isSale && isset($trade['realized_profit']))
-            <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Realisiertes Ergebnis') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:{{ $trade['realized_profit'] >= 0 ? '#2dd4bf' : '#f08a8a' }};font-size:17px;font-weight:800">{{ $trade['realized_profit'] >= 0 ? '+' : '' }}{{ number_format($trade['realized_profit'], 2, ',', '.') }} {{ $trade['currency'] }}</td></tr>
+            <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Realisiertes Ergebnis') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:{{ $trade['realized_profit'] >= 0 ? '#22d3ee' : '#f08a8a' }};font-size:17px;font-weight:800">{{ $trade['realized_profit'] >= 0 ? '+' : '' }}{{ number_format($trade['realized_profit'], 2, ',', '.') }} {{ $trade['currency'] }}</td></tr>
             @endif
             @if($isSale && isset($trade['transaction_performance_percent']))
-            <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Performance der Transaktion') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:{{ $trade['transaction_performance_percent'] >= 0 ? '#2dd4bf' : '#f08a8a' }};font-size:17px;font-weight:800">{{ $trade['transaction_performance_percent'] >= 0 ? '+' : '' }}{{ number_format($trade['transaction_performance_percent'], 2, ',', '.') }} %</td></tr>
+            <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Performance der Transaktion') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:{{ $trade['transaction_performance_percent'] >= 0 ? '#22d3ee' : '#f08a8a' }};font-size:17px;font-weight:800">{{ $trade['transaction_performance_percent'] >= 0 ? '+' : '' }}{{ number_format($trade['transaction_performance_percent'], 2, ',', '.') }} %</td></tr>
             @endif
         </table>
 
@@ -49,7 +49,7 @@
                 <td style="width:25%;padding:13px;background:#152943;border:1px solid #29445e;border-radius:9px;color:#91a8bb;font-size:10px;text-transform:uppercase">{{ __('Depotwert') }}<div style="margin-top:6px;color:#f7fbfc;font-size:16px;font-weight:800">{{ number_format($trade['portfolio_value'], 2, ',', '.') }} {{ $trade['portfolio_currency'] }}</div></td>
                 <td style="width:25%;padding:13px;background:#152943;border:1px solid #29445e;border-radius:9px;color:#91a8bb;font-size:10px;text-transform:uppercase">{{ __('Kontostand') }}<div style="margin-top:6px;color:#f7fbfc;font-size:16px;font-weight:800">{{ number_format($trade['cash_balance'], 2, ',', '.') }} {{ $trade['portfolio_currency'] }}</div></td>
                 <td style="width:25%;padding:13px;background:#152943;border:1px solid #29445e;border-radius:9px;color:#91a8bb;font-size:10px;text-transform:uppercase">{{ __('Gesamtwert') }}<div style="margin-top:6px;color:#e5b95d;font-size:16px;font-weight:800">{{ number_format($trade['total_value'], 2, ',', '.') }} {{ $trade['portfolio_currency'] }}</div></td>
-                <td style="width:25%;padding:13px;background:#152943;border:1px solid #29445e;border-radius:9px;color:#91a8bb;font-size:10px;text-transform:uppercase">{{ __('Performance') }}<div style="margin-top:6px;color:{{ $trade['performance_percent'] >= 0 ? '#2dd4bf' : '#f08a8a' }};font-size:16px;font-weight:800">{{ $trade['performance_percent'] >= 0 ? '+' : '' }}{{ number_format($trade['performance_percent'], 2, ',', '.') }} %</div></td>
+                <td style="width:25%;padding:13px;background:#152943;border:1px solid #29445e;border-radius:9px;color:#91a8bb;font-size:10px;text-transform:uppercase">{{ __('Performance') }}<div style="margin-top:6px;color:{{ $trade['performance_percent'] >= 0 ? '#22d3ee' : '#f08a8a' }};font-size:16px;font-weight:800">{{ $trade['performance_percent'] >= 0 ? '+' : '' }}{{ number_format($trade['performance_percent'], 2, ',', '.') }} %</div></td>
             </tr>
         </table>
         @endif

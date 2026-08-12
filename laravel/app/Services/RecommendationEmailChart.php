@@ -14,10 +14,10 @@ final class RecommendationEmailChart
         $background = imagecolorallocate($chart, 18, 32, 52);
         $grid = imagecolorallocatealpha($chart, 112, 138, 164, 103);
         $text = imagecolorallocate($chart, 164, 181, 201);
-        $teal = imagecolorallocate($chart, 45, 212, 191);
+        $teal = imagecolorallocate($chart, 34, 211, 238);
         $red = imagecolorallocate($chart, 201, 92, 108);
         $amber = imagecolorallocate($chart, 224, 174, 84);
-        $forecastFill = imagecolorallocatealpha($chart, 45, 212, 191, 95);
+        $forecastFill = imagecolorallocatealpha($chart, 34, 211, 238, 95);
         imagefill($chart, 0, 0, $background);
 
         $bars = collect($candles)->filter(fn ($bar) => isset($bar['y']) && count($bar['y']) >= 4)->take(-32)->values();

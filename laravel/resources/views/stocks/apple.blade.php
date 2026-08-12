@@ -52,7 +52,7 @@
                 return {
                     chart: { type: 'area', height: '100%', background: 'transparent', toolbar: { show: false }, zoom: { enabled: true }, animations: { enabled: true, speed: 500 } },
                     series: [{ name: 'AAPL', data: points }],
-                    colors: [light ? '#14b8a6' : '#8b5cf6'],
+                    colors: [light ? '#06b6d4' : '#8b5cf6'],
                     stroke: { curve: 'smooth', width: 3 },
                     fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: .38, opacityTo: .03, stops: [0, 95, 100] } },
                     dataLabels: { enabled: false },

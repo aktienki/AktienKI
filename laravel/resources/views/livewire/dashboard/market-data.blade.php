@@ -10,8 +10,17 @@
     $toneLabel = $overallAssessment['status'] ?? __('Neutral');
     $analysisHeadline = $marketAnalysis['headline'] ?? __('Marktdaten statt Marktgeräusche');
     $analysisSummary = $marketAnalysis['summary'] ?? $marketComment ?? __('Die Marktübersicht bündelt globale Entwicklung, KI-Score und Signalwechsel zu einem kompakten Lagebild.');
-    $opportunities = collect($marketAnalysis['opportunities'] ?? [])->take(3);
-    $risks = collect($marketAnalysis['risks'] ?? [])->take(3);
+    $opportunities = collect($marketAnalysis['opportunities'] ?? []);
+    $risks = collect($marketAnalysis['risks'] ?? []);
+    $watchlist = collect($marketAnalysis['watchlist'] ?? []);
+    $analysisMetrics = collect($marketAnalysis['metrics'] ?? []);
+    $reportSources = collect($marketAnalysis['sources'] ?? []);
+    $isExternalAiReport = (bool) ($marketAnalysis['is_external_ai'] ?? false);
+    $analysisItemText = function (mixed $item): string {
+        if (is_string($item) || is_numeric($item)) return (string) $item;
+        if (!is_array($item)) return '';
+        return (string) ($item['summary'] ?? $item['description'] ?? $item['name'] ?? $item['title'] ?? collect($item)->filter(fn ($value) => is_scalar($value))->implode(' · '));
+    };
 @endphp
 
 <section class="ak-container ak-market-command py-5 lg:py-7">
@@ -83,41 +92,129 @@
     <x-dashboard.macro-indicator-cards :cards="$macroCards" />
 
     <article class="ak-market-briefing ak-detail-panel ak-standard-card mt-4">
-        <div class="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,.85fr)]">
-            <div>
-                <p class="ak-market-eyebrow">{{ __('KI Market Briefing') }}</p>
-                <h2 class="mt-3 text-2xl font-black tracking-[-.025em] text-[var(--ak-text)]">{{ $analysisHeadline }}</h2>
-                <p class="mt-3 max-w-3xl text-sm leading-6 text-[var(--ak-muted)]">{{ $analysisSummary }}</p>
-                @if (!empty($marketAnalysis['breadth']))
-                    <div class="ak-market-briefing-note mt-4">
-                        <x-heroicon-o-chart-pie class="h-4 w-4 shrink-0" />
-                        <span>{{ $marketAnalysis['breadth'] }}</span>
-                    </div>
-                @endif
-            </div>
-            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <section class="ak-market-list is-opportunity">
-                    <h3><x-heroicon-o-arrow-trending-up class="h-4 w-4" />{{ __('Chancen') }}</h3>
-                    @forelse ($opportunities as $item)
-                        <p>{{ is_array($item) ? ($item['title'] ?? $item['name'] ?? $item['description'] ?? json_encode($item)) : $item }}</p>
-                    @empty
-                        <p>{{ __('Relative Stärke und verbesserte Signale gezielt beobachten.') }}</p>
-                    @endforelse
-                </section>
-                <section class="ak-market-list is-risk">
-                    <h3><x-heroicon-o-shield-exclamation class="h-4 w-4" />{{ __('Risiken') }}</h3>
-                    @forelse ($risks as $item)
-                        <p>{{ is_array($item) ? ($item['title'] ?? $item['name'] ?? $item['description'] ?? json_encode($item)) : $item }}</p>
-                    @empty
-                        <p>{{ __('Volatilität und negative Signalwechsel weiter im Blick behalten.') }}</p>
-                    @endforelse
-                </section>
-            </div>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="ak-market-eyebrow">{{ $isExternalAiReport ? __('Externer Marktbericht') : __('Regelbasierter Marktbericht') }}</p>
+            <span class="rounded-lg border border-cyan-400/20 bg-cyan-400/[.06] px-2.5 py-1 text-[9px] font-black uppercase tracking-[.1em] text-cyan-400">{{ $isExternalAiReport ? __('Aktuelle Web-Recherche') : __('Datenbasierte Auswertung') }}</span>
         </div>
+        <h2 class="mt-3 text-2xl font-black tracking-[-.025em] text-[var(--ak-text)]">{{ $analysisHeadline }}</h2>
+        <p class="mt-3 max-w-5xl text-sm leading-6 text-[var(--ak-muted)]">{{ $analysisSummary }}</p>
+        @if ($analysisMetrics->isNotEmpty())
+            <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                @foreach ($analysisMetrics as $metric)
+                    <div class="rounded-xl border border-cyan-400/15 bg-cyan-400/[.04] px-3 py-2.5">
+                        <p class="text-[8px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ $metric['label'] }}</p>
+                        <p class="mt-1 text-lg font-black text-[var(--ak-text)]">{{ $metric['value'] }}</p>
+                        <p class="text-[9px] text-[var(--ak-muted)]">{{ $metric['detail'] }}</p>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+        @if (!empty($marketAnalysis['breadth']))
+            <div class="ak-market-briefing-note mt-4">
+                <x-heroicon-o-chart-pie class="h-4 w-4 shrink-0" />
+                <span>{{ $marketAnalysis['breadth'] }}</span>
+            </div>
+        @endif
         <footer class="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ak-border)] pt-3 text-[9px] font-semibold uppercase tracking-[.1em] text-[var(--ak-muted)]">
-            <span>{{ __('Automatisierte KI-Auswertung · keine Anlageberatung') }}</span>
+            <span>{{ $isExternalAiReport ? __('Markteinschätzung mit aktuellen externen Quellen · keine Anlageberatung') : __('Regelbasierte Auswertung aktueller Marktdaten · keine Anlageberatung') }}</span>
             @if (!empty($marketAnalysis['date']))<span>{{ __('Analyse vom') }} {{ \Illuminate\Support\Carbon::parse($marketAnalysis['date'])->format('d.m.Y') }}</span>@endif
         </footer>
     </article>
+
+    <section class="mt-4" aria-labelledby="market-opportunities-risks-title">
+        <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+                <p class="ak-market-eyebrow">{{ __('Bericht') }}</p>
+                <h2 id="market-opportunities-risks-title" class="mt-1 text-xl font-black text-[var(--ak-text)]">{{ __('Chancen & Risiken') }}</h2>
+            </div>
+            @if (!empty($marketAnalysis['date']))
+                <span class="text-[9px] font-bold uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ __('Analyse vom') }} {{ \Illuminate\Support\Carbon::parse($marketAnalysis['date'])->format('d.m.Y') }}</span>
+            @endif
+        </div>
+        <div class="grid gap-4">
+            @foreach ([
+                [__('Chancen'), $opportunities, 'opportunity', 'text-emerald-500', '↗'],
+                [__('Risiken'), $risks, 'risk', 'text-rose-500', '!'],
+                [__('Beobachtungsliste'), $watchlist, 'watch', 'text-amber-500', '◉'],
+            ] as [$title, $items, $tone, $titleClass, $symbol])
+                <article class="ak-analysis-panel ak-analysis-panel-{{ $tone }} ak-detail-panel ak-standard-card ak-card ak-card-static overflow-hidden p-5">
+                    <div class="ak-analysis-card-head ak-detail-card-head -mx-5 -mt-5 flex items-center justify-between gap-3 px-5 py-4">
+                        <div class="flex items-center gap-3">
+                            <span class="ak-analysis-icon grid h-9 w-9 place-items-center rounded-xl border text-lg font-black {{ $titleClass }}">{{ $symbol }}</span>
+                            <div>
+                                <p class="text-[9px] font-black uppercase tracking-[.18em] text-[var(--ak-muted)]">{{ __('Markteinschätzung') }}</p>
+                                <h3 class="mt-0.5 text-lg font-black {{ $titleClass }}">{{ $title }}</h3>
+                            </div>
+                        </div>
+                        <span class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-1 text-[10px] font-black tabular-nums text-[var(--ak-muted)]">{{ $items->count() }}</span>
+                    </div>
+                    <ul class="mt-4 grid gap-2.5">
+                        @forelse ($items as $key => $item)
+                            <li class="ak-analysis-copy flex gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3 text-xs leading-[1.45]">
+                                <span class="ak-analysis-number grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[10px] font-black {{ $titleClass }}">{{ $loop->iteration }}</span>
+                                <span class="pt-0.5">
+                                    @if (!is_numeric($key))<strong class="text-[var(--ak-text)]">{{ __((string) $key) }}: </strong>@endif
+                                    {{ $analysisItemText($item) }}
+                                </span>
+                            </li>
+                        @empty
+                            <li class="text-xs text-[var(--ak-muted)]">—</li>
+                        @endforelse
+                    </ul>
+                </article>
+            @endforeach
+        </div>
+    </section>
+
+    @if ($reportSources->isNotEmpty())
+        <section class="mt-4" aria-labelledby="report-sources-title">
+            <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
+                <div>
+                    <p class="ak-market-eyebrow">{{ __('Quellennachweis') }}</p>
+                    <h2 id="report-sources-title" class="mt-1 text-xl font-black text-[var(--ak-text)]">{{ __('Im Marktbericht verwendete Quellen') }}</h2>
+                </div>
+                <span class="text-[9px] font-bold uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ $reportSources->count() }} {{ __('Quellen') }}</span>
+            </div>
+            <div class="grid gap-3 md:grid-cols-2">
+                @foreach ($reportSources as $source)
+                    <a href="{{ $source['url'] }}" target="_blank" rel="noopener noreferrer" class="ak-dashboard-card ak-standard-card group p-4 transition hover:border-cyan-400/40">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="text-[9px] font-black uppercase tracking-[.12em] text-cyan-400">{{ $source['publisher'] }}</p>
+                                <h3 class="mt-1 text-sm font-black leading-5 text-[var(--ak-text)]">{{ $source['title'] }}</h3>
+                                @if ($source['used_for'])<p class="mt-1 text-[10px] leading-4 text-[var(--ak-muted)]">{{ $source['used_for'] }}</p>@endif
+                            </div>
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 text-[var(--ak-muted)] transition group-hover:text-cyan-400" />
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
+    <section class="mt-4" aria-labelledby="official-market-sources-title">
+        <div class="mb-3">
+            <p class="ak-market-eyebrow">{{ __('Externer Kontext') }}</p>
+            <h2 id="official-market-sources-title" class="mt-1 text-xl font-black text-[var(--ak-text)]">{{ __('Offizielle Markt- und Konjunkturberichte') }}</h2>
+            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Originalquellen für Geldpolitik, Inflation und Konjunktur.') }}</p>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            @foreach ([
+                ['EZB', __('Economic Bulletin'), __('Euroraum · Geldpolitik und Inflation'), 'https://www.ecb.europa.eu/press/economic-bulletin/html/index.en.html'],
+                [__('Bundesbank'), __('Monatsbericht'), __('Deutschland · Wirtschaft und Finanzmärkte'), 'https://www.bundesbank.de/de/publikationen/berichte/monatsberichte'],
+                ['IWF', __('World Economic Outlook'), __('Globale Konjunktur und Risikoszenarien'), 'https://www.imf.org/en/Publications/WEO'],
+                ['OECD', __('Economic Outlook'), __('Internationale Prognosen und Risiken'), 'https://www.oecd.org/en/topics/economic-outlook.html'],
+            ] as [$source, $title, $description, $url])
+                <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" class="ak-dashboard-card ak-standard-card group p-4 transition hover:border-cyan-400/40">
+                    <div class="flex items-start justify-between gap-3">
+                        <span class="text-[9px] font-black uppercase tracking-[.14em] text-cyan-400">{{ $source }}</span>
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 text-[var(--ak-muted)] transition group-hover:text-cyan-400" />
+                    </div>
+                    <h3 class="mt-2 text-sm font-black text-[var(--ak-text)]">{{ $title }}</h3>
+                    <p class="mt-1 text-[10px] leading-4 text-[var(--ak-muted)]">{{ $description }}</p>
+                </a>
+            @endforeach
+        </div>
+    </section>
 
 </section>

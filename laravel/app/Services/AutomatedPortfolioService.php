@@ -59,12 +59,35 @@ final class AutomatedPortfolioService
 
         $candidates = $this->candidates($strategy);
         $sectorRotation = (bool) data_get($strategy->filters, 'sector_score_rotation', false);
+        $indexRotation = (bool) data_get($strategy->filters, 'index_score_rotation', false);
         $sectorAverages = $candidates->groupBy(fn (object $row) => (string) ($row->sector ?: 'Other'))
             ->map(fn (Collection $rows): float => (float) $rows->avg('score_10'));
+        $memberships = $indexRotation
+            ? DB::table('index_memberships')->whereNull('removed_at')
+                ->whereIn('instrument_id', $candidates->pluck('instrument_id')->unique())
+                ->get(['instrument_id', 'market_index_id'])->groupBy('instrument_id')
+            : collect();
+        $candidateByInstrument = $candidates->keyBy('instrument_id');
+        $indexAverages = $indexRotation
+            ? $memberships->flatten(1)->groupBy('market_index_id')->map(function (Collection $rows) use ($candidateByInstrument): float {
+                return (float) $rows->map(fn (object $membership): float => (float) ($candidateByInstrument->get($membership->instrument_id)?->score_10 ?? 0))->avg();
+            })
+            : collect();
 
-        $candidates = $candidates->sortByDesc(function (object $row) use ($sectorRotation, $sectorAverages): string {
+        $candidates = $candidates->sortByDesc(function (object $row) use ($sectorRotation, $indexRotation, $sectorAverages, $memberships, $indexAverages): string {
             $sectorScore = $sectorRotation ? (float) $sectorAverages->get((string) ($row->sector ?: 'Other'), 0) : 0;
-            return sprintf('%09.4f:%09.4f:%09.4f', $sectorScore, (float) $row->score_10, (float) $row->confidence_percent);
+            $indexScore = $indexRotation
+                ? (float) collect($memberships->get($row->instrument_id, collect()))
+                    ->map(fn (object $membership): float => (float) $indexAverages->get($membership->market_index_id, 0))->max()
+                : 0;
+            $rotationScores = array_filter([
+                $sectorRotation ? $sectorScore : null,
+                $indexRotation ? $indexScore : null,
+            ], fn ($score): bool => $score !== null);
+            $rotationScore = $rotationScores === [] ? 0 : array_sum($rotationScores) / count($rotationScores);
+
+            // The stock score remains primary. Rotation only resolves equal scores.
+            return sprintf('%09.4f:%09.4f:%09.4f', (float) $row->score_10, $rotationScore, (float) $row->confidence_percent);
         })->values();
 
         $purchases = 0;

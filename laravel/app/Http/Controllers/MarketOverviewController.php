@@ -160,48 +160,27 @@ class MarketOverviewController extends Controller
         $us2y = $macroSeries($macroBars->get('US2Y', collect()));
         $us10y = $macroSeries($macroBars->get('US10Y', collect()));
 
-        $volatilitySeries = DB::table('market_snapshots')
-            ->whereNotNull('volatility')
-            ->orderByDesc('snapshot_time')
-            ->limit(30)
-            ->get(['snapshot_time', 'volatility'])
-            ->sortBy('snapshot_time')
-            ->map(fn (object $row): array => [
-                'label' => Carbon::parse($row->snapshot_time)->format('d.m.'),
-                'value' => is_numeric($row->volatility) ? (float) $row->volatility : null,
-            ])->filter(fn (array $point): bool => $point['value'] !== null)->values()->all();
+        // Use the actual VDAX-NEW index (ISIN A0DMX9) here.  The previous
+        // implementation used realised S&P 500 volatility, which is a
+        // different measure and therefore did not match the VDAX detail page.
+        $vdaxId = DB::table('instruments')
+            ->where('isin', 'A0DMX9')
+            ->orWhere('symbol', 'VDAX')
+            ->value('id');
+        $volatilitySeries = $vdaxId
+            ? DB::table('price_bars')
+                ->where('instrument_id', $vdaxId)
+                ->where('interval', '1d')
+                ->orderByDesc('bar_time')
+                ->limit(260)
+                ->get(['bar_time', 'close'])
+                ->sortBy('bar_time')
+                ->map(fn (object $row): array => [
+                    'label' => Carbon::parse($row->bar_time)->format('d.m.'),
+                    'value' => is_numeric($row->close) ? (float) $row->close : null,
+                ])->filter(fn (array $point): bool => $point['value'] !== null)->values()->all()
+            : [];
 
-        // If the snapshot worker has not produced a row yet, derive a small
-        // realised-volatility line from the persisted S&P 500 daily bars.
-        if ($volatilitySeries === []) {
-            $spxId = DB::table('instruments')->where('symbol', '^GSPC')->value('id');
-            $closes = $spxId
-                ? DB::table('price_bars')->where('instrument_id', $spxId)->where('interval', '1d')->orderByDesc('bar_time')->limit(45)->get(['close', 'bar_time'])->sortBy('bar_time')->values()
-                : collect();
-            $prices = $closes->map(fn (object $row): ?float => is_numeric($row->close) ? (float) $row->close : null)->filter(fn ($value) => $value !== null)->values();
-            $dailyReturns = collect();
-            for ($index = 1; $index < $prices->count(); $index++) {
-                $dailyReturns->push($prices[$index - 1] > 0 ? ($prices[$index] / $prices[$index - 1]) - 1 : null);
-            }
-            for ($index = 20; $index < $dailyReturns->count(); $index++) {
-                $window = $dailyReturns->slice($index - 20, 20)->filter(fn ($value) => $value !== null)->values();
-                $mean = $window->avg();
-                $variance = $window->map(fn (float $value): float => ($value - $mean) ** 2)->avg() ?? 0.0;
-                $volatilitySeries[] = [
-                    'label' => Carbon::parse($closes[$index + 1]->bar_time)->format('d.m.'),
-                    'value' => sqrt($variance) * sqrt(252) * 100,
-                ];
-            }
-        }
-
-        $normalise = static function (array $values): array {
-            $numeric = collect($values)->pluck('value')->filter(fn ($value) => is_numeric($value));
-            $base = (float) ($numeric->first() ?? 0);
-            return $base > 0
-                ? collect($values)->map(fn (array $point): array => ['label' => $point['label'], 'value' => (($point['value'] / $base) - 1) * 100])->all()
-                : [];
-        };
-        $bondSeries = $normalise($us10y);
         $macroCards = [
             [
                 'key' => 'rates', 'title' => __('Zinsen'),
@@ -210,15 +189,15 @@ class MarketOverviewController extends Controller
                 'unit' => '%',
             ],
             [
-                'key' => 'volatility', 'title' => __('Volatilität'),
-                'subtitle' => __('Marktvolatilität aus den letzten Snapshots'),
-                'series' => [['name' => __('Volatilität'), 'color' => '#fb7185', 'points' => $volatilitySeries]],
+                'key' => 'vdax', 'title' => __('Volatilität'),
+                'subtitle' => __('VDAX-NEW · A0DMX9 · letzter Jahresverlauf'),
+                'series' => [['name' => __('VDAX'), 'color' => '#fb7185', 'points' => $volatilitySeries]],
                 'unit' => '%',
             ],
             [
                 'key' => 'bonds', 'title' => __('Anleihen'),
-                'subtitle' => __('US 10J · Veränderung seit Serienbeginn'),
-                'series' => [['name' => 'US 10J', 'color' => '#34d399', 'points' => $bondSeries]],
+                'subtitle' => __('US 10J · historische Renditereihe'),
+                'series' => [['name' => 'US 10J', 'color' => '#34d399', 'points' => $us10y]],
                 'unit' => '%',
             ],
         ];

@@ -22,7 +22,7 @@
     ];
 @endphp
 
-<section x-cloak x-show="stockTab === 'heatmap'" class="space-y-3">
+<section data-stock-collapsible="heatmap" data-stock-collapsible-title="{{ __('Heatmap') }}" class="space-y-3">
     <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 py-3 shadow-[var(--ak-shadow)]">
         <div>
             <p class="text-[10px] font-black uppercase tracking-[.16em] text-teal-500">{{ __('Historischer Backtest') }}</p>

@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\PlanLevel;
 use App\Models\Watchlist;
+use App\Services\PlanAccessService;
+use App\Services\PersonalizedSignalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -141,14 +144,55 @@ class WatchlistController extends Controller
                 ->leftJoinSub($latestQuoteIds, 'latest_quote', fn ($join) =>
                     $join->on('latest_quote.instrument_id', '=', 'prediction.instrument_id'))
                 ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
-                ->get([
+                ->select([
                     'prediction.id',
                     'prediction.instrument_id',
                     'prediction.prediction_score',
+                    'prediction.confidence',
+                    'prediction.horizon_fusion_stability_score',
+                    'prediction.risk_score',
+                    'prediction.drawdown_risk_factor',
                     'prediction.prediction_time',
                     DB::raw('COALESCE(current_quote.price, prediction.current_price) AS current_price'),
                 ])
+                ->selectRaw(app(PersonalizedSignalService::class)->sql('prediction', $request->user()).' AS personalized_signal')
+                ->get()
                 ->keyBy('instrument_id');
+
+        $canViewSignalChanges = app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Pro);
+        $signalChanges = collect();
+        if ($canViewSignalChanges) {
+            $signalSql = app(PersonalizedSignalService::class)->sql('prediction', $request->user());
+            $signalChanges = $instrumentIds->mapWithKeys(function ($instrumentId) use ($signalSql): array {
+                $history = DB::table('predictions as prediction')
+                    ->where('prediction.instrument_id', $instrumentId)
+                    ->select(['prediction.id', 'prediction.prediction_time'])
+                    ->selectRaw($signalSql.' AS personalized_signal')
+                    ->orderByDesc('prediction.prediction_time')->orderByDesc('prediction.id')->limit(30)->get();
+                $latest = $history->first();
+                if (! $latest) return [$instrumentId => null];
+                $to = strtoupper((string) ($latest->personalized_signal ?: 'HOLD'));
+                $previous = $history->skip(1)->first(fn ($row) => strtoupper((string) ($row->personalized_signal ?: 'HOLD')) !== $to);
+
+                return [$instrumentId => $previous ? [
+                    'from' => strtoupper((string) ($previous->personalized_signal ?: 'HOLD')),
+                    'to' => $to,
+                    'date' => $latest->prediction_time,
+                ] : null];
+            });
+        }
+
+        $latestWalkForwardRunIds = DB::table('walk_forward_backtest_runs')
+            ->where('status', 'completed')->whereIn('horizon_days', [5, 10, 15, 20])
+            ->groupBy('horizon_days')->selectRaw('MAX(id) AS id')->pluck('id');
+        $walkForwardStats = $instrumentIds->isEmpty() || $latestWalkForwardRunIds->isEmpty()
+            ? collect()
+            : DB::table('walk_forward_backtest_trades')
+                ->whereIn('instrument_id', $instrumentIds)->whereIn('run_id', $latestWalkForwardRunIds)
+                ->groupBy('instrument_id')
+                ->selectRaw('instrument_id, AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
+                ->selectRaw('AVG(net_return) * 100 AS average_profit_per_trade_percent')
+                ->get()->keyBy('instrument_id');
 
         $profits = $watchlist->items
             ->map(function ($item) use ($latestPredictions): ?float {
@@ -164,17 +208,47 @@ class WatchlistController extends Controller
 
         $averageProfit = $profits->isEmpty() ? null : (float) $profits->avg();
         $instrumentIndices = $this->instrumentIndices($instrumentIds);
+        $performanceSeries = $watchlist->items->mapWithKeys(function ($item) use ($latestPredictions): array {
+            $entryPrice = is_numeric($item->entry_price) && (float) $item->entry_price > 0
+                ? (float) $item->entry_price : null;
+            if ($entryPrice === null) return [$item->instrument_id => collect()];
+
+            $points = DB::table('price_bars')
+                ->where('instrument_id', $item->instrument_id)
+                ->where('interval', '1d')->where('close', '>', 0)
+                ->when($item->entry_price_at ?: $item->added_at, fn ($query, $from) => $query->where('bar_time', '>=', $from))
+                ->orderByDesc('bar_time')->limit(60)->get(['bar_time', 'close'])->reverse()->values()
+                ->map(fn ($bar): array => [
+                    'date' => (string) $bar->bar_time,
+                    'value' => (((float) $bar->close - $entryPrice) / $entryPrice) * 100,
+                ]);
+            $current = $latestPredictions->get($item->instrument_id)?->current_price;
+            if (is_numeric($current)) {
+                $points->push(['date' => now()->toIso8601String(), 'value' => (((float) $current - $entryPrice) / $entryPrice) * 100]);
+            }
+
+            return [$item->instrument_id => $points];
+        });
 
         return view('watchlists.show', compact(
             'watchlist',
             'latestPredictions',
+            'walkForwardStats',
             'averageProfit',
             'instrumentIndices',
+            'performanceSeries',
+            'canViewSignalChanges',
+            'signalChanges',
         ));
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $isPlus = app(PlanAccessService::class)->level($request->user()) === PlanLevel::Plus;
+        if ($isPlus && Watchlist::query()->where('user_id', $request->user()->id)->where('active', true)->exists()) {
+            return back()->withErrors(['name' => __('Im Plus-Tarif ist eine Watchlist enthalten. Für weitere Watchlists ist Pro erforderlich.')]);
+        }
+
         $validated = $request->validate([
             'name' => [
                 'required',

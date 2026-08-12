@@ -32,6 +32,8 @@ class ProfileUpdateRequest extends FormRequest
             'email_market_summary' => ['sometimes', 'boolean'],
             'email_price_alerts' => ['sometimes', 'boolean'],
             'email_product_updates' => ['sometimes', 'boolean'],
+            'mobile_nav_order' => ['nullable', 'json'],
+            'mobile_nav_hidden' => ['nullable', 'json'],
             'return_to' => ['nullable', 'string', 'max:2048'],
         ];
     }

@@ -53,6 +53,15 @@ class ProfileController extends Controller
             $request->session()->put('locale', $validated['locale']);
         }
 
+        $allowedMobileNav = ['welcome', 'features', 'roadmap', 'dashboard', 'predictions', 'depots', 'accounts', 'setup', 'news', 'pricing', 'contact', 'community'];
+        if (array_key_exists('mobile_nav_order', $validated) || array_key_exists('mobile_nav_hidden', $validated)) {
+            $order = json_decode((string) ($validated['mobile_nav_order'] ?? '[]'), true);
+            $hidden = json_decode((string) ($validated['mobile_nav_hidden'] ?? '[]'), true);
+            $order = is_array($order) ? array_values(array_unique(array_filter($order, fn ($key) => in_array($key, $allowedMobileNav, true)))) : [];
+            $hidden = is_array($hidden) ? array_values(array_unique(array_filter($hidden, fn ($key) => in_array($key, $allowedMobileNav, true)))) : [];
+            $preferences['mobile_navigation'] = ['order' => $order, 'hidden' => $hidden];
+        }
+
         $meta = $user->meta ?? [];
 
         if (isset($validated['risk_level'])) {

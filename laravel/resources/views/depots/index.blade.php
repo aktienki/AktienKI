@@ -341,7 +341,7 @@
             gap: .7rem;
             border: 1px solid var(--ak-border);
             border-radius: .85rem;
-            background: linear-gradient(135deg, color-mix(in srgb, var(--ak-card) 92%, #14b8a6 8%), var(--ak-card));
+            background: linear-gradient(135deg, color-mix(in srgb, var(--ak-card) 92%, #06b6d4 8%), var(--ak-card));
             padding: .65rem .8rem;
             box-shadow: var(--ak-shadow);
         }
@@ -351,10 +351,10 @@
             height: 2rem;
             flex: 0 0 2rem;
             place-items: center;
-            border: 1px solid color-mix(in srgb, #14b8a6 30%, transparent);
+            border: 1px solid color-mix(in srgb, #06b6d4 30%, transparent);
             border-radius: .6rem;
-            background: color-mix(in srgb, #14b8a6 11%, transparent);
-            color: #0d9488;
+            background: color-mix(in srgb, #06b6d4 11%, transparent);
+            color: #0891b2;
         }
         .ak-strategy-summary-card p {
             overflow: hidden;
@@ -508,7 +508,7 @@
                                 { name: @js(__('Performance')), type: 'area', data: this.active.chart.map(point => ({ x: point.x, y: point.y })) },
                                 { name: @js(__('Ø KI-Score')), type: 'line', data: this.active.chart.map(point => ({ x: point.x, y: point.score })) },
                             ],
-                            colors: [positive ? '#14b8a6' : '#f43f5e', '#f59e0b'],
+                            colors: [positive ? '#06b6d4' : '#f43f5e', '#f59e0b'],
                             stroke: { width: [2, 3], curve: 'smooth', dashArray: [0, 4] },
                             fill: {
                                 type: ['gradient', 'solid'],

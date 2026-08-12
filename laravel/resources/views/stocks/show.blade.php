@@ -3,30 +3,35 @@
 @section('content')
     <style>
         #stock-detail-page {
-            --stock-detail-accent: #14b8a6;
+            --stock-detail-accent: #22d3ee;
             --stock-detail-accent-bright: #22d3ee;
         }
 
         #stock-detail-page .stock-detail-panel {
             --stock-panel-padding: 1rem;
             position: relative;
-            border-color: color-mix(in srgb, var(--ak-border) 76%, var(--stock-detail-accent) 24%) !important;
+            border-color: color-mix(in srgb, var(--ak-border) 68%, #22d3ee 32%) !important;
+            border-bottom-color: rgba(34, 211, 238, .58) !important;
             background:
-                radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .12), transparent 28%),
-                linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(244, 250, 249, .96)) !important;
+                radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .10), transparent 30%),
+                rgba(255, 255, 255, .28) !important;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             box-shadow:
                 0 1px 0 rgba(255, 255, 255, .9) inset,
-                0 0 0 1px rgba(15, 118, 110, .055),
+                0 -1px 0 rgba(34, 211, 238, .20) inset,
+                0 0 0 1px rgba(34, 211, 238, .075),
                 0 14px 34px rgba(15, 23, 42, .105),
-                0 4px 12px rgba(15, 118, 110, .07) !important;
+                0 4px 12px rgba(14, 116, 144, .07) !important;
         }
 
         :root:not([data-theme="light"]) #stock-detail-page .stock-detail-panel {
             background:
-                radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .11), transparent 30%),
-                linear-gradient(145deg, rgba(22, 35, 45, .98), rgba(13, 25, 34, .98)) !important;
+                radial-gradient(circle at 94% 100%, rgba(34, 211, 238, .10), transparent 30%),
+                rgba(7, 24, 38, .42) !important;
             box-shadow:
                 0 1px 0 rgba(255, 255, 255, .045) inset,
+                0 -1px 0 rgba(34, 211, 238, .22) inset,
                 0 0 0 1px rgba(34, 211, 238, .065),
                 0 18px 42px rgba(0, 0, 0, .34),
                 0 5px 16px rgba(6, 182, 212, .055) !important;
@@ -36,14 +41,33 @@
             --stock-panel-padding: .75rem;
         }
 
+        #stock-chart-card:fullscreen,
+        #stock-chart-card:-webkit-full-screen {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            max-height: none !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            padding: 1.25rem !important;
+            background: var(--ak-page, #071826) !important;
+        }
+
+        #stock-chart-card:fullscreen #stock-chart-fullscreen-close,
+        #stock-chart-card:-webkit-full-screen #stock-chart-fullscreen-close {
+            display: inline-flex !important;
+        }
+
         #stock-detail-page .stock-detail-panel::before {
             content: '';
             position: absolute;
             z-index: 3;
-            inset: 0 18% auto;
-            height: 2px;
-            border-radius: 0 0 999px 999px;
-            background: linear-gradient(90deg, transparent, rgba(13, 148, 136, .62), rgba(34, 211, 238, .78), transparent);
+            inset: 12% auto 12% 0;
+            width: 3px;
+            height: auto;
+            border-radius: 0 999px 999px 0;
+            background: linear-gradient(180deg, transparent, rgba(34, 211, 238, .58) 18%, #22d3ee 50%, rgba(34, 211, 238, .58) 82%, transparent);
+            box-shadow: 0 0 14px rgba(34, 211, 238, .34);
             pointer-events: none;
         }
 
@@ -51,11 +75,11 @@
             position: relative;
             margin: calc(var(--stock-panel-padding) * -1) calc(var(--stock-panel-padding) * -1) .75rem;
             padding: var(--stock-panel-padding);
-            border-bottom: 1px solid rgba(13, 148, 136, .28);
+            border-bottom: 1px solid rgba(34, 211, 238, .28);
             background:
                 radial-gradient(circle at 5% 0%, rgba(34, 211, 238, .22), transparent 40%),
-                linear-gradient(108deg, rgba(13, 148, 136, .24), rgba(20, 184, 166, .14) 42%, rgba(6, 182, 212, .08) 72%, transparent);
-            box-shadow: 0 6px 16px rgba(15, 118, 110, .055);
+                linear-gradient(108deg, rgba(34, 211, 238, .20), rgba(6, 182, 212, .11) 55%, transparent);
+            box-shadow: 0 6px 16px rgba(6, 182, 212, .07);
         }
 
         #stock-detail-page .ak-prediction-donut {
@@ -88,8 +112,10 @@
         }
 
         #stock-detail-page .stock-company-title {
-            border-color: color-mix(in srgb, var(--stock-detail-accent) 30%, var(--ak-border)) !important;
-            background: linear-gradient(135deg, color-mix(in srgb, var(--ak-card) 89%, var(--stock-detail-accent) 11%), var(--ak-card)) !important;
+            border-style: none !important;
+            border-color: transparent !important;
+            background: transparent !important;
+            box-shadow: none !important;
         }
 
         #stock-detail-page .stock-company-symbol {
@@ -100,8 +126,24 @@
 
         #stock-detail-page .text-violet-300,
         #stock-detail-page .text-violet-200 {
-            color: #2dd4bf !important;
+            color: #22d3ee !important;
         }
+
+        #stock-detail-page .text-teal-300,
+        #stock-detail-page .text-teal-400,
+        #stock-detail-page .text-teal-500,
+        #stock-detail-page .text-teal-600,
+        #stock-detail-page .text-teal-700 { color: #22d3ee !important; }
+
+        #stock-detail-page .border-teal-400\/20,
+        #stock-detail-page .border-teal-500\/15,
+        #stock-detail-page .border-teal-500\/20,
+        #stock-detail-page .border-teal-500\/25 { border-color: rgba(34, 211, 238, .28) !important; }
+
+        #stock-detail-page .bg-teal-500\/\[\.05\],
+        #stock-detail-page .bg-teal-500\/\[\.06\],
+        #stock-detail-page .bg-teal-500\/\[\.08\],
+        #stock-detail-page .bg-teal-500\/10 { background-color: rgba(34, 211, 238, .09) !important; }
 
         #stock-detail-page .bg-violet-500\/10,
         #stock-detail-page .bg-violet-500\/15 {
@@ -115,6 +157,87 @@
             border-color: color-mix(in srgb, var(--stock-detail-accent) 32%, transparent) !important;
         }
 
+        #stock-detail-page .stock-collapsible-section {
+            border-radius: 1rem;
+        }
+
+        #stock-detail-page .stock-collapsible-toggle {
+            display: flex;
+            width: 100%;
+            min-height: 2.75rem;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            border: 1px solid rgba(34, 211, 238, .26);
+            border-radius: .8rem;
+            padding: .65rem .9rem;
+            color: #22d3ee;
+            background: rgba(34, 211, 238, .065);
+            font-size: .68rem;
+            font-weight: 900;
+            letter-spacing: .12em;
+            text-align: left;
+            text-transform: uppercase;
+        }
+
+        #stock-detail-page .stock-collapsible-copy {
+            min-width: 0;
+            flex: 1;
+        }
+
+        #stock-detail-page .stock-collapsible-description {
+            display: block;
+            margin-top: .2rem;
+            color: var(--ak-muted);
+            font-size: .58rem;
+            font-weight: 700;
+            letter-spacing: .025em;
+            line-height: 1.25;
+            text-transform: none;
+        }
+
+        #stock-detail-page .stock-collapsible-icon {
+            display: grid;
+            width: 2rem;
+            height: 2rem;
+            flex: 0 0 2rem;
+            place-items: center;
+            border: 1px solid rgba(34, 211, 238, .28);
+            border-radius: .55rem;
+            background: rgba(34, 211, 238, .08);
+        }
+
+        #stock-detail-page .stock-collapsible-icon svg {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        #stock-detail-page .stock-collapsible-toggle:hover {
+            background: rgba(34, 211, 238, .11);
+        }
+
+        #stock-detail-page .stock-collapsible-chevron {
+            width: 1rem;
+            height: 1rem;
+            transition: transform .2s ease;
+        }
+
+        #stock-detail-page .stock-collapsible-toggle[aria-expanded="true"] .stock-collapsible-chevron {
+            transform: rotate(180deg);
+        }
+
+        #stock-detail-page .stock-collapsible-content {
+            margin-top: .75rem;
+        }
+
+        @media (min-width: 768px) {
+            #stock-detail-page .chart-pattern-stat-row {
+                display: grid;
+                grid-template-columns: minmax(180px, .85fr) minmax(180px, 1fr) minmax(180px, .8fr);
+                align-items: center;
+            }
+        }
+
         @media (min-width: 1024px) {
             .stock-overview-grid {
                 height: calc(100% - 3rem);
@@ -124,7 +247,7 @@
 
         @media (min-width: 900px) {
             .stock-overview-grid-with-evaluation {
-                grid-template-columns: minmax(320px, .9fr) minmax(0, 1.3fr) minmax(230px, .55fr);
+                grid-template-columns: minmax(320px, .78fr) minmax(0, 1.52fr);
             }
 
             .stock-overview-grid-with-evaluation > .stock-overview-chart {
@@ -135,9 +258,6 @@
                 order: 1;
             }
 
-            .stock-overview-grid-with-evaluation > .stock-overview-evaluation {
-                order: 3;
-            }
         }
     </style>
     @php
@@ -145,18 +265,22 @@
         $confidencePercent = is_numeric($prediction?->confidence)
             ? max(0, min(100, (float) $prediction->confidence <= 1 ? (float) $prediction->confidence * 100 : (float) $prediction->confidence))
             : null;
-        $displayRiskScore = $prediction?->risk_score ?? $prediction?->drawdown_risk_factor;
-        $riskPercent = is_numeric($displayRiskScore)
-            ? max(20, min(100, (float) $displayRiskScore <= 1 ? (float) $displayRiskScore * 100 : (float) $displayRiskScore))
-            : null;
+        $riskPercent = \App\Support\RiskScore::toPercent(
+            $prediction?->risk_score,
+            $prediction?->drawdown_risk_factor,
+            $modelQuality?->maximum_drawdown,
+        );
         $signal = strtoupper((string) ($prediction?->personalized_signal ?? 'HOLD'));
         $signalClass = $signal === 'BUY'
-            ? 'border-teal-300/70 bg-teal-400/25 text-teal-100 shadow-[0_0_18px_rgba(45,212,191,.22)]'
+            ? 'border-teal-300/70 bg-teal-400/25 text-teal-100 shadow-[0_0_18px_rgba(34, 211, 238,.22)]'
             : ($signal === 'SELL'
                 ? 'border-rose-400/35 bg-rose-400/10 text-rose-300'
                 : ($signal === 'WATCH'
                     ? 'border-lime-300/30 bg-lime-300/10 text-lime-300'
-                    : 'border-amber-300/30 bg-amber-300/10 text-amber-300'));
+                    : ($signal === 'WAIT'
+                        ? 'border-emerald-300/70 bg-emerald-400/25 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,.22)]'
+                        : 'border-amber-300/30 bg-amber-300/10 text-amber-300')));
+        $signalLabel = $signal;
         $trendValue = strtolower((string) ($predictionMetadata['trend'] ?? $prediction?->higher_timeframe_trend ?? 'neutral'));
         $trendLabel = match ($trendValue) {
             'bullish', 'up', 'uptrend' => __('Bullisch'),
@@ -186,7 +310,7 @@
             'Consumer Cyclical' => '#a3e635',
             'Consumer Defensive' => '#4ade80',
             'Real Estate' => '#818cf8',
-            'Utilities' => '#2dd4bf',
+            'Utilities' => '#22d3ee',
             default => '#a78bfa',
         };
         $isInAnyWatchlist = $instrumentWatchlistIds->isNotEmpty();
@@ -205,6 +329,7 @@
             'BUY' => 'border-teal-300/60 bg-teal-400/20 text-teal-200',
             'SELL' => 'border-rose-400/45 bg-rose-400/15 text-rose-300',
             'WATCH' => 'border-lime-300/35 bg-lime-300/10 text-lime-300',
+            'WAIT' => 'border-emerald-300/60 bg-emerald-400/20 text-emerald-200',
             default => 'border-amber-300/35 bg-amber-300/10 text-amber-300',
         };
         $historicalStartPrice = is_numeric($prediction?->current_price) ? (float) $prediction->current_price : null;
@@ -242,8 +367,6 @@
 
     <div
         id="stock-detail-page"
-        x-data="{ stockTab: 'overview' }"
-        x-init="$watch('stockTab', value => $nextTick(() => window.dispatchEvent(new CustomEvent('stock-tab-changed', { detail: { tab: value } }))))"
         class="mx-auto flex h-[calc(100dvh-89px)] min-h-0 w-full max-w-screen-2xl flex-col py-4"
     >
         <header class="mb-4 flex shrink-0 flex-col justify-between gap-4 border-b border-[var(--ak-border)] pb-3 sm:flex-row sm:items-end">
@@ -314,8 +437,9 @@
                     </a>
                 @endif
 
-                <a href="{{ route('stocks.chart-analysis', $instrument->symbol) }}" class="inline-flex h-10 w-36 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-teal-500/25 bg-teal-500/10 px-3 text-xs font-black text-teal-600 transition hover:border-teal-500/45 hover:bg-teal-500/15">
-                    <x-heroicon-o-chart-bar-square class="h-4 w-4" />{{ __('Chartanalyse') }}
+                <a href="{{ route('stocks.report', ['symbol' => $instrument->symbol, 'prediction' => $prediction?->id, 'v' => now()->timestamp]) }}" title="{{ __('Ausführlichen PDF-Bericht für :stock herunterladen', ['stock' => $instrument->name]) }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 text-[10px] font-black uppercase tracking-wide text-cyan-400 transition hover:border-cyan-400/50 hover:bg-cyan-400/15">
+                    <x-heroicon-o-document-arrow-down class="h-4 w-4" />
+                    <span>{{ __('Bericht') }}</span>
                 </a>
 
                 <a href="{{ $returnTo ?: ($requestedPredictionId > 0 ? route('predictions.index') : route('stocks.index')) }}" class="inline-flex h-10 w-44 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 text-xs font-bold text-[var(--ak-muted)] transition hover:border-violet-400/30 hover:text-[var(--ak-text)]">
@@ -324,55 +448,65 @@
             </div>
         </header>
 
-        <nav class="mb-4 flex shrink-0 items-end gap-1 overflow-x-auto border-b border-[var(--ak-border)] px-1" aria-label="{{ __('Bereiche der Aktienanalyse') }}">
-            @foreach ([
-                ['overview', __('Übersicht'), 'heroicon-o-squares-2x2'],
-                ['indicators', __('Indikatoren Statistik'), 'heroicon-o-presentation-chart-line'],
-                ['indicator-matrix', __('Indikator Matrix'), 'heroicon-o-squares-plus'],
-                ['heatmap', __('Heatmap'), 'heroicon-o-table-cells'],
-                ['fundamentals', __('Fundamentals'), 'heroicon-o-building-library'],
-                ['aki', __('aKI Daten'), 'heroicon-o-cpu-chip'],
-                ['analysis', __('Analyse'), 'heroicon-o-sparkles'],
-            ] as [$tabKey, $tabLabel, $tabIcon])
-                <button
-                    type="button"
-                    @click="stockTab = '{{ $tabKey }}'; $nextTick(() => window.dispatchEvent(new Event('resize')))"
-                    :aria-selected="stockTab === '{{ $tabKey }}'"
-                    class="relative -mb-px inline-flex h-9 shrink-0 items-center gap-1.5 rounded-t-xl border px-3 text-[10px] font-black uppercase tracking-[.08em] transition"
-                    :class="stockTab === '{{ $tabKey }}'
-                        ? 'border-[var(--ak-border)] border-b-[var(--ak-card-strong)] bg-[var(--ak-card-strong)] text-teal-500'
-                        : 'border-transparent bg-transparent text-[var(--ak-muted)] hover:border-[var(--ak-border)] hover:bg-[var(--ak-surface-muted)] hover:text-[var(--ak-text)]'"
-                    role="tab"
-                >
-                    <x-dynamic-component :component="$tabIcon" class="h-3.5 w-3.5" />
-                    {{ $tabLabel }}
-                </button>
-            @endforeach
-        </nav>
-
         <div
             class="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 pb-3"
-            :class="stockTab === 'overview' ? 'lg:overflow-hidden' : ''"
         >
         <section
-            x-show="stockTab === 'overview'"
             class="stock-overview-grid {{ $requestedPredictionId > 0 && $prediction ? 'stock-overview-grid-with-evaluation' : 'lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]' }} grid min-h-0 gap-4"
         >
-            <article class="stock-detail-panel stock-overview-chart flex min-h-[350px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)] lg:h-full lg:min-h-0">
+            <article id="stock-chart-card" class="stock-detail-panel stock-overview-chart flex min-h-[350px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)] lg:h-full lg:min-h-0">
+                <button
+                    id="stock-chart-fullscreen-close"
+                    type="button"
+                    class="absolute right-20 top-5 z-50 hidden items-center gap-2 rounded-xl border border-cyan-300/40 bg-[#071826]/95 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-cyan-300 shadow-xl backdrop-blur transition hover:border-cyan-300/70 hover:bg-cyan-400/15"
+                    aria-label="{{ __('Vollbild beenden') }}"
+                    title="{{ __('Vollbild beenden') }}"
+                >
+                    <x-heroicon-o-arrows-pointing-in class="h-4 w-4" />
+                    {{ __('Vollbild beenden') }}
+                </button>
                 <div class="stock-detail-card-head flex shrink-0 items-start justify-between gap-3">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Kurschart') }}</p>
                         <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Kursentwicklung') }}</h2>
                         <p class="mt-1 text-xs text-[var(--ak-muted)]">
-                            {{ __('Tageskerzen · letzte 100 Handelstage') }}
+                            {{ __('Tageskerzen · Zeitraum und Indikatoren frei wählbar') }}
                         </p>
-                        <div id="stock-indicator-buttons" class="mt-2 flex flex-nowrap items-center gap-1.5 whitespace-nowrap">
-                            @foreach (['rsi' => 'RSI 14', 'sma20' => 'SMA 20', 'sma50' => 'SMA 50'] as $indicator => $indicatorLabel)
+                        <div id="stock-chart-period-buttons" class="mt-2 flex flex-wrap items-center gap-1 sm:flex-nowrap">
+                            @foreach ([22 => '1M', 66 => '3M', 132 => '6M', 252 => '1J', 0 => 'Max'] as $periodDays => $periodLabel)
+                                <button type="button" data-chart-period="{{ $periodDays }}" aria-pressed="{{ $periodDays === 132 ? 'true' : 'false' }}" class="min-w-0 rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-wide transition {{ $periodDays === 132 ? 'border-cyan-400/35 bg-cyan-400/15 text-cyan-400' : 'border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-[var(--ak-muted)] hover:border-cyan-400/25 hover:text-[var(--ak-text)]' }}">{{ $periodLabel }}</button>
+                            @endforeach
+                        </div>
+                        <details class="group mt-1.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] {{ $canUseChartIndicators ? '' : 'opacity-55 grayscale' }}">
+                            <summary aria-disabled="{{ $canUseChartIndicators ? 'false' : 'true' }}" class="flex list-none items-center justify-between gap-3 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)] transition [&::-webkit-details-marker]:hidden {{ $canUseChartIndicators ? 'cursor-pointer hover:text-cyan-400' : 'pointer-events-none cursor-not-allowed' }}">
+                                <span class="inline-flex items-center gap-2">
+                                    <x-heroicon-o-adjustments-horizontal class="h-4 w-4 text-cyan-400" />
+                                    {{ __('Indikatoren') }}
+                                    @unless ($canUseChartIndicators)
+                                        <span class="rounded-md border border-amber-400/35 bg-amber-400/10 px-1.5 py-0.5 text-[7px] font-black tracking-wide text-amber-400">PRO</span>
+                                    @endunless
+                                </span>
+                                <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform group-open:rotate-180" />
+                            </summary>
+                            <div id="stock-indicator-buttons" class="flex flex-wrap items-center gap-1.5 border-t border-[var(--ak-border)] px-2.5 py-2.5">
+                            <span id="stock-chart-pattern-badge" class="{{ empty($chartPatterns) ? 'hidden ' : '' }}mb-1 inline-flex w-full items-start gap-2 rounded-lg border border-cyan-400/25 bg-cyan-400/[.07] px-2.5 py-2 text-[9px] font-black uppercase leading-relaxed tracking-wide text-cyan-300">
+                                <x-heroicon-o-chart-bar class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                <span data-pattern-label>{{ collect($chartPatterns)->pluck('name')->join(' · ') }}</span>
+                            </span>
+                            @foreach ([
+                                'rsi' => 'RSI 14', 'sma20' => 'SMA 20', 'sma50' => 'SMA 50', 'sma200' => 'SMA 200',
+                                'ema20' => 'EMA 20', 'ema50' => 'EMA 50', 'bollinger' => 'Bollinger', 'sar' => 'SAR',
+                                'macd' => 'MACD', 'adx' => 'ADX 14', 'atr' => 'ATR 14', 'stochastic' => 'Stochastik',
+                                'cci' => 'CCI 20', 'mfi' => 'MFI 14', 'vwap' => 'VWAP', 'obv' => 'OBV',
+                                'williams' => 'Williams %R', 'roc' => 'ROC 12', 'volatility' => 'Volatilität', 'momentum' => 'Momentum 10',
+                                'support' => 'Unterstützung', 'patterns' => 'Chartmuster',
+                            ] as $indicator => $indicatorLabel)
                                 <button
                                     type="button"
                                     data-indicator="{{ $indicator }}"
-                                    aria-pressed="{{ $indicator === 'rsi' ? 'true' : 'false' }}"
-                                    class="rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide transition {{ $indicator === 'rsi' ? 'border-violet-400/35 bg-violet-500/15 text-violet-300' : 'border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-[var(--ak-muted)] hover:border-violet-400/25 hover:text-[var(--ak-text)]' }}"
+                                    @disabled(! $canUseChartIndicators)
+                                    aria-pressed="false"
+                                    class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)] transition hover:border-violet-400/25 hover:text-[var(--ak-text)]"
                                 >
                                     {{ $indicatorLabel }}
                                 </button>
@@ -380,65 +514,180 @@
                             <button
                                 type="button"
                                 data-chart-reset
+                                @disabled(! $canUseChartIndicators)
                                 title="{{ __('Chart zurücksetzen') }}"
                                 aria-label="{{ __('Chart zurücksetzen') }}"
                                 class="inline-flex items-center gap-1 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)] transition hover:border-violet-400/25 hover:text-[var(--ak-text)]"
                             >
                                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />Reset
                             </button>
-                        </div>
+                            </div>
+                        </details>
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-2">
-                        <div class="rounded-xl border border-teal-500/25 bg-teal-500/[.09] px-3 py-1.5 text-right">
+                        <div data-stock-live-card class="rounded-xl border border-cyan-500/25 bg-cyan-500/[.09] px-3 py-1.5 text-right transition-colors duration-300">
                             <p
                                 data-live-symbol="{{ $instrument->symbol }}"
                                 data-stock-live-price
                                 data-live-currency="{{ $currency }}"
                                 data-live-decimals="2"
-                                class="whitespace-nowrap text-sm font-black tabular-nums text-teal-400"
+                                class="whitespace-nowrap text-sm font-black tabular-nums text-cyan-400 transition-colors duration-300"
                             >{{ number_format((float) ($chartLast ?? $prediction?->current_price ?? 0), 2, ',', '.') }} {{ $currency }}</p>
-                            <p class="mt-0.5 flex items-center justify-end gap-1 text-[7px] font-black uppercase tracking-wide text-teal-400/75">
-                                <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-teal-400 shadow-[0_0_5px_rgba(45,212,191,.55)]"></span>
-                                TwelveData · <span data-live-time-symbol="{{ $instrument->symbol }}" data-stock-live-time>{{ !empty($prediction->current_quote_time) ? \Illuminate\Support\Carbon::parse($prediction->current_quote_time)->timezone('Europe/Berlin')->format('H:i:s') : __('wartet') }}</span>
+                            <p data-stock-live-meta class="mt-0.5 flex items-center justify-end gap-1 text-[7px] font-black uppercase tracking-wide text-cyan-400/75 transition-colors duration-300">
+                                <span data-stock-live-dot class="h-1.5 w-1.5 {{ $canViewRealtime && $marketSession['open'] ? 'animate-pulse bg-cyan-400 shadow-[0_0_5px_rgba(34,211,238,.55)]' : 'bg-slate-500' }} rounded-full"></span>
+                                <span data-stock-live-status>{{ $canViewRealtime ? ($marketSession['open'] ? __('TwelveData Realtime') : __('Börse geschlossen')) : __('Realtime ab Pro') }}</span>
+                                @if ($canViewRealtime)
+                                    · <span data-live-time-symbol="{{ $instrument->symbol }}" data-stock-live-time>{{ !empty($prediction->current_quote_time) ? \Illuminate\Support\Carbon::parse($prediction->current_quote_time)->timezone('Europe/Berlin')->format('H:i:s') : __('wartet') }}</span>
+                                @endif
                             </p>
                         </div>
+                        <span data-stock-live-change class="inline-flex min-w-24 flex-col items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-2.5 py-1.5 text-cyan-400 transition-colors duration-300">
+                            <strong data-stock-live-change-value class="text-[11px] font-black tabular-nums">—</strong>
+                            <small class="mt-0.5 text-[7px] font-black uppercase tracking-wide opacity-75">{{ __('Tagesperformance') }}</small>
+                        </span>
                         <span class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2 text-[10px] font-bold text-[var(--ak-muted)]">
                             {{ $chartCandles->count() }} {{ __('Tage') }}
                         </span>
                         <span class="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/20 bg-amber-400/[.08] px-2.5 py-2 text-[9px] font-black uppercase tracking-wide text-amber-500">
                             <i class="h-0.5 w-5 rounded-full bg-amber-500"></i>{{ __('Historischer KI-Score') }}
                         </span>
-                        <span class="inline-flex items-center gap-1.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
-                            <i class="h-4 border-l border-dashed border-emerald-500/70"></i>{{ __('Signalwechsel') }}
-                        </span>
+                        <button
+                            type="button"
+                            onclick="document.getElementById('stock-horizon-stability-modal')?.showModal()"
+                            title="{{ __('Stabilitätswerte der Prognosehorizonte') }}"
+                            aria-label="{{ __('Stabilitätswerte anzeigen') }}"
+                            class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-cyan-400/40 bg-cyan-400/15 px-2.5 text-[9px] font-black uppercase tracking-wide text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,.12)] transition hover:border-cyan-300/70 hover:bg-cyan-400/20"
+                        >
+                            <x-heroicon-o-adjustments-horizontal class="h-4 w-4" />
+                            <span>{{ __('Filterwerte') }}</span>
+                        </button>
+                        @if ($latestSignalTransition)
+                            @php
+                                $transitionTarget = strtoupper((string) ($latestSignalTransition['to'] ?? 'HOLD'));
+                                $transitionClasses = match ($transitionTarget) {
+                                    'BUY' => 'border-emerald-400/35 bg-emerald-400/10 text-emerald-400',
+                                    'WATCH' => 'border-lime-400/35 bg-lime-400/10 text-lime-400',
+                                    'SELL' => 'border-rose-400/35 bg-rose-400/10 text-rose-400',
+                                    default => 'border-amber-400/35 bg-amber-400/10 text-amber-400',
+                                };
+                            @endphp
+                            <span
+                                class="inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[9px] font-black uppercase tracking-wide {{ $transitionClasses }}"
+                                title="{{ __('Letzter Signalwechsel') }}"
+                            >
+                                <i class="h-4 border-l border-dashed border-current opacity-70"></i>
+                                {{ strtoupper((string) ($latestSignalTransition['from'] ?? '—')) }}
+                                <x-heroicon-o-arrow-right class="h-3 w-3" />
+                                {{ $transitionTarget }}
+                                <span class="opacity-70">· {{ \Carbon\CarbonImmutable::createFromTimestampMs((int) $latestSignalTransition['x'])->format('d.m.Y') }}</span>
+                            </span>
+                        @endif
+                        <button
+                            id="stock-chart-fullscreen"
+                            type="button"
+                            title="{{ __('Chart maximieren') }}"
+                            aria-label="{{ __('Chart maximieren') }}"
+                            aria-pressed="false"
+                            @disabled(! $canUseChartZoom)
+                            class="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border px-2.5 transition {{ $canUseChartZoom ? 'border-cyan-400/25 bg-cyan-400/10 text-cyan-400 hover:border-cyan-400/50 hover:bg-cyan-400/15' : 'cursor-not-allowed border-slate-500/20 bg-slate-500/10 text-slate-500 grayscale' }}"
+                        >
+                            <x-heroicon-o-arrows-pointing-out data-fullscreen-open class="h-5 w-5" />
+                            <x-heroicon-o-arrows-pointing-in data-fullscreen-close class="hidden h-5 w-5" />
+                            @unless ($canUseChartZoom)<span class="text-[7px] font-black">PRO</span>@endunless
+                        </button>
                     </div>
                 </div>
                 @if ($chartCandles->isNotEmpty())
                     <div class="relative min-h-[160px] min-w-0 flex-1 overflow-hidden lg:min-h-0">
                         <div id="stock-detail-chart" class="absolute inset-0" aria-label="{{ __('Kurschart') }} {{ $instrument->symbol }}"></div>
                         <svg id="stock-indicator-overlay" class="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible" aria-hidden="true"></svg>
+                        <div id="stock-chart-zoom-selection" class="pointer-events-none absolute bottom-8 top-4 z-20 hidden rounded border border-cyan-300 bg-cyan-300/10 shadow-[0_0_12px_rgba(34,211,238,.22)]" aria-hidden="true"></div>
                     </div>
-                    <div id="stock-rsi-panel" class="mt-2 shrink-0 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2 pb-1 pt-1.5">
+                    <div id="stock-rsi-panel" class="mt-2 hidden shrink-0 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-transparent px-2 pb-1 pt-1.5">
                         <div class="flex items-center justify-between px-1">
                             <span class="text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">RSI 14</span>
                             <span id="stock-rsi-value" class="text-[10px] font-black text-violet-300">—</span>
                         </div>
                         <div id="stock-detail-rsi" class="h-16 min-w-0" aria-label="{{ __('RSI 14') }} {{ $instrument->symbol }}"></div>
                     </div>
+                    <div id="stock-secondary-indicator-panels" class="mt-2 grid max-h-44 shrink-0 grid-cols-1 gap-2 overflow-y-auto"></div>
                 @else
                     <div class="grid min-h-[200px] flex-1 place-items-center rounded-2xl border border-dashed border-[var(--ak-border)] text-sm text-[var(--ak-muted)]">
                         {{ __('Keine OHLC-Tageskurse verfügbar.') }}
                     </div>
                 @endif
             </article>
+            <dialog id="stock-horizon-stability-modal" class="m-auto w-[min(94vw,920px)] rounded-2xl border border-cyan-400/30 bg-[var(--ak-card)] p-0 text-[var(--ak-text)] shadow-2xl backdrop:bg-slate-950/75">
+                <div class="border-b border-[var(--ak-border)] px-5 py-4">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-400">{{ __('Prognosestabilität') }}</p>
+                            <h2 class="mt-1 text-lg font-black">{{ __('Werte je Horizont') }}</h2>
+                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Noise- und Stabilitätswerte der Prognosen für 5, 10, 15 und 20 Handelstage.') }}</p>
+                        </div>
+                        <button type="button" onclick="this.closest('dialog').close()" aria-label="{{ __('Schließen') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)] hover:text-cyan-400">
+                            <x-heroicon-o-x-mark class="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto p-5">
+                    <table class="w-full min-w-[760px] text-left text-xs">
+                        <thead class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                            <tr class="border-b border-[var(--ak-border)]">
+                                <th class="px-2 py-2">{{ __('Horizont') }}</th>
+                                <th class="px-2 py-2">{{ __('Kursziel') }}</th>
+                                <th class="px-2 py-2">{{ __('Rendite') }}</th>
+                                <th class="px-2 py-2">{{ __('Stabilität') }}</th>
+                                <th class="px-2 py-2">{{ __('Richtungskonsistenz') }}</th>
+                                <th class="px-2 py-2">{{ __('Streuung') }}</th>
+                                <th class="px-2 py-2">{{ __('Noise') }}</th>
+                                <th class="px-2 py-2">{{ __('Stabilitätsfilter') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ([5, 10, 15, 20] as $days)
+                                @php
+                                    $stability = $horizonStability[$days] ?? [];
+                                @endphp
+                                <tr class="border-b border-[var(--ak-border)]/70 last:border-0">
+                                    <td class="px-2 py-3 font-black text-cyan-400">{{ $days }}T</td>
+                                    <td class="px-2 py-3 font-bold">{{ is_numeric($stability['price'] ?? null) ? number_format((float) $stability['price'], 2, ',', '.').' '.$currency : '—' }}</td>
+                                    <td class="px-2 py-3 font-black {{ !is_numeric($stability['return'] ?? null) ? 'text-[var(--ak-muted)]' : ((float) $stability['return'] >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ is_numeric($stability['return'] ?? null) ? (((float) $stability['return'] > 0 ? '+' : '').number_format((float) $stability['return'], 2, ',', '.').' %') : '—' }}</td>
+                                    <td class="px-2 py-3">{{ is_numeric($stability['stability_score'] ?? null) ? number_format((float) $stability['stability_score'] * 100, 1, ',', '.').' %' : __('Keine Daten') }}</td>
+                                    <td class="px-2 py-3">{{ is_numeric($stability['direction_consistency'] ?? null) ? number_format((float) $stability['direction_consistency'] * 100, 1, ',', '.').' %' : __('Keine Daten') }}</td>
+                                    <td class="px-2 py-3">{{ is_numeric($stability['dispersion'] ?? null) ? number_format((float) $stability['dispersion'] * 100, 2, ',', '.').' %' : __('Keine Daten') }}</td>
+                                    @foreach (['noise_passed', 'stability_passed'] as $gate)
+                                        <td class="px-2 py-3">
+                                            @if (($stability[$gate] ?? null) === null)
+                                                <span class="text-[var(--ak-muted)]">{{ __('Keine Daten') }}</span>
+                                            @elseif ($stability[$gate])
+                                                <span class="font-black text-emerald-400">{{ __('Bestanden') }}</span>
+                                            @else
+                                                <span class="font-black text-rose-400">{{ __('Nicht bestanden') }}</span>
+                                            @endif
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                    <p class="mt-4 text-[10px] leading-5 text-[var(--ak-muted)]">{{ __('Hinweis: Noise-Filter und Horizontfusion bewerten die gemeinsame Form der Prognosekurve. Identische Fusionswerte in mehreren Zeilen sind daher möglich.') }}</p>
+                </div>
+            </dialog>
 
-            <article x-show="stockTab === 'overview'" class="stock-detail-panel stock-detail-panel-compact stock-overview-analysis min-h-0 overflow-y-auto rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] lg:h-full">
+            <article class="stock-detail-panel stock-detail-panel-compact stock-overview-analysis min-h-0 overflow-y-auto rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] lg:h-full">
                 <div class="stock-detail-card-head flex items-start justify-between gap-4">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Aktuelle KI-Analyse') }}</p>
                         <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Persönliche Einordnung') }}</h2>
                     </div>
-                    <span class="inline-flex h-8 min-w-20 items-center justify-center rounded-lg border px-3 text-xs font-black {{ $signalClass }}">{{ $signal }}</span>
+                    @if ($signal === 'WAIT' && $canViewRealtime)
+                        <button type="button" onclick="document.getElementById('entry-signal-alert-modal')?.showModal()" class="inline-flex h-8 min-w-24 items-center justify-center gap-1.5 rounded-lg border border-emerald-300/70 bg-emerald-400/25 px-3 text-xs font-black text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,.22)] transition hover:bg-emerald-400/35">
+                            <x-heroicon-o-clock class="h-4 w-4" />{{ $signalLabel }}
+                        </button>
+                    @else
+                        <span class="inline-flex h-8 min-w-20 items-center justify-center rounded-lg border px-3 text-xs font-black {{ $signalClass }}">{{ $signalLabel }}</span>
+                    @endif
                 </div>
 
                 @if ($prediction)
@@ -472,76 +721,56 @@
                                 ? (float) $modelQuality->quality_score * 100
                                 : (float) $modelQuality->quality_score))
                             : null;
-                        $analysisModelQualityColor = match (true) {
-                            $analysisModelQualityPercent === null => '#64748b',
-                            $analysisModelQualityPercent < 40 => '#e35f72',
-                            $analysisModelQualityPercent < 60 => '#f28a45',
-                            $analysisModelQualityPercent < 75 => '#e5b643',
-                            $analysisModelQualityPercent < 88 => '#91c94b',
-                            default => '#22c58b',
+                        $analysisQualityDonutColor = static function (?float $percent): string {
+                            if ($percent === null) return '#64748b';
+                            $percent = max(0, min(100, $percent));
+                            $hue = $percent <= 50
+                                ? ($percent / 50) * 48
+                                : 48 + (($percent - 50) / 50) * 94;
+                            return sprintf('hsl(%.1f 78%% 52%%)', $hue);
                         };
-                        $analysisScoreColor = match (true) {
-                            $scorePercent === null => '#64748b',
-                            $scorePercent < 40 => '#e35f72',
-                            $scorePercent < 55 => '#f28a45',
-                            $scorePercent < 70 => '#e5b643',
-                            $scorePercent < 82 => '#84cc16',
-                            default => '#22c58b',
-                        };
-                        $analysisRiskColor = match (true) {
-                            $riskPercent === null => '#64748b',
-                            $riskPercent <= 20 => '#dc3f58',
-                            default => sprintf('hsl(%.1f 72%% 43%%)', 52 + (($riskPercent - 20) / 80 * 68)),
-                        };
+                        $analysisScoreColor = $analysisQualityDonutColor($scorePercent);
+                        $analysisModelQualityColor = $analysisQualityDonutColor($analysisModelQualityPercent);
+                        $analysisRiskColor = $analysisQualityDonutColor($riskPercent !== null ? 100 - $riskPercent : null);
+                        $analysisHitRatePercent = is_numeric($detailWalkForwardStats?->hit_rate)
+                            ? max(0, min(100, (float) $detailWalkForwardStats->hit_rate)) : null;
+                        $analysisProfitPerTrade = is_numeric($detailWalkForwardStats?->average_profit_per_trade_percent)
+                            ? (float) $detailWalkForwardStats->average_profit_per_trade_percent : null;
+                        $analysisProfitPerTradeScale = $analysisProfitPerTrade !== null
+                            ? max(0, min(100, 50 + ($analysisProfitPerTrade * 25))) : null;
+                        $analysisStabilityPercent = is_numeric($prediction->horizon_fusion_stability_score ?? null)
+                            ? max(0, min(100, (float) $prediction->horizon_fusion_stability_score * ((float) $prediction->horizon_fusion_stability_score <= 1 ? 100 : 1)))
+                            : null;
+                        $analysisConfidenceColor = $analysisQualityDonutColor($confidencePercent);
+                        $analysisHitRateColor = $analysisQualityDonutColor($analysisHitRatePercent);
+                        $analysisProfitPerTradeColor = $analysisQualityDonutColor($analysisProfitPerTradeScale);
+                        $analysisStabilityColor = $analysisQualityDonutColor($analysisStabilityPercent);
                     @endphp
                     <div class="mt-3 space-y-3">
-                        <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
-                            <p class="mb-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Modellranking') }}</p>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div class="min-w-0 rounded-lg border border-amber-400/20 bg-amber-400/[.06] px-2.5 py-2">
-                                    <p class="text-[8px] font-black uppercase tracking-[.12em] text-amber-500">{{ __('Champion') }}</p>
-                                    <p class="mt-1 truncate text-xs font-black text-[var(--ak-text)]">{{ $modelQuality?->model_alias ?: '—' }}</p>
-                                    <span class="ak-model-tier mt-1.5 {{ $analysisModelTierClass }}">{{ $analysisModelTierName }}</span>
+                        <div class="rounded-xl border border-[var(--ak-border)] bg-transparent p-3">
+                            <p class="mb-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Bewertung') }}</p>
+                            <div class="flex min-h-[76px] flex-wrap items-center justify-center gap-3">
+                                <div class="screener-metric-donut screener-metric-donut-score" style="--donut-value: {{ number_format($scorePercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisScoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($scorePercent ?? 0) }}">
+                                    <span>{{ $scorePercent !== null ? number_format($scorePercent, 0, ',', '.') : '—' }}</span><small>{{ __('KI-Score') }}</small>
                                 </div>
-                                <div class="min-w-0 rounded-lg border border-teal-500/20 bg-teal-500/[.06] px-2.5 py-2">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <p class="text-[8px] font-black uppercase tracking-[.12em] text-teal-500">{{ __('Challenger') }}</p>
-                                        @if ($analysisChallengerQualityPercent !== null)
-                                            <span class="shrink-0 rounded-md border border-teal-500/20 bg-teal-500/[.08] px-1.5 py-0.5 text-[8px] font-black tabular-nums text-teal-500" title="{{ __('Challenger Quality Score') }}">
-                                                {{ number_format($analysisChallengerQualityPercent, 1, ',', '.') }} %
-                                            </span>
-                                        @endif
-                                    </div>
-                                    @if ($modelChallenger)
-                                        <p class="mt-1 truncate text-xs font-black text-[var(--ak-text)]">{{ $modelChallenger->model_alias ?: '—' }}</p>
-                                        <span class="ak-model-tier mt-1.5 !w-full !max-w-none !flex-1 {{ $analysisChallengerTierClass }}">{{ $analysisChallengerTierName }}</span>
-                                    @else
-                                        <p class="mt-1 text-xs font-bold text-[var(--ak-muted)]">{{ __('Kein aktiver Challenger') }}</p>
-                                    @endif
+                                <div class="screener-metric-donut" style="--donut-value: {{ number_format($confidencePercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisConfidenceColor }}" role="meter" aria-label="{{ __('Konfidenz') }}" aria-valuemin="0" aria-valuemax="100" @if($confidencePercent !== null) aria-valuenow="{{ round($confidencePercent) }}" @endif>
+                                    <span>{{ $confidencePercent !== null ? number_format($confidencePercent, 0, ',', '.').'%' : '—' }}</span><small>{{ __('Konf.') }}</small>
+                                </div>
+                                <div class="screener-metric-donut" style="--donut-value: {{ number_format($analysisHitRatePercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisHitRateColor }}" role="meter" aria-label="{{ __('Hit-Rate') }}" aria-valuemin="0" aria-valuemax="100" @if($analysisHitRatePercent !== null) aria-valuenow="{{ round($analysisHitRatePercent) }}" @endif>
+                                    <span>{{ $analysisHitRatePercent !== null ? number_format($analysisHitRatePercent, 0, ',', '.').'%' : '—' }}</span><small>{{ __('Hit-Rate') }}</small>
+                                </div>
+                                <div class="screener-metric-donut" style="--donut-value: {{ number_format($analysisProfitPerTradeScale ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisProfitPerTradeColor }}" role="meter" aria-label="{{ __('Durchschnittlicher Netto-Profit je Trade') }}" @if($analysisProfitPerTrade !== null) aria-valuenow="{{ $analysisProfitPerTrade }}" @endif>
+                                    <span>{{ $analysisProfitPerTrade !== null ? (($analysisProfitPerTrade > 0 ? '+' : '').number_format($analysisProfitPerTrade, 2, ',', '.').'%') : '—' }}</span><small>{{ __('Ø/Trade') }}</small>
+                                </div>
+                                <div class="screener-metric-donut" style="--donut-value: {{ number_format($analysisStabilityPercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisStabilityColor }}" role="meter" aria-label="{{ __('Stabilität') }}" aria-valuemin="0" aria-valuemax="100" @if($analysisStabilityPercent !== null) aria-valuenow="{{ round($analysisStabilityPercent) }}" @endif>
+                                    <span>{{ $analysisStabilityPercent !== null ? number_format($analysisStabilityPercent, 0, ',', '.').'%' : '—' }}</span><small>{{ __('Stabilität') }}</small>
+                                </div>
+                                <div class="screener-metric-donut screener-risk-donut" style="--donut-value: {{ number_format($riskPercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisRiskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" @if($riskPercent !== null) aria-valuenow="{{ round($riskPercent) }}" @endif>
+                                    <span>{{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.').'%' : '—' }}</span><small>{{ __('Risiko') }}</small>
                                 </div>
                             </div>
                         </div>
-                        <div class="grid grid-cols-3 gap-2">
-                            <div class="flex min-h-[88px] min-w-0 flex-col items-center justify-start gap-2.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2 py-2">
-                                <p class="w-full truncate text-center text-[8px] font-black uppercase leading-none tracking-[.035em] text-[var(--ak-muted)]">{{ __('KI-Score') }}</p>
-                                <div class="ak-prediction-donut" style="--value:{{ $scorePercent ?? 0 }}%;--color:{{ $analysisScoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $analysisScore10 ?? 0 }}">
-                                    <span>{{ $analysisScore10 !== null ? number_format($analysisScore10, 1, ',', '.') : '—' }}<small>{{ $analysisScore10 !== null ? '/10' : '' }}</small></span>
-                                </div>
-                            </div>
-                            <div class="flex min-h-[88px] min-w-0 flex-col items-center justify-start gap-2.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2 py-2">
-                                <p class="w-full truncate text-center text-[8px] font-black uppercase leading-none tracking-[.025em] text-[var(--ak-muted)]">{{ __('Modellqualität') }}</p>
-                                <div class="ak-prediction-donut" style="--value:{{ $analysisModelQualityPercent ?? 0 }}%;--color:{{ $analysisModelQualityColor }}" role="meter" aria-label="{{ __('Modellqualität') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($analysisModelQualityPercent ?? 0) }}">
-                                    <span>{{ $analysisModelQualityPercent !== null ? number_format($analysisModelQualityPercent, 0, ',', '.') : '—' }}<small>{{ $analysisModelQualityPercent !== null ? '%' : '' }}</small></span>
-                                </div>
-                            </div>
-                            <div class="flex min-h-[88px] min-w-0 flex-col items-center justify-start gap-2.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2 py-2">
-                                <p class="w-full truncate text-center text-[8px] font-black uppercase leading-none tracking-[.035em] text-[var(--ak-muted)]">{{ __('Risiko') }}</p>
-                                <div class="ak-prediction-donut" style="--value:{{ $riskPercent ?? 0 }}%;--color:{{ $analysisRiskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($riskPercent ?? 0) }}">
-                                    <span>{{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.') : '—' }}<small>{{ $riskPercent !== null ? '%' : '' }}</small></span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
+                        <div class="rounded-xl border border-[var(--ak-border)] bg-transparent p-2">
                             <div class="flex items-center justify-between gap-2">
                                 <p class="text-[9px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Aktueller Trend') }}</p>
                                 <span class="rounded-md border border-current/20 px-1.5 py-0.5 text-[8px] font-black uppercase {{ $trendClass }}">{{ $trendTimeframe }}</span>
@@ -553,62 +782,93 @@
                                 </p>
                             @endif
                         </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
-                                <p class="text-[9px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Ziel 5 Tage') }}</p>
-                                <p class="mt-1 text-base font-black text-violet-300">{{ is_numeric($prediction->predicted_price_5d) ? number_format((float) $prediction->predicted_price_5d, 2, ',', '.').' '.$currency : '—' }}</p>
-                            </div>
-                            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-2">
-                                <p class="text-[9px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Ziel 20 Tage') }}</p>
-                                <div class="mt-1 min-w-0">
-                                    <p class="truncate text-base font-black text-violet-300">{{ is_numeric($prediction->predicted_price_20d) ? number_format((float) $prediction->predicted_price_20d, 2, ',', '.').' '.$currency : '—' }}</p>
-                                    @if ($outlook20dPercent !== null)
-                                        <span class="mt-0.5 block truncate text-[10px] font-black {{ $outlook20dPercent >= 0 ? 'text-teal-400' : 'text-rose-400' }}">
-                                            {{ $outlook20dPercent > 0 ? '+' : '' }}{{ number_format($outlook20dPercent, 2, ',', '.') }} %
-                                        </span>
-                                    @endif
+                        <div class="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                            @foreach ([5, 10, 15, 20] as $horizonDays)
+                                @php
+                                    $horizonTarget = $horizonTargets[$horizonDays] ?? ['price' => null, 'return' => null];
+                                    $horizonReturn = $horizonTarget['return'];
+                                @endphp
+                                <div class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-transparent p-2">
+                                    <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $horizonDays }} {{ __('Tage') }}</p>
+                                    <p class="mt-1 truncate text-sm font-black text-cyan-400">{{ is_numeric($horizonTarget['price']) ? number_format((float) $horizonTarget['price'], 2, ',', '.').' '.$currency : '—' }}</p>
+                                    <span class="mt-0.5 block truncate text-[9px] font-black {{ !is_numeric($horizonReturn) ? 'text-[var(--ak-muted)]' : ($horizonReturn >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">
+                                        {{ is_numeric($horizonReturn) ? (($horizonReturn > 0 ? '+' : '').number_format((float) $horizonReturn, 2, ',', '.').' %') : __('Keine Prognose') }}
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
+                        @if ($requestedPredictionId > 0)
+                            <div class="rounded-xl border border-[var(--ak-border)] bg-transparent p-2.5">
+                                <div class="mb-2 flex items-center gap-2">
+                                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-300/10 text-amber-300"><x-heroicon-o-clock class="h-4 w-4" /></span>
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Historische Prognoseauswertung') }}</p>
+                                        <p class="text-[8px] text-[var(--ak-muted)]">{{ __('Prognose vom :date', ['date' => \Illuminate\Support\Carbon::parse($prediction->prediction_time)->format('d.m.Y H:i')]) }}</p>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="rounded-lg border border-[var(--ak-border)] bg-transparent px-2.5 py-2">
+                                        <span class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Gegebenes Signal') }}</span>
+                                        <div class="mt-1 flex items-center justify-between gap-2"><span class="rounded-md border px-2 py-0.5 text-[10px] font-black {{ $historicalSignalClass }}">{{ $historicalSignal }}</span><span class="text-[8px] text-[var(--ak-muted)]">{{ $signalChangedAt?->format('d.m.Y') ?? '—' }}</span></div>
+                                    </div>
+                                    @foreach ([
+                                        [__('Kurs bei Prognose'), $historicalStartPrice !== null ? number_format($historicalStartPrice, 2, ',', '.').' '.$currency : '—', 'text-[var(--ak-text)]'],
+                                        [__('Kurs danach'), $historicalEndPrice !== null ? number_format($historicalEndPrice, 2, ',', '.').' '.$currency : '—', 'text-[var(--ak-text)]'],
+                                        [__('Tatsächliche Entwicklung'), $historicalReturn !== null ? ($historicalReturn > 0 ? '+' : '').number_format($historicalReturn, 2, ',', '.').' %' : '—', $historicalReturn === null ? 'text-[var(--ak-muted)]' : ($historicalReturn >= 0 ? 'text-teal-400' : 'text-rose-400')],
+                                    ] as [$historyLabel, $historyValue, $historyTone])
+                                        <div class="rounded-lg border border-[var(--ak-border)] bg-transparent px-2.5 py-2">
+                                            <span class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ $historyLabel }}</span>
+                                            <span class="mt-1 block text-xs font-black tabular-nums {{ $historyTone }}">{{ $historyValue }}</span>
+                                        </div>
+                                    @endforeach
+                                    <div class="col-span-2 rounded-lg border border-[var(--ak-border)] bg-transparent px-2.5 py-2">
+                                        <span class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Ergebnis') }}</span>
+                                        <span class="mt-1 block text-[10px] font-black {{ $directionCorrect === null ? 'text-[var(--ak-muted)]' : ($directionCorrect ? 'text-teal-400' : 'text-rose-400') }}">{{ $directionCorrect === null ? __('Noch nicht validiert') : ($directionCorrect ? __('Richtung korrekt') : __('Richtung verfehlt')) }}</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        @endif
                     </div>
                 @else
                     <div class="mt-8 rounded-xl border border-dashed border-[var(--ak-border)] p-8 text-center text-sm text-[var(--ak-muted)]">{{ __('Noch keine KI-Analyse vorhanden.') }}</div>
                 @endif
             </article>
-
-            @if ($requestedPredictionId > 0 && $prediction)
-                <aside class="stock-detail-panel stock-detail-panel-compact stock-overview-evaluation min-h-0 overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)] lg:h-full">
-                    <div class="stock-detail-card-head flex items-center gap-2">
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-300/10 text-amber-300"><x-heroicon-o-clock class="h-4 w-4" /></span>
-                        <div class="min-w-0">
-                            <h2 class="text-xs font-black leading-tight text-[var(--ak-text)]">{{ __('Historische Prognoseauswertung') }}</h2>
-                            <p class="mt-0.5 text-[9px] text-[var(--ak-muted)]">{{ __('Prognose vom :date', ['date' => \Illuminate\Support\Carbon::parse($prediction->prediction_time)->format('d.m.Y H:i')]) }}</p>
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        <div class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2">
-                            <span class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Gegebenes Signal') }}</span>
-                            <div class="mt-1 flex items-center justify-between gap-2"><span class="rounded-md border px-2 py-0.5 text-[10px] font-black {{ $historicalSignalClass }}">{{ $historicalSignal }}</span><span class="text-[9px] text-[var(--ak-muted)]">{{ $signalChangedAt?->format('d.m.Y') ?? '—' }}</span></div>
-                        </div>
-                        @foreach ([
-                            [__('Kurs bei Prognose'), $historicalStartPrice !== null ? number_format($historicalStartPrice, 2, ',', '.').' '.$currency : '—', 'text-[var(--ak-text)]'],
-                            [__('Kurs danach'), $historicalEndPrice !== null ? number_format($historicalEndPrice, 2, ',', '.').' '.$currency : '—', 'text-[var(--ak-text)]'],
-                            [__('Tatsächliche Entwicklung'), $historicalReturn !== null ? ($historicalReturn > 0 ? '+' : '').number_format($historicalReturn, 2, ',', '.').' %' : '—', $historicalReturn === null ? 'text-[var(--ak-muted)]' : ($historicalReturn >= 0 ? 'text-teal-400' : 'text-rose-400')],
-                        ] as [$historyLabel, $historyValue, $historyTone])
-                            <div class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2">
-                                <span class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ $historyLabel }}</span>
-                                <span class="mt-1 block text-sm font-black tabular-nums {{ $historyTone }}">{{ $historyValue }}</span>
+            @if ($signal === 'WAIT' && $canViewRealtime)
+                <dialog id="entry-signal-alert-modal" class="m-auto w-[min(92vw,440px)] rounded-2xl border border-emerald-400/35 bg-[var(--ak-card)] p-0 text-[var(--ak-text)] shadow-2xl backdrop:bg-slate-950/75">
+                    <form method="POST" action="{{ route('stocks.entry-alert.store', $instrument->id) }}" class="p-5">
+                        @csrf
+                        <input type="hidden" name="prediction_id" value="{{ $prediction->id }}">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-[9px] font-black uppercase tracking-[.15em] text-emerald-400">PRO · {{ __('Einstiegsalarm') }}</p>
+                                <h2 class="mt-1 text-lg font-black">{{ __('Per E-Mail informieren?') }}</h2>
                             </div>
-                        @endforeach
-                        <div class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2">
-                            <span class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Ergebnis') }}</span>
-                            <span class="mt-1 block text-[10px] font-black {{ $directionCorrect === null ? 'text-[var(--ak-muted)]' : ($directionCorrect ? 'text-teal-400' : 'text-rose-400') }}">{{ $directionCorrect === null ? __('Noch nicht validiert') : ($directionCorrect ? __('Richtung korrekt') : __('Richtung verfehlt')) }}</span>
+                            <button type="button" onclick="this.closest('dialog').close()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)]"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
                         </div>
-                    </div>
-                </aside>
+                        <p class="mt-4 text-sm leading-6 text-[var(--ak-muted)]">{{ __('Du erhältst einmalig eine E-Mail, sobald sich der Status von WAIT auf BUY ändert. Danach wird der Alarm automatisch beendet.') }}</p>
+                        <fieldset class="mt-4 space-y-2">
+                            <legend class="mb-2 text-[9px] font-black uppercase tracking-wide text-emerald-400">{{ __('Wann informieren?') }}</legend>
+                            <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] p-3">
+                                <input type="radio" name="notification_mode" value="buy_only" checked class="mt-0.5 text-emerald-500 focus:ring-emerald-400/30">
+                                <span><strong class="block text-sm text-[var(--ak-text)]">{{ __('Nur bei BUY') }}</strong><small class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('E-Mail erst beim tatsächlichen Wechsel auf BUY.') }}</small></span>
+                            </label>
+                            <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3">
+                                <input type="radio" name="notification_mode" value="wait_or_buy" class="mt-0.5 text-emerald-500 focus:ring-emerald-400/30">
+                                <span><strong class="block text-sm text-[var(--ak-text)]">{{ __('Bei WAIT oder BUY') }}</strong><small class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Bei der nächsten positiven Tagesprognose informieren – auch wenn WAIT bestehen bleibt.') }}</small></span>
+                            </label>
+                        </fieldset>
+                        <p class="mt-3 rounded-lg border border-rose-400/15 bg-rose-400/[.05] px-3 py-2 text-[10px] leading-4 text-[var(--ak-muted)]">{{ __('Bei HOLD oder SELL wird keine E-Mail gesendet. Der Alarm bleibt für eine spätere positive Prognose aktiv.') }}</p>
+                        <div class="mt-5 flex justify-end gap-2">
+                            <button type="button" onclick="this.closest('dialog').close()" class="h-10 rounded-lg border border-[var(--ak-border)] px-4 text-xs font-black text-[var(--ak-muted)]">{{ __('Nein') }}</button>
+                            <button type="submit" class="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-300/50 bg-emerald-400/20 px-4 text-xs font-black text-emerald-200 hover:bg-emerald-400/30"><x-heroicon-o-envelope class="h-4 w-4" />{{ __('Ja, informieren') }}</button>
+                        </div>
+                    </form>
+                </dialog>
             @endif
+
         </section>
 
+        @if ($canUseChartIndicators)
         @php
             $indicatorDataPointCount = $indicatorCards->max(fn (array $card): int => count($card['points'])) ?? 0;
             $indicatorOverallProbability = $indicatorCards
@@ -616,18 +876,11 @@
                 ->filter(fn ($value) => is_numeric($value))
                 ->avg();
         @endphp
-        <section x-cloak x-show="stockTab === 'indicators'" class="space-y-4">
-            <article class="stock-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
-                <div class="stock-detail-card-head flex flex-wrap items-center justify-between gap-4">
-                    <div class="flex min-w-0 items-center gap-3">
-                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-teal-500/25 bg-teal-500/10 text-teal-500">
-                            <x-heroicon-o-presentation-chart-line class="h-5 w-5" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Indikatoren Statistik') }}</p>
-                            <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Historische Indikatoranalyse') }}</h2>
-                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Realisierte 20-Tage-Fälle aus den letzten drei Jahren') }}</p>
-                        </div>
+        <section data-stock-collapsible="indicators" data-stock-collapsible-title="{{ __('Indikatoren Statistik') }}" class="space-y-4">
+            <div class="flex flex-wrap items-end justify-between gap-3 px-1">
+                    <div class="min-w-0">
+                        <h2 class="text-xs font-black uppercase tracking-[.14em] text-cyan-400">{{ __('Historische Indikatoranalyse') }}</h2>
+                        <p class="mt-1 text-[11px] text-[var(--ak-muted)]">{{ __('Realisierte 20-Tage-Fälle aus den letzten drei Jahren') }}</p>
                     </div>
                     <div class="flex shrink-0 items-center gap-2">
                         <span class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
@@ -637,16 +890,33 @@
                             {{ $indicatorOverallProbability !== null ? number_format($indicatorOverallProbability, 1, ',', '.').' %' : '—' }}
                         </span>
                     </div>
-                </div>
+            </div>
+            <div class="px-1 pb-5">
                 <div class="flex flex-wrap items-center gap-3">
                     <span class="text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Mittlere Steigwahrscheinlichkeit') }}</span>
-                    <div class="min-w-44 flex-1"><x-dashboard.score-stripes :percent="$indicatorOverallProbability ?? 0" palette="teal" /></div>
+                    <div class="min-w-44 flex-1"><x-dashboard.score-stripes :percent="$indicatorOverallProbability ?? 0" /></div>
                 </div>
-            </article>
+            </div>
 
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 @foreach ($indicatorCards as $index => $card)
-                    <article class="stock-detail-panel stock-detail-panel-compact flex h-[230px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]">
+                    @php
+                        $indicatorForecastRising = is_numeric($card['currentProbability'] ?? null)
+                            ? (float) $card['currentProbability'] >= (float) ($card['currentFallProbability'] ?? (100 - (float) $card['currentProbability']))
+                            : null;
+                        $indicatorForecastBorder = $indicatorForecastRising === null
+                            ? null
+                            : ($indicatorForecastRising ? 'rgba(34,197,94,.62)' : 'rgba(244,63,94,.62)');
+                        $indicatorForecastBackground = $indicatorForecastRising === null
+                            ? null
+                            : ($indicatorForecastRising
+                                ? 'linear-gradient(145deg, rgba(34,197,94,.12), rgba(34,197,94,.04))'
+                                : 'linear-gradient(145deg, rgba(244,63,94,.12), rgba(244,63,94,.04))');
+                    @endphp
+                    <article
+                        class="stock-detail-panel stock-detail-panel-compact flex h-[230px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]"
+                        @if ($indicatorForecastBorder) style="border-color: {{ $indicatorForecastBorder }} !important; border-bottom-color: {{ $indicatorForecastBorder }} !important; background: {{ $indicatorForecastBackground }} !important;" @endif
+                    >
                         <div class="stock-detail-card-head flex shrink-0 items-center justify-between gap-3">
                             <div class="flex min-w-0 items-center gap-2.5">
                                 <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-teal-500/20 bg-teal-500/[.08] text-teal-500">
@@ -670,12 +940,85 @@
                                 @endif
                             </div>
                         </div>
-                        <div class="min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-1 py-0.5">
+                        <div class="min-h-0 flex-1 overflow-hidden rounded-xl border border-cyan-400/20 bg-transparent px-1 py-0.5">
                             <div id="stock-indicator-probability-chart-{{ $index }}" class="h-full min-h-0"></div>
                         </div>
                     </article>
                 @endforeach
             </div>
+        </section>
+
+        <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartformationen') }}">
+            <article class="stock-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
+                <div class="grid gap-2 lg:grid-cols-2">
+                    @foreach ($chartPatternStats as $patternStat)
+                        @php
+                            $patternBullish = $patternStat['direction'] === 'bullish';
+                            $patternTone = $patternBullish ? 'text-emerald-400' : 'text-rose-400';
+                            $performance = $patternStat['average_performance'];
+                            $performanceTone = $performance === null ? 'text-[var(--ak-muted)]' : ($performance >= 0 ? 'text-emerald-400' : 'text-rose-400');
+                            $patternExample = collect($patternStat['example'] ?? []);
+                            $exampleLow = $patternExample->isNotEmpty() ? (float) $patternExample->min('low') : 0;
+                            $exampleHigh = $patternExample->isNotEmpty() ? (float) $patternExample->max('high') : 1;
+                            $exampleRange = max(.000001, $exampleHigh - $exampleLow);
+                        @endphp
+                        <div class="chart-pattern-stat-row grid min-h-[88px] items-center gap-4 rounded-xl border border-cyan-400/15 bg-cyan-400/[.035] px-3 py-2.5">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-current/30 bg-current/[.06] {{ $patternTone }}">
+                                    @if ($patternBullish)
+                                        <x-heroicon-o-arrow-trending-up class="h-5 w-5" />
+                                    @else
+                                        <x-heroicon-o-arrow-trending-down class="h-5 w-5" />
+                                    @endif
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="truncate text-xs font-black text-[var(--ak-text)]">{{ $patternStat['name'] }}</p>
+                                    <p class="mt-1 text-[9px] font-bold {{ $patternTone }}">
+                                        {{ $patternStat['latest_at'] ? __('Zuletzt erkannt: :date', ['date' => \Illuminate\Support\Carbon::parse($patternStat['latest_at'])->format('d.m.Y')]) : __('In drei Jahren nicht erkannt') }}
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="h-14 overflow-hidden rounded-lg border border-cyan-400/15 bg-transparent px-1">
+                                @if ($patternExample->isNotEmpty())
+                                    <svg viewBox="0 0 150 54" class="h-full w-full" role="img" aria-label="{{ __('Kursbeispiel für :pattern', ['pattern' => $patternStat['name']]) }}">
+                                        <line x1="3" y1="50" x2="147" y2="50" stroke="#22d3ee" stroke-opacity=".18" />
+                                        @foreach ($patternExample as $exampleIndex => $exampleCandle)
+                                            @php
+                                                $exampleX = 13 + $exampleIndex * (124 / max(1, $patternExample->count() - 1));
+                                                $exampleOpenY = 47 - (((float) $exampleCandle['open'] - $exampleLow) / $exampleRange) * 40;
+                                                $exampleCloseY = 47 - (((float) $exampleCandle['close'] - $exampleLow) / $exampleRange) * 40;
+                                                $exampleHighY = 47 - (((float) $exampleCandle['high'] - $exampleLow) / $exampleRange) * 40;
+                                                $exampleLowY = 47 - (((float) $exampleCandle['low'] - $exampleLow) / $exampleRange) * 40;
+                                                $exampleColor = (float) $exampleCandle['close'] >= (float) $exampleCandle['open'] ? '#22c55e' : '#ef4444';
+                                                $isPatternCandle = $exampleIndex === min(3, $patternExample->count() - 1);
+                                            @endphp
+                                            <line x1="{{ $exampleX }}" y1="{{ $exampleHighY }}" x2="{{ $exampleX }}" y2="{{ $exampleLowY }}" stroke="{{ $exampleColor }}" stroke-width="1" />
+                                            <rect x="{{ $exampleX - 4 }}" y="{{ min($exampleOpenY, $exampleCloseY) }}" width="8" height="{{ max(2, abs($exampleCloseY - $exampleOpenY)) }}" rx="1" fill="{{ $exampleColor }}" @if($isPatternCandle) stroke="#22d3ee" stroke-width="1.5" @endif />
+                                        @endforeach
+                                    </svg>
+                                @else
+                                    <span class="grid h-full place-items-center text-[8px] font-bold text-[var(--ak-muted)]">{{ __('Kein Beispiel') }}</span>
+                                @endif
+                            </div>
+                            <div class="grid min-w-0 grid-cols-3 gap-1.5 border-l border-cyan-400/15 pl-2 text-right">
+                                <div>
+                                    <span class="block text-[7px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Fälle') }}</span>
+                                    <strong class="mt-1 block text-xs tabular-nums text-[var(--ak-text)]">{{ number_format($patternStat['samples'], 0, ',', '.') }}</strong>
+                                </div>
+                                <div>
+                                    <span class="block text-[7px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Treffer') }}</span>
+                                    <strong class="mt-1 block text-xs tabular-nums {{ is_numeric($patternStat['hit_rate']) && $patternStat['hit_rate'] >= 50 ? 'text-emerald-400' : 'text-rose-400' }}">{{ is_numeric($patternStat['hit_rate']) ? number_format($patternStat['hit_rate'], 1, ',', '.').'%' : '—' }}</strong>
+                                </div>
+                                <div>
+                                    <span class="block text-[7px] font-black uppercase tracking-wide text-[var(--ak-muted)]">Ø 20T</span>
+                                    <strong class="mt-1 block whitespace-nowrap text-xs tabular-nums {{ $performanceTone }}">{{ is_numeric($performance) ? (($performance > 0 ? '+' : '').number_format($performance, 2, ',', '.').'%') : '—' }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+                <p class="mt-3 text-[9px] leading-4 text-[var(--ak-muted)]">{{ __('Bei bearischen Mustern wird die Performance richtungsbereinigt: Ein fallender Kurs zählt dort als positiver Treffer. Vergangene Muster sind keine Garantie für zukünftige Ergebnisse.') }}</p>
+            </article>
         </section>
 
         @php
@@ -748,18 +1091,12 @@
                 return $trendCard && $oscillatorCard ? $indicatorMatrixBuild($trendCard, $oscillatorCard) : null;
             })->filter()->values();
         @endphp
-        <section x-cloak x-show="stockTab === 'indicator-matrix'" class="space-y-4">
-            <article class="stock-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
-                <div class="stock-detail-card-head flex flex-wrap items-center justify-between gap-4">
-                    <div class="flex min-w-0 items-center gap-3">
-                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-teal-500/25 bg-teal-500/10 text-teal-500">
-                            <x-heroicon-o-squares-plus class="h-5 w-5" />
-                        </span>
-                        <div>
-                            <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Indikator Matrix') }}</p>
-                            <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Trend trifft Stochastik') }}</h2>
-                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Historische 20-Tage-Steigwahrscheinlichkeit nach gemeinsamen Indikatorzuständen') }}</p>
-                        </div>
+        <section data-stock-collapsible="indicator-matrix" data-stock-collapsible-title="{{ __('Indikator Matrix') }}" class="space-y-4">
+            <div>
+                <div class="flex flex-wrap items-end justify-between gap-3 px-1">
+                    <div>
+                        <h2 class="text-xs font-black uppercase tracking-[.14em] text-cyan-400">{{ __('Trend trifft Stochastik') }}</h2>
+                        <p class="mt-1 text-[11px] text-[var(--ak-muted)]">{{ __('Historische 20-Tage-Steigwahrscheinlichkeit nach gemeinsamen Indikatorzuständen') }}</p>
                     </div>
                     <span class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                         {{ $indicatorMatrixPairs->count() }} {{ __('Vergleiche') }}
@@ -869,13 +1206,30 @@
                         </div>
                     @endforelse
                 </div>
-            </article>
+            </div>
+        </section>
+        @else
+        <section data-stock-collapsible="indicators" data-stock-collapsible-title="{{ __('Indikatoren Statistik') }}" data-stock-pro-locked>
+            <div class="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-cyan-400/[.025] px-5 py-8 text-center">
+                <span class="rounded-md border border-amber-400/35 bg-amber-400/10 px-2 py-1 text-[8px] font-black tracking-[.14em] text-amber-400">PRO</span>
+                <p class="mt-3 text-sm font-black text-[var(--ak-text)]">{{ __('Historische Indikatorstatistiken sind im Pro-Tarif verfügbar.') }}</p>
+                <p class="mt-1 max-w-xl text-xs leading-5 text-[var(--ak-muted)]">{{ __('Enthält Einzelanalysen, Steigwahrscheinlichkeiten und Heatmaps der Indikatorkombinationen.') }}</p>
+            </div>
         </section>
 
-        <section x-cloak x-show="stockTab === 'analysis'" class="rounded-[1.5rem] border border-teal-500/20 bg-[linear-gradient(120deg,rgba(20,184,166,.07),var(--ak-card))] p-5 shadow-[var(--ak-shadow)]">
+        <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartformationen') }}" data-stock-pro-locked>
+            <div class="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-cyan-400/[.025] px-5 py-8 text-center">
+                <span class="rounded-md border border-amber-400/35 bg-amber-400/10 px-2 py-1 text-[8px] font-black tracking-[.14em] text-amber-400">PRO</span>
+                <p class="mt-3 text-sm font-black text-[var(--ak-text)]">{{ __('Chartformationen sind im Pro-Tarif verfügbar.') }}</p>
+                <p class="mt-1 max-w-xl text-xs leading-5 text-[var(--ak-muted)]">{{ __('Enthält erkannte Muster, Beispielcharts und deren historische Performance.') }}</p>
+            </div>
+        </section>
+        @endif
+
+        <section data-stock-collapsible="analysis" data-stock-collapsible-title="{{ __('Analyse und Risikoeinordnung') }}">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <span class="flex h-11 w-11 items-center justify-center rounded-xl border border-teal-500/25 bg-teal-500/10 p-1.5 shadow-[0_0_18px_rgba(20,184,166,.08)]">
+                    <span class="flex h-11 w-11 items-center justify-center rounded-xl border border-teal-500/25 bg-teal-500/10 p-1.5 shadow-[0_0_18px_rgba(6, 182, 212,.08)]">
                         <img src="{{ asset('assets/aki-robot-logo.svg') }}" alt="{{ __('aKI Logo') }}" class="h-full w-full object-contain">
                     </span>
                     <div>
@@ -920,10 +1274,8 @@
 
         </section>
 
-        @include('stocks.partials.backtest-heatmap')
-
-        <section x-cloak x-show="stockTab === 'fundamentals' || stockTab === 'aki'" class="grid gap-5">
-            <article x-show="stockTab === 'fundamentals'" class="min-h-0">
+        <section class="grid gap-5">
+            <article data-stock-collapsible="fundamentals" data-stock-collapsible-title="{{ __('Fundamentals') }}" class="min-h-0">
                 @php
                     $fundamentalPercent = static function (mixed $value): ?string {
                         if (! is_numeric($value)) return null;
@@ -1031,15 +1383,6 @@
                                 ['label' => __('Nettogewinn'), 'value' => $fundamentalData['netIncomeToCommon'] ?? null],
                             ],
                         ],
-                        [
-                            'title' => __('Handelsstatus'),
-                            'subtitle' => __('Verfügbarkeit in aktienKI.com'),
-                            'icon' => 'heroicon-o-check-badge',
-                            'values' => [
-                                ['label' => __('Handelbar'), 'value' => (bool) $instrument->is_tradeable],
-                                ['label' => __('Aktiv'), 'value' => (bool) $instrument->is_active],
-                            ],
-                        ],
                     ];
                 @endphp
 
@@ -1051,44 +1394,58 @@
                     </div>
                 </div>
 
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    @foreach ($fundamentalGroups as $group)
-                        <section class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
-                            <div class="flex items-center gap-2.5 border-b border-[var(--ak-border)] pb-3">
-                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-400/10 text-amber-300">
-                                    <x-dynamic-component :component="$group['icon']" class="h-4 w-4" />
-                                </span>
-                                <div class="min-w-0">
-                                    <h3 class="text-sm font-black text-[var(--ak-text)]">{{ $group['title'] }}</h3>
-                                    <p class="truncate text-[10px] text-[var(--ak-muted)]">{{ $group['subtitle'] }}</p>
-                                </div>
-                            </div>
-                            <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
-                                @foreach ($group['values'] as $item)
-                                    <div class="min-w-0">
-                                        <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $item['label'] }}</dt>
-                                        <dd class="mt-1 flex flex-wrap items-center gap-1.5">
-                                            <span class="break-words text-sm font-bold text-[var(--ak-text)]">
-                                                {{ $item['value'] === null || $item['value'] === '' ? '—' : $formatValue((string) $item['label'], $item['value']) }}
-                                            </span>
+                <div class="ak-table-wrap mx-auto w-full max-w-2xl !rounded-xl !border-cyan-400/10 overflow-x-auto">
+                    <table class="ak-table w-full min-w-[36rem] table-fixed text-left [&_td]:!px-2.5 [&_td]:!py-1.5 [&_th]:!px-2.5 [&_th]:!py-2">
+                        <thead>
+                            <tr>
+                                <th class="w-[23%]">{{ __('Bereich') }}</th>
+                                <th class="w-[28%]">{{ __('Kennzahl') }}</th>
+                                <th class="w-[27%] !text-right">{{ __('Wert') }}</th>
+                                <th class="w-[22%] !text-right">{{ __('Sektorvergleich') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($fundamentalGroups as $group)
+                                @foreach ($group['values'] as $itemIndex => $item)
+                                    <tr>
+                                        @if ($itemIndex === 0)
+                                            <th rowspan="{{ count($group['values']) }}" style="border-top: 1px solid rgba(251,191,36,.48) !important" class="!bg-cyan-400/[.018] align-top normal-case !tracking-normal">
+                                                <span class="flex items-start gap-2.5">
+                                                    <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-400/10 text-amber-300">
+                                                        <x-dynamic-component :component="$group['icon']" class="h-3.5 w-3.5" />
+                                                    </span>
+                                                    <span class="min-w-0">
+                                                        <span class="block text-xs font-black text-[var(--ak-text)]">{{ $group['title'] }}</span>
+                                                        <span class="mt-1 block text-[9px] font-medium leading-4 text-[var(--ak-muted)]">{{ $group['subtitle'] }}</span>
+                                                    </span>
+                                                </span>
+                                            </th>
+                                        @endif
+                                        <td style="border-top: 1px solid {{ $itemIndex === 0 ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="text-[11px] font-bold text-[var(--ak-muted)]">{{ $item['label'] }}</td>
+                                        <td style="border-top: 1px solid {{ $itemIndex === 0 ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="break-words text-right text-[13px] font-black tabular-nums text-[var(--ak-text)]">
+                                            {{ $item['value'] === null || $item['value'] === '' ? '—' : $formatValue((string) $item['label'], $item['value']) }}
+                                        </td>
+                                        <td style="border-top: 1px solid {{ $itemIndex === 0 ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="text-right">
                                             @if ($item['ranking'] ?? null)
-                                                <span class="inline-flex rounded-md border border-teal-400/20 bg-teal-500/10 px-1.5 py-0.5 text-[9px] font-bold text-teal-300">
-                                                    {{ __('Rang :rank von :total im Sektor', [
+                                                <span class="inline-flex rounded-md border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[9px] font-bold text-cyan-300">
+                                                    {{ __('Rang :rank von :total', [
                                                         'rank' => $item['ranking']['rank'],
                                                         'total' => $item['ranking']['total'],
                                                     ]) }}
                                                 </span>
+                                            @else
+                                                <span class="text-[11px] text-[var(--ak-muted)]">—</span>
                                             @endif
-                                        </dd>
-                                    </div>
+                                        </td>
+                                    </tr>
                                 @endforeach
-                            </dl>
-                        </section>
-                    @endforeach
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             </article>
 
-            <article id="aki-data-panel" x-show="stockTab === 'aki'" class="flex min-h-0 flex-col overflow-hidden">
+            <article id="aki-data-panel" data-stock-collapsible="aki" data-stock-collapsible-title="{{ __('aKI Daten') }}" class="flex min-h-0 flex-col overflow-hidden">
                 <div class="flex shrink-0 items-center gap-3">
                     <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-300"><x-heroicon-o-sparkles class="h-4 w-4" /></span>
                     <div><h2 class="text-base font-black text-[var(--ak-text)]">{{ __('Alle Prognosewerte') }}</h2><p class="text-xs text-[var(--ak-muted)]">{{ __('Neueste verfügbare Modellberechnung') }}</p></div>
@@ -1111,114 +1468,72 @@
                             : null;
                     @endphp
                 @endif
-                <div class="mt-2 grid min-h-0 flex-1 items-stretch gap-2 md:grid-cols-2 xl:grid-cols-3 xl:grid-rows-[minmax(0,1fr)_auto]">
-                    @include('stocks.partials.top-stock-analysis')
-                    <div class="h-full rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-2 shadow-[var(--ak-shadow)]">
-                        <p class="mb-1 text-[10px] font-black uppercase tracking-[.12em] text-teal-500">{{ __('Modelldaten') }}</p>
-                        @if ($modelQuality || $predictionData)
-                            <dl class="grid grid-cols-2 content-start gap-x-3 gap-y-4">
-                                @if ($modelQuality)
-                                    <div class="min-w-0">
-                                        <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Modell') }}</dt>
-                                        <dd class="truncate text-[13px] font-bold text-[var(--ak-text)]">{{ $modelQuality->model_alias ?: '—' }}</dd>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Qualitätsstufe') }}</dt>
-                                        <dd class="mt-0.5"><span class="ak-model-tier {{ $modelTierClass }}">{{ $modelTierName }}</span></dd>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Modellqualität') }}</dt>
-                                        <dd class="text-[13px] font-bold text-[var(--ak-text)]">{{ $modelQualityPercent !== null ? number_format($modelQualityPercent, 1, ',', '.').' %' : '—' }}</dd>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Letztes Training') }}</dt>
-                                        <dd class="text-[13px] font-bold tabular-nums text-[var(--ak-text)]">
-                                            {{ $modelQuality->trained_at ? \Illuminate\Support\Carbon::parse($modelQuality->trained_at)->timezone(config('app.timezone'))->format('d.m.Y H:i') : '—' }}
-                                        </dd>
-                                    </div>
-                                @endif
-                                @foreach ($predictionData as $key => $value)
-                                    <div class="min-w-0">
-                                        <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $label($key) }}</dt>
-                                        <dd class="break-words text-[13px] font-bold text-[var(--ak-text)]">
-                                            @if ($key === 'quality_gate_passed')
-                                                <span class="ak-model-tier {{ $value === null ? 'border-slate-500/25 bg-slate-500/10 text-slate-400' : ($value ? 'border-teal-500/30 bg-teal-500/15 text-teal-400' : 'border-rose-500/30 bg-rose-500/15 text-rose-400') }}">
-                                                    {{ $value === null ? '—' : ($value ? __('Bestanden') : __('Nicht bestanden')) }}
-                                            </span>
-                                            @elseif ($value === null)
-                                                —
-                                            @else
-                                                {{ $formatValue($key, $value) }}
-                                            @endif
-                                        </dd>
-                                    </div>
-                                @endforeach
-                            </dl>
-                        @else
-                            <p class="text-sm text-[var(--ak-muted)]">{{ __('Noch keine Prognosewerte vorhanden.') }}</p>
-                        @endif
-                    </div>
-                    @if ($ensembleData)
-                        <div class="h-full rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-2 shadow-[var(--ak-shadow)] md:col-span-2 xl:col-span-1">
-                            <p class="mb-1 text-[10px] font-black uppercase tracking-[.12em] text-teal-500">{{ __('Ensemble-Daten') }}</p>
-                            <dl class="grid grid-cols-2 content-start gap-x-3 gap-y-4">
-                                @foreach ($ensembleData as $ensembleLabel => $ensembleValue)
-                                    <div class="min-w-0">
-                                        <dt class="text-[10px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $ensembleLabel }}</dt>
-                                        <dd class="break-words text-[13px] font-bold text-[var(--ak-text)]">
-                                            @if ($ensembleLabel === __('Ensemble-Veto'))
-                                                <span class="ak-model-tier {{ $ensembleValue === null ? 'border-slate-500/25 bg-slate-500/10 text-slate-400' : ($ensembleValue ? 'border-rose-500/30 bg-rose-500/15 text-rose-400' : 'border-teal-500/30 bg-teal-500/15 text-teal-400') }}">
-                                                    {{ $ensembleValue === null ? '—' : ($ensembleValue ? __('Ja') : __('Nein')) }}
-                                                </span>
-                                            @elseif ($ensembleValue === null)
-                                                —
-                                            @elseif (is_bool($ensembleValue))
-                                                {{ $ensembleValue ? __('Ja') : __('Nein') }}
-                                            @elseif ($ensembleLabel === __('Ensemble-Score') && is_numeric($ensembleValue))
-                                                {{ number_format((float) $ensembleValue, 1, ',', '.') }} %
-                                            @elseif (in_array($ensembleLabel, [
-                                                __('Relative Streuung'),
-                                                __('Modellübereinstimmung'),
-                                                __('Ø Modellqualität'),
-                                                __('Schwächste Modellqualität'),
-                                                __('Ø Stabilität'),
-                                                __('Statistische Zuverlässigkeit'),
-                                            ], true) && is_numeric($ensembleValue))
-                                                {{ number_format((float) $ensembleValue * 100, 1, ',', '.') }} %
-                                            @elseif ($ensembleLabel === __('Ø Profit-Faktor') && is_numeric($ensembleValue))
-                                                {{ number_format((float) $ensembleValue, 2, ',', '.') }}
-                                            @else
-                                                {{ $ensembleValue }}
-                                            @endif
-                                        </dd>
-                                    </div>
-                                @endforeach
-                            </dl>
-                        </div>
-                    @endif
-                    @if ($modelQuality)
-                        <div
-                            style="grid-column: 1 / -1; height: 4rem;"
-                            class="w-full overflow-hidden rounded-lg border border-[var(--ak-border)] bg-amber-500/[.06] px-2.5 py-1.5 {{ $modelTierCode === 'top' ? 'invisible pointer-events-none' : '' }}"
-                            @if ($modelTierCode === 'top') aria-hidden="true" @endif
-                        >
-                            <p class="text-xs font-black uppercase tracking-[.11em] text-amber-500">{{ __('Warum kein Quality-Gate-Modell?') }}</p>
-                            @if ($modelQualityGateReasons->isNotEmpty())
-                                <div class="mt-1.5 flex flex-wrap gap-1.5">
-                                    @foreach ($modelQualityGateReasons as $gateReason)
-                                        <span class="rounded border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2 py-1 text-[11px] font-bold text-[var(--ak-muted)]">
-                                            {{ $gateReason['name'] }}:
-                                            <strong class="text-[var(--ak-text)]">{{ number_format($gateReason['actual'], $gateReason['unit'] === '%' ? 1 : 2, ',', '.') }}{{ $gateReason['unit'] }}</strong>
-                                            {{ $gateReason['direction'] === 'min' ? '<' : '>' }}
-                                            {{ number_format($gateReason['threshold'], $gateReason['unit'] === '%' ? 1 : 2, ',', '.') }}{{ $gateReason['unit'] }}
-                                        </span>
-                                    @endforeach
-                                </div>
-                            @else
-                                <p class="mt-1.5 text-[11px] font-medium text-[var(--ak-muted)]">{{ __('Das Modell erfüllt derzeit nicht alle Freigabekriterien der Quality-Gate-Stufe.') }}</p>
+                @php
+                    $akiModelRows = collect();
+                    if ($modelQuality) {
+                        $akiModelRows->push(['label' => __('Modell'), 'value' => $modelQuality->model_alias ?: '—', 'type' => 'text']);
+                        $akiModelRows->push(['label' => __('Qualitätsstufe'), 'value' => $modelTierName, 'type' => 'tier']);
+                        $akiModelRows->push(['label' => __('Modellqualität'), 'value' => $modelQualityPercent, 'type' => 'percent']);
+                        $akiModelRows->push(['label' => __('Letztes Training'), 'value' => $modelQuality->trained_at ? \Illuminate\Support\Carbon::parse($modelQuality->trained_at)->timezone(config('app.timezone'))->format('d.m.Y H:i') : null, 'type' => 'text']);
+                    }
+                    foreach ($predictionData as $key => $value) $akiModelRows->push(['label' => $label($key), 'value' => $value, 'type' => $key === 'quality_gate_passed' ? 'gate' : 'prediction', 'key' => $key]);
+                @endphp
+                <div class="ak-table-wrap mx-auto mt-3 w-full max-w-2xl !rounded-xl !border-cyan-400/10 overflow-x-auto">
+                    <table class="ak-table w-full min-w-[36rem] table-fixed text-left [&_td]:!px-2.5 [&_td]:!py-1.5 [&_th]:!px-2.5 [&_th]:!py-2">
+                        <thead><tr><th class="w-[23%]">{{ __('Bereich') }}</th><th class="w-[28%]">{{ __('Kennzahl') }}</th><th class="w-[27%] !text-right">{{ __('Wert') }}</th><th class="w-[22%] !text-right">{{ __('Einordnung') }}</th></tr></thead>
+                        <tbody>
+                            @foreach ($topStockFactorRatings as $rowIndex => $topFactor)
+                                <tr>
+                                    @if ($rowIndex === 0)<th rowspan="{{ $topStockFactorRatings->count() }}" style="border-top: 1px solid rgba(251,191,36,.48) !important" class="!bg-cyan-400/[.018] align-top normal-case !tracking-normal"><span class="text-xs font-black text-[var(--ak-text)]">{{ __('Faktorbewertung') }}</span><span class="mt-1 block text-[9px] font-medium text-[var(--ak-muted)]">{{ __('Bewertung von 0 bis 10') }}</span></th>@endif
+                                    <td style="border-top: 1px solid {{ $rowIndex === 0 ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="text-[11px] font-bold text-[var(--ak-muted)]">{{ $topFactor['label'] }}</td>
+                                    <td style="border-top: 1px solid {{ $rowIndex === 0 ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="text-right text-[13px] font-black text-[var(--ak-text)]">{{ $topFactor['rating'] !== null ? $topFactor['rating'].' / 10' : '—' }}</td>
+                                    <td style="border-top: 1px solid {{ $rowIndex === 0 ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="text-right text-[11px] text-[var(--ak-muted)]">—</td>
+                                </tr>
+                            @endforeach
+                            @foreach ($akiModelRows as $rowIndex => $row)
+                                <tr>
+                                    @if ($rowIndex === 0)<th rowspan="{{ $akiModelRows->count() }}" style="border-top: 1px solid rgba(251,191,36,.48) !important" class="!bg-cyan-400/[.018] align-top normal-case !tracking-normal"><span class="text-xs font-black text-[var(--ak-text)]">{{ __('Modelldaten') }}</span><span class="mt-1 block text-[9px] font-medium text-[var(--ak-muted)]">{{ __('Aktuelle Modellberechnung') }}</span></th>@endif
+                                    <td style="border-top: 1px solid {{ $rowIndex === 0 ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="text-[11px] font-bold text-[var(--ak-muted)]">{{ $row['label'] }}</td>
+                                    <td style="border-top: 1px solid {{ $rowIndex === 0 ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="break-words text-right text-[13px] font-black text-[var(--ak-text)]">
+                                        @if ($row['type'] === 'tier')<span class="ak-model-tier {{ $modelTierClass }}">{{ $row['value'] }}</span>
+                                        @elseif ($row['type'] === 'percent'){{ is_numeric($row['value']) ? number_format((float) $row['value'], 1, ',', '.').' %' : '—' }}
+                                        @elseif ($row['type'] === 'gate')<span class="ak-model-tier {{ $row['value'] === null ? 'border-slate-500/25 bg-slate-500/10 text-slate-400' : ($row['value'] ? 'border-teal-500/30 bg-teal-500/15 text-teal-400' : 'border-rose-500/30 bg-rose-500/15 text-rose-400') }}">{{ $row['value'] === null ? '—' : ($row['value'] ? __('Bestanden') : __('Nicht bestanden')) }}</span>
+                                        @elseif ($row['type'] === 'prediction' && $row['value'] !== null){{ $formatValue($row['key'], $row['value']) }}
+                                        @else{{ $row['value'] ?? '—' }}@endif
+                                    </td>
+                                    <td style="border-top: 1px solid {{ $rowIndex === 0 ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="text-right text-[11px] text-[var(--ak-muted)]">—</td>
+                                </tr>
+                            @endforeach
+                            @foreach ($ensembleData as $ensembleLabel => $ensembleValue)
+                                <tr>
+                                    @if ($loop->first)<th rowspan="{{ count($ensembleData) }}" style="border-top: 1px solid rgba(251,191,36,.48) !important" class="!bg-cyan-400/[.018] align-top normal-case !tracking-normal"><span class="text-xs font-black text-[var(--ak-text)]">{{ __('Ensemble-Daten') }}</span><span class="mt-1 block text-[9px] font-medium text-[var(--ak-muted)]">{{ __('Zusammenführung der Modelle') }}</span></th>@endif
+                                    <td style="border-top: 1px solid {{ $loop->first ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="text-[11px] font-bold text-[var(--ak-muted)]">{{ $ensembleLabel }}</td>
+                                    <td style="border-top: 1px solid {{ $loop->first ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="text-right text-[13px] font-black text-[var(--ak-text)]">
+                                        @if ($ensembleLabel === __('Ensemble-Veto'))<span class="ak-model-tier {{ $ensembleValue === null ? 'border-slate-500/25 bg-slate-500/10 text-slate-400' : ($ensembleValue ? 'border-rose-500/30 bg-rose-500/15 text-rose-400' : 'border-teal-500/30 bg-teal-500/15 text-teal-400') }}">{{ $ensembleValue === null ? '—' : ($ensembleValue ? __('Ja') : __('Nein')) }}</span>
+                                        @elseif ($ensembleValue === null) —
+                                        @elseif (is_bool($ensembleValue)){{ $ensembleValue ? __('Ja') : __('Nein') }}
+                                        @elseif ($ensembleLabel === __('Ensemble-Score') && is_numeric($ensembleValue)){{ number_format((float) $ensembleValue, 1, ',', '.') }} %
+                                        @elseif (in_array($ensembleLabel, [__('Relative Streuung'), __('Modellübereinstimmung'), __('Ø Modellqualität'), __('Schwächste Modellqualität'), __('Ø Stabilität'), __('Statistische Zuverlässigkeit')], true) && is_numeric($ensembleValue)){{ number_format((float) $ensembleValue * 100, 1, ',', '.') }} %
+                                        @elseif ($ensembleLabel === __('Ø Profit-Faktor') && is_numeric($ensembleValue)){{ number_format((float) $ensembleValue, 2, ',', '.') }}
+                                        @else{{ $ensembleValue }}@endif
+                                    </td>
+                                    <td style="border-top: 1px solid {{ $loop->first ? 'rgba(251,191,36,.48)' : 'rgba(34,211,238,.13)' }} !important" class="text-right text-[11px] text-[var(--ak-muted)]">—</td>
+                                </tr>
+                            @endforeach
+                            @if ($modelQuality && $modelTierCode !== 'top')
+                                @forelse ($modelQualityGateReasons as $gateReason)
+                                    <tr>
+                                        @if ($loop->first)<th rowspan="{{ max(1, $modelQualityGateReasons->count()) }}" class="!border-t !border-amber-400/25 !bg-cyan-400/[.018] align-top normal-case !tracking-normal"><span class="text-xs font-black text-[var(--ak-text)]">{{ __('Quality Gate') }}</span><span class="mt-1 block text-[9px] font-medium text-[var(--ak-muted)]">{{ __('Nicht erfüllte Kriterien') }}</span></th>@endif
+                                        <td class="{{ $loop->first ? '!border-t !border-amber-400/25' : '' }} text-[11px] font-bold text-[var(--ak-muted)]">{{ $gateReason['name'] }}</td>
+                                        <td class="{{ $loop->first ? '!border-t !border-amber-400/25' : '' }} text-right text-[12px] font-black text-amber-400">{{ number_format($gateReason['actual'], $gateReason['unit'] === '%' ? 1 : 2, ',', '.') }}{{ $gateReason['unit'] }} {{ $gateReason['direction'] === 'min' ? '<' : '>' }} {{ number_format($gateReason['threshold'], $gateReason['unit'] === '%' ? 1 : 2, ',', '.') }}{{ $gateReason['unit'] }}</td>
+                                        <td class="{{ $loop->first ? '!border-t !border-amber-400/25' : '' }} text-right text-[11px] text-[var(--ak-muted)]">—</td>
+                                    </tr>
+                                @empty
+                                    <tr><th class="!border-t !border-amber-400/25 !bg-cyan-400/[.018] normal-case !tracking-normal">{{ __('Quality Gate') }}</th><td colspan="3" class="!border-t !border-amber-400/25 text-[11px] text-[var(--ak-muted)]">{{ __('Das Modell erfüllt derzeit nicht alle Freigabekriterien.') }}</td></tr>
+                                @endforelse
                             @endif
-                        </div>
-                    @endif
+                        </tbody>
+                    </table>
                 </div>
             </article>
         </section>
@@ -1229,11 +1544,94 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const analysisSection = document.querySelector('[data-stock-collapsible="analysis"]');
+            const stockDisclaimer = document.querySelector('#stock-disclaimer');
+            if (analysisSection && stockDisclaimer) {
+                stockDisclaimer.parentNode.insertBefore(analysisSection, stockDisclaimer);
+            }
+
+            const indicatorSection = document.querySelector('[data-stock-collapsible="indicators"]');
+            const matrixSection = document.querySelector('[data-stock-collapsible="indicator-matrix"]');
+            if (indicatorSection && matrixSection) {
+                const heading = document.createElement('div');
+                heading.className = 'mt-5 flex items-center gap-3 border-t border-cyan-400/20 pt-4';
+                heading.innerHTML = `<span class="grid h-9 w-9 place-items-center rounded-lg border border-cyan-400/25 bg-cyan-400/10 text-cyan-400"><svg viewBox="0 0 20 20" fill="none" class="h-4 w-4" aria-hidden="true"><path d="M3 3h5v5H3V3Zm9 0h5v5h-5V3ZM3 12h5v5H3v-5Zm9 0h5v5h-5v-5Z" stroke="currentColor" stroke-width="1.5"/></svg></span><div><p class="text-[10px] font-black uppercase tracking-[.14em] text-cyan-400">${@json(__('Indikator-Heatmaps'))}</p><p class="text-xs text-[var(--ak-muted)]">${@json(__('Gemeinsame Wirkung der wichtigsten Indikatorkombinationen'))}</p></div>`;
+                indicatorSection.appendChild(heading);
+                while (matrixSection.firstChild) indicatorSection.appendChild(matrixSection.firstChild);
+                matrixSection.remove();
+            }
+
+            const sectionMeta = {
+                indicators: {
+                    description: @json(__('Historische Einzelcharts und Heatmaps der technischen Indikatoren.')),
+                    icon: '<path d="M3 16V9m4 7V5m4 11v-4m4 4V3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+                },
+                'chart-patterns': {
+                    description: @json(__('Zuletzt gefundene Formationen mit Beispielchart und historischer 20-Tage-Performance.')),
+                    icon: '<path d="M3 15 7 10l3 2 4-7 3 3M3 17h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+                },
+                analysis: {
+                    description: @json(__('Chancen, Risiken und die aktuelle Einordnung der Aktie.')),
+                    icon: '<path d="m10 2 1.2 4.1L15 8l-3.8 1.9L10 14l-1.2-4.1L5 8l3.8-1.9L10 2Zm5 10 .7 2.3L18 15.5l-2.3 1.2L15 19l-.7-2.3-2.3-1.2 2.3-1.2L15 12Z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/>',
+                },
+                heatmap: {
+                    description: @json(__('Historische Ergebnisse nach KI-Score und Konfidenz.')),
+                    icon: '<path d="M3 3h5v5H3V3Zm9 0h5v5h-5V3ZM3 12h5v5H3v-5Zm9 0h5v5h-5v-5Z" stroke="currentColor" stroke-width="1.45"/>',
+                },
+                fundamentals: {
+                    description: @json(__('Unternehmens-, Bewertungs- und Bilanzkennzahlen.')),
+                    icon: '<path d="M3 17h14M5 17V8h10v9M4 8l6-5 6 5M8 11v3m4-3v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+                },
+                aki: {
+                    description: @json(__('Modelldaten, Qualitätswerte und vollständige Prognoseinformationen.')),
+                    icon: '<rect x="4" y="4" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 8h4v4H8V8ZM7 1v3m6-3v3M7 16v3m6-3v3M1 7h3m-3 6h3m12-6h3m-3 6h3" stroke="currentColor" stroke-width="1.35"/>',
+                },
+            };
+
+            document.querySelectorAll('[data-stock-collapsible]').forEach(section => {
+                const key = section.dataset.stockCollapsible;
+                const title = section.dataset.stockCollapsibleTitle || key;
+                const meta = sectionMeta[key] || { description: '', icon: '' };
+                const proLocked = section.hasAttribute('data-stock-pro-locked');
+                const content = document.createElement('div');
+                content.className = 'stock-collapsible-content';
+                while (section.firstChild) content.appendChild(section.firstChild);
+
+                const toggle = document.createElement('button');
+                toggle.type = 'button';
+                toggle.className = 'stock-collapsible-toggle';
+                toggle.setAttribute('aria-expanded', 'false');
+                toggle.innerHTML = `<span class="stock-collapsible-icon"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true">${meta.icon}</svg></span><span class="stock-collapsible-copy"><span class="flex items-center gap-2">${title}${proLocked ? '<span class="rounded-md border border-amber-400/35 bg-amber-400/10 px-1.5 py-0.5 text-[7px] font-black tracking-wide text-amber-400">PRO</span>' : ''}</span><small class="stock-collapsible-description">${meta.description}</small></span><svg class="stock-collapsible-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+                content.hidden = true;
+                section.classList.add('stock-collapsible-section');
+                section.append(toggle, content);
+
+                toggle.addEventListener('click', () => {
+                    const open = toggle.getAttribute('aria-expanded') !== 'true';
+                    toggle.setAttribute('aria-expanded', String(open));
+                    content.hidden = !open;
+                    if (open) {
+                        window.dispatchEvent(new CustomEvent('stock-detail-section-opened', { detail: { section: key } }));
+                        window.requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+                    }
+                });
+            });
+
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
             const panel = document.querySelector('#aki-data-panel');
             const disclaimer = document.querySelector('#stock-disclaimer');
             if (!panel) return;
 
             const fitAkiPanel = () => {
+                const collapsibleContent = panel.querySelector(':scope > .stock-collapsible-content');
+                if (collapsibleContent?.hidden) {
+                    panel.style.height = '';
+                    return;
+                }
                 if (window.innerWidth < 1024) {
                     panel.style.height = '';
                     return;
@@ -1284,7 +1682,7 @@
                         series: [{ name: @json(__('20-Tage-Steigwahrscheinlichkeit')), data: histogram }],
                         chart: {
                             type: 'bar',
-                            height: 198,
+                            height: Math.max(140, element.clientHeight || 140),
                             background: 'transparent',
                             animations: { enabled: false },
                             toolbar: { show: false },
@@ -1299,7 +1697,7 @@
                         grid: {
                             borderColor: 'rgba(100,116,139,.14)',
                             strokeDashArray: 3,
-                            padding: { top: 4, right: 8, bottom: 4, left: 4 },
+                            padding: { top: 4, right: 8, bottom: 12, left: 4 },
                         },
                         xaxis: {
                             type: 'numeric',
@@ -1309,7 +1707,7 @@
                                 style: { colors: '#82909f', fontSize: '8px' },
                             },
                             axisBorder: { show: true, color: 'rgba(148,163,184,.38)' },
-                            axisTicks: { show: false },
+                            axisTicks: { show: true, color: 'rgba(148,163,184,.30)', height: 3 },
                         },
                         yaxis: {
                             min: 0,
@@ -1344,12 +1742,19 @@
                 });
             };
 
-            window.addEventListener('stock-tab-changed', event => {
-                if (event.detail?.tab === 'indicators') renderIndicatorCards();
+            window.addEventListener('stock-detail-section-opened', event => {
+                if (event.detail?.section === 'indicators') renderIndicatorCards();
             });
         });
     </script>
 
+    @php
+        $chartHorizonTargets = collect([5, 10, 15, 20])->mapWithKeys(function (int $days) use ($horizonTargets): array {
+            $price = data_get($horizonTargets, $days.'.price');
+
+            return [$days => is_numeric($price) ? (float) $price : null];
+        })->all();
+    @endphp
     @if ($chartCandles->isNotEmpty())
         <script>
             document.addEventListener('DOMContentLoaded', () => {
@@ -1360,10 +1765,12 @@
                 const historicalAiScores = @json($historicalAiScores->values());
                 const historicalSignalTransitions = @json($historicalSignalTransitions->values());
                 const initialWatchlistEntry = @json($watchlistEntry);
+                const initialChartPatterns = @json($chartPatterns);
                 const currency = @json($currency);
                 const lightTheme = document.documentElement.dataset.theme === 'light';
-                const sectorColor = lightTheme ? '#14b8a6' : @json($sectorColor);
+                const sectorColor = lightTheme ? '#06b6d4' : @json($sectorColor);
                 const predictedPrice20d = @json(is_numeric($prediction?->predicted_price_20d) ? (float) $prediction->predicted_price_20d : null);
+                const forecastHorizonTargets = @json($chartHorizonTargets);
                 const chartFocusAt = @json($chartFocusAt?->getTimestampMs());
                 const liveSourceSymbol = @json($requestedPredictionId === 0 ? $instrument->symbol : null);
                 const dataUrl = @json($chartDataUrl);
@@ -1372,15 +1779,29 @@
                 const rsiElement = document.querySelector('#stock-detail-rsi');
                 const rsiPanel = document.querySelector('#stock-rsi-panel');
                 const rsiValueElement = document.querySelector('#stock-rsi-value');
+                const secondaryPanels = document.querySelector('#stock-secondary-indicator-panels');
                 const indicatorOverlay = document.querySelector('#stock-indicator-overlay');
                 const indicatorButtons = document.querySelectorAll('#stock-indicator-buttons [data-indicator]');
+                const periodButtons = document.querySelectorAll('#stock-chart-period-buttons [data-chart-period]');
                 const chartResetButton = document.querySelector('#stock-indicator-buttons [data-chart-reset]');
+                const zoomSelection = document.querySelector('#stock-chart-zoom-selection');
+                const chartCard = document.querySelector('#stock-chart-card');
+                const fullscreenButton = document.querySelector('#stock-chart-fullscreen');
+                const fullscreenCloseButton = document.querySelector('#stock-chart-fullscreen-close');
+                const canUseChartIndicators = @json($canUseChartIndicators);
+                const canUseChartZoom = @json($canUseChartZoom);
                 let chart;
                 let rsiChart;
+                const secondaryCharts = new Map();
                 let currentCandles = initialCandles;
+                let chartPatterns = initialChartPatterns;
                 let watchlistEntry = initialWatchlistEntry;
                 let liveTimer;
-                const activeIndicators = new Set(['rsi']);
+                let selectedPeriod = 132;
+                let zoomTimeRange = null;
+                let zoomDragStart = null;
+                let zoomInteractionActive = false;
+                const activeIndicators = new Set();
 
                 const addTradingDays = (timestamp, tradingDays) => {
                     const target = new Date(timestamp);
@@ -1409,6 +1830,184 @@
                             };
                         })
                         .filter(Boolean);
+                };
+
+                const emaData = period => {
+                    const multiplier = 2 / (period + 1);
+                    let ema = null;
+                    return currentCandles.map(candle => {
+                        const close = Number(candle?.y?.[3]);
+                        if (!Number.isFinite(close)) return null;
+                        ema = ema === null ? close : ((close - ema) * multiplier) + ema;
+                        return { x: candle.x, y: ema };
+                    }).filter(Boolean);
+                };
+
+                const atrData = (period = 14) => {
+                    let atr = null;
+                    return currentCandles.map((candle, index) => {
+                        if (index === 0) return null;
+                        const high = Number(candle.y[1]); const low = Number(candle.y[2]);
+                        const previousClose = Number(currentCandles[index - 1].y[3]);
+                        const trueRange = Math.max(high - low, Math.abs(high - previousClose), Math.abs(low - previousClose));
+                        atr = atr === null ? trueRange : ((atr * (period - 1)) + trueRange) / period;
+                        return index >= period ? { x: candle.x, y: atr } : null;
+                    }).filter(Boolean);
+                };
+
+                const stochasticData = (period = 14) => currentCandles.map((candle, index) => {
+                    if (index < period - 1) return null;
+                    const sample = currentCandles.slice(index - period + 1, index + 1);
+                    const high = Math.max(...sample.map(item => Number(item.y[1])));
+                    const low = Math.min(...sample.map(item => Number(item.y[2])));
+                    return { x: candle.x, y: high === low ? 50 : ((Number(candle.y[3]) - low) / (high - low)) * 100 };
+                }).filter(Boolean);
+
+                const momentumData = (period = 10) => currentCandles.map((candle, index) => {
+                    if (index < period) return null;
+                    const previous = Number(currentCandles[index - period].y[3]);
+                    return previous ? { x: candle.x, y: ((Number(candle.y[3]) / previous) - 1) * 100 } : null;
+                }).filter(Boolean);
+
+                const rocData = (period = 12) => momentumData(period);
+
+                const cciData = (period = 20) => {
+                    const typical = currentCandles.map(candle => (Number(candle.y[1]) + Number(candle.y[2]) + Number(candle.y[3])) / 3);
+                    return currentCandles.map((candle, index) => {
+                        if (index < period - 1) return null;
+                        const sample = typical.slice(index - period + 1, index + 1);
+                        const average = sample.reduce((sum, number) => sum + number, 0) / period;
+                        const deviation = sample.reduce((sum, number) => sum + Math.abs(number - average), 0) / period;
+                        return { x: candle.x, y: deviation ? (typical[index] - average) / (.015 * deviation) : 0 };
+                    }).filter(Boolean);
+                };
+
+                const williamsData = (period = 14) => currentCandles.map((candle, index) => {
+                    if (index < period - 1) return null;
+                    const sample = currentCandles.slice(index - period + 1, index + 1);
+                    const high = Math.max(...sample.map(item => Number(item.y[1])));
+                    const low = Math.min(...sample.map(item => Number(item.y[2])));
+                    return { x: candle.x, y: high === low ? -50 : -100 * ((high - Number(candle.y[3])) / (high - low)) };
+                }).filter(Boolean);
+
+                const vwapData = () => {
+                    let cumulativePriceVolume = 0;
+                    let cumulativeVolume = 0;
+                    return currentCandles.map(candle => {
+                        const volume = Number(candle.volume);
+                        if (!Number.isFinite(volume) || volume <= 0) return null;
+                        const typical = (Number(candle.y[1]) + Number(candle.y[2]) + Number(candle.y[3])) / 3;
+                        cumulativePriceVolume += typical * volume;
+                        cumulativeVolume += volume;
+                        return { x: candle.x, y: cumulativePriceVolume / cumulativeVolume };
+                    }).filter(Boolean);
+                };
+
+                const obvData = () => {
+                    let obv = 0;
+                    return currentCandles.map((candle, index) => {
+                        const volume = Number(candle.volume);
+                        if (!Number.isFinite(volume)) return null;
+                        if (index) {
+                            const close = Number(candle.y[3]);
+                            const previous = Number(currentCandles[index - 1].y[3]);
+                            if (close > previous) obv += volume;
+                            if (close < previous) obv -= volume;
+                        }
+                        return { x: candle.x, y: obv };
+                    }).filter(Boolean);
+                };
+
+                const mfiData = (period = 14) => {
+                    const flows = currentCandles.map((candle, index) => {
+                        const typical = (Number(candle.y[1]) + Number(candle.y[2]) + Number(candle.y[3])) / 3;
+                        const previousTypical = index ? (Number(currentCandles[index - 1].y[1]) + Number(currentCandles[index - 1].y[2]) + Number(currentCandles[index - 1].y[3])) / 3 : typical;
+                        const flow = typical * Number(candle.volume);
+                        return { positive: typical >= previousTypical ? flow : 0, negative: typical < previousTypical ? flow : 0 };
+                    });
+                    return currentCandles.map((candle, index) => {
+                        if (index < period || !Number.isFinite(Number(candle.volume))) return null;
+                        const sample = flows.slice(index - period + 1, index + 1);
+                        const positive = sample.reduce((sum, item) => sum + item.positive, 0);
+                        const negative = sample.reduce((sum, item) => sum + item.negative, 0);
+                        return { x: candle.x, y: negative ? 100 - (100 / (1 + positive / negative)) : 100 };
+                    }).filter(Boolean);
+                };
+
+                const volatilityData = (period = 20) => {
+                    const returns = currentCandles.map((candle, index) => index ? Math.log(Number(candle.y[3]) / Number(currentCandles[index - 1].y[3])) : null);
+                    return currentCandles.map((candle, index) => {
+                        if (index < period) return null;
+                        const sample = returns.slice(index - period + 1, index + 1).filter(Number.isFinite);
+                        const average = sample.reduce((sum, value) => sum + value, 0) / sample.length;
+                        const deviation = Math.sqrt(sample.reduce((sum, value) => sum + ((value - average) ** 2), 0) / sample.length);
+                        return { x: candle.x, y: deviation * Math.sqrt(252) * 100 };
+                    }).filter(Boolean);
+                };
+
+                const macdData = () => {
+                    const fast = emaData(12); const slow = emaData(26);
+                    const fastByTime = new Map(fast.map(point => [String(point.x), point.y]));
+                    return slow.map(point => ({ x: point.x, y: (fastByTime.get(String(point.x)) ?? point.y) - point.y }));
+                };
+
+                const adxData = (period = 14) => {
+                    let smoothedTr = 0; let smoothedPlus = 0; let smoothedMinus = 0; let adx = null;
+                    return currentCandles.map((candle, index) => {
+                        if (!index) return null;
+                        const previous = currentCandles[index - 1];
+                        const high = Number(candle.y[1]); const low = Number(candle.y[2]); const previousClose = Number(previous.y[3]);
+                        const upMove = high - Number(previous.y[1]); const downMove = Number(previous.y[2]) - low;
+                        const tr = Math.max(high - low, Math.abs(high - previousClose), Math.abs(low - previousClose));
+                        const plus = upMove > downMove && upMove > 0 ? upMove : 0;
+                        const minus = downMove > upMove && downMove > 0 ? downMove : 0;
+                        smoothedTr = index <= period ? smoothedTr + tr : smoothedTr - (smoothedTr / period) + tr;
+                        smoothedPlus = index <= period ? smoothedPlus + plus : smoothedPlus - (smoothedPlus / period) + plus;
+                        smoothedMinus = index <= period ? smoothedMinus + minus : smoothedMinus - (smoothedMinus / period) + minus;
+                        if (index < period || !smoothedTr) return null;
+                        const plusDi = 100 * smoothedPlus / smoothedTr; const minusDi = 100 * smoothedMinus / smoothedTr;
+                        const dx = plusDi + minusDi ? 100 * Math.abs(plusDi - minusDi) / (plusDi + minusDi) : 0;
+                        adx = adx === null ? dx : ((adx * (period - 1)) + dx) / period;
+                        return { x: candle.x, y: adx };
+                    }).filter(Boolean);
+                };
+
+                const bollingerData = (period = 20, deviations = 2) => {
+                    const closes = currentCandles.map(candle => Number(candle?.y?.[3]));
+                    return currentCandles.map((candle, index) => {
+                        if (index < period - 1) return null;
+                        const sample = closes.slice(index - period + 1, index + 1);
+                        if (sample.some(value => !Number.isFinite(value))) return null;
+                        const middle = sample.reduce((sum, value) => sum + value, 0) / period;
+                        const variance = sample.reduce((sum, value) => sum + ((value - middle) ** 2), 0) / period;
+                        const deviation = Math.sqrt(variance) * deviations;
+                        return { x: candle.x, middle, upper: middle + deviation, lower: middle - deviation };
+                    }).filter(Boolean);
+                };
+
+                const parabolicSarData = (step = .02, maximum = .2) => {
+                    if (currentCandles.length < 3) return [];
+                    let bullish = Number(currentCandles[1].y[3]) >= Number(currentCandles[0].y[3]);
+                    let extreme = bullish ? Number(currentCandles[0].y[1]) : Number(currentCandles[0].y[2]);
+                    let sar = bullish ? Number(currentCandles[0].y[2]) : Number(currentCandles[0].y[1]);
+                    let acceleration = step;
+                    const result = [];
+                    for (let index = 1; index < currentCandles.length; index += 1) {
+                        const candle = currentCandles[index];
+                        const high = Number(candle.y[1]); const low = Number(candle.y[2]);
+                        sar += acceleration * (extreme - sar);
+                        if (bullish) {
+                            sar = Math.min(sar, Number(currentCandles[index - 1].y[2]), index > 1 ? Number(currentCandles[index - 2].y[2]) : low);
+                            if (low < sar) { bullish = false; sar = extreme; extreme = low; acceleration = step; }
+                            else if (high > extreme) { extreme = high; acceleration = Math.min(maximum, acceleration + step); }
+                        } else {
+                            sar = Math.max(sar, Number(currentCandles[index - 1].y[1]), index > 1 ? Number(currentCandles[index - 2].y[1]) : high);
+                            if (high > sar) { bullish = true; sar = extreme; extreme = high; acceleration = step; }
+                            else if (low < extreme) { extreme = low; acceleration = Math.min(maximum, acceleration + step); }
+                        }
+                        result.push({ x: candle.x, y: sar, bullish });
+                    }
+                    return result;
                 };
 
                 const forecastOrigin = () => {
@@ -1470,27 +2069,53 @@
                         : NaN;
 
                     if (Number.isFinite(chartFocusAt)) {
-                        const fiftyDays = 50 * 24 * 60 * 60 * 1000;
+                        const focusIndex = Math.max(0, currentCandles.findLastIndex(candle => new Date(candle.x).getTime() <= chartFocusAt));
+                        const firstVisibleIndex = selectedPeriod > 0 ? Math.max(0, focusIndex - selectedPeriod + 1) : 0;
+                        const firstVisibleTimestamp = new Date(currentCandles[firstVisibleIndex]?.x).getTime();
 
-                        return {
-                            min: chartFocusAt - fiftyDays,
-                            max: Number.isFinite(forecastEnd) ? forecastEnd : chartFocusAt + fiftyDays,
+                        const range = {
+                            min: Number.isFinite(firstVisibleTimestamp) ? firstVisibleTimestamp : chartFocusAt,
+                            max: Number.isFinite(forecastEnd) ? forecastEnd : chartFocusAt,
                         };
+
+                        return zoomTimeRange ?? range;
                     }
 
-                    const firstTimestamp = new Date(currentCandles[0]?.x).getTime();
+                    const firstVisibleIndex = selectedPeriod > 0 ? Math.max(0, currentCandles.length - selectedPeriod) : 0;
+                    const firstTimestamp = new Date(currentCandles[firstVisibleIndex]?.x).getTime();
 
-                    return {
+                    const range = {
                         min: Number.isFinite(firstTimestamp) ? firstTimestamp : undefined,
                         max: Number.isFinite(forecastEnd) ? forecastEnd : undefined,
                     };
+
+                    return zoomTimeRange ?? range;
                 };
 
                 const chartPriceRange = () => {
+                    const timeRange = chartTimeRange();
                     const values = currentCandles
+                        .filter(candle => {
+                            const timestamp = new Date(candle.x).getTime();
+                            return (!Number.isFinite(timeRange.min) || timestamp >= timeRange.min)
+                                && (!Number.isFinite(timeRange.max) || timestamp <= timeRange.max);
+                        })
                         .flatMap(candle => Array.isArray(candle?.y) ? candle.y.map(Number) : [])
                         .filter(Number.isFinite);
-                    if (Number.isFinite(predictedPrice20d)) values.push(predictedPrice20d);
+                    if (activeIndicators.has('bollinger')) {
+                        bollingerData().filter(point => new Date(point.x).getTime() >= timeRange.min).forEach(point => values.push(point.upper, point.lower));
+                    }
+                    if (activeIndicators.has('sar')) {
+                        parabolicSarData().filter(point => new Date(point.x).getTime() >= timeRange.min).forEach(point => values.push(point.y));
+                    }
+                    if (activeIndicators.has('vwap')) {
+                        vwapData().filter(point => new Date(point.x).getTime() >= timeRange.min).forEach(point => values.push(point.y));
+                    }
+                    Object.values(forecastHorizonTargets)
+                        .filter(value => value !== null && value !== undefined && value !== '' && Number(value) > 0)
+                        .map(Number)
+                        .filter(Number.isFinite)
+                        .forEach(value => values.push(value));
                     if (watchlistEntry?.price && Number.isFinite(Number(watchlistEntry.price))) values.push(Number(watchlistEntry.price));
                     if (values.length === 0) return {};
 
@@ -1679,18 +2304,93 @@
                     }`;
                 };
 
+                const secondaryIndicatorDefinitions = {
+                    macd: { label: 'MACD', color: '#a78bfa', unit: '', values: () => macdData(), reference: 0 },
+                    adx: { label: 'ADX 14', color: '#22d3ee', unit: '', values: () => adxData(14), reference: 25 },
+                    atr: { label: 'ATR 14', color: '#f59e0b', unit: ` ${currency}`, values: () => atrData(14) },
+                    stochastic: { label: 'Stochastik %K', color: '#38bdf8', unit: ' %', values: () => stochasticData(14), min: 0, max: 100, reference: 80, secondReference: 20 },
+                    cci: { label: 'CCI 20', color: '#f59e0b', unit: '', values: () => cciData(20), reference: 100, secondReference: -100 },
+                    mfi: { label: 'MFI 14', color: '#2dd4bf', unit: '', values: () => mfiData(14), min: 0, max: 100, reference: 80, secondReference: 20 },
+                    obv: { label: 'OBV', color: '#60a5fa', unit: '', values: () => obvData(), reference: 0 },
+                    williams: { label: 'Williams %R', color: '#e879f9', unit: ' %', values: () => williamsData(14), min: -100, max: 0, reference: -20, secondReference: -80 },
+                    roc: { label: 'ROC 12', color: '#34d399', unit: ' %', values: () => rocData(12), reference: 0 },
+                    volatility: { label: 'Volatilität 20T', color: '#fb7185', unit: ' %', values: () => volatilityData(20) },
+                    momentum: { label: 'Momentum 10T', color: '#84cc16', unit: ' %', values: () => momentumData(10), reference: 0 },
+                };
+
+                const renderSecondaryPanels = async () => {
+                    if (!secondaryPanels) return;
+                    secondaryCharts.forEach(instance => instance.destroy());
+                    secondaryCharts.clear();
+                    secondaryPanels.replaceChildren();
+
+                    for (const [key, definition] of Object.entries(secondaryIndicatorDefinitions)) {
+                        if (!activeIndicators.has(key)) continue;
+                        const values = definition.values();
+                        const latest = values.at(-1)?.y;
+                        const panel = document.createElement('div');
+                        panel.className = 'min-w-0 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-transparent px-2 pb-1 pt-1.5';
+                        const head = document.createElement('div');
+                        head.className = 'flex items-center justify-between px-1';
+                        const label = document.createElement('span');
+                        label.className = 'text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]';
+                        label.textContent = definition.label;
+                        const value = document.createElement('span');
+                        value.className = 'text-[10px] font-black text-cyan-400';
+                        value.textContent = Number.isFinite(latest) ? `${Number(latest).toFixed(2).replace('.', ',')}${definition.unit}` : '—';
+                        const chartElement = document.createElement('div');
+                        chartElement.className = 'h-16 min-w-0';
+                        head.append(label, value);
+                        panel.append(head, chartElement);
+                        secondaryPanels.append(panel);
+
+                        const light = document.documentElement.dataset.theme === 'light';
+                        const annotations = [definition.reference, definition.secondReference]
+                            .filter(Number.isFinite)
+                            .map(reference => ({ y: reference, borderColor: 'rgba(148,163,184,.42)', strokeDashArray: 4 }));
+                        const instance = new window.ApexCharts(chartElement, {
+                            chart: { type: 'line', height: 64, background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+                            series: [{ name: definition.label, data: values }],
+                            colors: [definition.color],
+                            stroke: { width: 2, curve: 'smooth' },
+                            markers: { size: 0 },
+                            dataLabels: { enabled: false },
+                            annotations: { yaxis: annotations },
+                            grid: { borderColor: light ? 'rgba(51,65,85,.10)' : 'rgba(148,163,184,.08)', strokeDashArray: 4, padding: { top: -8, right: 8, bottom: -10, left: 2 } },
+                            xaxis: { type: 'datetime', min: chartTimeRange().min, max: chartTimeRange().max, labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false } },
+                            yaxis: { min: definition.min, max: definition.max, opposite: true, tickAmount: 2, labels: { formatter: number => Number(number).toFixed(0), style: { colors: [light ? '#64748b' : '#94a3b8'], fontSize: '9px' } } },
+                            tooltip: { theme: light ? 'light' : 'dark', x: { format: 'dd.MM.yyyy' }, y: { formatter: number => `${Number(number).toFixed(2)}${definition.unit}` } },
+                            theme: { mode: light ? 'light' : 'dark' },
+                        });
+                        secondaryCharts.set(key, instance);
+                        await instance.render();
+                    }
+                };
+
                 const syncIndicatorUi = () => {
                     indicatorButtons.forEach(button => {
                         const active = activeIndicators.has(button.dataset.indicator);
                         button.setAttribute('aria-pressed', active ? 'true' : 'false');
                         button.className = `rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide transition ${
                             active
-                                ? 'border-violet-400/35 bg-violet-500/15 text-violet-300'
+                                ? (button.dataset.indicator === 'bollinger'
+                                    ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-300 shadow-[0_0_10px_rgba(192,132,252,.18)]'
+                                    : 'border-violet-400/35 bg-violet-500/15 text-violet-300')
                                 : 'border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-[var(--ak-muted)] hover:border-violet-400/25 hover:text-[var(--ak-text)]'
                         }`;
                     });
 
                     if (rsiPanel) rsiPanel.classList.toggle('hidden', !activeIndicators.has('rsi'));
+                };
+
+                const syncPeriodUi = () => {
+                    periodButtons.forEach(button => {
+                        const active = Number(button.dataset.chartPeriod) === selectedPeriod;
+                        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+                        button.className = `min-w-0 rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-wide transition ${active
+                            ? 'border-cyan-400/35 bg-cyan-400/15 text-cyan-400'
+                            : 'border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-[var(--ak-muted)] hover:border-cyan-400/25 hover:text-[var(--ak-text)]'}`;
+                    });
                 };
 
                 const drawSmaLines = () => {
@@ -1712,60 +2412,145 @@
                     const plotHeight = Math.max(1, height - top - 32);
                     const xSpan = timeRange.max - timeRange.min;
                     const ySpan = priceRange.max - priceRange.min;
+                    const overlayX = timestamp => left + ((timestamp - timeRange.min) / xSpan) * plotWidth;
+                    const overlayY = price => top + plotHeight - ((price - priceRange.min) / ySpan) * plotHeight;
 
                     const forecastCandle = forecastOrigin();
                     const forecastStart = forecastCandle ? new Date(forecastCandle.x).getTime() : NaN;
                     const forecastStartPrice = Number(forecastCandle?.y?.[3]);
-                    if (Number.isFinite(predictedPrice20d) && Number.isFinite(forecastStart) && Number.isFinite(forecastStartPrice)) {
-                        const forecastEnd = addTradingDays(forecastStart, 20);
-                        const positive = predictedPrice20d >= forecastStartPrice;
-                        const forecastColor = positive ? '#22c55e' : '#ef4444';
+                    const horizonPoints = [5, 10, 15, 20]
+                        .map(days => {
+                            const value = forecastHorizonTargets[days];
+
+                            return {
+                                days,
+                                price: value === null || value === undefined || value === '' || Number(value) <= 0 ? null : Number(value),
+                            };
+                        })
+                        .filter(point => Number.isFinite(point.price));
+                    if (horizonPoints.length && Number.isFinite(forecastStart) && Number.isFinite(forecastStartPrice)) {
                         const toX = timestamp => left + ((timestamp - timeRange.min) / xSpan) * plotWidth;
                         const toY = price => top + plotHeight - ((price - priceRange.min) / ySpan) * plotHeight;
+                        const points = [
+                            { days: 0, timestamp: forecastStart, price: forecastStartPrice },
+                            ...horizonPoints.map(point => ({
+                                ...point,
+                                timestamp: addTradingDays(forecastStart, point.days),
+                            })),
+                        ];
+                        for (let index = 1; index < points.length; index += 1) {
+                            const previous = points[index - 1];
+                            const point = points[index];
+                            const segmentColor = point.price >= previous.price ? '#22c55e' : '#ef4444';
+                            const previousX = toX(previous.timestamp);
+                            const previousY = toY(previous.price);
+                            const pointX = toX(point.timestamp);
+                            const pointY = toY(point.price);
+                            const triangleCornerX = point.price >= previous.price ? pointX : previousX;
+                            const triangleCornerY = Math.max(previousY, pointY);
+                            const gradientId = `forecast-segment-gradient-${@json($instrument->id)}-${index}`;
+                            const glowId = `forecast-segment-glow-${@json($instrument->id)}-${index}`;
+                            const definitions = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                            const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+                            gradient.setAttribute('id', gradientId);
+                            gradient.setAttribute('x1', '0%');
+                            gradient.setAttribute('y1', '0%');
+                            gradient.setAttribute('x2', '0%');
+                            gradient.setAttribute('y2', '100%');
+                            const gradientTop = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                            gradientTop.setAttribute('offset', '0%');
+                            gradientTop.setAttribute('stop-color', segmentColor);
+                            gradientTop.setAttribute('stop-opacity', '.42');
+                            const gradientBottom = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                            gradientBottom.setAttribute('offset', '100%');
+                            gradientBottom.setAttribute('stop-color', segmentColor);
+                            gradientBottom.setAttribute('stop-opacity', '.10');
+                            gradient.append(gradientTop, gradientBottom);
+                            const glow = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+                            glow.setAttribute('id', glowId);
+                            glow.setAttribute('x', '-20%');
+                            glow.setAttribute('y', '-20%');
+                            glow.setAttribute('width', '140%');
+                            glow.setAttribute('height', '140%');
+                            const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+                            blur.setAttribute('stdDeviation', '3');
+                            glow.appendChild(blur);
+                            definitions.append(gradient, glow);
+                            indicatorOverlay.appendChild(definitions);
 
-                        const definitions = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-                        const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
-                        const patternId = `forecast-hatch-${@json($instrument->id)}`;
-                        pattern.setAttribute('id', patternId);
-                        pattern.setAttribute('width', '7');
-                        pattern.setAttribute('height', '7');
-                        pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-                        pattern.setAttribute('patternTransform', 'rotate(35)');
-                        const hatch = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                        hatch.setAttribute('x1', '0');
-                        hatch.setAttribute('y1', '0');
-                        hatch.setAttribute('x2', '0');
-                        hatch.setAttribute('y2', '7');
-                        hatch.setAttribute('stroke', forecastColor);
-                        hatch.setAttribute('stroke-width', '1');
-                        hatch.setAttribute('stroke-opacity', '0.38');
-                        pattern.appendChild(hatch);
-                        definitions.appendChild(pattern);
-                        indicatorOverlay.appendChild(definitions);
+                            const segmentGlow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                            segmentGlow.setAttribute('points', [
+                                `${previousX},${previousY}`,
+                                `${pointX},${pointY}`,
+                                `${triangleCornerX},${triangleCornerY}`,
+                            ].join(' '));
+                            segmentGlow.setAttribute('fill', segmentColor);
+                            segmentGlow.setAttribute('fill-opacity', '.20');
+                            segmentGlow.setAttribute('filter', `url(#${glowId})`);
+                            indicatorOverlay.appendChild(segmentGlow);
 
-                        const triangle = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                        triangle.setAttribute('points', [
-                            `${toX(forecastStart)},${toY(forecastStartPrice)}`,
-                            `${toX(forecastEnd)},${toY(Math.max(forecastStartPrice, predictedPrice20d))}`,
-                            `${toX(forecastEnd)},${toY(Math.min(forecastStartPrice, predictedPrice20d))}`,
-                        ].join(' '));
-                        triangle.setAttribute('fill', `url(#${patternId})`);
-                        triangle.setAttribute('stroke', forecastColor);
-                        triangle.setAttribute('stroke-width', '1.15');
-                        triangle.setAttribute('stroke-dasharray', '5 5');
-                        triangle.setAttribute('stroke-opacity', '0.62');
-                        triangle.setAttribute('stroke-linejoin', 'round');
-                        triangle.setAttribute('vector-effect', 'non-scaling-stroke');
-                        indicatorOverlay.appendChild(triangle);
+                            const segmentArea = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                            segmentArea.setAttribute('points', [
+                                `${previousX},${previousY}`,
+                                `${pointX},${pointY}`,
+                                `${triangleCornerX},${triangleCornerY}`,
+                            ].join(' '));
+                            segmentArea.setAttribute('fill', `url(#${gradientId})`);
+                            segmentArea.setAttribute('fill-opacity', '1');
+                            segmentArea.setAttribute('stroke', 'none');
+                            indicatorOverlay.appendChild(segmentArea);
+
+                            const segmentLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                            segmentLine.setAttribute('x1', previousX);
+                            segmentLine.setAttribute('y1', previousY);
+                            segmentLine.setAttribute('x2', pointX);
+                            segmentLine.setAttribute('y2', pointY);
+                            segmentLine.setAttribute('stroke', segmentColor);
+                            segmentLine.setAttribute('stroke-width', '2.25');
+                            segmentLine.setAttribute('stroke-opacity', '0.92');
+                            segmentLine.setAttribute('stroke-linecap', 'round');
+                            segmentLine.setAttribute('vector-effect', 'non-scaling-stroke');
+                            indicatorOverlay.appendChild(segmentLine);
+                        }
+
+                        points.slice(1).forEach((point, pointIndex) => {
+                            const previous = points[pointIndex];
+                            const pointColor = point.price >= previous.price ? '#22c55e' : '#ef4444';
+                            const x = toX(point.timestamp);
+                            const y = toY(point.price);
+                            const marker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                            marker.setAttribute('cx', x);
+                            marker.setAttribute('cy', y);
+                            marker.setAttribute('r', '3.25');
+                            marker.setAttribute('fill', '#0f172a');
+                            marker.setAttribute('stroke', pointColor);
+                            marker.setAttribute('stroke-width', '2');
+                            marker.setAttribute('vector-effect', 'non-scaling-stroke');
+                            indicatorOverlay.appendChild(marker);
+
+                            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                            label.setAttribute('x', x);
+                            label.setAttribute('y', Math.max(top + 9, y - 8));
+                            label.setAttribute('fill', pointColor);
+                            label.setAttribute('font-size', '8');
+                            label.setAttribute('font-weight', '800');
+                            label.setAttribute('text-anchor', 'middle');
+                            label.textContent = `${point.days}T`;
+                            indicatorOverlay.appendChild(label);
+                        });
                     }
 
                     [
-                        ['sma20', 20, '#fb923c'],
-                        ['sma50', 50, '#60a5fa'],
-                    ].forEach(([indicator, period, color]) => {
+                        ['sma20', () => movingAverageData(20), '#fb923c', '8 6'],
+                        ['sma50', () => movingAverageData(50), '#60a5fa', '8 6'],
+                        ['sma200', () => movingAverageData(200), '#f43f5e', '10 6'],
+                        ['ema20', () => emaData(20), '#22c55e', ''],
+                        ['ema50', () => emaData(50), '#a78bfa', ''],
+                        ['vwap', () => vwapData(), '#22d3ee', '3 3'],
+                    ].forEach(([indicator, dataSource, color, dashArray]) => {
                         if (!activeIndicators.has(indicator)) return;
 
-                        const points = movingAverageData(period)
+                        const points = dataSource()
                             .map(point => {
                                 const timestamp = new Date(point.x).getTime();
                                 if (!Number.isFinite(timestamp) || !Number.isFinite(point.y)) return null;
@@ -1783,7 +2568,7 @@
                         path.setAttribute('fill', 'none');
                         path.setAttribute('stroke', color);
                         path.setAttribute('stroke-width', '2.25');
-                        path.setAttribute('stroke-dasharray', '8 6');
+                        if (dashArray) path.setAttribute('stroke-dasharray', dashArray);
                         path.setAttribute('stroke-linecap', 'round');
                         path.setAttribute('stroke-linejoin', 'round');
                         path.setAttribute('opacity', '0.62');
@@ -1792,6 +2577,48 @@
                         path.style.filter = 'none';
                         indicatorOverlay.appendChild(path);
                     });
+
+                    if (activeIndicators.has('bollinger')) {
+                        const points = bollingerData().filter(point => {
+                            const timestamp = new Date(point.x).getTime();
+                            return timestamp >= timeRange.min && timestamp <= timeRange.max;
+                        });
+                        if (points.length >= 2) {
+                            const upper = points.map(point => `${overlayX(new Date(point.x).getTime()).toFixed(2)},${overlayY(point.upper).toFixed(2)}`);
+                            const lower = [...points].reverse().map(point => `${overlayX(new Date(point.x).getTime()).toFixed(2)},${overlayY(point.lower).toFixed(2)}`);
+                            const band = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                            band.setAttribute('points', [...upper, ...lower].join(' '));
+                            band.setAttribute('fill', '#a78bfa');
+                            band.setAttribute('fill-opacity', '.14');
+                            band.setAttribute('stroke', '#c4b5fd');
+                            band.setAttribute('stroke-opacity', '.92');
+                            band.setAttribute('stroke-width', '1.8');
+                            band.setAttribute('vector-effect', 'non-scaling-stroke');
+                            indicatorOverlay.appendChild(band);
+                            const middle = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                            middle.setAttribute('d', points.map((point, index) => `${index ? 'L' : 'M'} ${overlayX(new Date(point.x).getTime()).toFixed(2)} ${overlayY(point.middle).toFixed(2)}`).join(' '));
+                            middle.setAttribute('fill', 'none');
+                            middle.setAttribute('stroke', '#fbbf24');
+                            middle.setAttribute('stroke-opacity', '.92');
+                            middle.setAttribute('stroke-dasharray', '4 4');
+                            middle.setAttribute('stroke-width', '1.5');
+                            indicatorOverlay.appendChild(middle);
+                        }
+                    }
+
+                    if (activeIndicators.has('sar')) {
+                        parabolicSarData().forEach(point => {
+                            const timestamp = new Date(point.x).getTime();
+                            if (timestamp < timeRange.min || timestamp > timeRange.max) return;
+                            const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                            dot.setAttribute('cx', overlayX(timestamp).toFixed(2));
+                            dot.setAttribute('cy', overlayY(point.y).toFixed(2));
+                            dot.setAttribute('r', '1.8');
+                            dot.setAttribute('fill', point.bullish ? '#22c55e' : '#ef4444');
+                            dot.setAttribute('fill-opacity', '.82');
+                            indicatorOverlay.appendChild(dot);
+                        });
+                    }
                 };
 
                 const svgNode = (name, attributes = {}) => {
@@ -1849,6 +2676,61 @@
                     });
                     const candleWidth = Math.max(2.5, Math.min(7, (plotWidth / Math.max(visibleCandles.length, 1)) * 0.42));
 
+                    if (activeIndicators.has('support') && visibleCandles.length >= 7) {
+                        const latestClose = Number(visibleCandles.at(-1)?.y?.[3]);
+                        const lows = visibleCandles.map(candle => Number(candle?.y?.[2]));
+                        const candidates = [];
+
+                        for (let index = 2; index < lows.length - 2; index += 1) {
+                            const low = lows[index];
+                            if (!Number.isFinite(low) || (Number.isFinite(latestClose) && low > latestClose * 1.005)) continue;
+                            if (low <= lows[index - 1] && low <= lows[index - 2]
+                                && low <= lows[index + 1] && low <= lows[index + 2]) {
+                                candidates.push({ price: low, index });
+                            }
+                        }
+
+                        const tolerance = Math.max((priceRange.max - priceRange.min) * 0.012, (latestClose || 1) * 0.006);
+                        const zones = [];
+                        candidates.forEach(candidate => {
+                            const zone = zones.find(item => Math.abs(item.price - candidate.price) <= tolerance);
+                            if (zone) {
+                                zone.points.push(candidate);
+                                zone.price = zone.points.reduce((sum, point) => sum + point.price, 0) / zone.points.length;
+                            } else {
+                                zones.push({ price: candidate.price, points: [candidate] });
+                            }
+                        });
+
+                        zones
+                            .map(zone => ({
+                                ...zone,
+                                score: zone.points.length * 10 + Math.max(...zone.points.map(point => point.index)) / visibleCandles.length,
+                            }))
+                            .sort((leftZone, rightZone) => rightZone.score - leftZone.score)
+                            .slice(0, 3)
+                            .sort((leftZone, rightZone) => rightZone.price - leftZone.price)
+                            .forEach((zone, index) => {
+                                const y = toY(zone.price);
+                                const color = index === 0 ? '#22d3ee' : '#06b6d4';
+                                svg.appendChild(svgNode('line', {
+                                    x1: left, x2: left + plotWidth, y1: y, y2: y,
+                                    stroke: color, 'stroke-width': index === 0 ? '1.5' : '1',
+                                    'stroke-dasharray': index === 0 ? '7 5' : '4 5',
+                                    'stroke-opacity': index === 0 ? '.82' : '.55',
+                                    'vector-effect': 'non-scaling-stroke',
+                                }));
+                                const label = svgNode('text', {
+                                    x: left + plotWidth - 5, y: Math.max(top + 9, y - 4),
+                                    fill: color, 'fill-opacity': index === 0 ? '.95' : '.72',
+                                    'font-size': '8', 'font-weight': '800', 'text-anchor': 'end',
+                                    'font-family': 'inherit',
+                                });
+                                label.textContent = `${@json(__('Unterstützung'))} ${zone.price.toFixed(2)} ${currency}`;
+                                svg.appendChild(label);
+                            });
+                    }
+
                     visibleCandles.forEach(candle => {
                         const timestamp = new Date(candle.x).getTime();
                         const [open, high, low, close] = candle.y.map(Number);
@@ -1867,6 +2749,42 @@
                             rx: '.75',
                             fill: color,
                         }));
+                    });
+
+                    if (activeIndicators.has('patterns')) chartPatterns.forEach((pattern, index) => {
+                        const from = Number(pattern.from);
+                        const to = Number(pattern.to);
+                        const low = Number(pattern.low);
+                        const high = Number(pattern.high);
+                        if (![from, to, low, high].every(Number.isFinite) || to < timeRange.min || from > timeRange.max) return;
+                        const bullish = pattern.direction === 'bullish';
+                        const color = bullish ? '#22c55e' : '#ef4444';
+                        const candleStep = visibleCandles.length > 1
+                            ? Math.abs(toX(new Date(visibleCandles[1].x).getTime()) - toX(new Date(visibleCandles[0].x).getTime()))
+                            : 8;
+                        const x1 = Math.max(left, toX(from) - candleStep * .48);
+                        const x2 = Math.min(left + plotWidth, toX(to) + candleStep * .48);
+                        const y1 = Math.max(top, toY(high) - 7);
+                        const y2 = Math.min(top + plotHeight, toY(low) + 7);
+                        svg.appendChild(svgNode('rect', {
+                            x: x1, y: y1, width: Math.max(8, x2 - x1), height: Math.max(12, y2 - y1), rx: '4',
+                            fill: color, 'fill-opacity': '.08', stroke: color, 'stroke-width': '1.5',
+                            'stroke-dasharray': '3 2', 'vector-effect': 'non-scaling-stroke',
+                        }));
+                        const labelText = `${bullish ? '↗' : '↘'} ${pattern.name}`;
+                        const labelWidth = Math.max(72, labelText.length * 5.3 + 12);
+                        const labelX = Math.max(left, Math.min(left + plotWidth - labelWidth, (x1 + x2 - labelWidth) / 2));
+                        const labelY = Math.max(top + 2, y1 - 18 - ((index % 2) * 16));
+                        svg.appendChild(svgNode('rect', {
+                            x: labelX, y: labelY, width: labelWidth, height: 15, rx: '4',
+                            fill: color, 'fill-opacity': '.18', stroke: color, 'stroke-opacity': '.55',
+                        }));
+                        const label = svgNode('text', {
+                            x: labelX + labelWidth / 2, y: labelY + 10.5, fill: color,
+                            'font-size': '8', 'font-weight': '800', 'text-anchor': 'middle', 'font-family': 'inherit',
+                        });
+                        label.textContent = labelText;
+                        svg.appendChild(label);
                     });
 
                     const visibleAiScores = historicalAiScores
@@ -1968,6 +2886,7 @@
                     }
 
                     const tickCount = 7;
+                    const fullscreenChart = (document.fullscreenElement || document.webkitFullscreenElement) === chartCard;
                     for (let index = 0; index < tickCount; index += 1) {
                         const timestamp = timeRange.min + (xSpan * index / (tickCount - 1));
                         const label = svgNode('text', {
@@ -1975,7 +2894,9 @@
                             fill: labelColor, 'font-size': '10', 'text-anchor': 'middle',
                             'font-family': 'inherit',
                         });
-                        label.textContent = new Date(timestamp).toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+                        label.textContent = new Date(timestamp).toLocaleDateString([], fullscreenChart
+                            ? { day: '2-digit', month: '2-digit', year: 'numeric' }
+                            : { day: '2-digit', month: '2-digit' });
                         svg.appendChild(label);
                     }
 
@@ -1983,18 +2904,161 @@
                     drawSmaLines();
                 };
 
+                const rerenderAllCharts = async () => {
+                    renderMainChart();
+                    if (activeIndicators.has('rsi') && rsiElement && !rsiChart) {
+                        rsiChart = new window.ApexCharts(rsiElement, rsiOptions());
+                        await rsiChart.render();
+                        updateRsiValue();
+                    } else if (activeIndicators.has('rsi') && rsiChart) {
+                        await rsiChart.updateOptions(rsiOptions(), false, true);
+                        updateRsiValue();
+                    }
+                    await renderSecondaryPanels();
+                };
+
+                const chartBounds = () => {
+                    const first = new Date(currentCandles[0]?.x).getTime();
+                    const origin = forecastOrigin();
+                    const last = origin ? addTradingDays(new Date(origin.x).getTime(), 20) : new Date(currentCandles.at(-1)?.x).getTime();
+                    return { min: first, max: last };
+                };
+
+                const clampZoomRange = (min, max) => {
+                    const bounds = chartBounds();
+                    const minimumSpan = 5 * 86400000;
+                    let span = Math.max(minimumSpan, max - min);
+                    span = Math.min(span, bounds.max - bounds.min);
+                    let nextMin = min;
+                    let nextMax = min + span;
+                    if (nextMin < bounds.min) { nextMin = bounds.min; nextMax = bounds.min + span; }
+                    if (nextMax > bounds.max) { nextMax = bounds.max; nextMin = bounds.max - span; }
+                    return { min: nextMin, max: nextMax };
+                };
+
+                const syncZoomInteraction = () => {
+                    element.style.cursor = canUseChartZoom && zoomInteractionActive ? 'crosshair' : 'default';
+                    element.style.boxShadow = canUseChartZoom && zoomInteractionActive
+                        ? 'inset 0 0 0 1px rgba(34, 211, 238, .55)'
+                        : 'none';
+                    element.removeAttribute('title');
+                };
+                syncZoomInteraction();
+                element.addEventListener('wheel', event => {
+                    if (!canUseChartZoom || !zoomInteractionActive) return;
+                    event.preventDefault();
+                    const range = chartTimeRange();
+                    if (!Number.isFinite(range.min) || !Number.isFinite(range.max)) return;
+                    const rect = element.getBoundingClientRect();
+                    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left - 18) / Math.max(1, rect.width - 104)));
+                    const anchor = range.min + ((range.max - range.min) * ratio);
+                    const factor = event.deltaY < 0 ? .82 : 1.22;
+                    const nextMin = anchor - ((anchor - range.min) * factor);
+                    const nextMax = anchor + ((range.max - anchor) * factor);
+                    zoomTimeRange = clampZoomRange(nextMin, nextMax);
+                    rerenderAllCharts();
+                }, { passive: false });
+                element.addEventListener('pointerdown', event => {
+                    if (!canUseChartZoom) return;
+                    if (event.button !== 0) return;
+                    if (!zoomInteractionActive) {
+                        zoomInteractionActive = true;
+                        syncZoomInteraction();
+                        return;
+                    }
+                    zoomDragStart = event.clientX;
+                    if (zoomSelection) {
+                        const rect = element.getBoundingClientRect();
+                        const left = Math.max(18, Math.min(rect.width - 86, event.clientX - rect.left));
+                        zoomSelection.style.left = `${left}px`;
+                        zoomSelection.style.width = '0px';
+                        zoomSelection.classList.remove('hidden');
+                    }
+                    element.setPointerCapture?.(event.pointerId);
+                });
+                element.addEventListener('pointermove', event => {
+                    if (!Number.isFinite(zoomDragStart) || !zoomSelection) return;
+                    const rect = element.getBoundingClientRect();
+                    const start = Math.max(18, Math.min(rect.width - 86, zoomDragStart - rect.left));
+                    const current = Math.max(18, Math.min(rect.width - 86, event.clientX - rect.left));
+                    zoomSelection.style.left = `${Math.min(start, current)}px`;
+                    zoomSelection.style.width = `${Math.abs(current - start)}px`;
+                });
+                element.addEventListener('pointerup', event => {
+                    if (!Number.isFinite(zoomDragStart)) return;
+                    const start = zoomDragStart;
+                    zoomDragStart = null;
+                    zoomSelection?.classList.add('hidden');
+                    if (Math.abs(event.clientX - start) < 18) return;
+                    const rect = element.getBoundingClientRect();
+                    const range = chartTimeRange();
+                    const toTime = clientX => range.min + Math.max(0, Math.min(1, (clientX - rect.left - 18) / Math.max(1, rect.width - 104))) * (range.max - range.min);
+                    zoomTimeRange = clampZoomRange(Math.min(toTime(start), toTime(event.clientX)), Math.max(toTime(start), toTime(event.clientX)));
+                    rerenderAllCharts();
+                });
+                element.addEventListener('pointercancel', () => {
+                    zoomDragStart = null;
+                    zoomSelection?.classList.add('hidden');
+                });
+                element.addEventListener('dblclick', () => {
+                    if (!canUseChartZoom || !zoomInteractionActive) return;
+                    zoomTimeRange = null;
+                    rerenderAllCharts();
+                });
+                document.addEventListener('pointerdown', event => {
+                    if (!zoomInteractionActive || element.contains(event.target)) return;
+                    zoomInteractionActive = false;
+                    zoomDragStart = null;
+                    zoomSelection?.classList.add('hidden');
+                    syncZoomInteraction();
+                });
+
+                const syncFullscreenButton = () => {
+                    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+                    const active = fullscreenElement === chartCard;
+                    fullscreenButton?.setAttribute('aria-pressed', active ? 'true' : 'false');
+                    fullscreenButton?.setAttribute('aria-label', active ? @json(__('Vollbild beenden')) : @json(__('Chart maximieren')));
+                    fullscreenButton?.setAttribute('title', active ? @json(__('Vollbild beenden')) : @json(__('Chart maximieren')));
+                    fullscreenButton?.querySelector('[data-fullscreen-open]')?.classList.toggle('hidden', active);
+                    fullscreenButton?.querySelector('[data-fullscreen-close]')?.classList.toggle('hidden', !active);
+                    window.setTimeout(() => rerenderAllCharts(), 80);
+                };
+                fullscreenButton?.addEventListener('click', async () => {
+                    if (!canUseChartZoom) return;
+                    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+                    if (fullscreenElement === chartCard) {
+                        if (document.exitFullscreen) await document.exitFullscreen();
+                        else document.webkitExitFullscreen?.();
+                        return;
+                    }
+                    if (chartCard?.requestFullscreen) await chartCard.requestFullscreen();
+                    else chartCard?.webkitRequestFullscreen?.();
+                });
+                fullscreenCloseButton?.addEventListener('click', async () => {
+                    if (document.exitFullscreen) await document.exitFullscreen();
+                    else document.webkitExitFullscreen?.();
+                });
+                document.addEventListener('fullscreenchange', syncFullscreenButton);
+                document.addEventListener('webkitfullscreenchange', syncFullscreenButton);
+
                 renderMainChart();
                 if (indicatorOverlay && window.ResizeObserver) {
                     new ResizeObserver(() => renderMainChart()).observe(element);
                 }
-                if (rsiElement) {
-                    rsiChart = new window.ApexCharts(rsiElement, rsiOptions());
-                    rsiChart.render();
-                    updateRsiValue();
-                }
                 syncIndicatorUi();
+                syncPeriodUi();
+                renderSecondaryPanels();
+                periodButtons.forEach(button => {
+                    button.addEventListener('click', async () => {
+                        selectedPeriod = Number(button.dataset.chartPeriod);
+                        zoomTimeRange = null;
+                        syncPeriodUi();
+                        await rerenderAllCharts();
+                    });
+                });
                 indicatorButtons.forEach(button => {
                     button.addEventListener('click', async () => {
+                        if (!canUseChartIndicators) return;
                         const indicator = button.dataset.indicator;
                         if (activeIndicators.has(indicator)) {
                             activeIndicators.delete(indicator);
@@ -2003,27 +3067,20 @@
                         }
 
                         syncIndicatorUi();
-                        if (indicator !== 'rsi') {
-                            drawSmaLines();
-                        } else if (activeIndicators.has('rsi') && rsiChart) {
-                            await rsiChart.updateOptions(rsiOptions(), false, true);
-                            updateRsiValue();
-                        }
+                        await rerenderAllCharts();
                     });
                 });
                 chartResetButton?.addEventListener('click', async () => {
+                    if (!canUseChartIndicators) return;
                     activeIndicators.clear();
-                    activeIndicators.add('rsi');
+                    selectedPeriod = 132;
+                    zoomTimeRange = null;
                     syncIndicatorUi();
-                    renderMainChart();
-                    if (rsiChart) {
-                        await rsiChart.updateOptions(rsiOptions(), false, true);
-                        updateRsiValue();
-                    }
+                    syncPeriodUi();
+                    await rerenderAllCharts();
                 });
                 window.addEventListener('aktienki:theme-changed', async () => {
-                    renderMainChart();
-                    if (rsiChart) await rsiChart.updateOptions(rsiOptions(), false, true);
+                    await rerenderAllCharts();
                 });
                 window.addEventListener('aktienki:live-price', event => {
                     if (!liveSourceSymbol || String(event.detail?.symbol ?? '').toUpperCase() !== String(liveSourceSymbol).toUpperCase()) return;
@@ -2061,7 +3118,42 @@
                 });
 
                 const liveQuoteUrl = @js(route('stocks.live-quote', ['symbol' => $instrument->symbol]));
+                const canViewRealtime = @json($canViewRealtime);
+                let marketTimezone = @json($marketSession['timezone']);
+                let lastLivePrice = null;
+                const updateLiveClock = () => {
+                    const timeElement = document.querySelector('[data-stock-live-time]');
+                    if (!timeElement || !canViewRealtime) return;
+                    try {
+                        timeElement.textContent = new Date().toLocaleTimeString(document.documentElement.lang, {
+                            hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: marketTimezone,
+                        });
+                    } catch (_) {
+                        timeElement.textContent = new Date().toLocaleTimeString(document.documentElement.lang, {
+                            hour: '2-digit', minute: '2-digit', second: '2-digit',
+                        });
+                    }
+                };
+                const setLiveQuoteTone = change => {
+                    const card = document.querySelector('[data-stock-live-card]');
+                    const priceElement = document.querySelector('[data-stock-live-price]');
+                    const changeElement = document.querySelector('[data-stock-live-change]');
+                    const metaElement = document.querySelector('[data-stock-live-meta]');
+                    const dotElement = document.querySelector('[data-stock-live-dot]');
+                    const positive = Number(change) > 0;
+                    const negative = Number(change) < 0;
+                    if (card) card.className = `rounded-xl border px-3 py-1.5 text-right transition-colors duration-300 ${
+                        positive ? 'border-emerald-400/35 bg-emerald-400/10' : (negative ? 'border-rose-400/35 bg-rose-400/10' : 'border-cyan-500/25 bg-cyan-500/[.09]')
+                    }`;
+                    if (priceElement) priceElement.className = `whitespace-nowrap text-sm font-black tabular-nums transition-colors duration-300 ${positive ? 'text-emerald-400' : (negative ? 'text-rose-400' : 'text-cyan-400')}`;
+                    if (changeElement) changeElement.className = `inline-flex min-w-24 flex-col items-center justify-center rounded-xl border px-2.5 py-1.5 transition-colors duration-300 ${
+                        positive ? 'border-emerald-400/35 bg-emerald-400/12 text-emerald-400' : (negative ? 'border-rose-400/35 bg-rose-400/12 text-rose-400' : 'border-cyan-400/25 bg-cyan-400/10 text-cyan-400')
+                    }`;
+                    if (metaElement) metaElement.className = `mt-0.5 flex items-center justify-end gap-1 text-[7px] font-black uppercase tracking-wide transition-colors duration-300 ${positive ? 'text-emerald-400/80' : (negative ? 'text-rose-400/80' : 'text-cyan-400/75')}`;
+                    if (dotElement) dotElement.className = `h-1.5 w-1.5 animate-pulse rounded-full ${positive ? 'bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,.55)]' : (negative ? 'bg-rose-400 shadow-[0_0_5px_rgba(251,113,133,.55)]' : 'bg-cyan-400 shadow-[0_0_5px_rgba(34,211,238,.55)]')}`;
+                };
                 const refreshTwelveDataQuote = async () => {
+                    if (!canViewRealtime || document.visibilityState !== 'visible') return;
                     try {
                         const response = await fetch(liveQuoteUrl, {
                             credentials: 'same-origin',
@@ -2070,9 +3162,29 @@
                         });
                         if (!response.ok) return;
                         const quote = await response.json();
+                        const statusElement = document.querySelector('[data-stock-live-status]');
+                        if (quote.timezone) marketTimezone = quote.timezone;
+                        if (quote.market_open === false) {
+                            if (statusElement) statusElement.textContent = @json(__('Börse geschlossen'));
+                            document.querySelector('[data-stock-live-dot]')?.classList.remove('animate-pulse');
+                            return;
+                        }
                         const price = Number(quote.price);
                         const timestamp = Number(quote.timestamp);
                         if (!Number.isFinite(price) || price <= 0) return;
+
+                        const liveChange = Number.isFinite(Number(quote.change_percent))
+                            ? Number(quote.change_percent)
+                            : (Number.isFinite(lastLivePrice) && lastLivePrice !== 0 ? ((price - lastLivePrice) / lastLivePrice) * 100 : 0);
+                        lastLivePrice = price;
+                        setLiveQuoteTone(liveChange);
+                        const changeValueElement = document.querySelector('[data-stock-live-change-value]');
+                        if (changeValueElement) {
+                            changeValueElement.textContent = `${liveChange > 0 ? '+' : ''}${liveChange.toLocaleString(document.documentElement.lang, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                            })} %`;
+                        }
 
                         const priceElement = document.querySelector('[data-stock-live-price]');
                         const timeElement = document.querySelector('[data-stock-live-time]');
@@ -2083,12 +3195,8 @@
                                 maximumFractionDigits: 2,
                             })}${currency ? ` ${currency}` : ''}`;
                         }
-                        if (timeElement && Number.isFinite(timestamp)) {
-                            timeElement.textContent = new Date(timestamp * 1000).toLocaleTimeString(
-                                document.documentElement.lang,
-                                { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Berlin' },
-                            );
-                        }
+                        updateLiveClock();
+                        if (statusElement) statusElement.textContent = @json(__('TwelveData Realtime'));
                         window.dispatchEvent(new CustomEvent('aktienki:live-price', {
                             detail: { symbol: @js($instrument->symbol), price, timestamp },
                         }));
@@ -2096,9 +3204,18 @@
                         // Der zuletzt bekannte Kurs bleibt bei einem kurzzeitigen API-Fehler sichtbar.
                     }
                 };
-                refreshTwelveDataQuote();
-                const liveQuoteTimer = window.setInterval(refreshTwelveDataQuote, 2_000);
-                window.addEventListener('pagehide', () => window.clearInterval(liveQuoteTimer), { once: true });
+                let liveQuoteTimer = null;
+                let liveClockTimer = null;
+                if (canViewRealtime) {
+                    updateLiveClock();
+                    refreshTwelveDataQuote();
+                    liveQuoteTimer = window.setInterval(refreshTwelveDataQuote, 2_000);
+                    liveClockTimer = window.setInterval(updateLiveClock, 1_000);
+                    window.addEventListener('pagehide', () => {
+                        window.clearInterval(liveQuoteTimer);
+                        window.clearInterval(liveClockTimer);
+                    }, { once: true });
+                }
 
                 const refreshChart = async () => {
                     if (document.visibilityState !== 'visible') return;
@@ -2113,9 +3230,11 @@
 
                         const payload = await response.json();
                         const nextCandles = Array.isArray(payload.candles) ? payload.candles : [];
+                        const nextChartPatterns = Array.isArray(payload.chart_patterns) ? payload.chart_patterns : [];
                         const entryChanged = JSON.stringify(payload.watchlist_entry) !== JSON.stringify(watchlistEntry);
-                        if (JSON.stringify(nextCandles) !== JSON.stringify(currentCandles) || entryChanged) {
+                        if (JSON.stringify(nextCandles) !== JSON.stringify(currentCandles) || JSON.stringify(nextChartPatterns) !== JSON.stringify(chartPatterns) || entryChanged) {
                             currentCandles = nextCandles;
+                            chartPatterns = nextChartPatterns;
                             watchlistEntry = payload.watchlist_entry || null;
                             renderMainChart();
                             if (rsiChart) {
