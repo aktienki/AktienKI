@@ -318,6 +318,7 @@
                 position:relative;
                 inset:auto;
                 grid-column:1/-1;
+                margin-top:52px;
                 min-height:0;
                 height:auto;
                 max-height:0;
