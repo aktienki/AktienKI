@@ -282,7 +282,10 @@
             .assessment-trend{padding:7px 9px}
             .assessment-trend strong{margin-top:3px;font-size:14px}
             .horizon-grid{gap:4px;margin-top:5px}
-            .horizon{padding:6px 7px}
+            .horizon{padding:4px 6px}
+            .horizon small{font-size:6px;line-height:1}
+            .horizon strong{margin:2px 0;font-size:9px;line-height:1.1}
+            .horizon em{font-size:7px;line-height:1}
             .market-chart{height:auto;min-height:210px;padding:90px 8px 10px}
             .market-chart .chart-stage{
                 position:absolute;
