@@ -328,10 +328,11 @@ BASH, 15);
     private function ssh(string $remoteCommand, int $timeout): ProcessResult
     {
         $mini = config('operations.mini');
+        $identityFile = $this->runtimeIdentityFile((string) $mini['identity_file']);
         $arguments = [
             '/usr/bin/ssh',
             '-p', (string) $mini['port'],
-            '-i', (string) $mini['identity_file'],
+            '-i', $identityFile,
         ];
 
         $knownHostsFile = (string) ($mini['known_hosts_file'] ?? '');
@@ -354,6 +355,29 @@ BASH, 15);
         );
 
         return Process::timeout($timeout)->run($arguments);
+    }
+
+    private function runtimeIdentityFile(string $source): string
+    {
+        if ($source === '' || ! is_readable($source)) {
+            return $source;
+        }
+
+        $uid = function_exists('posix_geteuid') ? (int) posix_geteuid() : 0;
+        $directory = rtrim(sys_get_temp_dir(), '/').'/aktienki-operations-'.$uid;
+        $target = $directory.'/mini-pc-identity';
+        $contents = file_get_contents($source);
+
+        if (! is_dir($directory)) {
+            mkdir($directory, 0700, true);
+        }
+        if (! is_file($target) || file_get_contents($target) !== $contents) {
+            file_put_contents($target, $contents, LOCK_EX);
+        }
+        chmod($directory, 0700);
+        chmod($target, 0600);
+
+        return $target;
     }
 
     private function sections(string $output): array
