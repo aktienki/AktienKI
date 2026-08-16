@@ -250,6 +250,12 @@
                 width:100%;
                 max-width:none;
             }
+            .market-panel{
+                height:calc(100svh - 89px);
+                min-height:0;
+                max-height:none;
+                grid-template-rows:auto minmax(0,1fr) auto;
+            }
             .beta-ribbon{
                 position:relative;
                 inset:auto;
@@ -267,12 +273,27 @@
             .hero-grid>div:first-child:before{margin-bottom:12px;line-height:1.5}
             .market-top .donuts{
                 grid-template-columns:repeat(3,minmax(0,1fr));
-                gap:10px 6px;
-                padding:12px 6px;
+                gap:5px;
+                margin:8px 0 6px;
+                padding:7px 5px;
             }
-            .market-top .donut{width:68px;height:68px}
-            .market-chart{height:378px;padding:98px 8px 14px}
+            .market-top{padding:44px 12px 9px}
+            .market-top .donut{width:58px;height:58px}
+            .assessment-trend{padding:7px 9px}
+            .assessment-trend strong{margin-top:3px;font-size:14px}
+            .horizon-grid{gap:4px;margin-top:5px}
+            .horizon{padding:6px 7px}
+            .market-chart{height:auto;min-height:0;padding:90px 8px 10px}
             .market-chart .chart-stage{height:calc(100% - 24px)}
+            .quality-sequence .quality-message h2{font-size:25px}
+            .quality-sequence .quality-message p{font-size:10px;line-height:1.4}
+            .quality-sequence .quality-chips{gap:4px;margin-top:8px}
+            .quality-sequence .quality-chips span{padding:5px 7px;font-size:7px}
+            .quality-gate{grid-template-columns:1fr auto 1fr;gap:5px;margin-top:8px}
+            .gate-input,.gate-output{grid-template-columns:1fr}
+            .gate-core{width:88px;padding:7px 5px;font-size:7px}
+            .gate-core b{font-size:9px}
+            .gate-model{padding:4px 5px;font-size:6px}
             .final-invitation{
                 position:relative;
                 inset:auto;
