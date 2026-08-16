@@ -208,6 +208,23 @@
             .market-panel{height:calc(100dvh - 224px);min-height:520px;max-height:650px}
             .market-chart{height:calc(100% - 36px)}
         }
+        @media (max-width:760px){
+            .beta-ribbon{
+                position:relative;
+                inset:auto;
+                width:100%;
+                margin:0;
+                padding:0;
+                border-top:1px solid rgba(251,191,36,.46);
+                border-bottom:1px solid rgba(251,191,36,.46);
+            }
+            .beta-current,.beta-preview{min-height:0;padding:11px 17px}
+            .beta-preview{gap:9px}
+            .beta-preview-copy span{font-size:9px;line-height:1.45}
+            .beta-request-button{margin-top:2px}
+            .hero{padding-top:24px}
+            .hero-grid>div:first-child:before{margin-bottom:12px;line-height:1.5}
+        }
     </style>
 </head>
 <body>
