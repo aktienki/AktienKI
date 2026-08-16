@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Enums\PlanLevel;
+use App\Services\PlanAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
 use App\Models\MessagingConnection;
+use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
 {
@@ -17,9 +20,15 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $countryChangeCount = (int) data_get($request->user()->preferences, 'country_code_change_count', 0);
+        $countryLocked = app(PlanAccessService::class)->level($request->user()) === PlanLevel::Free
+            && $countryChangeCount >= 1;
+
         return view('profile.edit', [
             'user' => $request->user(),
             'whatsapp' => MessagingConnection::query()->firstOrNew(['user_id' => $request->user()->id, 'provider' => 'whatsapp_cloud']),
+            'countryLocked' => $countryLocked,
+            'countryChangeCount' => $countryChangeCount,
         ]);
     }
 
@@ -52,8 +61,26 @@ class ProfileController extends Controller
             $preferences['locale'] = $validated['locale'];
             $request->session()->put('locale', $validated['locale']);
         }
+        $requestedCountry = strtoupper((string) $validated['country_code']);
+        $currentCountry = strtoupper((string) ($preferences['country_code'] ?? ''));
+        $countryChanged = $currentCountry !== '' && $requestedCountry !== $currentCountry;
 
-        $allowedMobileNav = ['welcome', 'features', 'roadmap', 'dashboard', 'predictions', 'depots', 'accounts', 'setup', 'news', 'pricing', 'contact', 'community'];
+        if ($countryChanged && app(PlanAccessService::class)->level($user) === PlanLevel::Free) {
+            $countryChangeCount = (int) ($preferences['country_code_change_count'] ?? 0);
+
+            if ($countryChangeCount >= 1) {
+                throw ValidationException::withMessages([
+                    'country_code' => __('Im Free-Tarif kann das Land nach der Registrierung nur einmal geändert werden.'),
+                ]);
+            }
+
+            $preferences['country_code_change_count'] = $countryChangeCount + 1;
+            $preferences['country_code_changed_at'] = now()->toIso8601String();
+        }
+
+        $preferences['country_code'] = $requestedCountry;
+
+        $allowedMobileNav = ['welcome', 'features', 'roadmap', 'dashboard', 'predictions', 'depots', ...($user->is_admin ? ['accounts'] : []), 'setup', 'news', 'pricing', 'contact', 'community'];
         if (array_key_exists('mobile_nav_order', $validated) || array_key_exists('mobile_nav_hidden', $validated)) {
             $order = json_decode((string) ($validated['mobile_nav_order'] ?? '[]'), true);
             $hidden = json_decode((string) ($validated['mobile_nav_hidden'] ?? '[]'), true);

@@ -2,8 +2,9 @@
 
 @section('content')
     <x-detail-page-theme />
+    @php $watchlistLimitReached = $watchlistLimit !== null && $watchlists->where('active', true)->count() >= $watchlistLimit; @endphp
     <div
-        x-data="{ setupOpen: @js($errors->any()) }"
+        x-data="{ setupOpen: @js(! $watchlistLimitReached && $errors->any()) }"
         @keydown.escape.window="setupOpen = false"
         class="ak-detail-design mx-auto w-full max-w-screen-2xl space-y-5 py-5"
     >
@@ -14,9 +15,16 @@
                 <p class="mt-2 text-sm text-[var(--ak-muted)]">{{ __('Erstelle zuerst eine Watchlist und füge anschließend Aktien über den Stern in der Aktientabelle hinzu.') }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                <button type="button" @click="setupOpen = true" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-400/10 px-4 text-xs font-black text-cyan-300 shadow-lg shadow-cyan-950/20 transition hover:border-cyan-300/55 hover:bg-cyan-400/20 hover:text-cyan-200">
-                    <x-heroicon-o-cog-6-tooth class="h-4 w-4" />{{ __('Watchlist einrichten') }}
-                </button>
+                @if ($watchlistLimitReached)
+                    <div class="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/[.08] px-4 text-xs font-bold text-amber-200">
+                        <x-heroicon-o-information-circle class="h-4 w-4" />
+                        {{ __('Limit erreicht: :count Watchlists', ['count' => $watchlistLimit]) }}
+                    </div>
+                @else
+                    <button type="button" @click="setupOpen = true" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-400/10 px-4 text-xs font-black text-cyan-300 shadow-lg shadow-cyan-950/20 transition hover:border-cyan-300/55 hover:bg-cyan-400/20 hover:text-cyan-200">
+                        <x-heroicon-o-cog-6-tooth class="h-4 w-4" />{{ __('Watchlist einrichten') }}
+                    </button>
+                @endif
                 <a href="{{ route('stocks.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 text-xs font-bold text-[var(--ak-muted)] transition hover:border-violet-400/30 hover:text-[var(--ak-text)]">
                     <x-heroicon-o-table-cells class="h-4 w-4" />{{ __('Zur Aktienliste') }}
                 </a>
@@ -33,6 +41,7 @@
             <div class="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-bold text-emerald-400">{{ __('Aktie wurde in die ausgewählte Watchlist verschoben.') }}</div>
         @endif
 
+        @unless ($watchlistLimitReached)
         <div x-cloak x-show="setupOpen" x-transition.opacity class="fixed inset-0 z-[80] bg-slate-950/65 backdrop-blur-sm" @click="setupOpen = false"></div>
         <aside
             x-cloak
@@ -78,6 +87,7 @@
                 </button>
             </form>
         </aside>
+        @endunless
 
         <section>
             <div class="space-y-4">

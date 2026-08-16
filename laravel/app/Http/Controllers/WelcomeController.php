@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Throwable;
 
@@ -19,21 +20,33 @@ class WelcomeController extends Controller
         return $this->renderWelcome('welcome-copy', true);
     }
 
+    public function original(): View
+    {
+        return $this->renderWelcome('welcome', true);
+    }
+
     private function renderWelcome(string $view, bool $showBetaNotice): View
     {
-        $betaTesterLimit = 25;
+        $betaTesterLimit = 20;
         $betaTesterCount = 0;
         $welcomeCountries = [];
         $welcomeStats = [
             'stocks' => null,
             'indices' => null,
             'sectors' => null,
+            'countries' => null,
             'forecasts' => null,
             'data-points' => null,
+            'analyzed-stocks' => null,
         ];
+        $publicTradePerformance = null;
+        if (Storage::disk('public')->exists('statistics/trade-performance-backtest.json')) {
+            $decoded = json_decode(Storage::disk('public')->get('statistics/trade-performance-backtest.json'), true);
+            if (is_array($decoded) && ($decoded['version'] ?? null) === 1) $publicTradePerformance = $decoded;
+        }
 
         try {
-            $data = Cache::remember('public.welcome.stats-v2', now()->addMinutes(15), function () use ($betaTesterLimit) {
+            $data = Cache::remember('public.welcome.stats-v6', now()->addMinutes(15), function () use ($betaTesterLimit) {
                 $countries = DB::table('instruments')
                     ->where('type', 'stock')
                     ->whereNull('deleted_at')
@@ -62,9 +75,19 @@ class WelcomeController extends Controller
                 $forecastCount = $tableEstimates->get('predictions', 0);
 
                 return [
-                    'betaTesterCount' => min(
-                        $betaTesterLimit,
+                    'betaTesterCount' => min($betaTesterLimit,
                         DB::table('users')->where('account_status', 'tester')->count()
+                        + DB::table('contact_messages as beta_request')
+                            ->where('beta_request.meta->source', 'beta_request')
+                            ->whereNotExists(function ($query): void {
+                                $query->selectRaw('1')
+                                    ->from('users')
+                                    ->where('users.account_status', 'tester')
+                                    ->whereRaw('LOWER(users.email) = LOWER(beta_request.email)');
+                            })
+                            ->selectRaw('LOWER(beta_request.email)')
+                            ->distinct()
+                            ->count()
                     ),
                     'countries' => $countries,
                     'stats' => [
@@ -77,8 +100,15 @@ class WelcomeController extends Controller
                             ->where('sector', '<>', '')
                             ->distinct()
                             ->count('sector'),
+                        'countries' => count($countries),
                         'forecasts' => $forecastCount,
                         'data-points' => $tableEstimates->sum(),
+                        'analyzed-stocks' => DB::table('stock_ai_assessments')
+                            ->join('instruments', 'instruments.id', '=', 'stock_ai_assessments.instrument_id')
+                            ->where('instruments.type', 'stock')
+                            ->whereNull('instruments.deleted_at')
+                            ->distinct()
+                            ->count('stock_ai_assessments.instrument_id'),
                     ],
                 ];
             });
@@ -96,6 +126,7 @@ class WelcomeController extends Controller
             'showBetaNotice',
             'betaTesterCount',
             'betaTesterLimit',
+            'publicTradePerformance',
         ));
     }
 }

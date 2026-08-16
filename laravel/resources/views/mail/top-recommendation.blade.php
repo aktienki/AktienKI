@@ -1,8 +1,4 @@
 <x-mail::message>
-<div style="text-align:center;margin:0 0 24px">
-<img src="cid:aktienki-logo.png" alt="aktienKI.com" width="282" style="display:inline-block;max-width:82%;height:auto">
-</div>
-
 <div style="background:#122034;border:1px solid #29445a;border-radius:14px;padding:22px;color:#e7edf5">
 <div style="color:#d9a84e;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase">{{ __('aKI Top-Empfehlung') }}</div>
 <div style="font-size:25px;font-weight:800;margin-top:6px;color:#ffffff">{!! str_ireplace('.com', '.&#8203;com', e($name)) !!} <span style="color:#d9a84e;font-size:15px">{{ $symbol }}</span></div>

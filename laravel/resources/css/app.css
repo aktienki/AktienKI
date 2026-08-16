@@ -33,18 +33,21 @@
     top: .65rem;
     left: .75rem;
     right: .75rem;
-    display: flex;
+    display: grid;
+    grid-template-columns: 1.28fr repeat(5, minmax(0, 1fr));
     min-width: 0;
     align-items: center;
-    justify-content: space-between;
-    gap: clamp(.25rem, .55vw, .7rem);
+    justify-items: center;
+    gap: .2rem;
 }
 
 .screener-metric-donut {
     position: relative;
     display: grid;
-    width: 3.2rem;
-    height: 3.2rem;
+    width: min(100%, 4.15rem);
+    height: auto;
+    aspect-ratio: 1;
+    flex: 0 0 auto;
     place-items: center;
     border-radius: 999px;
     background: conic-gradient(var(--donut-color) var(--donut-value), rgba(148, 163, 184, .16) 0);
@@ -64,29 +67,29 @@
     z-index: 1;
     margin-top: -.24rem;
     color: var(--donut-color);
-    font-size: .66rem;
+    font-size: .76rem;
     font-weight: 900;
     line-height: 1;
 }
 
 .screener-metric-donut small {
     position: absolute;
-    bottom: .64rem;
+    bottom: .88rem;
     z-index: 1;
     color: var(--ak-muted);
-    font-size: .4rem;
+    font-size: .46rem;
     font-weight: 800;
     line-height: 1;
 }
 
 .screener-metric-donut-score {
-    width: 4.5rem;
-    height: 4.5rem;
+    width: min(100%, 5.35rem);
+    height: auto;
     box-shadow: 0 0 18px rgba(251, 191, 36, .22);
 }
 
 .screener-metric-donut-score span {
-    font-size: .92rem;
+    font-size: 1.05rem;
 }
 
 .screener-metric-donut-score::after {
@@ -94,19 +97,23 @@
 }
 
 .screener-metric-donut-score small {
-    bottom: 1rem;
-    font-size: .46rem;
+    bottom: 1.15rem;
+    font-size: .52rem;
+}
+
+.screener-donut-spacer {
+    height: 5.35rem;
 }
 
 @media (min-width: 1280px) and (max-width: 1535px) {
     .screener-metric-donut {
-        width: 2.85rem;
-        height: 2.85rem;
+        width: min(100%, 3.7rem);
+        height: auto;
     }
 
     .screener-metric-donut-score {
-        width: 4rem;
-        height: 4rem;
+        width: min(100%, 4.8rem);
+        height: auto;
     }
 }
 
@@ -596,20 +603,20 @@
     --ak-card-hover: rgba(255, 255, 255, .98);
     --ak-card-strong: rgba(255, 255, 255, .96);
     --ak-border: rgba(51, 65, 85, .15);
-    --ak-border-strong: rgba(8, 145, 178, .38);
-    --ak-text: #1f2937;
-    --ak-muted: #64748b;
+    --ak-border-strong: rgba(8, 127, 140, .42);
+    --ak-text: #0f172a;
+    --ak-muted: #475569;
     --ak-surface: #ffffff;
     --ak-surface-muted: rgba(241, 245, 244, .90);
-    --ak-accent: #0e7490;
-    --ak-accent-soft: rgba(6, 182, 212, .10);
-    --ak-violet: #06b6d4;
-    --ak-violet-soft: #0e7490;
-    --ak-cyan: #06b6d4;
+    --ak-accent: #00656f;
+    --ak-accent-soft: rgba(0, 101, 111, .12);
+    --ak-violet: #00656f;
+    --ak-violet-soft: #004f57;
+    --ak-cyan: #00656f;
     --ak-warm: #b7791f;
     --ak-warm-soft: rgba(198, 146, 62, .10);
     --ak-shadow: 0 16px 42px rgba(31, 41, 55, .09);
-    --ak-shadow-hover: 0 20px 52px rgba(14, 116, 144, .14);
+    --ak-shadow-hover: 0 20px 52px rgba(8, 127, 140, .14);
 }
 
 /* Use cyan as the primary orange accent in light mode. */
@@ -954,8 +961,11 @@ body:not(.welcome-background) :is(
 }
 
 :root:not([data-theme="light"]) .ak-brand-link .ak-brand-logo-dark {
-    /* Keep the original orange accent in dark mode for stronger brand contrast. */
-    filter: brightness(1.08) contrast(1.06) saturate(1.04) drop-shadow(0 0 8px rgba(245, 158, 11, .18));
+    filter: none;
+}
+
+:root:not([data-theme="light"]) .ak-welcome-brand-logo img {
+    filter: drop-shadow(0 0 8px rgba(82, 241, 255, .42)) drop-shadow(0 0 22px rgba(24, 207, 227, .18));
 }
 
 :root[data-theme="light"] .ak-brand-link .ak-brand-logo-light {
@@ -971,8 +981,7 @@ body:not(.welcome-background) :is(
 }
 
 :root:not([data-theme="light"]) .ak-brand-wordmark-dark {
-    /* Welcome and application dark themes use the orange-accent logo asset unchanged. */
-    filter: brightness(1.08) contrast(1.06) saturate(1.04) drop-shadow(0 0 8px rgba(245, 158, 11, .18));
+    filter: none;
 }
 
 :root[data-theme="light"] .ak-brand-wordmark-dark {
@@ -3144,10 +3153,10 @@ body:not(.welcome-background) :is(
     --ak-workspace-card: rgba(255, 255, 255, .94);
     --ak-workspace-card-hover: #ffffff;
     --ak-workspace-border: #d9e7e4;
-    --ak-workspace-accent: #0e7490;
-    --ak-workspace-accent-bright: #06b6d4;
-    --ak-workspace-accent-soft: rgba(34, 211, 238, .10);
-    --ak-workspace-accent-border: rgba(6, 182, 212, .22);
+    --ak-workspace-accent: #00656f;
+    --ak-workspace-accent-bright: #007c87;
+    --ak-workspace-accent-soft: rgba(0, 101, 111, .12);
+    --ak-workspace-accent-border: rgba(0, 101, 111, .28);
     --ak-workspace-shadow: 0 8px 22px rgba(35, 72, 67, .065);
 }
 
@@ -3667,6 +3676,9 @@ body:not(.welcome-background) :is(
     .ak-app-topbar > .ak-container { gap: .35rem !important; padding-inline: .5rem !important; }
     .ak-brand-link { width: 2.9rem !important; }
     .ak-brand-logo { height: 2.8rem !important; max-width: 8.5rem !important; }
+    .ak-brand-link .ak-welcome-brand-logo { gap: 0 !important; }
+    .ak-brand-link .ak-welcome-brand-logo img { width: 2.8rem !important; height: 2.8rem !important; }
+    .ak-brand-link .ak-welcome-brand-name { display: none !important; }
     .ak-app-topbar nav { gap: .25rem !important; }
     .ak-app-topbar nav .ak-top-link,
     .ak-app-topbar nav .ak-top-link-active { min-width: 2.55rem !important; height: 2.45rem; padding-inline: .62rem !important; border-radius: .8rem; }
@@ -3770,7 +3782,7 @@ body:not(.welcome-background) :is(
     }
     #predictions-page #predictions-table-scroll .ak-stocks-table {
         width: max-content !important;
-        min-width: 980px !important;
+        min-width: 560px !important;
         table-layout: fixed !important;
     }
     #predictions-page #predictions-table-scroll .ak-stocks-table th,
@@ -3779,29 +3791,382 @@ body:not(.welcome-background) :is(
         vertical-align: middle !important;
     }
     #predictions-page #predictions-table-scroll .ak-prediction-donut {
-        width: 42px !important;
-        height: 42px !important;
-        flex-basis: 42px !important;
+        width: 34px !important;
+        height: 34px !important;
+        flex-basis: 34px !important;
     }
-    #predictions-page #predictions-table-scroll .ak-prediction-donut span { font-size: 10px !important; }
-    #predictions-page #predictions-table-scroll .ak-prediction-signal-badge { min-width: 5.5rem !important; }
-    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="1"] :is(th:nth-child(2), td:nth-child(2)),
-    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="1"] :is(th:nth-child(6), td:nth-child(6)),
-    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="1"] :is(th:nth-child(7), td:nth-child(7)),
-    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="1"] :is(th:nth-child(16), td:nth-child(16)),
-    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="0"] :is(th:nth-child(5), td:nth-child(5)),
-    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="0"] :is(th:nth-child(6), td:nth-child(6)),
-    #predictions-page #predictions-table-scroll .ak-stocks-table[data-smart-labels="0"] :is(th:nth-child(15), td:nth-child(15)) {
+    #predictions-page #predictions-table-scroll .ak-prediction-donut span { font-size: 9px !important; }
+    #predictions-page #predictions-table-scroll .ak-prediction-signal-badge { min-width: 4.25rem !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table :is(th, td) {
+        padding-top: .35rem !important;
+        padding-bottom: .35rem !important;
+        font-size: 9px !important;
+    }
+    #predictions-page #predictions-table-scroll .ak-stocks-table :is(th:nth-child(1), td:nth-child(1), th:nth-child(2), td:nth-child(2), th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6), th:nth-child(11), td:nth-child(11), th:nth-child(12), td:nth-child(12), th:nth-child(13), td:nth-child(13)) {
         display: none !important;
+    }
+    .ak-mobile-performance-table {
+        min-width: 500px !important;
+        font-size: 10px !important;
+    }
+    .ak-mobile-performance-table :is(th, td) {
+        padding: .45rem .55rem !important;
+        white-space: nowrap;
+    }
+    .ak-mobile-performance-table :is(th:nth-child(3), td:nth-child(3), th:nth-child(4), td:nth-child(4)) {
+        display: none;
+    }
+    .trade-performance-stats {
+        gap: .25rem !important;
+    }
+    .trade-performance-stats > article {
+        border-radius: .55rem !important;
+        padding: .45rem .3rem !important;
+    }
+    .trade-performance-stats > article > p:first-child {
+        font-size: 6px !important;
+        letter-spacing: .02em !important;
+    }
+    .trade-performance-stats > article > p:last-child {
+        margin-top: .3rem !important;
+        font-size: 10px !important;
     }
 }
 
-@media (min-width: 768px) and (max-width: 1023px) {
+@media (min-width: 768px) and (max-width: 1279px) {
+    .ak-depot-detail-card {
+        padding: .55rem !important;
+    }
+    .ak-depot-metrics-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+        column-gap: .3rem !important;
+        row-gap: .3rem !important;
+    }
+    .ak-depot-metrics-grid .ak-depot-metric {
+        min-height: 2.75rem !important;
+        padding: .35rem .45rem !important;
+    }
+    .ak-depot-metrics-grid .ak-depot-metric > p:first-child {
+        font-size: 7px !important;
+        line-height: 1 !important;
+    }
+    .ak-depot-metrics-grid .ak-depot-metric > p:last-child {
+        margin-top: .25rem !important;
+        font-size: .7rem !important;
+        line-height: 1 !important;
+    }
+
     .ak-container { padding-inline: 1rem !important; }
     .ak-detail-design { max-width: 100% !important; }
     .ak-detail-design .grid.xl\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ak-detail-design .overflow-x-auto { max-width: 100%; -webkit-overflow-scrolling: touch; }
     .ak-predictions-table table, .ak-stocks-table table { min-width: 900px; }
+
+    #predictions-page #predictions-table-scroll .ak-stocks-table {
+        width: 100% !important;
+        min-width: 900px !important;
+        table-layout: fixed !important;
+    }
+    #predictions-page #predictions-table-scroll .ak-stocks-table :is(col:nth-child(1), col:nth-child(2), col:nth-child(5), col:nth-child(6), th:nth-child(1), td:nth-child(1), th:nth-child(2), td:nth-child(2), th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6)) {
+        display: none !important;
+    }
+    #predictions-page #predictions-table-scroll .ak-stocks-table col:nth-child(3) { width: 145px !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table col:nth-child(4) { width: 42px !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table col:nth-child(7) { width: 52px !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table col:nth-child(8) { width: 62px !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table col:nth-child(9) { width: 145px !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table col:nth-child(10) { width: 88px !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table col:nth-child(11) { width: 118px !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table col:nth-child(12) { width: 58px !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table col:nth-child(13) { width: 190px !important; }
+    #predictions-page #predictions-table-scroll .ak-stocks-table :is(th, td) {
+        padding-left: .4rem !important;
+        padding-right: .4rem !important;
+    }
+    #predictions-page #predictions-table-scroll .ak-tablet-name-watchlist {
+        display: inline-flex !important;
+        z-index: 2;
+    }
+    #predictions-page #predictions-table-scroll .ak-stocks-table td:nth-child(3) {
+        padding-right: 1.8rem !important;
+    }
+
+    .ak-watchlist-table {
+        min-width: 960px !important;
+        table-layout: fixed;
+    }
+    .ak-watchlist-table :is(th, td) {
+        padding: .5rem .35rem !important;
+    }
+    .ak-watchlist-table th {
+        font-size: 7px !important;
+        letter-spacing: .07em !important;
+    }
+    .ak-watchlist-table .ak-watchlist-stock {
+        width: 180px;
+    }
+    .ak-watchlist-table .ak-watchlist-stock > a {
+        gap: .45rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-stock > a > span:first-child {
+        width: 2rem !important;
+        height: 2rem !important;
+        border-radius: .55rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-stock strong {
+        font-size: .7rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-stock strong + span {
+        max-width: 125px !important;
+        font-size: .58rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-stock span.mt-1\.5 {
+        margin-top: .2rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-ai {
+        width: 310px;
+    }
+    .ak-watchlist-table .ak-watchlist-ai-metrics {
+        min-width: 0 !important;
+        gap: .22rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-ai-metrics > span {
+        min-width: 2.7rem !important;
+        padding: .35rem .25rem !important;
+        font-size: 7px !important;
+    }
+    .ak-watchlist-table .screener-metric-donut,
+    .ak-watchlist-table .screener-metric-donut-score {
+        width: 2.45rem !important;
+    }
+    .ak-watchlist-table .screener-metric-donut::after,
+    .ak-watchlist-table .screener-metric-donut-score::after {
+        inset: 2px !important;
+    }
+    .ak-watchlist-table .screener-metric-donut span,
+    .ak-watchlist-table .screener-metric-donut-score span {
+        margin-top: -.12rem !important;
+        font-size: .53rem !important;
+    }
+    .ak-watchlist-table .screener-metric-donut small,
+    .ak-watchlist-table .screener-metric-donut-score small {
+        bottom: .43rem !important;
+        font-size: .3rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-chart {
+        width: 84px;
+    }
+    .ak-watchlist-table .ak-watchlist-chart-svg {
+        width: 4.75rem !important;
+        height: 2rem !important;
+    }
+    .ak-watchlist-table td {
+        font-size: .65rem !important;
+    }
+}
+
+.ak-watchlist-entry-tablet {
+    display: none;
+}
+
+/* Compact notebook layout: keep every metric and the chart visible without
+   giving each watchlist row desktop-monitor proportions. */
+@media (min-width: 1280px) and (max-width: 1600px) {
+    .ak-watchlist-table {
+        display: block;
+        min-width: 0 !important;
+        table-layout: auto;
+    }
+    .ak-watchlist-table :is(thead, tbody) {
+        display: block;
+        width: 100%;
+    }
+    .ak-watchlist-table tr {
+        display: grid;
+        grid-template-columns: minmax(220px, 1.4fr) 115px 115px 76px minmax(390px, 2.2fr) 120px 110px 42px;
+        align-items: center;
+        width: 100%;
+    }
+    .ak-watchlist-table.has-signal-change tr {
+        grid-template-columns: minmax(205px, 1.3fr) 105px 105px 70px minmax(360px, 2fr) 100px 115px 100px 42px;
+    }
+    .ak-watchlist-table :is(th, td) {
+        display: block;
+        min-width: 0;
+        width: auto !important;
+        padding: .55rem .45rem !important;
+    }
+    .ak-watchlist-table tbody tr {
+        min-height: 6.4rem;
+        border-bottom: 1px solid rgba(251, 191, 36, .16);
+    }
+    .ak-watchlist-table tbody tr:last-child {
+        border-bottom: 0;
+    }
+    .ak-watchlist-table th {
+        font-size: 8px !important;
+        letter-spacing: .08em !important;
+    }
+    .ak-watchlist-table .ak-watchlist-stock {
+        width: auto;
+    }
+    .ak-watchlist-table .ak-watchlist-entry {
+        width: auto;
+    }
+    .ak-watchlist-table .ak-watchlist-current {
+        width: auto;
+    }
+    .ak-watchlist-table .ak-watchlist-stock > a {
+        gap: .55rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-stock > a > span:first-child {
+        height: 2.35rem !important;
+        width: 2.35rem !important;
+        border-radius: .65rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-stock strong {
+        font-size: .75rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-stock strong + span {
+        max-width: 175px !important;
+        font-size: .64rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-stock span.mt-1\.5 {
+        margin-top: .2rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-ai {
+        width: auto;
+    }
+    .ak-watchlist-table .ak-watchlist-ai-metrics {
+        min-width: 0 !important;
+        gap: .35rem !important;
+        justify-content: center !important;
+        transform: none;
+    }
+    .ak-watchlist-table .ak-watchlist-profit {
+        width: auto;
+        transform: none;
+    }
+    .ak-watchlist-table .ak-watchlist-ai-metrics > span {
+        min-width: 3.3rem !important;
+        padding: .4rem .35rem !important;
+        font-size: 8px !important;
+    }
+    .ak-watchlist-table .screener-metric-donut,
+    .ak-watchlist-table .screener-metric-donut-score {
+        width: 3.45rem !important;
+    }
+    .ak-watchlist-table .screener-metric-donut::after,
+    .ak-watchlist-table .screener-metric-donut-score::after {
+        inset: 3px !important;
+    }
+    .ak-watchlist-table .screener-metric-donut span,
+    .ak-watchlist-table .screener-metric-donut-score span {
+        font-size: .68rem !important;
+    }
+    .ak-watchlist-table .screener-metric-donut small,
+    .ak-watchlist-table .screener-metric-donut-score small {
+        bottom: .55rem !important;
+        font-size: .4rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-chart {
+        width: auto;
+    }
+    .ak-watchlist-table .ak-watchlist-chart-svg {
+        height: 2.15rem !important;
+        width: 5.75rem !important;
+    }
+    .ak-watchlist-table td {
+        font-size: .7rem !important;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) and (orientation: landscape) {
+    .ak-watchlist-table {
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+    .ak-watchlist-table .ak-watchlist-current {
+        display: none !important;
+    }
+    .ak-watchlist-table .ak-watchlist-entry-desktop {
+        display: none !important;
+    }
+    .ak-watchlist-table .ak-watchlist-entry-tablet {
+        display: grid !important;
+        gap: .08rem;
+    }
+    .ak-watchlist-table th.ak-watchlist-entry .ak-watchlist-entry-tablet {
+        display: inline !important;
+    }
+    .ak-watchlist-table td.ak-watchlist-entry {
+        width: 94px !important;
+        text-align: left !important;
+    }
+    .ak-watchlist-table td.ak-watchlist-entry small {
+        color: var(--ak-muted);
+        font-size: 6px;
+        font-weight: 800;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+    .ak-watchlist-table td.ak-watchlist-entry b {
+        font-size: .57rem;
+        line-height: 1.15;
+        white-space: nowrap;
+    }
+    .ak-watchlist-table .ak-watchlist-stock {
+        width: 160px !important;
+    }
+    .ak-watchlist-table .ak-watchlist-ai {
+        width: 288px !important;
+    }
+    .ak-watchlist-table .ak-watchlist-ai-metrics > span {
+        min-width: 2.35rem !important;
+    }
+    .ak-watchlist-table .screener-metric-donut,
+    .ak-watchlist-table .screener-metric-donut-score {
+        width: 2.25rem !important;
+    }
+    .ak-watchlist-table :is(th, td) {
+        padding-inline: .25rem !important;
+    }
+    .ak-watchlist-table .ak-watchlist-chart {
+        width: 72px !important;
+    }
+    .ak-watchlist-table .ak-watchlist-chart-svg {
+        width: 4rem !important;
+    }
+}
+
+@media (max-width: 767px) {
+    .ak-depot-detail-card {
+        padding: .45rem !important;
+    }
+    .ak-depot-metrics-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        column-gap: .25rem !important;
+        row-gap: .25rem !important;
+    }
+    .ak-depot-metrics-grid .ak-depot-metric {
+        min-height: 2.65rem !important;
+        padding: .3rem .4rem !important;
+    }
+    .ak-depot-metrics-grid .ak-depot-metric > p:first-child {
+        font-size: 6px !important;
+        line-height: 1 !important;
+    }
+    .ak-depot-metrics-grid .ak-depot-metric > p:last-child {
+        margin-top: .2rem !important;
+        font-size: .64rem !important;
+        line-height: 1 !important;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) and (orientation: portrait) {
+    .ak-depot-metrics-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
 }
 .company-description-card:not([open]) .company-description {
     display: none;
@@ -3841,6 +4206,34 @@ body:not(.welcome-background) :is(
 .simple-assessment-card[open] .simple-assessment-preview { display: none; }
 .simple-assessment-card > summary::-webkit-details-marker { display: none; }
 
+/* Screener: the chart is the single emphasized surface; supporting cards stay transparent. */
+:root:not([data-theme="light"]) .screener-stock-card .screener-chart-panel {
+    background: linear-gradient(145deg, rgba(34, 211, 238, .075), rgba(7, 24, 41, .52) 58%, rgba(8, 30, 48, .42)) !important;
+    border-color: transparent !important;
+    box-shadow: inset 3px 0 0 rgba(34, 211, 238, .56), 0 0 28px rgba(34, 211, 238, .15), 0 12px 30px rgba(2, 8, 23, .22) !important;
+}
+
+:root:not([data-theme="light"]) .screener-stock-card .screener-transparent-panel {
+    background: transparent !important;
+    background-image: none !important;
+    border-color: rgba(148, 163, 184, .18) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+:root[data-theme="light"] .screener-stock-card .screener-chart-panel {
+    background: rgba(255, 255, 255, .96) !important;
+    border-color: transparent !important;
+    box-shadow: inset 3px 0 0 rgba(6, 182, 212, .62), 0 10px 28px rgba(35, 72, 67, .12) !important;
+}
+
+:root[data-theme="light"] .screener-stock-card .screener-transparent-panel {
+    background: transparent !important;
+    background-image: none !important;
+    border-color: rgba(6, 182, 212, .20) !important;
+    box-shadow: none !important;
+}
+
 @media (min-width: 1280px) {
     .screener-stock-card {
         height: 25rem;
@@ -3873,16 +4266,402 @@ body:not(.welcome-background) :is(
 
 /* Tablet: Kerndaten und KI-Auswertung nebeneinander, Bewertung in voller Breite. */
 @media (min-width: 768px) and (max-width: 1279px) {
+    .screener-top-stocks-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .screener-top-stocks-grid > a {
+        min-width: 0;
+    }
+
+    .screener-ranking-donuts {
+        top: .5rem;
+        left: .5rem;
+        right: .5rem;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: .1rem;
+    }
+
+    .screener-metric-donut,
+    .screener-metric-donut-score {
+        width: min(100%, 3.65rem);
+    }
+
+    .screener-metric-donut::after,
+    .screener-metric-donut-score::after {
+        inset: 3px;
+    }
+
+    .screener-metric-donut span,
+    .screener-metric-donut-score span {
+        margin-top: -.18rem;
+        font-size: .72rem;
+    }
+
+    .screener-metric-donut small,
+    .screener-metric-donut-score small {
+        bottom: .72rem;
+        font-size: .42rem;
+    }
+
+    .screener-donut-spacer {
+        height: 3.65rem;
+    }
+
     .screener-stock-card > .grid {
         align-items: stretch;
     }
 
-    .screener-stock-card > .grid > div:nth-child(3) {
-        min-height: 13rem;
-    }
+}
 
-    .screener-stock-card > .grid > div:nth-child(3) > details:not([open]) {
-        min-height: 13rem;
-        max-height: 13rem;
-    }
+/* Dashboard light mode: high-contrast petrol analyst workspace. */
+:root[data-theme="light"] #personal-dashboard {
+    background-color: #f4f7fb !important;
+    background-image:
+        linear-gradient(rgba(8, 127, 140, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(8, 127, 140, .025) 1px, transparent 1px),
+        radial-gradient(circle at 88% 4%, rgba(8, 127, 140, .10), transparent 27%) !important;
+}
+
+:root[data-theme="light"] #personal-dashboard > .ak-container > header {
+    border-bottom-color: rgba(8, 127, 140, .18);
+}
+
+:root[data-theme="light"] #personal-dashboard > .ak-container > header h1,
+:root[data-theme="light"] #personal-dashboard .ak-dashboard-card :is(h2, h3, b),
+:root[data-theme="light"] #personal-dashboard .text-\[var\(--ak-text\)\] {
+    color: #0f172a !important;
+}
+
+:root[data-theme="light"] #personal-dashboard .ak-dashboard-card {
+    border-color: #cbd5e1 !important;
+    background: #ffffff !important;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, .08), inset 3px 0 0 #00656f !important;
+}
+
+:root[data-theme="light"] #personal-dashboard [class*="text-orange-"],
+:root[data-theme="light"] #personal-dashboard .text-violet-200,
+:root[data-theme="light"] #personal-dashboard .text-violet-300,
+:root[data-theme="light"] #personal-dashboard .text-violet-400 {
+    color: #00656f !important;
+}
+
+:root[data-theme="light"] #personal-dashboard [class*="bg-orange-"] {
+    background-color: rgba(8, 127, 140, .10) !important;
+}
+
+:root[data-theme="light"] #personal-dashboard [class*="border-orange-"] {
+    border-color: rgba(8, 127, 140, .28) !important;
+}
+
+:root[data-theme="light"] #personal-dashboard :is(.text-slate-200, .text-slate-300, .text-slate-400) {
+    color: #475569 !important;
+}
+
+:root[data-theme="light"] #personal-dashboard :is(.text-slate-500, .text-slate-600),
+:root[data-theme="light"] #personal-dashboard .text-\[var\(--ak-muted\)\] {
+    color: #526076 !important;
+}
+
+/* Light mode brand consistency: petrol replaces legacy cyan/teal/violet accents
+   across all authenticated application pages. Signal colors stay semantic. */
+:root[data-theme="light"] body:not(.welcome-background) {
+    --ak-accent: #00656f;
+    --ak-accent-soft: rgba(0, 101, 111, .12);
+    --ak-violet: #00656f;
+    --ak-violet-soft: #004f57;
+    --ak-cyan: #00656f;
+    --ak-border-strong: rgba(0, 101, 111, .46);
+    --ak-workspace-accent: #00656f;
+    --ak-workspace-accent-bright: #007c87;
+    --ak-workspace-accent-soft: rgba(0, 101, 111, .12);
+    --ak-workspace-accent-border: rgba(0, 101, 111, .28);
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    [class*="text-cyan-"],
+    [class*="text-teal-"],
+    [class*="text-violet-"],
+    [class*="text-purple-"],
+    [class*="text-fuchsia-"],
+    [class*="text-indigo-"],
+    [class*="text-orange-"]
+) {
+    color: #00656f !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    [class*="bg-cyan-"],
+    [class*="bg-teal-"],
+    [class*="bg-violet-"],
+    [class*="bg-purple-"],
+    [class*="bg-fuchsia-"],
+    [class*="bg-indigo-"],
+    [class*="bg-orange-"]
+) {
+    background-color: rgba(0, 101, 111, .12) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    [class~="bg-cyan-500"], [class~="bg-cyan-600"],
+    [class~="bg-teal-500"], [class~="bg-teal-600"],
+    [class~="bg-violet-500"], [class~="bg-violet-600"],
+    [class~="bg-indigo-500"], [class~="bg-indigo-600"],
+    [class~="bg-orange-400"], [class~="bg-orange-500"], [class~="bg-orange-600"]
+) {
+    background-color: #00656f !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    [class*="border-cyan-"],
+    [class*="border-teal-"],
+    [class*="border-violet-"],
+    [class*="border-purple-"],
+    [class*="border-fuchsia-"],
+    [class*="border-indigo-"],
+    [class*="border-orange-"]
+) {
+    border-color: rgba(0, 101, 111, .30) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    [class*="ring-cyan-"],
+    [class*="ring-teal-"],
+    [class*="ring-violet-"],
+    [class*="ring-purple-"],
+    [class*="ring-indigo-"]
+) {
+    --tw-ring-color: rgba(0, 101, 111, .30) !important;
+}
+
+/* Public pages define some light-mode accents in their own inline styles. */
+:root[data-theme="light"] body:is(.contact-bg, .features-bg, .pricing-bg, .status-bg, .roadmap-bg) {
+    background-color: #f2f8f8 !important;
+    background-image:
+        radial-gradient(circle at 78% 12%, rgba(0, 101, 111, .14), transparent 29%),
+        radial-gradient(circle at 14% 84%, rgba(0, 124, 135, .09), transparent 27%),
+        linear-gradient(rgba(0, 101, 111, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 101, 111, .035) 1px, transparent 1px) !important;
+}
+
+:root[data-theme="light"] :is(.contact-topbar, .features-topbar, .pricing-topbar, .status-topbar, .roadmap-topbar) {
+    border-color: rgba(0, 101, 111, .20) !important;
+}
+
+/* Market overview cards still carry legacy hard-coded cyan decoration. */
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    .ak-dashboard-market-card,
+    .ak-dashboard-atlas,
+    .ak-signal-overview-card,
+    .ak-transition-matrix-card
+) {
+    border-color: rgba(0, 101, 111, .34) !important;
+    box-shadow:
+        0 12px 30px rgba(15, 23, 42, .09),
+        inset 3px 0 0 #00656f !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-dashboard-market-card::before {
+    background: linear-gradient(90deg, #004f57, #00656f 58%, rgba(0, 124, 135, .38)) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    .ak-dashboard-market-card,
+    .ak-dashboard-atlas,
+    .ak-signal-overview-card,
+    .ak-transition-matrix-card
+):hover {
+    border-color: rgba(0, 101, 111, .52) !important;
+    box-shadow:
+        0 16px 34px rgba(0, 79, 87, .13),
+        inset 3px 0 0 #004f57 !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-standard-card-head {
+    border-color: rgba(0, 101, 111, .20) !important;
+    background:
+        radial-gradient(circle at 4% 0, rgba(0, 101, 111, .13), transparent 44%),
+        linear-gradient(108deg, rgba(0, 101, 111, .08), transparent 76%) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-market-assessment {
+    border-color: rgba(0, 101, 111, .30) !important;
+    background: linear-gradient(135deg, rgba(0, 101, 111, .12), rgba(242, 248, 248, .94)) !important;
+    color: #00656f !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    .ak-market-assessment-title,
+    .ak-market-assessment-status,
+    .ak-transition-icon
+) {
+    color: #00656f !important;
+    border-color: rgba(0, 101, 111, .28) !important;
+}
+
+/* Darker donut palette throughout the light-mode application. */
+:root[data-theme="light"] body:not(.welcome-background) .screener-metric-donut {
+    background: conic-gradient(
+        color-mix(in srgb, var(--donut-color) 70%, #00383e 30%) var(--donut-value),
+        rgba(100, 116, 139, .18) 0
+    ) !important;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--donut-color) 10%, transparent) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .screener-metric-donut span {
+    color: color-mix(in srgb, var(--donut-color) 68%, #00383e 32%) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-prediction-donut {
+    background: conic-gradient(
+        color-mix(in srgb, var(--color) 70%, #00383e 30%) 0 var(--value),
+        rgba(100, 116, 139, .18) var(--value) 100%
+    ) !important;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--color) 10%, transparent) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-market-score-donut {
+    background: conic-gradient(
+        color-mix(in srgb, var(--ak-score-color) 70%, #00383e 30%) var(--ak-score-angle),
+        rgba(100, 116, 139, .18) 0
+    ) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-screener-donut {
+    background: conic-gradient(
+        color-mix(in srgb, var(--color) 70%, #00383e 30%) var(--value),
+        rgba(100, 116, 139, .18) 0
+    ) !important;
+}
+
+/* Complete petrol treatment for light-mode cards and decorative transitions. */
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    .ak-card,
+    .ak-card-soft,
+    .ak-panel,
+    .ak-signal-card,
+    .ak-dashboard-card,
+    .ak-standard-card,
+    .ak-table-wrap
+) {
+    border-color: rgba(0, 101, 111, .26) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    .ak-card,
+    .ak-card-soft,
+    .ak-panel,
+    .ak-signal-card,
+    .ak-dashboard-card,
+    .ak-standard-card
+):hover {
+    border-color: rgba(0, 101, 111, .48) !important;
+    box-shadow:
+        0 16px 36px rgba(0, 79, 87, .12),
+        inset 3px 0 0 #00656f !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    .ak-standard-card-head,
+    .ak-market-card-head,
+    .ak-analysis-card-head,
+    .stock-detail-card-head
+) {
+    border-bottom-color: rgba(0, 101, 111, .24) !important;
+    background:
+        radial-gradient(circle at 5% 0, rgba(0, 101, 111, .15), transparent 42%),
+        linear-gradient(108deg, rgba(0, 101, 111, .11), rgba(0, 124, 135, .055) 55%, transparent 78%) !important;
+    box-shadow: 0 6px 16px rgba(0, 79, 87, .07) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    .ak-card,
+    .ak-panel,
+    .ak-dashboard-card,
+    .ak-standard-card,
+    .stock-detail-panel
+)::before {
+    background-color: #00656f;
+    border-color: rgba(0, 101, 111, .30);
+}
+
+:root[data-theme="light"] body:not(.welcome-background) [class*="from-cyan-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="from-teal-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="from-violet-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="from-indigo-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="from-orange-"] {
+    --tw-gradient-from: #00656f var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgba(0, 101, 111, 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) [class*="via-cyan-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="via-teal-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="via-violet-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="via-indigo-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="via-orange-"] {
+    --tw-gradient-via: #007c87 var(--tw-gradient-via-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) [class*="to-cyan-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="to-teal-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="to-violet-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="to-indigo-"],
+:root[data-theme="light"] body:not(.welcome-background) [class*="to-orange-"] {
+    --tw-gradient-to: #00919c var(--tw-gradient-to-position) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) :is(
+    [class*="shadow-cyan-"],
+    [class*="shadow-teal-"],
+    [class*="shadow-violet-"],
+    [class*="shadow-indigo-"],
+    [class*="shadow-orange-"]
+) {
+    --tw-shadow-color: rgba(0, 79, 87, .18) !important;
+}
+
+/* Consistent tariff badges across every authenticated and public page. */
+.ak-plan-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: .4rem;
+    padding: .18rem .42rem;
+    font-size: .46rem;
+    line-height: 1;
+    font-weight: 950;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.ak-plan-badge--plus {
+    border-color: rgba(226, 232, 240, .48) !important;
+    background: linear-gradient(145deg, rgba(241, 245, 249, .22), rgba(148, 163, 184, .12)) !important;
+    color: #e2e8f0 !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 12px rgba(203, 213, 225, .08);
+}
+
+.ak-plan-badge--pro {
+    border-color: rgba(251, 191, 36, .52) !important;
+    background: linear-gradient(145deg, rgba(251, 191, 36, .24), rgba(180, 83, 9, .12)) !important;
+    color: #fde68a !important;
+    box-shadow: inset 0 1px 0 rgba(254, 243, 199, .18), 0 0 14px rgba(245, 158, 11, .10);
+}
+
+:root[data-theme="light"] .ak-plan-badge--plus {
+    border-color: rgba(71, 85, 105, .38) !important;
+    background: linear-gradient(145deg, #f8fafc, #dbe2ea) !important;
+    color: #334155 !important;
+}
+
+:root[data-theme="light"] .ak-plan-badge--pro {
+    border-color: rgba(180, 83, 9, .42) !important;
+    background: linear-gradient(145deg, #fef3c7, #f6d365) !important;
+    color: #78350f !important;
 }

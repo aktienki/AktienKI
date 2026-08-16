@@ -41,16 +41,16 @@
     <main class="flex min-h-[calc(100svh-73px)] items-center justify-center px-5 py-6 lg:h-[calc(100svh-73px)] lg:min-h-0 lg:overflow-hidden lg:py-4">
         @php
             $riskFields = ['risk_level'];
-            $initialStep = $errors->hasAny(array_merge($riskFields, ['accept_disclaimer', 'accept_risk_notice'])) ? 2 : 1;
+            $initialStep = $errors->hasAny(array_merge($riskFields, ['accept_disclaimer'])) ? 2 : 1;
         @endphp
-        <section class="auth-shell grid w-full max-w-6xl overflow-hidden rounded-2xl border lg:grid-cols-[1.05fr_.95fr]" x-data="{ step: {{ $initialStep }}, riskLevel: @js(old('risk_level', 'normal')), disclaimerAccepted: @js((bool) old('accept_disclaimer')), riskNoticeAccepted: @js((bool) old('accept_risk_notice')) }">
+        <section class="auth-shell grid w-full max-w-6xl overflow-hidden rounded-2xl border lg:grid-cols-[1.05fr_.95fr]" x-data="{ step: {{ $initialStep }}, riskLevel: @js(old('risk_level', 'normal')), disclaimerAccepted: @js((bool) old('accept_disclaimer')) }">
             <div class="p-6 sm:p-8 lg:p-8">
                 <h1 class="text-2xl font-bold tracking-tight">{{ __('Konto erstellen') }}</h1>
                 <p class="mt-1 text-sm text-slate-400">{{ __('Starte mit KI-gestützten Aktienanalysen.') }}</p>
                 @if (config('aktienki.beta.enabled', true))
                     <div class="mt-4 flex items-start gap-3 rounded-xl border border-amber-300/35 bg-amber-300/[.09] px-3 py-2.5 text-amber-100">
                         <span class="mt-0.5 shrink-0 rounded-md border border-amber-300/50 bg-amber-300/20 px-2 py-1 text-[9px] font-black uppercase tracking-[.16em] text-amber-200">{{ __('Beta') }}</span>
-                        <p class="text-[11px] leading-4"><strong class="font-bold text-amber-200">{{ __('Beta-Zugang mit E-Mail-Bestätigung') }}</strong><br>{{ __('Nach der Registrierung erhältst du einen persönlichen Freischaltcode per E-Mail.') }}
+                        <p class="text-[11px] leading-4"><strong class="font-bold text-amber-200">{{ __('Beta-Zugang mit E-Mail-Bestätigung') }}</strong><br>{{ __('Nach der Registrierung erhältst du einen persönlichen Freischaltcode per E-Mail.') }}<br><span class="mt-1 inline-block">{{ __('Als Betatester erwarten wir deine aktive Mitarbeit und eine abschließende Bewertung. Als Dankeschön erhältst du 1 Jahr Pro kostenlos.') }}</span>
                             <a class="ml-1 font-bold text-amber-200 underline underline-offset-2 hover:text-white" href="mailto:{{ config('aktienki.beta.contact_email') }}?subject={{ rawurlencode(__('Frage zur AktienKI-Beta')) }}">{{ __('Frage zum Zugang?') }}</a>
                         </p>
                     </div>
@@ -67,7 +67,16 @@
 
                 <form id="registration-form" method="POST" action="{{ route('register') }}" class="mt-5">
                     @csrf
-                    <input type="hidden" name="invite" value="{{ old('invite', $invite ?? request('invite')) }}">
+                    @if ($betaCodeRequired ?? false)
+                        <div class="mb-4 rounded-xl border border-amber-300/30 bg-amber-300/[.07] p-3">
+                            <label for="invite" class="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-amber-300">{{ __('Beta-Einladungscode') }}</label>
+                            <input id="invite" name="invite" type="text" value="{{ old('invite', $invite ?? request('invite')) }}" required autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="AKI-XXXX-XXXX" class="h-11 w-full rounded-lg border border-amber-300/25 bg-[#0b1830]/75 px-4 font-mono uppercase tracking-[.12em] text-white outline-none transition focus:border-amber-300/65 focus:ring-4 focus:ring-amber-300/10">
+                            <p class="mt-2 text-[10px] leading-4 text-amber-100/75">{{ __('Während der geschlossenen Beta ist eine Registrierung nur mit einem persönlichen Einladungscode möglich.') }}</p>
+                            @error('invite')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
+                        </div>
+                    @else
+                        <input type="hidden" name="invite" value="{{ old('invite', $invite ?? request('invite')) }}">
+                    @endif
                     <input type="hidden" name="risk_level" x-model="riskLevel">
                     <div class="mb-4 grid grid-cols-2 gap-2" aria-label="{{ __('Registrierungsfortschritt') }}">
                         @foreach ([1 => __('Konto'), 2 => __('Risikoprofil & Bestätigung')] as $number => $label)
@@ -83,7 +92,18 @@
                         <div class="sm:col-span-2"><label for="email" class="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-orange-400">{{ __('E-Mail-Adresse') }}</label><input id="email" name="email" type="email" value="{{ old('email') }}" autocomplete="username" required class="h-11 w-full rounded-lg border border-orange-400/15 bg-[#0b1830]/75 px-4 text-white outline-none transition focus:border-orange-400/55 focus:ring-4 focus:ring-orange-400/10">@error('email')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror</div>
                         <div><label for="password" class="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-orange-400">{{ __('Passwort') }}</label><input id="password" name="password" type="password" autocomplete="new-password" required class="h-11 w-full rounded-lg border border-orange-400/15 bg-[#0b1830]/75 px-4 text-white outline-none transition focus:border-orange-400/55 focus:ring-4 focus:ring-orange-400/10">@error('password')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror</div>
                         <div><label for="password_confirmation" class="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-orange-400">{{ __('Wiederholen') }}</label><input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required class="h-11 w-full rounded-lg border border-orange-400/15 bg-[#0b1830]/75 px-4 text-white outline-none transition focus:border-orange-400/55 focus:ring-4 focus:ring-orange-400/10"></div>
-                        <div class="sm:col-span-2"><button type="button" @click="if ([...$el.closest('[data-step]').querySelectorAll('input')].every(field => field.reportValidity())) step = 2" class="h-11 w-full rounded-lg border border-orange-400/35 bg-orange-400/20 font-bold text-orange-400 transition hover:bg-orange-400/30">{{ __('Weiter zum Risikoprofil') }}</button></div>
+                        <div class="sm:col-span-2 rounded-xl border border-cyan-300/25 bg-cyan-300/[.06] p-3">
+                            <label for="country_code" class="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-cyan-300">{{ __('Dein Land') }}</label>
+                            <select id="country_code" name="country_code" required class="h-11 w-full rounded-lg border border-cyan-300/20 bg-[#0b1830] px-4 text-white outline-none transition focus:border-cyan-300/60 focus:ring-4 focus:ring-cyan-300/10">
+                                <option value="" disabled @selected(old('country_code') === null)>{{ __('Land auswählen') }}</option>
+                                @foreach(['DE'=>'Deutschland','AT'=>'Österreich','BE'=>'Belgien','BG'=>'Bulgarien','HR'=>'Kroatien','CY'=>'Zypern','CZ'=>'Tschechien','DK'=>'Dänemark','EE'=>'Estland','FI'=>'Finnland','FR'=>'Frankreich','GR'=>'Griechenland','HU'=>'Ungarn','IE'=>'Irland','IT'=>'Italien','LV'=>'Lettland','LT'=>'Litauen','LU'=>'Luxemburg','MT'=>'Malta','NL'=>'Niederlande','PL'=>'Polen','PT'=>'Portugal','RO'=>'Rumänien','SK'=>'Slowakei','SI'=>'Slowenien','ES'=>'Spanien','SE'=>'Schweden','US'=>'Vereinigte Staaten','CA'=>'Kanada','CH'=>'Schweiz','GB'=>'Vereinigtes Königreich','AU'=>'Australien','CN'=>'China','HK'=>'Hongkong','JP'=>'Japan'] as $code => $countryName)
+                                    <option value="{{ $code }}" @selected(old('country_code') === $code)>{{ __($countryName) }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-2 text-[10px] font-semibold leading-4 text-cyan-100"><strong class="text-cyan-300">{{ __('Diese Auswahl ist wichtig:') }}</strong> {{ __('Im Free-Tarif richtet sich danach, welche 100 wichtigen Aktien aus deinem Land und deiner Region dir angezeigt werden.') }}</p>
+                            @error('country_code')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="sm:col-span-2"><button type="button" @click="if ([...$el.closest('[data-step]').querySelectorAll('input, select')].every(field => field.reportValidity())) step = 2" class="h-11 w-full rounded-lg border border-orange-400/35 bg-orange-400/20 font-bold text-orange-400 transition hover:bg-orange-400/30">{{ __('Weiter zum Risikoprofil') }}</button></div>
                     </div>
 
                     <div x-cloak x-show="step === 2" data-step="2">
@@ -102,7 +122,7 @@
                             @error('risk_level')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
                         </fieldset>
                         <p class="mt-2 text-[9px] leading-4 text-amber-200/80">{{ __('Drawdown bezeichnet den zwischenzeitlichen Rückgang von einem Höchststand. Die Werte dienen nur der Einordnung: Tatsächliche Verluste können höher sein und bis zum vollständigen Kapitalverlust reichen.') }}</p>
-                    <div class="mt-3 grid grid-cols-[.7fr_1.3fr] gap-3"><button type="button" @click="step = 1" class="h-11 rounded-lg border border-orange-400/15 font-bold text-slate-300 hover:bg-orange-400/[.06]">{{ __('Zurück') }}</button><button type="submit" :disabled="!disclaimerAccepted || !riskNoticeAccepted" :aria-disabled="(!disclaimerAccepted || !riskNoticeAccepted).toString()" class="h-11 rounded-lg border border-orange-400/35 bg-orange-400/20 font-bold text-orange-400 shadow-lg shadow-orange-400/20 transition hover:bg-orange-400/30 disabled:cursor-not-allowed disabled:opacity-40">{{ __('Jetzt registrieren') }}</button></div>
+                    <div class="mt-3 grid grid-cols-[.7fr_1.3fr] gap-3"><button type="button" @click="step = 1" class="h-11 rounded-lg border border-orange-400/15 font-bold text-slate-300 hover:bg-orange-400/[.06]">{{ __('Zurück') }}</button><button type="submit" :disabled="!disclaimerAccepted" :aria-disabled="(!disclaimerAccepted).toString()" class="h-11 rounded-lg border border-orange-400/35 bg-orange-400/20 font-bold text-orange-400 shadow-lg shadow-orange-400/20 transition hover:bg-orange-400/30 disabled:cursor-not-allowed disabled:opacity-40">{{ __('Jetzt registrieren') }}</button></div>
                     </div>
                 </form>
                 <p class="mt-3 text-center text-xs text-slate-500">{{ __('Bereits registriert?') }} <a href="{{ route('login') }}" class="font-bold text-orange-400 hover:text-white">{{ __('Jetzt anmelden') }}</a></p>
@@ -125,19 +145,27 @@
                 </div>
                 <div class="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/[.06] p-3"><p class="text-xs font-bold text-amber-200">{{ __('Risikohinweis') }}</p><p class="mt-1 text-[11px] leading-4 text-slate-400">{{ __('Historische Ergebnisse sind kein verlässlicher Indikator für zukünftige Entwicklungen. Prüfe Informationen selbstständig und ziehe bei Bedarf qualifizierte Beratung hinzu.') }}</p></div>
                 <div x-cloak x-show="step === 2">
+                <div class="mt-3 rounded-xl border border-cyan-300/15 bg-cyan-300/[.04] p-3">
+                    <p class="text-[10px] font-black uppercase tracking-[.14em] text-cyan-200">{{ __('Vertrags- und Rechtsdokumente') }}</p>
+                    <p class="mt-1 text-[10px] leading-4 text-slate-400">{{ __('Alle Dokumente sind vor der Registrierung einzeln abrufbar und öffnen sich in einem neuen Tab.') }}</p>
+                    <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-bold">
+                        <a class="text-cyan-300 underline" target="_blank" rel="noopener" href="{{ route('legal.show','agb') }}">{{ __('AGB') }}</a>
+                        <a class="text-cyan-300 underline" target="_blank" rel="noopener" href="{{ route('legal.show','datenschutz') }}">{{ __('Datenschutz') }}</a>
+                        <a class="text-cyan-300 underline" target="_blank" rel="noopener" href="{{ route('legal.show','risikohinweise') }}">{{ __('Risikohinweise') }}</a>
+                        <a class="text-cyan-300 underline" target="_blank" rel="noopener" href="{{ route('legal.show','widerruf') }}">{{ __('Widerrufsbelehrung') }}</a>
+                        <a class="text-cyan-300 underline" target="_blank" rel="noopener" href="{{ route('legal.show','ki-transparenz') }}">{{ __('KI- und Datentransparenz') }}</a>
+                        <a class="text-cyan-300 underline" target="_blank" rel="noopener" href="{{ route('legal.show','impressum') }}">{{ __('Impressum') }}</a>
+                    </div>
+                </div>
                 <label class="mt-3 flex cursor-pointer items-start gap-3 rounded-lg border border-orange-400/12 bg-[#0b1830]/45 p-2 text-[10px] leading-4 text-slate-300 transition has-[:checked]:border-orange-400/55 has-[:checked]:bg-orange-400/[.09] has-[:checked]:ring-1 has-[:checked]:ring-orange-400/15">
                     <input form="registration-form" type="checkbox" name="accept_disclaimer" value="1" required x-model="disclaimerAccepted" class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-600 bg-[#0b1830] text-orange-4000 focus:ring-0 focus:ring-offset-0">
-                    <span>{{ __('Ich bestätige, dass AktienKI ausschließlich Analyse- und Informationswerkzeuge bereitstellt, keine Anlageberatung erbringt und keine zukünftigen Ergebnisse garantiert. Anlageentscheidungen treffe ich eigenverantwortlich und unter Berücksichtigung möglicher Kapitalverluste. Ich akzeptiere außerdem die geltenden Nutzungs- und Datenschutzbestimmungen.') }}</span>
+                    <span>{{ __('Ich habe alle oben verlinkten Vertrags- und Rechtsdokumente einschließlich der Risikohinweise vollständig gelesen und verstanden. Ich akzeptiere die AGB, bestätige die Kenntnisnahme der Datenschutzerklärung, der Widerrufsbelehrung sowie der KI- und Datentransparenzhinweise. Mir ist bekannt, dass AktienKI keine Anlageberatung erbringt, keine zukünftigen Ergebnisse garantiert und Kapitalverluste bis hin zum vollständigen Verlust möglich sind. Anlageentscheidungen treffe ich eigenverantwortlich.') }}</span>
                 </label>
                 @error('accept_disclaimer')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
-                <label class="mt-2 flex cursor-pointer items-start gap-3 rounded-lg border border-orange-400/12 bg-[#0b1830]/45 p-2 text-[10px] leading-4 text-slate-300 transition has-[:checked]:border-orange-400/55 has-[:checked]:bg-orange-400/[.09] has-[:checked]:ring-1 has-[:checked]:ring-orange-400/15">
-                    <input form="registration-form" type="checkbox" name="accept_risk_notice" value="1" required x-model="riskNoticeAccepted" class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-600 bg-[#0b1830] text-orange-4000 focus:ring-0 focus:ring-offset-0">
-                    <span>{{ __('Ich habe den Risikohinweis gelesen und bestätige, dass Kapitalanlagen mit Verlusten bis hin zum vollständigen Verlust des eingesetzten Kapitals verbunden sein können.') }}</span>
-                </label>
-                @error('accept_risk_notice')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
                 </div>
             </aside>
         </section>
     </main>
+<x-cookie-consent />
 </body>
 </html>

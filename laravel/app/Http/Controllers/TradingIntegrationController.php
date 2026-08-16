@@ -29,6 +29,8 @@ final class TradingIntegrationController extends Controller
 
     public function accounts(Request $request): View
     {
+        abort_unless((bool) $request->user()?->is_admin, 403);
+
         $accounts = BrokerConnection::query()
             ->where('user_id', $request->user()->id)
             ->where('provider', 'pepperstone_ctrader')
@@ -47,6 +49,8 @@ final class TradingIntegrationController extends Controller
 
     public function accountPositions(Request $request, BrokerConnection $connection, CTraderFixBroker $fix, CTraderBroker $ctrader): JsonResponse
     {
+        abort_unless((bool) $request->user()?->is_admin, 403);
+
         $this->owned($request, $connection);
         abort_unless($connection->provider === 'pepperstone_ctrader', 404);
         abort_unless(data_get($connection->credentials, 'connection_type', 'openapi') === 'fix', 422, 'Live-Positionen sind für dieses Konto noch nicht eingerichtet.');

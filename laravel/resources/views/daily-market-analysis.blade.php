@@ -15,7 +15,7 @@
     @endphp
 
     <div class="ak-body ak-detail-design min-h-[calc(100vh-73px)] pb-8">
-        <div class="ak-container pt-4">
+        <div class="ak-container pt-2">
             <div class="ak-detail-hero sticky top-[77px] z-30 flex flex-wrap items-center justify-between gap-4 rounded-[1.5rem] border border-[var(--ak-border)] px-5 py-4 backdrop-blur-xl">
                 <div class="flex items-center gap-3">
                     <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-teal-400/30 bg-teal-400/10 text-teal-500"><x-heroicon-o-scale class="h-6 w-6" /></span>
@@ -36,15 +36,15 @@
             </div>
         </div>
 
-        <main class="ak-container mt-5 space-y-4">
+        <main class="ak-container mt-3 space-y-4">
             @if ($analysis)
-                <section class="grid items-stretch gap-5 md:grid-cols-3">
+                <section class="grid items-stretch gap-5 xl:grid-cols-3">
                     @foreach ([
                         [__('Chancen'), $analysis->opportunities, 'opportunity', 'bg-emerald-500', 'text-emerald-500', '↗'],
                         [__('Risiken'), $analysis->risks, 'risk', 'bg-rose-500', 'text-rose-500', '!'],
                         [__('Beobachtungsliste'), $analysis->watchlist, 'watch', 'bg-amber-500', 'text-amber-500', '◉'],
                     ] as [$title, $items, $tone, $dotClass, $titleClass, $symbol])
-                        <article class="ak-analysis-panel ak-analysis-panel-{{ $tone }} ak-detail-panel ak-standard-card ak-card ak-card-static min-h-[320px] overflow-hidden p-5">
+                        <article class="ak-analysis-panel ak-analysis-panel-{{ $tone }} ak-detail-panel ak-standard-card ak-card ak-card-static overflow-hidden p-5 xl:min-h-[320px]">
                             <div class="ak-analysis-card-head ak-detail-card-head -mx-5 -mt-5 flex items-center justify-between gap-3 px-5 py-4">
                                 <div class="flex items-center gap-3">
                                     <span class="ak-analysis-icon grid h-9 w-9 place-items-center rounded-xl border text-lg font-black {{ $titleClass }}">{{ $symbol }}</span>
@@ -55,11 +55,11 @@
                                 </div>
                                 <span class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-1 text-[10px] font-black tabular-nums text-[var(--ak-muted)]">{{ collect($items)->count() }}</span>
                             </div>
-                            <ul class="mt-4 grid gap-2.5">
+                            <ul class="mt-4 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-1">
                                 @forelse ($items as $key => $item)
-                                    <li class="ak-analysis-copy flex gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3 text-xs leading-[1.45]">
+                                    <li class="ak-analysis-copy min-w-0 flex gap-3 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3 text-xs leading-[1.45]">
                                         <span class="ak-analysis-number grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[10px] font-black {{ $titleClass }}">{{ $loop->iteration }}</span>
-                                        <span class="pt-0.5">
+                                        <span class="min-w-0 break-words pt-0.5 [overflow-wrap:anywhere]">
                                             @if (!is_numeric($key))<strong class="text-[var(--ak-text)]">{{ __((string) $key) }}: </strong>@endif
                                             {{ $itemText($item) }}
                                         </span>

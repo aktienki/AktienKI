@@ -16,6 +16,9 @@ class Instrument extends Model
         'market_cap' => 'float',
         'is_active' => 'boolean',
         'is_tradeable' => 'boolean',
+        'is_german_tradeable' => 'boolean',
+        'german_listing_verified_at' => 'datetime',
+        'german_listing_checked_at' => 'datetime',
         'meta' => 'array',
     ];
 

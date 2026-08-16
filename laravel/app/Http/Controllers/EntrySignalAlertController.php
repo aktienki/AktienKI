@@ -27,4 +27,28 @@ class EntrySignalAlertController extends Controller
 
         return back()->with('status', __('Einstiegsalarm aktiviert. Du erhältst eine E-Mail, sobald der Status auf BUY wechselt.'));
     }
+
+    public function disable(Request $request, EntrySignalAlert $alert): RedirectResponse
+    {
+        abort_unless((int) $alert->user_id === (int) $request->user()->id, 404);
+        $alert->update(['status' => 'disabled']);
+
+        return back()->with('status', __('Signalalarm wurde deaktiviert.'));
+    }
+
+    public function enable(Request $request, EntrySignalAlert $alert): RedirectResponse
+    {
+        abort_unless((int) $alert->user_id === (int) $request->user()->id, 404);
+        $alert->update(['status' => 'active', 'notified_at' => null]);
+
+        return back()->with('status', __('Signalalarm wurde aktiviert.'));
+    }
+
+    public function destroy(Request $request, EntrySignalAlert $alert): RedirectResponse
+    {
+        abort_unless((int) $alert->user_id === (int) $request->user()->id, 404);
+        $alert->delete();
+
+        return back()->with('status', __('Signalalarm wurde gelöscht.'));
+    }
 }

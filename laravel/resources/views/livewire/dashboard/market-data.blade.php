@@ -131,6 +131,15 @@
                 <span class="text-[9px] font-bold uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ __('Analyse vom') }} {{ \Illuminate\Support\Carbon::parse($marketAnalysis['date'])->format('d.m.Y') }}</span>
             @endif
         </div>
+        @if($isRegionalFreeView)
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[.06] px-4 py-3">
+                <div>
+                    <p class="text-[9px] font-black uppercase tracking-[.15em] text-amber-400">{{ __('Free · Regionales Aktienuniversum') }}</p>
+                    <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Chancen und Risiken basieren auf den 100 wichtigsten Aktien deiner Region (:country).', ['country' => $regionalCountry]) }}</p>
+                </div>
+                <a href="{{ route('pricing') }}" class="inline-flex h-9 items-center rounded-lg border border-amber-400/30 bg-amber-400/[.08] px-3 text-[9px] font-black text-amber-300 transition hover:bg-amber-400/[.15]">{{ __('Internationale Auswahl ab Plus') }} →</a>
+            </div>
+        @endif
         <div class="grid gap-4">
             @foreach ([
                 [__('Chancen'), $opportunities, 'opportunity', 'text-emerald-500', '↗'],
@@ -148,11 +157,11 @@
                         </div>
                         <span class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-1 text-[10px] font-black tabular-nums text-[var(--ak-muted)]">{{ $items->count() }}</span>
                     </div>
-                    <ul class="mt-4 grid gap-2.5">
+                    <ul class="mt-4 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                         @forelse ($items as $key => $item)
-                            <li class="ak-analysis-copy flex gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3 text-xs leading-[1.45]">
+                            <li class="ak-analysis-copy min-w-0 flex gap-3 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3 text-xs leading-[1.45]">
                                 <span class="ak-analysis-number grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[10px] font-black {{ $titleClass }}">{{ $loop->iteration }}</span>
-                                <span class="pt-0.5">
+                                <span class="min-w-0 break-words pt-0.5 [overflow-wrap:anywhere]">
                                     @if (!is_numeric($key))<strong class="text-[var(--ak-text)]">{{ __((string) $key) }}: </strong>@endif
                                     {{ $analysisItemText($item) }}
                                 </span>

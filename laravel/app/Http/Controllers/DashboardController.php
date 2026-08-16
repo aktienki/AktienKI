@@ -6,12 +6,19 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use App\Enums\PlanLevel;
+use App\Services\PersonalizedSignalService;
+use App\Services\PlanAccessService;
 
 class DashboardController extends Controller
 {
     public function __invoke(Request $request): View
     {
         $user = $request->user();
+        $planAccess = app(PlanAccessService::class);
+        $canUsePlus = $planAccess->allowsTariff($user, PlanLevel::Plus);
+        $canUsePro = $planAccess->allowsTariff($user, PlanLevel::Pro);
+        $canManageMessages = $canUsePro;
         $riskProfile = (string) data_get($user->meta, 'risk_profile.level', data_get($user->risk_profile, 'level', 'normal'));
         $strategyPortfolio = $this->strategyPortfolio((int) $user->id);
         $overview = [
@@ -42,11 +49,76 @@ class DashboardController extends Controller
                 ]));
         $continentPredictions = $this->continentPredictions();
         $recentSignalOverview = $this->recentSignalOverview();
+        $latestStockPredictions = DB::table('predictions')
+            ->selectRaw('instrument_id, MAX(id) AS prediction_id')
+            ->where('prediction_time', '>=', now()->subDays(2))
+            ->groupBy('instrument_id');
+        $personalizedSignalSql = app(PersonalizedSignalService::class)->sql('prediction', $user);
+        $topStockQuery = fn () => DB::table('predictions as prediction')
+            ->joinSub($latestStockPredictions, 'latest_prediction', fn ($join) =>
+                $join->on('latest_prediction.prediction_id', '=', 'prediction.id'))
+            ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+            ->where('instrument.type', 'stock')
+            ->where('instrument.is_active', true)
+            ->whereNull('instrument.deleted_at')
+            ->orderByRaw('COALESCE(prediction.ai_score, prediction.prediction_score, 0) DESC')
+            ->orderByRaw('COALESCE(prediction.horizon_fusion_consensus_return, prediction.market_return_20d, 0) DESC');
+        $topStockToday = $topStockQuery()
+            ->whereRaw("UPPER({$personalizedSignalSql}) = ?", ['BUY'])
+            ->first(['prediction.id as prediction_id', 'prediction.ai_score', 'prediction.prediction_score', 'prediction.horizon_fusion_consensus_return', 'prediction.market_return_20d', 'instrument.symbol', 'instrument.name']);
+        $topWaitStock = $topStockQuery()
+            ->whereRaw("UPPER({$personalizedSignalSql}) = ?", ['WAIT'])
+            ->first(['prediction.id as prediction_id', 'prediction.ai_score', 'prediction.prediction_score', 'prediction.horizon_fusion_consensus_return', 'prediction.market_return_20d', 'instrument.symbol', 'instrument.name']);
+        $messageReminders = collect()
+            ->merge(
+                DB::table('prediction_purchase_reminders as reminder')
+                    ->join('instruments as instrument', 'instrument.id', '=', 'reminder.instrument_id')
+                    ->where('reminder.user_id', $user->id)
+                    ->whereIn('reminder.status', ['active', 'disabled'])
+                    ->orderBy('reminder.remind_on')
+                    ->limit(6)
+                    ->get(['reminder.id', 'reminder.intent', 'reminder.horizon_days', 'reminder.remind_on', 'reminder.status', 'instrument.symbol', 'instrument.name'])
+                    ->map(fn (object $reminder): array => [
+                        'id' => $reminder->id,
+                        'type' => 'prediction',
+                        'symbol' => $reminder->symbol,
+                        'name' => $reminder->name,
+                        'label' => $reminder->intent === 'purchased' ? __('Kaufauswertung') : __('Kauferinnerung'),
+                        'schedule' => \Illuminate\Support\Carbon::parse($reminder->remind_on)->format('d.m.Y'),
+                        'active' => $reminder->status === 'active',
+                    ])
+            )
+            ->merge(
+                DB::table('entry_signal_alerts as alert')
+                    ->join('instruments as instrument', 'instrument.id', '=', 'alert.instrument_id')
+                    ->where('alert.user_id', $user->id)
+                    ->whereIn('alert.status', ['active', 'disabled'])
+                    ->latest('alert.created_at')
+                    ->limit(6)
+                    ->get(['alert.id', 'alert.notification_mode', 'alert.status', 'instrument.symbol', 'instrument.name'])
+                    ->map(fn (object $alert): array => [
+                        'id' => $alert->id,
+                        'type' => 'signal',
+                        'symbol' => $alert->symbol,
+                        'name' => $alert->name,
+                        'label' => __('Signalalarm'),
+                        'schedule' => $alert->notification_mode === 'wait_or_buy' ? __('WAIT oder BUY') : __('Nur BUY'),
+                        'active' => $alert->status === 'active',
+                    ])
+            )
+            ->sortBy(fn (array $reminder): string => $reminder['symbol'].'-'.$reminder['label'])
+            ->values();
 
         return view('dashboard', compact(
             'riskProfile', 'strategyPortfolio', 'overview', 'marketSituation', 'continentPredictions',
             'recentSignalOverview',
             'communityOverview',
+            'messageReminders',
+            'canManageMessages',
+            'canUsePlus',
+            'canUsePro',
+            'topStockToday',
+            'topWaitStock',
         ));
     }
 

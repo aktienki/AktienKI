@@ -8,6 +8,8 @@
             'dividend_yield_min' => __('Dividendenrendite'), 'market_cap_min' => __('Marktkapitalisierung'),
             'revenue_growth_min' => __('Umsatzwachstum'), 'hit_rate_min' => __('Hitrate'),
             'sector_score_rotation' => __('Sektorrotation'), 'index_score_rotation' => __('Indexrotation'),
+            'forecast_score_rotation_5d_enabled' => __('Forecast-Score-Rotation (5T)'),
+            'strategy_priority' => __('Strategiepriorität'),
             'max_positions' => __('Maximale Positionen'),
             'position_factor' => __('Positionsanteil'),
             'exit_strategy' => __('Exitstrategie'),

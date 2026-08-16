@@ -6,6 +6,11 @@ final class RecommendationEmailChart
 {
     public function render(array $candles, ?float $targetPrice): string
     {
+        return $this->renderForecasts($candles, $targetPrice === null ? [] : [20 => $targetPrice]);
+    }
+
+    public function renderForecasts(array $candles, array $forecasts): string
+    {
         $width = 720;
         $height = 300;
         $chart = imagecreatetruecolor($width, $height);
@@ -27,7 +32,8 @@ final class RecommendationEmailChart
         }
 
         $prices = $bars->flatMap(fn ($bar) => array_map('floatval', $bar['y']))->all();
-        if ($targetPrice !== null) $prices[] = $targetPrice;
+        $forecasts = collect($forecasts)->filter(fn ($price, $days) => is_numeric($days) && is_numeric($price))->mapWithKeys(fn ($price, $days) => [(int) $days => (float) $price])->sortKeys();
+        foreach ($forecasts as $price) $prices[] = $price;
         $min = min($prices);
         $max = max($prices);
         $padding = max(($max - $min) * .13, max(abs($max), 1) * .015);
@@ -37,7 +43,7 @@ final class RecommendationEmailChart
         $plotTop = 24;
         $plotRight = 690;
         $plotBottom = 260;
-        $forecastWidth = 150;
+        $forecastWidth = 250;
         $historyRight = $plotRight - $forecastWidth;
         $toY = fn (float $price): int => (int) round($plotBottom - (($price - $min) / max($max - $min, .00001)) * ($plotBottom - $plotTop));
 
@@ -59,18 +65,26 @@ final class RecommendationEmailChart
         $current = (float) data_get($bars->last(), 'y.3');
         $startX = (int) round($historyRight - $step / 2);
         $startY = $toY($current);
-        $target = $targetPrice ?? $current;
-        $targetY = $toY($target);
-        $positive = $target >= $current;
-        $fill = $positive ? $forecastFill : imagecolorallocatealpha($chart, 201, 92, 108, 95);
-        imagefilledpolygon($chart, [$startX, $startY, $plotRight, $targetY - 24, $plotRight, $targetY + 24], $fill);
-        imagesetstyle($chart, [$amber, $amber, $amber, $background, $background]);
-        imageline($chart, $startX, $startY, $plotRight, $targetY, IMG_COLOR_STYLED);
-        imageline($chart, $startX, $startY, $plotRight, $targetY - 24, IMG_COLOR_STYLED);
-        imageline($chart, $startX, $startY, $plotRight, $targetY + 24, IMG_COLOR_STYLED);
+        $previousX = $startX;
+        $previousY = $startY;
+        $maxDays = max(20, (int) ($forecasts->keys()->max() ?? 20));
+        foreach ($forecasts as $days => $target) {
+            $targetX = (int) round($historyRight + (($plotRight - $historyRight) * ($days / $maxDays)));
+            $targetY = $toY($target);
+            $positive = $target >= $current;
+            $fill = $positive ? $forecastFill : imagecolorallocatealpha($chart, 201, 92, 108, 95);
+            imagefilledpolygon($chart, [$previousX, $previousY, $targetX, $targetY - 12, $targetX, $targetY + 12], $fill);
+            imagesetstyle($chart, [$amber, $amber, $amber, $background, $background]);
+            imageline($chart, $previousX, $previousY, $targetX, $targetY, IMG_COLOR_STYLED);
+            imageline($chart, $previousX, $previousY, $targetX, $targetY - 12, IMG_COLOR_STYLED);
+            imageline($chart, $previousX, $previousY, $targetX, $targetY + 12, IMG_COLOR_STYLED);
+            imagestring($chart, 2, max($historyRight, $targetX - 13), max($plotTop, $targetY - 27), $days.'T', $amber);
+            $previousX = $targetX;
+            $previousY = $targetY;
+        }
 
         imagestring($chart, 3, $plotLeft, 274, 'Historie', $text);
-        imagestring($chart, 3, $plotRight - 76, 274, '20 Tage', $amber);
+        imagestring($chart, 3, $plotRight - 106, 274, '5 / 10 / 15 / 20 T', $amber);
 
         return $this->png($chart);
     }
@@ -80,7 +94,6 @@ final class RecommendationEmailChart
         ob_start();
         imagepng($image, null, 7);
         $png = (string) ob_get_clean();
-        imagedestroy($image);
         return $png;
     }
 }

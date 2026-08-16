@@ -42,8 +42,6 @@ final class RecommendationEmailLogo
         ob_start();
         imagepng($image, null, 8);
         $png = (string) ob_get_clean();
-        imagedestroy($image);
-
         return $png;
     }
 }

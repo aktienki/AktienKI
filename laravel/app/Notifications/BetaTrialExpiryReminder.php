@@ -22,7 +22,7 @@ class BetaTrialExpiryReminder extends Notification
         return (new MailMessage)
             ->subject(__('Dein kostenloser AktienKI-Pro-Zugang endet bald'))
             ->greeting(__('Hallo :name,', ['name' => $notifiable->name]))
-            ->line(__('Deine dreimonatige Pro-Testphase für den Betatest endet am :date.', ['date' => $endsAt ?: __('bald')]))
+            ->line(__('Dein kostenloses Pro-Jahr für den Betatest endet am :date.', ['date' => $endsAt ?: __('bald')]))
             ->line(__('Ab diesem Zeitpunkt ist der Pro-Tarif kostenpflichtig. Du kannst dein Abo vorher prüfen oder ändern.'))
             ->action(__('Abo ansehen'), route('pricing'))
             ->line(__('Wenn du nichts ändern möchtest, musst du nichts tun. Diese Nachricht dient als rechtzeitige Erinnerung.'));

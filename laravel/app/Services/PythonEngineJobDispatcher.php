@@ -15,7 +15,7 @@ final class PythonEngineJobDispatcher
             'user_id' => $userId,
             'backtest_run_id' => $runId,
             'type' => 'filtered_backtest',
-            'calculation_version' => 'portfolio-v1',
+            'calculation_version' => 'filtered-portfolio-v2',
             'status' => 'queued',
             'progress' => 0,
             'payload' => json_encode([

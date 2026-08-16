@@ -255,5 +255,6 @@
 
         <p class="mx-auto mt-3 max-w-3xl shrink-0 text-center text-[10px] leading-4 text-[var(--ak-muted)]">{{ __('AktienKI unterstützt die Recherche, ersetzt jedoch keine individuelle Anlageberatung. Prognosen können falsch sein und Kapitalanlagen sind mit Risiken verbunden.') }}</p>
     </main>
+<x-cookie-consent />
 </body>
 </html>

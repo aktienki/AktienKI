@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Enums\PlanLevel;
 use App\Models\Portfolio;
 use App\Services\PlanAccessService;
+use App\Services\PersonalCollectionLimitService;
 use App\Services\PersonalizedSignalService;
+use App\Services\TwelveDataService;
 use App\Support\AiScore;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -28,8 +30,9 @@ final class DepotController extends Controller
         // Musterdepots are rebuilt later from the revised strategy logic.
         // Keep the page empty for now and avoid the expensive template queries.
         $strategyTemplates = [];
+        $canTestPaperDepot = app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Plus);
 
-        return view('depots.index', compact('portfolios', 'paperMode', 'stockInstrumentIds', 'strategyTemplates', 'availableStrategies'));
+        return view('depots.index', compact('portfolios', 'paperMode', 'stockInstrumentIds', 'strategyTemplates', 'availableStrategies', 'canTestPaperDepot'));
     }
 
     public function paperIndex(Request $request): View
@@ -42,35 +45,62 @@ final class DepotController extends Controller
         $strategyTemplates = [];
         $availableStrategies = $request->user()->savedPredictionFilters()->orderBy('name')->get(['id', 'name']);
 
-        return view('depots.index', compact('portfolios', 'paperMode', 'stockInstrumentIds', 'strategyTemplates', 'availableStrategies'));
+        $paperDepotLimit = app(PersonalCollectionLimitService::class)->paperDepots($request->user());
+        $canTestPaperDepot = app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Plus);
+
+        return view('depots.index', compact('portfolios', 'paperMode', 'stockInstrumentIds', 'strategyTemplates', 'availableStrategies', 'paperDepotLimit', 'canTestPaperDepot'));
     }
 
-    public function addInstrument(Request $request, Portfolio $portfolio, int $instrument): RedirectResponse
+    public function addInstrument(Request $request, Portfolio $portfolio, int $instrument, TwelveDataService $marketData): RedirectResponse
     {
         abort_unless((int) $portfolio->user_id === (int) $request->user()->id
             && $portfolio->active && $portfolio->type === 'paper', 404);
         $validated = $request->validate(['quantity' => ['required', 'integer', 'min:1', 'max:100000']]);
 
         $stock = DB::table('instruments')->where('id', $instrument)->where('type', 'stock')
-            ->where('is_active', true)->whereNull('deleted_at')->first(['id', 'currency']);
+            ->where('is_active', true)->whereNull('deleted_at')->first(['id', 'symbol', 'provider_symbol', 'name', 'isin', 'currency', 'german_listing_symbol', 'german_listing_exchange', 'german_listing_mic', 'german_listing_currency']);
         abort_unless($stock, 404);
-        abort_if(strtoupper((string) $stock->currency) !== strtoupper((string) $portfolio->currency), 422, __('Aktien- und Depotwährung müssen übereinstimmen.'));
 
-        $price = DB::table('current_stock_quotes')->where('instrument_id', $instrument)->where('status', 'current')
-            ->orderByDesc('quote_time')->orderByDesc('id')->value('price')
-            ?? DB::table('predictions')->where('instrument_id', $instrument)->orderByDesc('prediction_time')->orderByDesc('id')->value('current_price');
+        $stockCurrency = strtoupper((string) $stock->currency);
+        $portfolioCurrency = strtoupper((string) $portfolio->currency);
+        $usesGermanListing = $stockCurrency !== $portfolioCurrency;
+        $listing = null;
+        if ($usesGermanListing) {
+            abort_unless($portfolioCurrency === 'EUR', 422, __('Für diese Depotwährung ist noch keine Kursumrechnung verfügbar.'));
+            $listing = $stock->german_listing_symbol ? [
+                'symbol' => $stock->german_listing_symbol,
+                'exchange' => $stock->german_listing_exchange,
+                'mic_code' => $stock->german_listing_mic,
+                'currency' => $stock->german_listing_currency,
+            ] : $marketData->germanListing($stock->isin, (string) $stock->name, (string) $stock->symbol);
+            abort_unless($listing && strtoupper((string) ($listing['currency'] ?? '')) === 'EUR', 422, __('Für diese Aktie wurde keine handelbare deutsche EUR-Notierung gefunden.'));
+            DB::table('instruments')->where('id', $instrument)->update([
+                'german_listing_symbol' => $listing['symbol'], 'german_listing_exchange' => $listing['exchange'] ?: null,
+                'german_listing_mic' => $listing['mic_code'] ?: null, 'german_listing_currency' => 'EUR',
+                'german_listing_verified_at' => now(), 'updated_at' => now(),
+            ]);
+            $listingQuote = $marketData->listingQuote($listing['symbol'], $listing['exchange'] ?: null);
+            abort_unless(is_numeric($listingQuote['price'] ?? null) && strtoupper((string) ($listingQuote['currency'] ?? 'EUR')) === 'EUR', 422, __('Für die deutsche Notierung ist aktuell kein verlässlicher EUR-Kurs verfügbar.'));
+            $price = (float) $listingQuote['price'];
+        } else {
+            $price = DB::table('current_stock_quotes')->where('instrument_id', $instrument)->where('status', 'current')
+                ->orderByDesc('quote_time')->orderByDesc('id')->value('price')
+                ?? DB::table('predictions')->where('instrument_id', $instrument)->orderByDesc('prediction_time')->orderByDesc('id')->value('current_price');
+        }
         abort_unless(is_numeric($price) && (float) $price > 0, 422, __('Kein aktueller Kurs verfügbar.'));
 
         $prediction = DB::table('predictions')->where('instrument_id', $instrument)->orderByDesc('prediction_time')->orderByDesc('id')->first(['id', 'prediction_score', 'signal']);
         $aiScore = AiScore::toPercent($prediction?->prediction_score);
-        DB::transaction(function () use ($portfolio, $instrument, $stock, $price, $validated, $prediction, $aiScore): void {
+        DB::transaction(function () use ($portfolio, $instrument, $stock, $price, $validated, $prediction, $aiScore, $usesGermanListing, $listing): void {
             $quantity = (int) $validated['quantity'];
             $price = (float) $price;
+            $fee = max(0.0, (float) data_get($portfolio->meta, 'automation.trade_cost', 0));
             $cost = $quantity * $price;
+            $totalDebit = $cost + $fee;
             $account = DB::table('portfolio_cash_accounts')->where('portfolio_id', $portfolio->id)
                 ->where('currency', $portfolio->currency)->lockForUpdate()->first();
             abort_unless($account, 422, __('Kein Verrechnungskonto vorhanden.'));
-            abort_if(((float) $account->balance - (float) $account->reserved_balance) < $cost, 422, __('Das virtuelle Guthaben reicht für diesen Kauf nicht aus.'));
+            abort_if(((float) $account->balance - (float) $account->reserved_balance) < $totalDebit, 422, __('Das virtuelle Guthaben reicht für diesen Kauf einschließlich Kosten nicht aus.'));
 
             $position = DB::table('portfolio_positions')->where('portfolio_id', $portfolio->id)
                 ->where('instrument_id', $instrument)->lockForUpdate()->first();
@@ -86,7 +116,7 @@ final class DepotController extends Controller
                 DB::table('portfolio_positions')->insert([
                     'portfolio_id' => $portfolio->id, 'instrument_id' => $instrument,
                     'quantity' => $quantity, 'average_buy_price' => $price, 'current_price' => $price,
-                    'opened_at_date' => now()->toDateString(), 'meta' => json_encode(['source' => 'screener_manual', 'entry_ai_score' => $aiScore, 'entry_prediction_id' => $prediction?->id, 'entry_signal' => $prediction?->signal]),
+                    'opened_at_date' => now()->toDateString(), 'meta' => json_encode(['source' => 'screener_manual', 'entry_ai_score' => $aiScore, 'entry_prediction_id' => $prediction?->id, 'entry_signal' => $prediction?->signal, 'pricing_listing' => $listing]),
                     'created_at' => now(), 'updated_at' => now(),
                 ]);
             }
@@ -94,14 +124,14 @@ final class DepotController extends Controller
             $transactionId = DB::table('portfolio_transactions')->insertGetId([
                 'portfolio_id' => $portfolio->id, 'instrument_id' => $instrument, 'type' => 'buy',
                 'transaction_date' => now()->toDateString(), 'quantity' => $quantity, 'price' => $price,
-                'fees' => 0, 'currency' => $stock->currency, 'meta' => json_encode(['source' => 'screener_manual', 'ai_score' => $aiScore, 'prediction_id' => $prediction?->id, 'signal' => $prediction?->signal]),
+                'fees' => $fee, 'currency' => $portfolio->currency, 'meta' => json_encode(['source' => 'screener_manual', 'ai_score' => $aiScore, 'prediction_id' => $prediction?->id, 'signal' => $prediction?->signal, 'pricing_source' => $usesGermanListing ? 'german_listing' : 'primary_listing', 'pricing_listing' => $listing, 'primary_currency' => $stock->currency]),
                 'created_at' => now(), 'updated_at' => now(),
             ]);
-            $balance = (float) $account->balance - $cost;
+            $balance = (float) $account->balance - $totalDebit;
             DB::table('portfolio_cash_accounts')->where('id', $account->id)->update(['balance' => $balance, 'updated_at' => now()]);
             DB::table('portfolio_cash_ledger')->insert([
                 'portfolio_cash_account_id' => $account->id, 'portfolio_transaction_id' => $transactionId,
-                'type' => 'purchase_debit', 'amount' => -$cost, 'balance_after' => $balance,
+                'type' => 'purchase_debit', 'amount' => -$totalDebit, 'balance_after' => $balance,
                 'currency' => $account->currency, 'occurred_at' => now(),
                 'meta' => json_encode(['source' => 'screener_manual']), 'created_at' => now(), 'updated_at' => now(),
             ]);
@@ -207,7 +237,7 @@ final class DepotController extends Controller
         $quality = $baseQuery()
             ->where('prediction.quality_gate_passed', true)
             ->where('model_quality.eligible', true)
-            ->where('model_tier.code', 'top')
+            ->where('model_tier.code', 'strong')
             ->orderByDesc('prediction.prediction_score')
             ->orderByDesc('prediction.confidence')
             ->limit(5)
@@ -379,13 +409,19 @@ final class DepotController extends Controller
             'trade_cost' => ['required_if:type,paper', 'nullable', 'numeric', 'between:0,1000'],
         ]);
 
-        $planLevel = app(PlanAccessService::class)->level($request->user());
-        if ($planLevel === PlanLevel::Plus) {
-            if ($validated['type'] !== 'paper') {
-                return back()->withErrors(['type' => __('Strategiedepots sind ab dem Pro-Tarif verfügbar.')]);
-            }
-            if (Portfolio::query()->where('user_id', $request->user()->id)->where('active', true)->exists()) {
-                return back()->withErrors(['name' => __('Im Plus-Tarif ist ein Musterdepot enthalten. Für weitere Depots ist Pro erforderlich.')]);
+        if ($validated['type'] !== 'paper'
+            && ! app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Pro)) {
+            return back()->withErrors(['type' => __('Strategiedepots sind ab dem Pro-Tarif verfügbar.')]);
+        }
+        if ($validated['type'] === 'paper') {
+            $limit = app(PersonalCollectionLimitService::class)->paperDepots($request->user());
+            $currentCount = Portfolio::query()
+                ->where('user_id', $request->user()->id)
+                ->where('type', 'paper')
+                ->where('active', true)
+                ->count();
+            if ($limit !== null && $currentCount >= $limit) {
+                return back()->withErrors(['name' => __('Dein Tarif erlaubt maximal :count aktive Musterdepots.', ['count' => $limit])]);
             }
         }
 
@@ -744,6 +780,11 @@ final class DepotController extends Controller
     public function startSimulation(Request $request, Portfolio $portfolio): RedirectResponse
     {
         abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active && $portfolio->type === 'paper', 404);
+        if (! app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Plus)) {
+            return back()->withErrors([
+                'simulation' => __('Das Testen eines Musterdepots ist ab dem Plus-Tarif verfügbar.'),
+            ]);
+        }
         if ((bool) data_get($portfolio->meta, 'automation.live_enabled', false)) {
             return back()->withErrors([
                 'simulation' => __('Deaktiviere zuerst das mitlaufende Strategiedepot, bevor du eine historische Simulation startest.'),

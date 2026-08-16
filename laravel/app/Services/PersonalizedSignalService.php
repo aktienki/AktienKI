@@ -53,7 +53,8 @@ class PersonalizedSignalService
                     AND ({$risk} IS NULL OR {$risk} <= {$thresholds['watch_risk']})
                     AND {$return20d} IS NOT NULL
                     AND {$return20d} >= {$thresholds['buy_return_20d']}
-                    AND (({$return5d} IS NOT NULL AND {$return5d} < 0) OR ({$return10d} IS NOT NULL AND {$return10d} < 0))
+                    AND (({$return5d} IS NOT NULL AND {$return5d} < {$thresholds['watch_return']})
+                        OR ({$return10d} IS NOT NULL AND {$return10d} < {$thresholds['watch_return']}))
                     THEN 'WAIT'"
             : '';
 
@@ -266,7 +267,7 @@ class PersonalizedSignalService
 
         $summary = match ($signal) {
             'BUY' => __('Die Voraussetzungen für ein Kaufsignal sind im Profil :profile erfüllt.', ['profile' => $profile]),
-            'WAIT' => __('Der 20-Tage-Ausblick ist positiv, kurzfristig wird jedoch zunächst ein Rücksetzer erwartet. Daher noch abwarten.'),
+            'WAIT' => __('Der längerfristige Ausblick ist positiv, kurzfristig wird jedoch zunächst ein deutlicher Rücksetzer unter die Profilschwelle erwartet. Daher noch abwarten.'),
             'WATCH' => __('Die Aktie ist interessant, erfüllt aber noch nicht alle Voraussetzungen für BUY.'),
             'SELL' => __('Score oder erwartete Rendite sprechen derzeit für ein Verkaufssignal.'),
             default => __('Die positiven und negativen Faktoren reichen derzeit weder für BUY noch für SELL.'),

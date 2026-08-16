@@ -9,12 +9,14 @@ use App\Models\SavedPredictionFilter;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 final class AutomatedPortfolioService
 {
     public function __construct(
         private readonly PersonalizedSignalService $signals,
         private readonly VariableExitStrategyService $exitStrategies,
+        private readonly TechnicalPriceLevelService $priceLevels,
     ) {}
 
     public function scan(): array
@@ -57,7 +59,10 @@ final class AutomatedPortfolioService
             return ['candidates' => 0, 'purchases' => 0, 'skipped' => 1];
         }
 
+        $this->processDynamicExits($strategy, $portfolio);
         $candidates = $this->candidates($strategy);
+        $reservedInstrumentIds = $this->processEntryReservations($strategy, $portfolio, $candidates);
+        $candidates = $candidates->reject(fn (object $candidate): bool => $reservedInstrumentIds->contains((int) $candidate->instrument_id))->values();
         $sectorRotation = (bool) data_get($strategy->filters, 'sector_score_rotation', false);
         $indexRotation = (bool) data_get($strategy->filters, 'index_score_rotation', false);
         $sectorAverages = $candidates->groupBy(fn (object $row) => (string) ($row->sector ?: 'Other'))
@@ -73,6 +78,23 @@ final class AutomatedPortfolioService
                 return (float) $rows->map(fn (object $membership): float => (float) ($candidateByInstrument->get($membership->instrument_id)?->score_10 ?? 0))->avg();
             })
             : collect();
+        if (Schema::hasTable('market_context_predictions') && ($sectorRotation || $indexRotation)) {
+            $snapshotDate = DB::table('market_context_predictions')->max('prediction_date');
+            if ($snapshotDate) {
+                if ($sectorRotation) {
+                    $storedSectorAverages = DB::table('market_context_predictions')
+                        ->where('prediction_date', $snapshotDate)->where('scope_type', 'sector')
+                        ->pluck('score', 'scope_key')->map(fn ($score): float => (float) $score);
+                    if ($storedSectorAverages->isNotEmpty()) $sectorAverages = $storedSectorAverages;
+                }
+                if ($indexRotation) {
+                    $storedIndexAverages = DB::table('market_context_predictions')
+                        ->where('prediction_date', $snapshotDate)->where('scope_type', 'index')
+                        ->pluck('score', 'scope_key')->mapWithKeys(fn ($score, $key): array => [(int) $key => (float) $score]);
+                    if ($storedIndexAverages->isNotEmpty()) $indexAverages = $storedIndexAverages;
+                }
+            }
+        }
 
         $candidates = $candidates->sortByDesc(function (object $row) use ($sectorRotation, $indexRotation, $sectorAverages, $memberships, $indexAverages): string {
             $sectorScore = $sectorRotation ? (float) $sectorAverages->get((string) ($row->sector ?: 'Other'), 0) : 0;
@@ -93,11 +115,16 @@ final class AutomatedPortfolioService
         $purchases = 0;
         $skipped = 0;
         foreach ($candidates as $candidate) {
+            $candidateIndexScore = $indexRotation
+                ? collect($memberships->get($candidate->instrument_id, collect()))
+                    ->map(fn (object $membership): float => (float) $indexAverages->get($membership->market_index_id, 0))->max()
+                : null;
             $bought = DB::transaction(fn (): bool => $this->buyCandidate(
                 $strategy,
                 $portfolio,
                 $candidate,
                 (float) $sectorAverages->get((string) ($candidate->sector ?: 'Other'), 0),
+                $candidateIndexScore !== null ? (float) $candidateIndexScore : null,
             ), 3);
             $bought ? $purchases++ : $skipped++;
         }
@@ -136,17 +163,27 @@ final class AutomatedPortfolioService
             ->selectRaw('MAX(ABS(max_drawdown)) * 100 AS drawdown_percent')
             ->selectRaw('SUM(CASE WHEN net_return > 0 THEN net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN net_return < 0 THEN net_return ELSE 0 END)), 0) AS profit_factor')
             ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
+            ->selectRaw('COUNT(*) AS historical_trades')
             ->groupBy('instrument_id');
         $signalSql = $this->signals->sql('prediction', $strategy->user);
         $scoreSql = '(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END)';
         $confidenceSql = '(CASE WHEN prediction.confidence <= 1 THEN prediction.confidence * 100 ELSE prediction.confidence END)';
         $riskSql = '(CASE WHEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) <= 1 THEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) * 100 ELSE COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) END)';
         $predictedReturnSql = '((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100';
-        $fundamentalNumber = static fn (string $key): string =>
-            "(CASE WHEN NULLIF(fundamental.data::jsonb->>'{$key}', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'{$key}')::numeric END)";
+        $fundamentalNumber = static fn (string $key): string => match ($key) {
+            'trailingPE' => "COALESCE(fundamental.trailing_pe, CASE WHEN NULLIF(fundamental.data::jsonb->>'trailingPE', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'trailingPE')::numeric END)",
+            'dividendYield' => "COALESCE(fundamental.dividend_yield, CASE WHEN NULLIF(fundamental.data::jsonb->>'dividendYield', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'dividendYield')::numeric END)",
+            'marketCap' => "COALESCE(fundamental.market_cap, CASE WHEN NULLIF(fundamental.data::jsonb->>'marketCap', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'marketCap')::numeric END)",
+            'revenueGrowth' => "COALESCE(fundamental.revenue_growth, CASE WHEN NULLIF(fundamental.data::jsonb->>'revenueGrowth', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'revenueGrowth')::numeric END)",
+        };
         $modelIds = collect((array) ($filters['model'] ?? []))->map(fn ($id) => (int) $id)->filter()->all();
-        $minimumTiers = ['top' => ['top'], 'strong' => ['top', 'strong'], 'solid' => ['top', 'strong', 'solid'], 'test' => ['top', 'strong', 'solid', 'test']];
+        $minimumTiers = ['top' => ['strong'], 'strong' => ['strong'], 'solid' => ['strong', 'solid'], 'test' => ['strong', 'solid', 'test']];
         $tier = (string) ($filters['quality_tier'] ?? '');
+        $profileLimits = match ($this->signals->riskLevel($strategy->user)) {
+            'cautious' => ['risk' => 35.0, 'volatility' => 45.0, 'drawdown' => 25.0, 'confidence' => 65.0, 'trades' => 20],
+            'opportunity_oriented' => ['risk' => 80.0, 'volatility' => 100.0, 'drawdown' => 50.0, 'confidence' => 45.0, 'trades' => 10],
+            default => ['risk' => 60.0, 'volatility' => 65.0, 'drawdown' => 40.0, 'confidence' => 55.0, 'trades' => 15],
+        };
 
         return DB::table('predictions as prediction')
             ->joinSub($latestPredictionIds, 'latest_prediction', fn ($join) => $join->on('latest_prediction.prediction_id', '=', 'prediction.id'))
@@ -166,9 +203,16 @@ final class AutomatedPortfolioService
             ->leftJoin('current_stock_quotes as quote', 'quote.id', '=', 'latest_quote.quote_id')
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
+            ->where('instrument.is_german_tradeable', true)
             ->whereNull('instrument.deleted_at')
             ->whereRaw("({$signalSql}) = 'BUY'")
             ->whereRaw('COALESCE(prediction.predicted_price_20d, prediction.current_price) >= prediction.current_price')
+            // Hard pre-selection by the user's risk profile. Rotation and ranking only see this reduced universe.
+            ->whereRaw("({$riskSql} IS NULL OR {$riskSql} <= ?)", [$profileLimits['risk']])
+            ->whereRaw("{$confidenceSql} >= ?", [$profileLimits['confidence']])
+            ->whereRaw('(technical.volatility_20 IS NULL OR technical.volatility_20 * 100 <= ?)', [$profileLimits['volatility']])
+            ->whereRaw('(backtest_stat.drawdown_percent IS NULL OR backtest_stat.drawdown_percent <= ?)', [$profileLimits['drawdown']])
+            ->whereRaw('COALESCE(backtest_stat.historical_trades, 0) >= ?', [$profileLimits['trades']])
             ->whereNotExists(fn (Builder $query) => $query->selectRaw('1')
                 ->from('portfolio_automation_executions as execution')
                 ->where('execution.saved_prediction_filter_id', $strategy->id)
@@ -203,14 +247,15 @@ final class AutomatedPortfolioService
             ->when((float) ($filters['pe_max'] ?? 100) < 100, fn ($query) =>
                 $query->whereRaw($fundamentalNumber('trailingPE').' <= ?', [(float) $filters['pe_max']]))
             ->when((float) ($filters['dividend_yield_min'] ?? 0) > 0, fn ($query) =>
-                $query->whereRaw($fundamentalNumber('dividendYield').' >= ?', [(float) $filters['dividend_yield_min']]))
+                $query->whereRaw($fundamentalNumber('dividendYield').' >= ?', [(float) $filters['dividend_yield_min'] / 100]))
             ->when((float) ($filters['market_cap_min'] ?? 0) > 0, fn ($query) =>
                 $query->whereRaw($fundamentalNumber('marketCap').' >= ?', [(float) $filters['market_cap_min'] * 1_000_000_000]))
             ->when((float) ($filters['revenue_growth_min'] ?? -50) > -50, fn ($query) =>
                 $query->whereRaw($fundamentalNumber('revenueGrowth').' >= ?', [(float) $filters['revenue_growth_min'] / 100]))
             ->select([
                 'prediction.id as prediction_id', 'prediction.instrument_id', 'prediction.prediction_time',
-                'prediction.current_price', 'prediction.predicted_price_20d', 'instrument.symbol', 'instrument.name',
+                'prediction.current_price', 'prediction.predicted_price_5d', 'prediction.predicted_price_10d',
+                'prediction.predicted_price_15d', 'prediction.predicted_price_20d', 'instrument.symbol', 'instrument.name',
                 'instrument.sector', 'instrument.currency', 'quote.price as quote_price',
             ])
             ->selectRaw("{$scoreSql} AS score_10")
@@ -218,7 +263,7 @@ final class AutomatedPortfolioService
             ->get();
     }
 
-    private function buyCandidate(SavedPredictionFilter $strategy, Portfolio $assignedPortfolio, object $candidate, float $sectorAverage): bool
+    private function buyCandidate(SavedPredictionFilter $strategy, Portfolio $assignedPortfolio, object $candidate, float $sectorAverage, ?float $indexAverage = null, bool $reservationReleased = false): bool
     {
         if (DB::table('portfolio_automation_executions')->where('saved_prediction_filter_id', $strategy->id)->where('prediction_id', $candidate->prediction_id)->exists()) return false;
 
@@ -227,9 +272,17 @@ final class AutomatedPortfolioService
         if (! $portfolio || ! $portfolio->active || ! data_get($portfolio->meta, 'automation.live_enabled', false)) return false;
 
         $meta = (array) $portfolio->meta;
-        $initialCapital = max(1000.0, (float) data_get($meta, 'automation.initial_capital', 10000));
+        $initialCapital = max(1000.0, (float) data_get(
+            $strategy->filters,
+            'initial_capital',
+            data_get($meta, 'automation.initial_capital', 10000),
+        ));
         $maxUnits = max(1, min(50, (int) data_get($strategy->filters, 'max_positions', 5)));
-        $tradeCost = max(0.0, (float) data_get($meta, 'automation.trade_cost', 10));
+        $tradeCost = max(0.0, (float) data_get(
+            $strategy->filters,
+            'trade_cost',
+            data_get($meta, 'automation.trade_cost', 10),
+        ));
         $baseCapital = $initialCapital / $maxUnits;
         $cashAccount = DB::table('portfolio_cash_accounts')
             ->where('portfolio_id', $portfolio->id)
@@ -239,6 +292,8 @@ final class AutomatedPortfolioService
         $cash = max(0.0, (float) $cashAccount->balance - (float) $cashAccount->reserved_balance);
         $usedUnits = PortfolioPosition::query()->where('portfolio_id', $portfolio->id)->get()
             ->sum(fn (PortfolioPosition $position): int => max(1, (int) data_get($position->meta, 'automation.position_factor', 1)));
+        $usedUnits += (int) DB::table('portfolio_strategy_reservations')->where('portfolio_id', $portfolio->id)
+            ->where('status', 'active')->where('instrument_id', '<>', $candidate->instrument_id)->sum('position_factor');
         $availableUnits = max(0, $maxUnits - $usedUnits);
         $maximumFactor = max(1, min($maxUnits, (int) data_get($strategy->filters, 'position_factor', 1)));
         $affordableUnits = (int) floor(max(0, $cash - $tradeCost) / $baseCapital);
@@ -247,8 +302,32 @@ final class AutomatedPortfolioService
 
         $price = (float) ($candidate->quote_price ?: $candidate->current_price);
         if ($price <= 0) return false;
-        $exitStrategy = $this->exitStrategies->resolve((int) $candidate->instrument_id);
+        $exitStrategy = (bool) data_get($strategy->filters, 'dynamic_horizon_exit_enabled', false)
+            ? $this->exitStrategies->resolveForPrediction((int) $candidate->instrument_id, $candidate)
+            : $this->exitStrategies->resolve((int) $candidate->instrument_id);
         $allocated = min($cash - $tradeCost, $baseCapital * $factor);
+        if (! $reservationReleased && (bool) data_get($strategy->filters, 'entry_wait_5d_enabled', false)) {
+            $targets = collect([5, 10, 15, 20])->map(fn (int $days): float => (float) data_get($candidate, 'predicted_price_'.$days.'d', 0))->filter(fn (float $target): bool => $target > 0);
+            $highestTarget = (float) ($targets->max() ?? 0);
+            if ($highestTarget > 0 && $price > $highestTarget) {
+                $reservedCapital = min((float) $cashAccount->balance - (float) $cashAccount->reserved_balance, $allocated + $tradeCost);
+                if ($reservedCapital <= 0 || DB::table('portfolio_strategy_reservations')->where('saved_prediction_filter_id', $strategy->id)
+                    ->where('instrument_id', $candidate->instrument_id)->where('status', 'active')->exists()) return false;
+                DB::table('portfolio_strategy_reservations')->insert([
+                    'saved_prediction_filter_id' => $strategy->id, 'portfolio_id' => $portfolio->id,
+                    'prediction_id' => $candidate->prediction_id, 'instrument_id' => $candidate->instrument_id,
+                    'reserved_capital' => $reservedCapital, 'position_factor' => $factor, 'status' => 'active',
+                    'expires_at' => now()->addDays(5),
+                    'details' => json_encode(['reason' => 'current_performance_above_prediction', 'quote_price' => $price,
+                        'highest_target_price' => $highestTarget, 'symbol' => $candidate->symbol], JSON_THROW_ON_ERROR),
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+                DB::table('portfolio_cash_accounts')->where('id', $cashAccount->id)->update([
+                    'reserved_balance' => (float) $cashAccount->reserved_balance + $reservedCapital, 'updated_at' => now(),
+                ]);
+                return false;
+            }
+        }
         $quantity = floor($allocated / $price);
         if ($quantity < 1) return false;
         $allocated = $quantity * $price;
@@ -266,6 +345,7 @@ final class AutomatedPortfolioService
         data_set($positionMeta, 'automation.exit_holding_days', $exitStrategy['holding_days']);
         data_set($positionMeta, 'automation.exit_profile_id', $exitStrategy['profile_id']);
         data_set($positionMeta, 'automation.exit_model_signature', $exitStrategy['model_signature']);
+        data_set($positionMeta, 'automation.exit_target_price', $exitStrategy['target_price'] ?? null);
         $position->fill([
             'quantity' => $newQuantity,
             'average_buy_price' => $newQuantity > 0
@@ -289,6 +369,10 @@ final class AutomatedPortfolioService
                 'source' => 'strategy_automation', 'strategy_id' => $strategy->id,
                 'prediction_id' => $candidate->prediction_id, 'sector' => $candidate->sector,
                 'sector_average_score' => round($sectorAverage, 4), 'position_factor' => $factor,
+                'index_average_score' => $indexAverage !== null ? round($indexAverage, 4) : null,
+                'base_position_capital' => round($baseCapital, 2),
+                'target_position_capital' => round($baseCapital * $factor, 2),
+                'calculated_quantity' => (int) $quantity,
                 'exit_strategy' => 'variable_instrument_horizon',
                 'exit_holding_days' => $exitStrategy['holding_days'],
                 'exit_profile_id' => $exitStrategy['profile_id'],
@@ -333,6 +417,10 @@ final class AutomatedPortfolioService
                 'symbol' => $candidate->symbol,
                 'score' => $candidate->score_10,
                 'confidence' => $candidate->confidence_percent,
+                'index_average_score' => $indexAverage !== null ? round($indexAverage, 4) : null,
+                'base_position_capital' => round($baseCapital, 2),
+                'target_position_capital' => round($baseCapital * $factor, 2),
+                'calculated_quantity' => (int) $quantity,
                 'exit_holding_days' => $exitStrategy['holding_days'],
                 'exit_profile_id' => $exitStrategy['profile_id'],
             ], JSON_THROW_ON_ERROR),
@@ -340,5 +428,129 @@ final class AutomatedPortfolioService
         ]);
 
         return true;
+    }
+
+    private function processDynamicExits(SavedPredictionFilter $strategy, Portfolio $portfolio): void
+    {
+        $fixed20dExit = (bool) data_get($strategy->filters, 'fixed_20d_exit_enabled', false);
+        $dynamicHorizonExit = (bool) data_get($strategy->filters, 'dynamic_horizon_exit_enabled', false);
+        $supportStop = (bool) data_get($strategy->filters, 'support_stop_enabled', false);
+        $resistanceExit = (bool) data_get($strategy->filters, 'resistance_trailing_stop_enabled', false);
+        if (! $fixed20dExit && ! $dynamicHorizonExit && ! $supportStop && ! $resistanceExit) return;
+
+        PortfolioPosition::query()->where('portfolio_id', $portfolio->id)->get()
+            ->filter(fn (PortfolioPosition $position): bool => (int) data_get($position->meta, 'automation.strategy_id', 0) === (int) $strategy->id)
+            ->each(function (PortfolioPosition $position) use ($strategy, $portfolio, $fixed20dExit, $dynamicHorizonExit, $supportStop, $resistanceExit): void {
+                $quote = DB::table('current_stock_quotes')->where('instrument_id', $position->instrument_id)
+                    ->whereIn('status', ['ok', 'current'])->orderByDesc('quote_time')->orderByDesc('id')->value('price');
+                $price = is_numeric($quote) ? (float) $quote : (float) $position->current_price;
+                if ($price <= 0 || $position->quantity <= 0) return;
+
+                $levels = $this->priceLevels->levels((int) $position->instrument_id);
+                $tradingDaysHeld = $position->opened_at_date
+                    ? DB::table('price_bars')->where('instrument_id', $position->instrument_id)->where('interval', '1d')
+                        ->whereDate('bar_time', '>=', $position->opened_at_date->toDateString())->distinct('bar_time')->count('bar_time')
+                    : 0;
+                $fixedExitTrigger = $fixed20dExit && $tradingDaysHeld >= 20;
+                $dynamicExitDays = max(1, (int) data_get($position->meta, 'automation.exit_holding_days', 20));
+                $dynamicExitTrigger = $dynamicHorizonExit && $tradingDaysHeld >= $dynamicExitDays;
+                $supportTrigger = $supportStop && is_numeric($levels['support']) && $price < (float) $levels['support'] * .99;
+                $positionMeta = (array) $position->meta;
+                $trailingStop = data_get($positionMeta, 'automation.resistance_trailing_stop');
+                $profitable = $price > (float) $position->average_buy_price;
+                if ($resistanceExit && $profitable && is_numeric($levels['broken_resistance'])) {
+                    $newStop = (float) $levels['broken_resistance'] * .99;
+                    if (! is_numeric($trailingStop) || $newStop > (float) $trailingStop) {
+                        data_set($positionMeta, 'automation.resistance_trailing_stop', $newStop);
+                        data_set($positionMeta, 'automation.resistance_broken_at', now()->toIso8601String());
+                        $position->forceFill(['meta' => $positionMeta, 'current_price' => $price])->save();
+                        $trailingStop = $newStop;
+                    }
+                }
+                $trailingTrigger = is_numeric($trailingStop) && $price < (float) $trailingStop;
+                if (! $fixedExitTrigger && ! $dynamicExitTrigger && ! $supportTrigger && ! $trailingTrigger) return;
+
+                $reason = $fixedExitTrigger ? 'fixed_20_trading_days'
+                    : ($dynamicExitTrigger ? 'dynamic_prediction_horizon'
+                    : ($supportTrigger ? 'support_stop_1_percent' : 'resistance_trailing_stop'));
+                DB::transaction(function () use ($strategy, $position, $portfolio, $price, $levels, $reason): void {
+                    $locked = PortfolioPosition::query()->lockForUpdate()->find($position->id);
+                    if (! $locked) return;
+                    $quantity = (float) $locked->quantity;
+                    $proceeds = $quantity * $price;
+                    $costBasis = $quantity * (float) $locked->average_buy_price;
+                    $account = DB::table('portfolio_cash_accounts')->where('portfolio_id', $portfolio->id)
+                        ->where('currency', $portfolio->currency)->lockForUpdate()->first();
+                    if (! $account) return;
+                    $transactionId = DB::table('portfolio_transactions')->insertGetId([
+                        'portfolio_id' => $portfolio->id, 'instrument_id' => $locked->instrument_id,
+                        'type' => 'sell', 'transaction_date' => now()->toDateString(), 'quantity' => $quantity,
+                        'price' => $price, 'fees' => 0, 'currency' => $portfolio->currency,
+                        'meta' => json_encode(['source' => 'strategy_automation', 'exit_reason' => $reason,
+                            'support' => $levels['support'], 'resistance' => $levels['resistance'],
+                            'realized_profit' => $proceeds - $costBasis], JSON_THROW_ON_ERROR),
+                        'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                    $balance = (float) $account->balance + $proceeds;
+                    DB::table('portfolio_cash_accounts')->where('id', $account->id)->update(['balance' => $balance, 'updated_at' => now()]);
+                    DB::table('portfolio_cash_ledger')->insert([
+                        'portfolio_cash_account_id' => $account->id, 'portfolio_transaction_id' => $transactionId,
+                        'type' => 'sale_credit', 'amount' => $proceeds, 'balance_after' => $balance,
+                        'currency' => $portfolio->currency, 'occurred_at' => now(),
+                        'meta' => json_encode(['source' => 'strategy_automation', 'exit_reason' => $reason], JSON_THROW_ON_ERROR),
+                        'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                    $predictionId = (int) DB::table('predictions')->where('instrument_id', $locked->instrument_id)->latest('id')->value('id');
+                    if ($predictionId > 0) DB::table('portfolio_automation_executions')->insert([
+                        'saved_prediction_filter_id' => $strategy->id, 'portfolio_id' => $portfolio->id,
+                        'prediction_id' => $predictionId, 'instrument_id' => $locked->instrument_id,
+                        'portfolio_transaction_id' => $transactionId, 'action' => 'sell',
+                        'position_factor' => max(1, (int) data_get($locked->meta, 'automation.position_factor', 1)),
+                        'allocated_capital' => $proceeds, 'details' => json_encode(['exit_reason' => $reason,
+                            'support' => $levels['support'], 'resistance' => $levels['resistance']], JSON_THROW_ON_ERROR),
+                        'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                    $locked->delete();
+                }, 3);
+            });
+    }
+
+    private function processEntryReservations(SavedPredictionFilter $strategy, Portfolio $portfolio, Collection $candidates): Collection
+    {
+        $active = DB::table('portfolio_strategy_reservations')->where('saved_prediction_filter_id', $strategy->id)
+            ->where('portfolio_id', $portfolio->id)->where('status', 'active')->orderBy('id')->get();
+        $remaining = collect();
+        foreach ($active as $reservation) {
+            $candidate = $candidates->firstWhere('instrument_id', $reservation->instrument_id);
+            $expired = now()->greaterThanOrEqualTo($reservation->expires_at);
+            if ($expired || ! $candidate) {
+                $this->releaseReservation($reservation, $expired ? 'expired' : 'signal_invalid');
+                continue;
+            }
+            $price = (float) ($candidate->quote_price ?: $candidate->current_price);
+            $highestTarget = (float) collect([5, 10, 15, 20])->map(fn (int $days): float => (float) data_get($candidate, 'predicted_price_'.$days.'d', 0))->max();
+            if ($price > 0 && $highestTarget > 0 && $price <= $highestTarget) {
+                $this->releaseReservation($reservation, 'converted');
+                DB::transaction(fn (): bool => $this->buyCandidate($strategy, $portfolio, $candidate, 0.0, null, true), 3);
+                continue;
+            }
+            $remaining->push((int) $reservation->instrument_id);
+        }
+        return $remaining;
+    }
+
+    private function releaseReservation(object $reservation, string $status): void
+    {
+        DB::transaction(function () use ($reservation, $status): void {
+            $locked = DB::table('portfolio_strategy_reservations')->where('id', $reservation->id)->where('status', 'active')->lockForUpdate()->first();
+            if (! $locked) return;
+            $account = DB::table('portfolio_cash_accounts')->where('portfolio_id', $locked->portfolio_id)->lockForUpdate()->first();
+            if ($account) DB::table('portfolio_cash_accounts')->where('id', $account->id)->update([
+                'reserved_balance' => max(0, (float) $account->reserved_balance - (float) $locked->reserved_capital), 'updated_at' => now(),
+            ]);
+            DB::table('portfolio_strategy_reservations')->where('id', $locked->id)->update([
+                'status' => $status, 'released_at' => now(), 'updated_at' => now(),
+            ]);
+        }, 3);
     }
 }

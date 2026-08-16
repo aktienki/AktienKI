@@ -4,7 +4,7 @@ return [
     'beta' => [
         'enabled' => (bool) env('AKTIENKI_BETA_ENABLED', true),
         'phase_ended' => (bool) env('AKTIENKI_BETA_PHASE_ENDED', false),
-        'contact_email' => env('AKTIENKI_BETA_CONTACT_EMAIL', env('MAIL_FROM_ADDRESS', 'info@aktienki.com')),
+        'contact_email' => env('AKTIENKI_BETA_CONTACT_EMAIL', 'admin@aktienki.com'),
     ],
 
     'saved_filter_limits' => [
@@ -51,5 +51,10 @@ return [
         'api_key' => env('TWELVE_DATA_API_KEY'),
         'base_url' => env('TWELVE_DATA_BASE_URL', 'https://api.twelvedata.com'),
         'indexes_enabled' => (bool) env('TWELVE_DATA_INDEXES_ENABLED', false),
+    ],
+    'market_data' => [
+        // Analysis remains available, but historical prices for these markets
+        // must neither be fetched for nor returned to public chart surfaces.
+        'restricted_historical_chart_countries' => ['AU', 'JP'],
     ],
 ];

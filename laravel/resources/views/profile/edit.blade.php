@@ -5,8 +5,9 @@
     @php
         $preferences = $user->preferences ?? [];
         $selectedLocale = old('locale', $preferences['locale'] ?? app()->getLocale());
+        $selectedCountry = strtoupper((string) old('country_code', $preferences['country_code'] ?? 'DE'));
         $selectedRiskLevel = old('risk_level', data_get($user->meta, 'risk_profile.level', 'normal'));
-        $mobileNavDefaults = ['welcome','features','roadmap','dashboard','predictions','depots','accounts','setup','news','pricing','contact','community'];
+        $mobileNavDefaults = ['welcome','features','roadmap','dashboard','predictions','depots', ...($user->is_admin ? ['accounts'] : []), 'setup','news','pricing','contact','community'];
         $mobileNavLabels = ['welcome' => __('Startseite'), 'features' => __('Features'), 'roadmap' => __('Roadmap'), 'dashboard' => __('Dashboard'), 'predictions' => __('Prognosen'), 'depots' => __('Depots & Watchlist'), 'accounts' => __('Konten'), 'setup' => __('Setup'), 'news' => __('News'), 'pricing' => __('Preise'), 'contact' => __('Kontakt'), 'community' => __('Community')];
         $savedMobileNav = data_get($preferences, 'mobile_navigation', []);
         $mobileNavOrder = array_values(array_unique(array_merge((array) data_get($savedMobileNav, 'order', []), $mobileNavDefaults)));
@@ -47,6 +48,26 @@
                 <div class="mt-6 space-y-4">
                     <div><label for="name" class="ak-label">{{ __('Name') }}</label><input id="name" class="ak-input mt-2" name="name" type="text" value="{{ old('name', $user->name) }}" required>@error('name')<p class="mt-2 text-xs text-rose-400">{{ $message }}</p>@enderror</div>
                     <div><label for="email" class="ak-label">{{ __('E-Mail-Adresse') }}</label><input id="email" class="ak-input mt-2" name="email" type="email" value="{{ old('email', $user->email) }}" required>@error('email')<p class="mt-2 text-xs text-rose-400">{{ $message }}</p>@enderror</div>
+                    <div>
+                        <label for="country_code" class="ak-label">{{ __('Land') }}</label>
+                        @if($countryLocked)
+                            <input type="hidden" name="country_code" value="{{ $selectedCountry }}">
+                        @endif
+                        <select id="country_code" @unless($countryLocked) name="country_code" @endunless class="ak-input mt-2 disabled:cursor-not-allowed disabled:opacity-55" required @disabled($countryLocked)>
+                            @foreach(['DE'=>'Deutschland','AT'=>'Österreich','BE'=>'Belgien','BG'=>'Bulgarien','HR'=>'Kroatien','CY'=>'Zypern','CZ'=>'Tschechien','DK'=>'Dänemark','EE'=>'Estland','FI'=>'Finnland','FR'=>'Frankreich','GR'=>'Griechenland','HU'=>'Ungarn','IE'=>'Irland','IT'=>'Italien','LV'=>'Lettland','LT'=>'Litauen','LU'=>'Luxemburg','MT'=>'Malta','NL'=>'Niederlande','PL'=>'Polen','PT'=>'Portugal','RO'=>'Rumänien','SK'=>'Slowakei','SI'=>'Slowenien','ES'=>'Spanien','SE'=>'Schweden','US'=>'Vereinigte Staaten','CA'=>'Kanada','CH'=>'Schweiz','GB'=>'Vereinigtes Königreich','AU'=>'Australien','CN'=>'China','HK'=>'Hongkong','JP'=>'Japan'] as $code => $countryName)
+                                <option value="{{ $code }}" @selected($selectedCountry === $code)>{{ __($countryName) }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-2 text-xs text-[var(--ak-muted)]">
+                            {{ __('Bestimmt die bevorzugte Kursnotierung: EUR innerhalb der EU, USD außerhalb der EU.') }}
+                            @if($countryLocked)
+                                <span class="mt-1 block font-bold text-amber-400">{{ __('Deine einmalige Länderänderung im Free-Tarif wurde bereits genutzt.') }}</span>
+                            @else
+                                <span class="mt-1 block">{{ __('Im Free-Tarif kannst du das bei der Registrierung gewählte Land später genau einmal ändern.') }}</span>
+                            @endif
+                        </p>
+                        @error('country_code')<p class="mt-2 text-xs text-rose-400">{{ $message }}</p>@enderror
+                    </div>
                 </div>
             </details>
 

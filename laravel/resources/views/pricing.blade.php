@@ -34,6 +34,10 @@
     </style>
 </head>
 <body class="pricing-bg min-h-screen text-[var(--ak-text)] antialiased">
+    @php
+        $standalonePricing = request()->boolean('standalone');
+    @endphp
+    @unless ($standalonePricing)
     <header class="ak-public-topbar pricing-topbar sticky top-0 z-30 h-[73px]">
         <div class="mx-auto flex h-full max-w-screen-2xl items-center justify-between px-3 sm:px-8 lg:px-12 xl:px-16">
             <a href="{{ route('welcome') }}" class="flex items-center gap-3" aria-label="{{ __('AktienKI Startseite') }}">
@@ -59,8 +63,9 @@
             </div>
         </div>
     </header>
+    @endunless
 
-    <main class="mx-auto flex max-w-7xl flex-col px-5 py-5 sm:px-8 lg:px-10 lg:py-3">
+    <main class="mx-auto flex max-w-7xl flex-col px-5 py-5 sm:px-8 lg:px-10 {{ $standalonePricing ? 'lg:py-8' : 'lg:py-3' }}">
         <div class="mx-auto max-w-3xl text-center">
             <p class="text-xs font-black uppercase tracking-[.22em] text-orange-400">{{ __('Tarife') }}</p>
             <h1 class="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{{ __('Der passende Zugang zu AktienKI.') }}</h1>
@@ -105,9 +110,9 @@
         @endphp
 
         <div class="mt-7 items-stretch">
-            <div class="grid items-start gap-5 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
+            <div class="mx-auto grid max-w-5xl items-stretch gap-5 md:grid-cols-3 md:gap-4">
                 @foreach ($plans as $plan)
-                    <article class="pricing-plan-card relative flex min-h-[520px] flex-col rounded-2xl border p-5 lg:min-h-0 xl:h-[560px] xl:min-h-0 {{ $plan['featured'] ? 'pricing-featured' : ($plan['planned'] ? 'pricing-planned' : 'pricing-dashboard-card') }}">
+                    <article class="pricing-plan-card relative flex h-full min-h-[590px] flex-col rounded-2xl border p-5 {{ $plan['featured'] ? 'pricing-featured' : ($plan['planned'] ? 'pricing-planned' : 'pricing-dashboard-card') }}">
                         @if ($plan['featured'])
                             <span class="pricing-popular-badge absolute right-5 top-5 rounded-md px-3 py-1 text-[10px] font-black uppercase tracking-wider">{{ __('Empfehlung') }}</span>
                         @elseif ($plan['planned'])
@@ -125,7 +130,7 @@
                                 @php($featureEnabled = in_array($featureKey, $plan['enabled'], true))
                                 <li class="flex min-h-5 items-center gap-2 text-[10px] leading-4 {{ $featureEnabled ? 'text-[var(--ak-text)]' : 'text-slate-500/75' }}">
                                     <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-md border text-[9px] font-black {{ $featureEnabled ? 'border-orange-400/30 bg-orange-400/10 text-orange-400' : 'border-slate-500/20 bg-slate-700/10 text-slate-600' }}">{{ $featureEnabled ? '✓' : '–' }}</span>
-                                    <span>{{ $featureKey === 'stock_access' ? ($plan['name'] === __('Free') ? __('Zugriff auf 100 Aktien') : __('Zugriff auf alle Aktien')) : ($featureKey === 'watchlists' && $plan['name'] === __('Free') ? __('Eine Watchlist') : ($featureKey === 'research' && $plan['name'] === __('Pro') ? __('Erweiterte Analysen') : ($featureKey === 'ai_questions' ? ($plan['name'] === __('Plus') ? __('50 AKI-Fragen pro Monat') : ($plan['name'] === __('Pro') ? __('100 AKI-Abfragen pro Monat') : $feature)) : $feature))) }}</span>
+                                    <span>{{ $featureKey === 'stock_access' ? ($plan['name'] === __('Free') ? __('Zugriff auf 100 Aktien') : __('Zugriff auf alle Aktien')) : ($featureKey === 'watchlists' && $plan['name'] === __('Free') ? __('Eine Watchlist') : ($featureKey === 'research' && $plan['name'] === __('Pro') ? __('Erweiterte Analysen') : ($featureKey === 'ai_questions' ? ($plan['name'] === __('Free') ? __('5 AKI-Credits pro Monat') : ($plan['name'] === __('Plus') ? __('50 AKI-Credits pro Monat') : ($plan['name'] === __('Pro') ? __('200 AKI-Credits · Standard oder Tiefenanalyse') : $feature))) : $feature))) }}</span>
                                 </li>
                             @endforeach
                         </ul>
@@ -137,7 +142,7 @@
                     </article>
                 @endforeach
 
-                <article x-data="{ developerDetails: false }" class="pricing-developer relative flex flex-col rounded-2xl p-5">
+                <article x-data="{ developerDetails: false }" class="pricing-developer relative hidden flex-col rounded-2xl p-5" aria-disabled="true">
                     <span class="pricing-developer-badge absolute right-5 top-5 rounded-md px-3 py-1 text-[10px] font-black uppercase tracking-wider">{{ __('Limitiert auf 10 User pro Monat') }}</span>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-300"><x-heroicon-o-code-bracket class="h-6 w-6" /></div>
                     <h2 class="mt-4 text-xl font-black">{{ __('Werde Developer') }}</h2>
@@ -169,5 +174,6 @@
 
         <p class="mx-auto mt-4 max-w-3xl shrink-0 text-center text-[10px] leading-4 text-[var(--ak-muted)]">{{ __('Alle Preise verstehen sich inklusive gesetzlicher Umsatzsteuer. AktienKI ist ein Analysewerkzeug und keine Anlageberatung. Tarife und Funktionsumfang können sich vor dem offiziellen Start noch ändern.') }}</p>
     </main>
+<x-cookie-consent />
 </body>
 </html>

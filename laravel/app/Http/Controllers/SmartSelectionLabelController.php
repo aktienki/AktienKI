@@ -29,9 +29,15 @@ final class SmartSelectionLabelController extends Controller
             'score_min' => ['nullable', 'numeric', 'between:0,10'],
             'confidence_min' => ['nullable', 'numeric', 'between:0,100'],
             'drawdown_max' => ['nullable', 'numeric', 'between:0,100'],
-            'profit_factor_min' => ['nullable', 'numeric', 'between:0,10'],
+            'profit_per_trade_min' => ['nullable', 'numeric', 'between:0,10'],
             'volatility_max' => ['nullable', 'numeric', 'between:0,1000000'],
             'predicted_return_min' => ['nullable', 'numeric', 'between:-50,100'],
+            'hit_rate_min' => ['nullable', 'numeric', 'between:0,100'],
+            'minimum_trades' => ['nullable', 'integer', 'between:0,10000'],
+            'pe_max' => ['nullable', 'numeric', 'between:0,10000'],
+            'dividend_yield_min' => ['nullable', 'numeric', 'between:0,100'],
+            'market_cap_min' => ['nullable', 'numeric', 'min:0'],
+            'revenue_growth_min' => ['nullable', 'numeric', 'between:-100,10000'],
             'email_notification_enabled' => ['nullable', 'boolean'],
         ]);
 
@@ -45,16 +51,33 @@ final class SmartSelectionLabelController extends Controller
                 ->value('id');
         }
 
-        $criteria = collect([
+        $numericCriteria = collect([
             'score_min' => 0,
             'confidence_min' => 0,
             'drawdown_max' => 50,
-            'profit_factor_min' => 0,
+            'profit_per_trade_min' => 0,
             'volatility_max' => 100,
-            'predicted_return_min' => -20,
+            'predicted_return_min' => -50,
+            'hit_rate_min' => 0,
+            'minimum_trades' => 0,
+            'pe_max' => 100,
+            'dividend_yield_min' => 0,
+            'market_cap_min' => 0,
+            'revenue_growth_min' => -50,
         ])->mapWithKeys(fn ($default, string $key): array => [
             $key => (float) ($validated[$key] ?? $default),
         ])->all();
+        $criteria = collect(SavedPredictionFilterController::FILTER_KEYS)
+            ->reject(fn (string $key): bool => in_array($key, ['initial_capital', 'trade_cost'], true))
+            ->mapWithKeys(function (string $key) use ($request): array {
+                $value = $request->input($key, SavedPredictionFilterController::FILTER_DEFAULTS[$key] ?? null);
+                return [$key => is_array($value) ? array_values($value) : $value];
+            })
+            ->merge($numericCriteria)
+            ->all();
+        // Existing labels used this legacy name. Keep it populated while all
+        // new selection logic uses the tester's canonical field name.
+        $criteria['profit_factor_min'] = $criteria['profit_per_trade_min'];
         $criteria['email_notification_enabled'] = (bool) ($validated['email_notification_enabled'] ?? false);
 
         $label = SmartSelectionLabel::query()->updateOrCreate(

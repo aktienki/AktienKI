@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\PlanLevel;
+use App\Services\FreeRegionalStockUniverseService;
+use App\Services\PlanAccessService;
 use App\Services\PersonalizedSignalService;
 use App\Services\TwelveDataService;
 use App\Support\AiScore;
@@ -29,15 +32,21 @@ final class RecommendationController extends Controller
             ->where('type', 'stock')
             ->where('is_active', true)
             ->whereNull('deleted_at')
-            ->get(['symbol', 'provider_symbol', 'currency']);
+            ->get(['symbol', 'provider_symbol', 'currency', 'german_listing_symbol', 'german_listing_exchange', 'german_listing_currency']);
 
         $quotes = $instruments->mapWithKeys(function (object $instrument) use ($marketData): array {
             $streamQuote = Cache::get('twelve_data_stream_quote_'.sha1(strtoupper((string) $instrument->symbol)));
             try {
-                $referenceQuote = $marketData->quote((string) ($instrument->provider_symbol ?: $instrument->symbol));
+                $usesGermanListing = filled($instrument->german_listing_symbol)
+                    && strtoupper((string) $instrument->german_listing_currency) === 'EUR';
+                $referenceQuote = $usesGermanListing
+                    ? $marketData->listingQuote((string) $instrument->german_listing_symbol, $instrument->german_listing_exchange ?: null)
+                    : $marketData->quote((string) ($instrument->provider_symbol ?: $instrument->symbol));
                 $quote = is_numeric($streamQuote['price'] ?? null)
                     ? [...($referenceQuote ?? []), ...$streamQuote]
-                    : $marketData->liveQuote((string) ($instrument->provider_symbol ?: $instrument->symbol));
+                    : ($usesGermanListing
+                        ? $marketData->listingQuote((string) $instrument->german_listing_symbol, $instrument->german_listing_exchange ?: null)
+                        : $marketData->liveQuote((string) ($instrument->provider_symbol ?: $instrument->symbol)));
             } catch (Throwable) {
                 $quote = null;
             }
@@ -46,15 +55,20 @@ final class RecommendationController extends Controller
                 return [];
             }
 
+            $timestamp = is_numeric($quote['timestamp'] ?? null)
+                ? (int) $quote['timestamp']
+                : now()->timestamp;
+            $ageSeconds = max(0, now()->timestamp - $timestamp);
+
             return [(string) $instrument->symbol => [
                 'price' => (float) $quote['price'],
-                'currency' => (string) (($quote['currency'] ?? null) ?: $instrument->currency ?: ''),
+                'currency' => $usesGermanListing ? 'EUR' : (string) (($quote['currency'] ?? null) ?: $instrument->currency ?: ''),
                 'change_percent' => is_numeric($quote['change_percent'] ?? null)
                     ? (float) $quote['change_percent']
                     : null,
-                'timestamp' => is_numeric($quote['timestamp'] ?? null)
-                    ? (int) $quote['timestamp']
-                    : now()->timestamp,
+                'timestamp' => $timestamp,
+                'age_seconds' => $ageSeconds,
+                'realtime' => $ageSeconds < 120,
             ]];
         });
 
@@ -66,6 +80,10 @@ final class RecommendationController extends Controller
      */
     public function screener(Request $request): View
     {
+        $isFreeRegional = app(PlanAccessService::class)->level($request->user()) === PlanLevel::Free;
+        $regionalUniverse = app(FreeRegionalStockUniverseService::class);
+        $allowedInstrumentIds = $isFreeRegional ? $regionalUniverse->instrumentIds($request->user())->all() : [];
+        $regionalCountry = $regionalUniverse->country($request->user());
         // Keep older installations usable until the optional description
         // columns have been added by the accompanying migration.
         $hasBusinessSummary = Schema::hasColumn('instruments', 'business_summary');
@@ -149,6 +167,7 @@ final class RecommendationController extends Controller
             ->where('ranked_instrument.type', 'stock')
             ->where('ranked_instrument.is_active', true)
             ->whereNull('ranked_instrument.deleted_at')
+            ->when($isFreeRegional, fn ($query) => $query->whereIn('ranked_instrument.id', $allowedInstrumentIds))
             ->get([
                 'ranked_prediction.instrument_id', 'ranked_prediction.prediction_score',
                 'ranked_prediction.confidence', 'ranked_prediction.risk_score',
@@ -168,8 +187,10 @@ final class RecommendationController extends Controller
                 $returnScore = max(0, min(100, 50 + ($return * 5)));
                 $confidence = (float) $row->confidence;
                 $confidence = max(0, min(100, $confidence <= 1 ? $confidence * 100 : $confidence));
-                $horizonStats = collect($profitFactorByInstrument->get($row->instrument_id, collect()))
-                    ->filter(fn (object $stat): bool => (int) ($stat->trade_count ?? 0) >= 10 && is_numeric($stat->profit_factor ?? null));
+                $allHorizonStats = collect($profitFactorByInstrument->get($row->instrument_id, collect()))
+                    ->filter(fn (object $stat): bool => (int) ($stat->trade_count ?? 0) >= 10);
+                $horizonStats = $allHorizonStats
+                    ->filter(fn (object $stat): bool => is_numeric($stat->profit_factor ?? null));
                 $tradeCount = (int) $horizonStats->sum(fn (object $stat): int => (int) $stat->trade_count);
                 $profitFactors = $horizonStats->map(function (object $stat): float {
                     $reliability = (int) $stat->trade_count / ((int) $stat->trade_count + 20);
@@ -179,10 +200,13 @@ final class RecommendationController extends Controller
                     $reliability = (int) $stat->trade_count / ((int) $stat->trade_count + 20);
                     return 50 + (((float) $stat->hit_rate - 50) * $reliability);
                 });
-                $profitsPerTrade = $horizonStats->filter(fn (object $stat): bool => is_numeric($stat->average_profit_per_trade_percent ?? null))
-                    ->pluck('average_profit_per_trade_percent')->map(fn ($value): float => (float) $value);
+                $profitTradeStats = $allHorizonStats
+                    ->filter(fn (object $stat): bool => is_numeric($stat->average_profit_per_trade_percent ?? null));
+                $profitTradeCount = (int) $profitTradeStats->sum(fn (object $stat): int => (int) $stat->trade_count);
                 $profitFactor = $profitFactors->isNotEmpty() ? (float) $profitFactors->avg() : null;
-                $profitPerTrade = $profitsPerTrade->isNotEmpty() ? (float) $profitsPerTrade->avg() : null;
+                $profitPerTrade = $profitTradeCount > 0
+                    ? (float) $profitTradeStats->sum(fn (object $stat): float => (float) $stat->average_profit_per_trade_percent * (int) $stat->trade_count) / $profitTradeCount
+                    : null;
                 $displayProfitPerTrade = $profitPerTrade;
                 $hitRate = $hitRates->isNotEmpty() ? (float) $hitRates->avg() : null;
                 $drawdowns = collect($drawdownByInstrument->get($row->instrument_id, collect()))
@@ -278,6 +302,7 @@ final class RecommendationController extends Controller
             ->whereIn('prediction.id', $latestIds)
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
+            ->where('instrument.is_german_tradeable', true)
             ->whereNull('instrument.deleted_at')
             ->select([
                 'prediction.id', 'prediction.instrument_id', 'prediction.prediction_time',
@@ -288,7 +313,9 @@ final class RecommendationController extends Controller
                 'prediction.prediction_score', 'prediction.confidence',
                 'prediction.risk_score', 'prediction.drawdown_risk_factor',
                 'prediction.quality_gate_blockers',
-                'instrument.symbol', 'instrument.name', 'instrument.country', 'instrument.currency', 'instrument.sector',
+                'instrument.symbol', 'instrument.name', 'instrument.isin', 'instrument.country', 'instrument.currency', 'instrument.sector',
+                'instrument.german_listing_symbol', 'instrument.german_listing_exchange',
+                'instrument.german_listing_currency', 'instrument.german_listing_verified_at',
                 'exchange.name as exchange_name', 'exchange.code as exchange_code',
                 'fundamental.trailing_pe', 'fundamental.forward_pe', 'fundamental.dividend_yield',
             ])
@@ -372,6 +399,53 @@ final class RecommendationController extends Controller
             $stocks = $stocks->take($resultLimit);
         }
         $stocks = $stocks->values();
+
+        // German listings are the canonical customer-facing prices. Preserve
+        // the model's forecast return when translating its target from the
+        // original listing into the current German EUR quote.
+        $marketData = app(TwelveDataService::class);
+        $euCountries = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE'];
+        $userCountry = strtoupper((string) data_get($request->user()?->preferences, 'country_code', 'DE'));
+        $preferEuro = in_array($userCountry, $euCountries, true);
+        $stocks->each(function (object $stock) use ($marketData, $preferEuro): void {
+            $stock->original_price = is_numeric($stock->current_price) ? (float) $stock->current_price : null;
+            $stock->original_currency = strtoupper((string) $stock->currency);
+
+            if (! $preferEuro && strtoupper((string) $stock->currency) === 'USD') {
+                return;
+            }
+
+            $preferredListing = $preferEuro
+                ? (filled($stock->german_listing_symbol) && strtoupper((string) $stock->german_listing_currency) === 'EUR'
+                    ? ['symbol' => $stock->german_listing_symbol, 'exchange' => $stock->german_listing_exchange, 'currency' => 'EUR'] : null)
+                : $marketData->usListing($stock->isin ?? null, (string) $stock->name, (string) $stock->symbol);
+
+            if (! $preferredListing) return;
+
+            try {
+                $quote = $marketData->listingQuote(
+                    (string) $preferredListing['symbol'],
+                    filled($preferredListing['exchange'] ?? null) ? (string) $preferredListing['exchange'] : null,
+                );
+            } catch (Throwable) {
+                $quote = null;
+            }
+
+            if (! is_numeric($quote['price'] ?? null) || (float) $quote['price'] <= 0) {
+                return;
+            }
+
+            $originalPrice = is_numeric($stock->current_price) ? (float) $stock->current_price : null;
+            $forecastRatio = $originalPrice && $originalPrice > 0 && is_numeric($stock->predicted_price_20d)
+                ? (float) $stock->predicted_price_20d / $originalPrice
+                : null;
+            $stock->original_symbol = $stock->symbol;
+            $stock->display_symbol = $preferredListing['symbol'];
+            $stock->current_price = (float) $quote['price'];
+            $stock->predicted_price_20d = $forecastRatio !== null ? $stock->current_price * $forecastRatio : null;
+            $stock->currency = $preferredListing['currency'];
+            $stock->expected_return_20d = $forecastRatio !== null ? ($forecastRatio - 1) * 100 : $stock->expected_return_20d;
+        });
         $latestAssessments = collect();
         if (Schema::hasTable('stock_ai_assessments')) {
             $latestAssessments = DB::table('stock_ai_assessments')
@@ -544,13 +618,14 @@ final class RecommendationController extends Controller
             );
             $stock->simple_assessment_is_stored = $storedPros !== [] || $storedCons !== [];
         });
-        $countries = DB::table('instruments')->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at')->whereNotNull('country')->distinct()->orderBy('country')->pluck('country');
-        $sectors = DB::table('instruments')->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at')->whereNotNull('sector')->distinct()->orderBy('sector')->pluck('sector');
+        $countries = DB::table('instruments')->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at')->whereNotNull('country')->when($isFreeRegional, fn ($query) => $query->whereIn('id', $allowedInstrumentIds))->distinct()->orderBy('country')->pluck('country');
+        $sectors = DB::table('instruments')->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at')->whereNotNull('sector')->when($isFreeRegional, fn ($query) => $query->whereIn('id', $allowedInstrumentIds))->distinct()->orderBy('sector')->pluck('sector');
         $indices = DB::table('market_indices as market_index')
             ->where('market_index.is_active', true)
             ->whereExists(fn ($membership) => $membership->selectRaw('1')
                 ->from('index_memberships as membership')
                 ->whereColumn('membership.market_index_id', 'market_index.id')
+                ->when($isFreeRegional, fn ($query) => $query->whereIn('membership.instrument_id', $allowedInstrumentIds))
                 ->whereNull('membership.removed_at'))
             ->orderBy('market_index.global_rank')
             ->get(['market_index.symbol', 'market_index.name']);
@@ -558,7 +633,8 @@ final class RecommendationController extends Controller
         $userWatchlists = DB::table('watchlists')->where('user_id', $request->user()->id)
             ->where('active', true)->orderByDesc('is_default')->orderBy('name')->get(['id', 'name']);
         $paperPortfolios = DB::table('portfolios')->where('user_id', $request->user()->id)
-            ->where('active', true)->where('type', 'paper')->orderByDesc('is_default')->orderBy('name')->get(['id', 'name', 'currency']);
+            ->leftJoin('portfolio_cash_accounts as cash', 'cash.portfolio_id', '=', 'portfolios.id')
+            ->where('portfolios.active', true)->where('portfolios.type', 'paper')->orderByDesc('portfolios.is_default')->orderBy('portfolios.name')->get(['portfolios.id', 'portfolios.name', 'portfolios.currency', 'portfolios.meta', DB::raw('COALESCE(cash.balance - cash.reserved_balance, 0) AS available_capital')]);
         $watchlistMemberships = DB::table('watchlist_items')->whereIn('watchlist_id', $userWatchlists->pluck('id'))
             ->whereIn('instrument_id', $stocks->pluck('instrument_id'))->get(['watchlist_id', 'instrument_id'])
             ->groupBy('instrument_id')->map(fn ($items) => $items->pluck('watchlist_id')->map(fn ($id) => (int) $id)->all());
@@ -566,7 +642,7 @@ final class RecommendationController extends Controller
             ->whereIn('instrument_id', $stocks->pluck('instrument_id'))->get(['portfolio_id', 'instrument_id'])
             ->groupBy('instrument_id')->map(fn ($items) => $items->pluck('portfolio_id')->map(fn ($id) => (int) $id)->all());
 
-        return view('screener.index', compact('stocks', 'countries', 'sectors', 'indices', 'userWatchlists', 'paperPortfolios', 'watchlistMemberships', 'paperPortfolioMemberships'));
+        return view('screener.index', compact('stocks', 'countries', 'sectors', 'indices', 'userWatchlists', 'paperPortfolios', 'watchlistMemberships', 'paperPortfolioMemberships', 'isFreeRegional', 'regionalCountry'));
     }
 
     public function screeningHistory(Request $request): View
@@ -652,6 +728,7 @@ final class RecommendationController extends Controller
             ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
+            ->where('instrument.is_german_tradeable', true)
             ->whereNull('instrument.deleted_at')
             ->whereNotNull('prediction.prediction_score')
             ->whereNotNull('prediction.confidence')

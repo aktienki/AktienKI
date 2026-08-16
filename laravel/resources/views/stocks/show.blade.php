@@ -85,9 +85,43 @@
         #stock-detail-page .ak-prediction-donut {
             width: 46px;
             height: 46px;
-            flex-basis: 46px;
+            min-width: 46px;
+            min-height: 46px;
+            flex: 0 0 46px;
+            aspect-ratio: 1 / 1;
             box-shadow: 0 0 0 1px var(--ak-border), 0 3px 8px rgba(15, 23, 42, .10);
             filter: none !important;
+        }
+
+        #stock-detail-page .ak-prediction-donut.screener-metric-donut-score {
+            width: 64px;
+            height: 64px;
+            min-width: 64px;
+            min-height: 64px;
+            flex-basis: 64px;
+        }
+
+        @media (min-width: 768px) and (max-width: 1279px) {
+            #stock-detail-page .stock-analysis-donuts .screener-metric-donut {
+                width: 42px;
+                height: 42px;
+                min-width: 42px;
+                min-height: 42px;
+                flex: 0 0 42px;
+                aspect-ratio: 1 / 1;
+            }
+
+            #stock-detail-page .stock-analysis-donuts .screener-metric-donut-score {
+                width: 58px;
+                height: 58px;
+                min-width: 58px;
+                min-height: 58px;
+                flex-basis: 58px;
+            }
+
+            #stock-detail-page .stock-horizon-cards {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
         }
 
         #stock-detail-page .ak-prediction-donut::after {
@@ -99,6 +133,30 @@
 
         :root:not([data-theme="light"]) #stock-detail-page .ak-prediction-donut::after {
             background: #1b2a33 !important;
+        }
+
+        :root:not([data-theme="light"]) #stock-detail-page .stock-analysis-donuts .screener-metric-donut {
+            background: conic-gradient(
+                color-mix(in srgb, var(--donut-color) 84%, #a5f3fc 16%) var(--donut-value),
+                rgba(148, 203, 213, .22) 0
+            );
+            box-shadow:
+                0 0 0 1px color-mix(in srgb, var(--donut-color) 38%, transparent),
+                0 0 18px color-mix(in srgb, var(--donut-color) 52%, transparent),
+                inset 0 0 8px color-mix(in srgb, var(--donut-color) 18%, transparent);
+        }
+
+        :root:not([data-theme="light"]) #stock-detail-page .stock-analysis-donuts .screener-metric-donut::after {
+            background: #132833 !important;
+        }
+
+        :root:not([data-theme="light"]) #stock-detail-page .stock-analysis-donuts .screener-metric-donut span {
+            color: color-mix(in srgb, var(--donut-color) 88%, white 12%) !important;
+            text-shadow: 0 0 12px color-mix(in srgb, var(--donut-color) 72%, transparent);
+        }
+
+        :root:not([data-theme="light"]) #stock-detail-page .stock-analysis-donuts .screener-metric-donut small {
+            color: #b7d5dc !important;
         }
 
         #stock-detail-page .ak-prediction-donut > span {
@@ -238,11 +296,35 @@
             }
         }
 
-        @media (min-width: 1024px) {
+        @media (min-width: 1280px) {
             .stock-overview-grid {
                 height: calc(100% - 3rem);
             }
 
+        }
+
+        /* Tablets need content-driven height. A viewport-locked overview made
+           the historical evaluation end below the visible card boundary. */
+        @media (min-width: 768px) and (max-width: 1279px) {
+            #stock-detail-page {
+                height: auto !important;
+                min-height: calc(100dvh - 89px);
+            }
+
+            #stock-detail-page > div.min-h-0.flex-1 {
+                overflow: visible !important;
+            }
+
+            #stock-detail-page .stock-overview-grid {
+                height: auto !important;
+                align-items: start;
+            }
+
+            #stock-detail-page .stock-overview-analysis {
+                height: auto !important;
+                min-height: max-content;
+                overflow: visible !important;
+            }
         }
 
         @media (min-width: 900px) {
@@ -258,6 +340,65 @@
                 order: 1;
             }
 
+        }
+        /* Light mode uses petrol for the complete stock-detail chrome. */
+        :root[data-theme="light"] #stock-detail-page {
+            --stock-detail-accent: #00656f;
+            --stock-detail-accent-bright: #007c87;
+        }
+
+        :root[data-theme="light"] #stock-detail-page .stock-detail-panel {
+            border-color: rgba(0, 101, 111, .34) !important;
+            border-bottom-color: rgba(0, 101, 111, .55) !important;
+            background:
+                radial-gradient(circle at 94% 100%, rgba(0, 101, 111, .10), transparent 30%),
+                rgba(255, 255, 255, .34) !important;
+            box-shadow:
+                0 1px 0 rgba(255, 255, 255, .92) inset,
+                0 -1px 0 rgba(0, 101, 111, .20) inset,
+                0 0 0 1px rgba(0, 101, 111, .08),
+                0 14px 34px rgba(15, 23, 42, .10),
+                0 4px 12px rgba(0, 79, 87, .08) !important;
+        }
+
+        :root[data-theme="light"] #stock-detail-page .stock-detail-panel::before {
+            background: linear-gradient(180deg, transparent, rgba(0, 101, 111, .58) 18%, #00656f 50%, rgba(0, 101, 111, .58) 82%, transparent) !important;
+            box-shadow: 0 0 12px rgba(0, 101, 111, .28) !important;
+        }
+
+        :root[data-theme="light"] #stock-detail-page .stock-detail-card-head {
+            border-bottom-color: rgba(0, 101, 111, .26) !important;
+            background:
+                radial-gradient(circle at 5% 0%, rgba(0, 101, 111, .18), transparent 40%),
+                linear-gradient(108deg, rgba(0, 101, 111, .14), rgba(0, 124, 135, .07) 55%, transparent) !important;
+            box-shadow: 0 6px 16px rgba(0, 79, 87, .07) !important;
+        }
+
+        :root[data-theme="light"] #stock-detail-page :is(
+            [class*="text-cyan-"],
+            .text-teal-300,
+            .text-teal-400,
+            .text-teal-500,
+            .text-teal-600,
+            .text-teal-700,
+            .text-violet-200,
+            .text-violet-300
+        ) {
+            color: #00656f !important;
+        }
+
+        :root[data-theme="light"] #stock-detail-page [class*="border-cyan-"] {
+            border-color: rgba(0, 101, 111, .30) !important;
+        }
+
+        :root[data-theme="light"] #stock-detail-page [class*="bg-cyan-"] {
+            background-color: rgba(0, 101, 111, .11) !important;
+        }
+
+        :root[data-theme="light"] #stock-detail-page .stock-collapsible-toggle {
+            border-color: rgba(0, 101, 111, .28);
+            color: #00656f;
+            background: rgba(0, 101, 111, .08);
         }
     </style>
     @php
@@ -437,6 +578,8 @@
                     </a>
                 @endif
 
+                <x-paper-depot-buy :portfolios="$paperPortfolios" :instrument-id="$instrument->id" :instrument-name="$instrument->name" :currency="$instrument->currency" :price="$prediction?->current_price" :score="\App\Support\AiScore::toPercent($prediction?->prediction_score)" />
+
                 <a href="{{ route('stocks.report', ['symbol' => $instrument->symbol, 'prediction' => $prediction?->id, 'v' => now()->timestamp]) }}" title="{{ __('Ausführlichen PDF-Bericht für :stock herunterladen', ['stock' => $instrument->name]) }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 text-[10px] font-black uppercase tracking-wide text-cyan-400 transition hover:border-cyan-400/50 hover:bg-cyan-400/15">
                     <x-heroicon-o-document-arrow-down class="h-4 w-4" />
                     <span>{{ __('Bericht') }}</span>
@@ -483,7 +626,7 @@
                                     <x-heroicon-o-adjustments-horizontal class="h-4 w-4 text-cyan-400" />
                                     {{ __('Indikatoren') }}
                                     @unless ($canUseChartIndicators)
-                                        <span class="rounded-md border border-amber-400/35 bg-amber-400/10 px-1.5 py-0.5 text-[7px] font-black tracking-wide text-amber-400">PRO</span>
+                                        <span class="ak-plan-badge ak-plan-badge--plus">PLUS</span>
                                     @endunless
                                 </span>
                                 <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform group-open:rotate-180" />
@@ -499,7 +642,7 @@
                                 'macd' => 'MACD', 'adx' => 'ADX 14', 'atr' => 'ATR 14', 'stochastic' => 'Stochastik',
                                 'cci' => 'CCI 20', 'mfi' => 'MFI 14', 'vwap' => 'VWAP', 'obv' => 'OBV',
                                 'williams' => 'Williams %R', 'roc' => 'ROC 12', 'volatility' => 'Volatilität', 'momentum' => 'Momentum 10',
-                                'support' => 'Unterstützung', 'patterns' => 'Chartmuster',
+                                'support' => 'Unterstützung', 'resistance' => 'Widerstand', 'patterns' => 'Chartmuster',
                             ] as $indicator => $indicatorLabel)
                                 <button
                                     type="button"
@@ -593,7 +736,7 @@
                         >
                             <x-heroicon-o-arrows-pointing-out data-fullscreen-open class="h-5 w-5" />
                             <x-heroicon-o-arrows-pointing-in data-fullscreen-close class="hidden h-5 w-5" />
-                            @unless ($canUseChartZoom)<span class="text-[7px] font-black">PRO</span>@endunless
+                            @unless ($canUseChartZoom)<span class="ak-plan-badge ak-plan-badge--pro">PRO</span>@endunless
                         </button>
                     </div>
                 </div>
@@ -612,8 +755,16 @@
                     </div>
                     <div id="stock-secondary-indicator-panels" class="mt-2 grid max-h-44 shrink-0 grid-cols-1 gap-2 overflow-y-auto"></div>
                 @else
-                    <div class="grid min-h-[200px] flex-1 place-items-center rounded-2xl border border-dashed border-[var(--ak-border)] text-sm text-[var(--ak-muted)]">
-                        {{ __('Keine OHLC-Tageskurse verfügbar.') }}
+                    <div class="grid min-h-[200px] flex-1 place-items-center rounded-2xl border border-dashed {{ empty($historicalChartAllowed) ? 'border-amber-400/25 bg-amber-400/[.04]' : 'border-[var(--ak-border)]' }} px-6 text-center text-sm text-[var(--ak-muted)]">
+                        <div class="max-w-xl">
+                            @if (empty($historicalChartAllowed))
+                                <x-heroicon-o-shield-exclamation class="mx-auto mb-3 h-8 w-8 text-amber-400" />
+                                <strong class="block text-sm font-black text-amber-300">{{ __('Historischer Chart nicht verfügbar') }}</strong>
+                                <span class="mt-2 block text-xs leading-5">{{ $historicalChartRestrictionReason }}</span>
+                            @else
+                                {{ __('Keine OHLC-Tageskurse verfügbar.') }}
+                            @endif
+                        </div>
                     </div>
                 @endif
             </article>
@@ -727,7 +878,7 @@
                             $hue = $percent <= 50
                                 ? ($percent / 50) * 48
                                 : 48 + (($percent - 50) / 50) * 94;
-                            return sprintf('hsl(%.1f 78%% 52%%)', $hue);
+                            return sprintf('hsl(%.1f 92%% 58%%)', $hue);
                         };
                         $analysisScoreColor = $analysisQualityDonutColor($scorePercent);
                         $analysisModelQualityColor = $analysisQualityDonutColor($analysisModelQualityPercent);
@@ -738,8 +889,10 @@
                             ? (float) $detailWalkForwardStats->average_profit_per_trade_percent : null;
                         $analysisProfitPerTradeScale = $analysisProfitPerTrade !== null
                             ? max(0, min(100, 50 + ($analysisProfitPerTrade * 25))) : null;
-                        $analysisStabilityPercent = is_numeric($prediction->horizon_fusion_stability_score ?? null)
-                            ? max(0, min(100, (float) $prediction->horizon_fusion_stability_score * ((float) $prediction->horizon_fusion_stability_score <= 1 ? 100 : 1)))
+                        $analysisStabilityValue = $prediction->horizon_fusion_stability_score
+                            ?? $modelQuality?->model_stability;
+                        $analysisStabilityPercent = is_numeric($analysisStabilityValue)
+                            ? max(0, min(100, (float) $analysisStabilityValue * ((float) $analysisStabilityValue <= 1 ? 100 : 1)))
                             : null;
                         $analysisConfidenceColor = $analysisQualityDonutColor($confidencePercent);
                         $analysisHitRateColor = $analysisQualityDonutColor($analysisHitRatePercent);
@@ -749,7 +902,7 @@
                     <div class="mt-3 space-y-3">
                         <div class="rounded-xl border border-[var(--ak-border)] bg-transparent p-3">
                             <p class="mb-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Bewertung') }}</p>
-                            <div class="flex min-h-[76px] flex-wrap items-center justify-center gap-3">
+                            <div class="stock-analysis-donuts flex min-h-[76px] w-full flex-nowrap items-center justify-between gap-1.5 overflow-visible">
                                 <div class="screener-metric-donut screener-metric-donut-score" style="--donut-value: {{ number_format($scorePercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisScoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($scorePercent ?? 0) }}">
                                     <span>{{ $scorePercent !== null ? number_format($scorePercent, 0, ',', '.') : '—' }}</span><small>{{ __('KI-Score') }}</small>
                                 </div>
@@ -782,20 +935,65 @@
                                 </p>
                             @endif
                         </div>
-                        <div class="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                        <div x-data="{ reminderOpen: false, reminderDays: 5, reminderTarget: null, reminderReturn: null, reminderIntent: 'interested' }" class="stock-horizon-cards grid grid-cols-2 gap-2 sm:grid-cols-4">
                             @foreach ([5, 10, 15, 20] as $horizonDays)
                                 @php
                                     $horizonTarget = $horizonTargets[$horizonDays] ?? ['price' => null, 'return' => null];
                                     $horizonReturn = $horizonTarget['return'];
                                 @endphp
-                                <div class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-transparent p-2">
+                                <button type="button" @if($canViewRealtime) @click="reminderDays={{ $horizonDays }}; reminderTarget=@js($horizonTarget['price']); reminderReturn=@js($horizonReturn); reminderIntent='interested'; reminderOpen=true" @endif title="{{ $canViewRealtime ? __('Kauferinnerung einrichten') : __('Ab Pro verfügbar') }}" class="relative min-w-0 rounded-xl border border-[var(--ak-border)] bg-transparent p-2 text-left transition {{ $canViewRealtime ? 'hover:border-cyan-400/45 hover:bg-cyan-400/[.05]' : 'cursor-default opacity-75' }}">
+                                    @unless($canViewRealtime)<span class="ak-plan-badge ak-plan-badge--pro absolute right-1.5 top-1.5">PRO</span>@endunless
                                     <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $horizonDays }} {{ __('Tage') }}</p>
                                     <p class="mt-1 truncate text-sm font-black text-cyan-400">{{ is_numeric($horizonTarget['price']) ? number_format((float) $horizonTarget['price'], 2, ',', '.').' '.$currency : '—' }}</p>
                                     <span class="mt-0.5 block truncate text-[9px] font-black {{ !is_numeric($horizonReturn) ? 'text-[var(--ak-muted)]' : ($horizonReturn >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">
                                         {{ is_numeric($horizonReturn) ? (($horizonReturn > 0 ? '+' : '').number_format((float) $horizonReturn, 2, ',', '.').' %') : __('Keine Prognose') }}
                                     </span>
-                                </div>
+                                </button>
                             @endforeach
+                            <template x-teleport="body">
+                                <div x-cloak x-show="reminderOpen" class="fixed inset-0 z-[160] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" @click.self="reminderOpen=false" @keydown.escape.window="reminderOpen=false">
+                                    <form method="POST" action="{{ route('stocks.purchase-reminder.store', $instrument->id) }}" class="w-full max-w-lg rounded-2xl border border-cyan-400/30 bg-[#0d1b2d] p-5 shadow-2xl">
+                                        @csrf
+                                        <input type="hidden" name="prediction_id" value="{{ $prediction->id }}">
+                                        <input type="hidden" name="horizon_days" :value="reminderDays">
+                                        <input type="hidden" name="intent" :value="reminderIntent">
+                                        <input type="hidden" name="purchase_price" value="{{ $prediction->current_price }}">
+                                        <div class="flex items-start justify-between">
+                                            <div><p class="text-[10px] font-black uppercase tracking-[.16em] text-cyan-400">PRO · {{ __('Prognose-Erinnerung') }}</p><h2 class="mt-1 text-xl font-black text-white"><span x-text="reminderDays"></span> {{ __('Tage') }}</h2></div>
+                                            <button type="button" @click="reminderOpen=false" class="text-slate-400"><x-heroicon-o-x-mark class="h-5 w-5"/></button>
+                                        </div>
+                                        <div class="mt-4 grid grid-cols-2 gap-2">
+                                            <div class="rounded-xl border border-cyan-400/20 bg-cyan-400/[.05] p-3"><small class="text-slate-400">{{ __('Kursziel') }}</small><strong class="mt-1 block text-cyan-300" x-text="reminderTarget == null ? '—' : new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(reminderTarget)+' {{ $currency }}'"></strong></div>
+                                            <div class="rounded-xl border border-amber-300/20 bg-amber-300/[.05] p-3"><small class="text-slate-400">{{ __('E-Mail am') }}</small><strong class="mt-1 block text-amber-300" x-text="new Intl.DateTimeFormat('de-DE').format(new Date(Date.now()+reminderDays*86400000))"></strong></div>
+                                        </div>
+                                        @if($signal === 'WAIT')<p class="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] p-3 text-xs font-bold text-emerald-300">{{ __('WAIT: Eine spätere Kaufprüfung ist hier besonders sinnvoll. Die E-Mail zeigt auch, ob das Signal inzwischen auf BUY gewechselt ist.') }}</p>@endif
+                                        <fieldset class="mt-4">
+                                            <legend class="mb-2 text-xs font-black uppercase tracking-wide text-slate-300">{{ __('Was möchtest du tun?') }}</legend>
+                                            <div class="grid gap-2 sm:grid-cols-2">
+                                                <button type="button" @click="reminderIntent='interested'" :aria-pressed="reminderIntent === 'interested'" :class="reminderIntent === 'interested' ? 'border-emerald-400 bg-emerald-400/15 ring-2 ring-emerald-400/25' : 'border-white/10 bg-white/[.03]'" class="relative min-h-24 rounded-xl border p-3 text-left text-sm font-black text-emerald-300 transition">
+                                                    <span class="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border" :class="reminderIntent === 'interested' ? 'border-emerald-400 bg-emerald-400 text-slate-950' : 'border-slate-500'" x-text="reminderIntent === 'interested' ? '✓' : ''"></span>
+                                                    <span class="block pr-7">{{ __('Ich möchte kaufen') }}</span><small class="mt-1 block font-medium text-slate-300">{{ __('Am gewählten Tag per E-Mail erneut prüfen') }}</small>
+                                                </button>
+                                                <button type="button" @click="reminderIntent='purchased'" :aria-pressed="reminderIntent === 'purchased'" :class="reminderIntent === 'purchased' ? 'border-cyan-400 bg-cyan-400/15 ring-2 ring-cyan-400/25' : 'border-white/10 bg-white/[.03]'" class="relative min-h-24 rounded-xl border p-3 text-left text-sm font-black text-cyan-200 transition">
+                                                    <span class="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border" :class="reminderIntent === 'purchased' ? 'border-cyan-400 bg-cyan-400 text-slate-950' : 'border-slate-500'" x-text="reminderIntent === 'purchased' ? '✓' : ''"></span>
+                                                    <span class="block pr-7">{{ __('Ich habe gekauft') }}</span><small class="mt-1 block font-medium text-slate-300">{{ __('Verkaufserinnerung erhalten') }}</small>
+                                                </button>
+                                            </div>
+                                        </fieldset>
+                                        <div x-show="reminderIntent === 'purchased'" x-cloak class="mt-3 rounded-xl border border-cyan-300/20 bg-cyan-400/[.05] p-3">
+                                            <p class="text-[10px] font-black uppercase tracking-wide text-cyan-200">{{ __('Dynamische Exit-Überwachung') }}</p>
+                                            <div class="mt-2 grid gap-2">
+                                                <label class="flex items-start gap-2 text-[10px] text-slate-300"><input type="checkbox" name="fixed_20d_exit_enabled" value="1" class="mt-0.5 h-4 w-4 rounded bg-slate-900 text-cyan-400"><span><b class="block text-white">{{ __('Fixer Exit nach 20 Tagen') }}</b>{{ __('Spätester Verkauf nach 20 Handelstagen.') }}</span></label>
+                                                <label class="flex items-start gap-2 text-[10px] text-slate-300"><input type="checkbox" name="dynamic_horizon_exit_enabled" value="1" checked class="mt-0.5 h-4 w-4 rounded bg-slate-900 text-cyan-400"><span><b class="block text-white">{{ __('Prognosehorizont') }}</b>{{ __('Bestes Ziel aus 5/10/15/20 Tagen überwachen.') }}</span></label>
+                                                <label class="flex items-start gap-2 text-[10px] text-slate-300"><input type="checkbox" name="support_stop_enabled" value="1" class="mt-0.5 h-4 w-4 rounded bg-slate-900 text-cyan-400"><span><b class="block text-white">{{ __('Unterstützungs-Stop') }}</b>{{ __('Stop 1 % unter bestätigter Unterstützung.') }}</span></label>
+                                                <label class="flex items-start gap-2 text-[10px] text-slate-300"><input type="checkbox" name="resistance_trailing_stop_enabled" value="1" class="mt-0.5 h-4 w-4 rounded bg-slate-900 text-cyan-400"><span><b class="block text-white">{{ __('Widerstands-Trailing-Stop') }}</b>{{ __('Nach Ausbruch Stop 1 % unter den ehemaligen Widerstand nachziehen.') }}</span></label>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="mt-4 h-11 w-full rounded-xl bg-cyan-400 text-sm font-black text-slate-950 transition hover:bg-cyan-300">{{ __('Erinnerung speichern') }}</button>
+                                        <button type="button" @click="reminderOpen=false" class="mt-2 h-9 w-full rounded-lg border border-white/10 text-xs font-black text-slate-400">{{ __('Abbrechen') }}</button>
+                                    </form>
+                                </div>
+                            </template>
                         </div>
                         @if ($requestedPredictionId > 0)
                             <div class="rounded-xl border border-[var(--ak-border)] bg-transparent p-2.5">
@@ -948,9 +1146,10 @@
             </div>
         </section>
 
+        @if ($canViewChartPatterns)
         <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartformationen') }}">
             <article class="stock-detail-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
-                <div class="grid gap-2 lg:grid-cols-2">
+                <div class="grid gap-2 xl:grid-cols-2">
                     @foreach ($chartPatternStats as $patternStat)
                         @php
                             $patternBullish = $patternStat['direction'] === 'bullish';
@@ -1020,6 +1219,15 @@
                 <p class="mt-3 text-[9px] leading-4 text-[var(--ak-muted)]">{{ __('Bei bearischen Mustern wird die Performance richtungsbereinigt: Ein fallender Kurs zählt dort als positiver Treffer. Vergangene Muster sind keine Garantie für zukünftige Ergebnisse.') }}</p>
             </article>
         </section>
+        @else
+        <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartformationen') }}" data-stock-pro-locked>
+            <div class="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-cyan-400/[.025] px-5 py-8 text-center">
+                <span class="ak-plan-badge ak-plan-badge--pro">PRO</span>
+                <p class="mt-3 text-sm font-black text-[var(--ak-text)]">{{ __('Chartformationen sind im Pro-Tarif verfügbar.') }}</p>
+                <p class="mt-1 max-w-xl text-xs leading-5 text-[var(--ak-muted)]">{{ __('Enthält erkannte Muster, Beispielcharts und deren historische Performance.') }}</p>
+            </div>
+        </section>
+        @endif
 
         @php
             $indicatorMatrixCards = $indicatorCards->keyBy('label');
@@ -1211,15 +1419,15 @@
         @else
         <section data-stock-collapsible="indicators" data-stock-collapsible-title="{{ __('Indikatoren Statistik') }}" data-stock-pro-locked>
             <div class="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-cyan-400/[.025] px-5 py-8 text-center">
-                <span class="rounded-md border border-amber-400/35 bg-amber-400/10 px-2 py-1 text-[8px] font-black tracking-[.14em] text-amber-400">PRO</span>
-                <p class="mt-3 text-sm font-black text-[var(--ak-text)]">{{ __('Historische Indikatorstatistiken sind im Pro-Tarif verfügbar.') }}</p>
+                <span class="ak-plan-badge ak-plan-badge--pro">PRO</span>
+                <p class="mt-3 text-sm font-black text-[var(--ak-text)]">{{ __('Chart-Indikatoren und historische Indikatorstatistiken sind im Plus-Tarif verfügbar.') }}</p>
                 <p class="mt-1 max-w-xl text-xs leading-5 text-[var(--ak-muted)]">{{ __('Enthält Einzelanalysen, Steigwahrscheinlichkeiten und Heatmaps der Indikatorkombinationen.') }}</p>
             </div>
         </section>
 
         <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartformationen') }}" data-stock-pro-locked>
             <div class="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-cyan-400/[.025] px-5 py-8 text-center">
-                <span class="rounded-md border border-amber-400/35 bg-amber-400/10 px-2 py-1 text-[8px] font-black tracking-[.14em] text-amber-400">PRO</span>
+                <span class="ak-plan-badge ak-plan-badge--pro">PRO</span>
                 <p class="mt-3 text-sm font-black text-[var(--ak-text)]">{{ __('Chartformationen sind im Pro-Tarif verfügbar.') }}</p>
                 <p class="mt-1 max-w-xl text-xs leading-5 text-[var(--ak-muted)]">{{ __('Enthält erkannte Muster, Beispielcharts und deren historische Performance.') }}</p>
             </div>
@@ -1601,7 +1809,7 @@
                 toggle.type = 'button';
                 toggle.className = 'stock-collapsible-toggle';
                 toggle.setAttribute('aria-expanded', 'false');
-                toggle.innerHTML = `<span class="stock-collapsible-icon"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true">${meta.icon}</svg></span><span class="stock-collapsible-copy"><span class="flex items-center gap-2">${title}${proLocked ? '<span class="rounded-md border border-amber-400/35 bg-amber-400/10 px-1.5 py-0.5 text-[7px] font-black tracking-wide text-amber-400">PRO</span>' : ''}</span><small class="stock-collapsible-description">${meta.description}</small></span><svg class="stock-collapsible-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+                toggle.innerHTML = `<span class="stock-collapsible-icon"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true">${meta.icon}</svg></span><span class="stock-collapsible-copy"><span class="flex items-center gap-2">${title}${proLocked ? '<span class="ak-plan-badge ak-plan-badge--pro">PRO</span>' : ''}</span><small class="stock-collapsible-description">${meta.description}</small></span><svg class="stock-collapsible-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
                 content.hidden = true;
                 section.classList.add('stock-collapsible-section');
                 section.append(toggle, content);
@@ -1772,6 +1980,7 @@
                 const predictedPrice20d = @json(is_numeric($prediction?->predicted_price_20d) ? (float) $prediction->predicted_price_20d : null);
                 const forecastHorizonTargets = @json($chartHorizonTargets);
                 const chartFocusAt = @json($chartFocusAt?->getTimestampMs());
+                const forecastBasePrice = @json(is_numeric($prediction?->current_price) ? (float) $prediction->current_price : null);
                 const liveSourceSymbol = @json($requestedPredictionId === 0 ? $instrument->symbol : null);
                 const dataUrl = @json($chartDataUrl);
                 const updatedElement = document.querySelector('#stock-chart-updated');
@@ -2015,10 +2224,17 @@
                         return currentCandles[currentCandles.length - 1];
                     }
 
-                    return [...currentCandles]
+                    const candle = [...currentCandles]
                         .reverse()
                         .find(candle => new Date(candle.x).getTime() <= chartFocusAt)
                         ?? currentCandles[0];
+
+                    if (!candle || !Number.isFinite(Number(forecastBasePrice))) return candle;
+
+                    return {
+                        ...candle,
+                        y: [candle.y?.[0], candle.y?.[1], candle.y?.[2], Number(forecastBasePrice)],
+                    };
                 };
 
                 const chartSeries = () => {
@@ -2727,6 +2943,61 @@
                                     'font-family': 'inherit',
                                 });
                                 label.textContent = `${@json(__('Unterstützung'))} ${zone.price.toFixed(2)} ${currency}`;
+                                svg.appendChild(label);
+                            });
+                    }
+
+                    if (activeIndicators.has('resistance') && visibleCandles.length >= 7) {
+                        const latestClose = Number(visibleCandles.at(-1)?.y?.[3]);
+                        const highs = visibleCandles.map(candle => Number(candle?.y?.[1]));
+                        const candidates = [];
+
+                        for (let index = 2; index < highs.length - 2; index += 1) {
+                            const high = highs[index];
+                            if (!Number.isFinite(high) || (Number.isFinite(latestClose) && high < latestClose * .995)) continue;
+                            if (high >= highs[index - 1] && high >= highs[index - 2]
+                                && high >= highs[index + 1] && high >= highs[index + 2]) {
+                                candidates.push({ price: high, index });
+                            }
+                        }
+
+                        const tolerance = Math.max((priceRange.max - priceRange.min) * .012, (latestClose || 1) * .006);
+                        const zones = [];
+                        candidates.forEach(candidate => {
+                            const zone = zones.find(item => Math.abs(item.price - candidate.price) <= tolerance);
+                            if (zone) {
+                                zone.points.push(candidate);
+                                zone.price = zone.points.reduce((sum, point) => sum + point.price, 0) / zone.points.length;
+                            } else {
+                                zones.push({ price: candidate.price, points: [candidate] });
+                            }
+                        });
+
+                        zones
+                            .map(zone => ({
+                                ...zone,
+                                score: zone.points.length * 10 + Math.max(...zone.points.map(point => point.index)) / visibleCandles.length,
+                            }))
+                            .sort((leftZone, rightZone) => rightZone.score - leftZone.score)
+                            .slice(0, 3)
+                            .sort((leftZone, rightZone) => leftZone.price - rightZone.price)
+                            .forEach((zone, index) => {
+                                const y = toY(zone.price);
+                                const color = index === 0 ? '#fb923c' : '#f97316';
+                                svg.appendChild(svgNode('line', {
+                                    x1: left, x2: left + plotWidth, y1: y, y2: y,
+                                    stroke: color, 'stroke-width': index === 0 ? '1.5' : '1',
+                                    'stroke-dasharray': index === 0 ? '7 5' : '4 5',
+                                    'stroke-opacity': index === 0 ? '.86' : '.58',
+                                    'vector-effect': 'non-scaling-stroke',
+                                }));
+                                const label = svgNode('text', {
+                                    x: left + plotWidth - 5, y: Math.max(top + 9, y - 4),
+                                    fill: color, 'fill-opacity': index === 0 ? '.98' : '.75',
+                                    'font-size': '8', 'font-weight': '800', 'text-anchor': 'end',
+                                    'font-family': 'inherit',
+                                });
+                                label.textContent = `${@json(__('Widerstand'))} ${zone.price.toFixed(2)} ${currency}`;
                                 svg.appendChild(label);
                             });
                     }

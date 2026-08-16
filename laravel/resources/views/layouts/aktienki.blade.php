@@ -26,6 +26,15 @@
         </main>
     </div>
 
+    @auth
+        @unless(request()->routeIs('admin.*'))
+            @unless(request()->routeIs('setup.quality'))
+                <x-authenticated-chat-dock />
+            @endunless
+        @endunless
+    @endauth
+
     @livewireScripts
+    <x-cookie-consent />
 </body>
 </html>

@@ -83,5 +83,6 @@
             </div>
         </section>
     </main>
+<x-cookie-consent />
 </body>
 </html>

@@ -15,7 +15,7 @@
             <div class="mb-5 inline-flex rounded-lg border border-amber-300/45 bg-amber-300/15 px-3 py-1.5 text-xs font-black uppercase tracking-[.16em] text-amber-200">{{ __('Beta-Zugang') }}</div>
             <h1 class="text-2xl font-bold">{{ __('Fast geschafft') }}</h1>
             <p class="mt-3 text-sm leading-6 text-slate-300">{{ __('Deine E-Mail-Adresse ist bestätigt. Gib jetzt den persönlichen Freischaltcode aus der E-Mail ein, um deinen Beta-Zugang zu aktivieren.') }}</p>
-            <p class="mt-4 rounded-lg border border-amber-300/25 bg-amber-300/[.08] px-3 py-2 text-xs leading-5 text-amber-100">{{ config('aktienki.beta.phase_ended', false) ? __('Du erhältst jetzt drei Monate Pro kostenlos. Danach wird der Pro-Tarif kostenpflichtig; vor Ablauf informieren wir dich per E-Mail.') : __('Während der laufenden Beta ist Pro kostenlos. Nach dem offiziellen Beta-Ende startet deine dreimonatige kostenlose Pro-Testphase; vor Ablauf informieren wir dich per E-Mail.') }}</p>
+            <p class="mt-4 rounded-lg border border-amber-300/25 bg-amber-300/[.08] px-3 py-2 text-xs leading-5 text-amber-100">{{ config('aktienki.beta.phase_ended', false) ? __('Du erhältst jetzt ein Jahr Pro kostenlos. Danach wird der Pro-Tarif kostenpflichtig; vor Ablauf informieren wir dich per E-Mail.') : __('Während der laufenden Beta ist Pro kostenlos. Nach dem offiziellen Beta-Ende startet dein kostenloses Pro-Jahr; vor Ablauf informieren wir dich per E-Mail.') }}</p>
             <form method="POST" action="{{ route('beta.activation.complete') }}" class="mt-6">
                 @csrf
                 <label for="beta_code" class="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-amber-300">{{ __('Freischaltcode') }}</label>
@@ -26,5 +26,6 @@
             <p class="mt-4 text-center text-xs text-slate-500"><a href="mailto:{{ config('aktienki.beta.contact_email') }}" class="text-amber-200 hover:text-white">{{ __('Code nicht erhalten? Schreib uns.') }}</a></p>
         </section>
     </main>
+<x-cookie-consent />
 </body>
 </html>

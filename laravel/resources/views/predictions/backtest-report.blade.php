@@ -43,6 +43,7 @@
         .stock-table th:not(:nth-child(2)), .stock-table td:not(:nth-child(2)) { text-align: center; }
         .stock-table td:first-child { font-weight: 800; color: #0e7490; }
         .stock-table td:nth-child(2) { color: #1f3046; }
+        .strategy-cell { max-width: 112px; color: #36536b; font-size: 6.4px; line-height: 1.25; }
         .footer { position: fixed; bottom: -20px; left: 0; right: 0; color: #7a8797; font-size: 7px; text-align: center; }
     </style>
 </head>
@@ -52,14 +53,17 @@
     $capital = (float) data_get($settings, 'capital.initial', $result['initial_capital']);
     $tradeCost = (float) data_get($settings, 'capital.trade_cost_eur', $result['trade_cost']);
     $filterLabels = [
-        'q' => 'Aktie', 'country' => 'Land', 'exchange' => 'Börse', 'sector' => 'Sektor',
-        'ai_type' => 'KI-Typ', 'model' => 'Modell', 'quality_tier' => 'Modellstufe mindestens', 'signal' => 'Signal',
+        'country' => 'Land', 'exchange' => 'Börse', 'sector' => 'Sektor',
+        'model' => 'Modell', 'quality_tier' => 'Modellstufe mindestens', 'signal' => 'Signal',
         'score_min' => 'KI-Score mindestens', 'confidence_min' => 'Konfidenz mindestens',
-        'drawdown_max' => 'Drawdown maximal', 'profit_factor_min' => 'Profitfaktor mindestens',
+        'drawdown_max' => 'Drawdown maximal', 'profit_per_trade_min' => 'Ø Netto-Profit je Trade mindestens',
         'volatility_max' => 'Volatilität maximal', 'pe_max' => 'KGV maximal',
         'dividend_yield_min' => 'Dividendenrendite mindestens', 'market_cap_min' => 'Marktkapitalisierung mindestens',
         'revenue_growth_min' => 'Umsatzwachstum mindestens', 'hit_rate_min' => 'Hitrate mindestens',
         'sector_score_rotation' => 'KI-Score-Sektorrotation', 'index_score_rotation' => 'KI-Score-Indexrotation',
+        'entry_strategy' => 'Einstiegsstrategie', 'entry_risk_style' => 'Auswahlprofil',
+        'entry_wait_5d_enabled' => 'WAIT-Einstieg (max. 5 Tage)',
+        'signal_change_exit_enabled' => 'Ausstieg beim Signalwechsel',
         'position_factor' => 'Maximaler Positionsanteil', 'exit_strategy' => 'Exitstrategie',
     ];
     $formatMoney = fn ($value) => number_format((float) $value, 2, ',', '.').' €';
@@ -70,15 +74,28 @@
         ->implode(' · ') ?: 'Keine Aufstockung';
     $spPerformance = (float) ($result['benchmark_performance'] ?? 0);
     $selectedExitStrategy = (string) ($filters['exit_strategy'] ?? 'fixed_20d');
+    $executionHorizon = (int) ($run->horizon_days ?? 20);
     $exitStrategyLabels = [
-        'fixed_20d' => '20 Tage',
-        'winner_runner' => 'Winner Runner',
-        'prediction_target' => 'Prognoseziel',
+        'fixed_20d' => $executionHorizon.' Tage',
         'buy_and_hold' => 'Buy and Hold',
     ];
     $selectedExitStrategyLabel = $exitStrategyLabels[$selectedExitStrategy] ?? $selectedExitStrategy;
     $moneyManagerEnabled = $selectedExitStrategy !== 'buy_and_hold';
-    $executionHorizon = (int) ($run->horizon_days ?? 20);
+    $showAdaptive = (bool) data_get($settings, 'selection_filters.adaptive_rotation_enabled', false);
+    $automaticComparison = (bool) data_get($settings, 'selection_filters.automatic_strategy_comparison', false);
+    $selectedStrategies = collect([
+        ! empty($filters['entry_wait_5d_enabled']) ? 'Einstieg: WAIT 5T' : null,
+        ! empty($filters['forecast_score_rotation_5d_enabled']) ? 'Einstieg: Forecast-Score 5T' : null,
+        ! empty($filters['sector_score_rotation']) ? 'Bereichspriorität: Sektor' : null,
+        ! empty($filters['index_score_rotation']) ? 'Bereichspriorität: Index' : null,
+        'Auswahl: '.match ($filters['entry_risk_style'] ?? 'balanced') { 'conservative' => 'Konservativ', 'chance' => 'Chance', default => 'Ausgewogen' },
+        $automaticComparison ? 'Vergleich: Automatik (alle Entry-/Exitvarianten)' : null,
+        $selectedExitStrategy === 'buy_and_hold' ? 'Haltedauer: Buy and Hold' : 'Exit: '.$executionHorizon.'T',
+        ! empty($filters['signal_change_exit_enabled']) ? 'Exit: Signalwechsel' : null,
+        ! empty($filters['support_stop_enabled']) ? 'Exit: Support-Stop' : null,
+        ! empty($filters['resistance_trailing_stop_enabled']) ? 'Exit: Resistance-Trailing' : null,
+    ])->filter()->unique()->values();
+    $selectedStrategiesLabel = $selectedStrategies->implode(' · ');
     $optimizationWeights = (array) data_get($settings, 'optimization.horizon_weights', []);
     $multiHorizonOptimization = data_get($settings, 'optimization.mode') === 'automatic_multi_horizon';
     $benchmarkStartDate = ! empty($result['benchmark']) ? date('d.m.Y', (int) ($result['benchmark'][0]['x'] / 1000)) : '—';
@@ -88,7 +105,7 @@
 <div class="header">
     <div class="brand">aktienKI.com</div>
     <h1>Persönlicher 3-Jahres-Backtest</h1>
-    <p class="subtitle">Ausführungshorizont {{ $executionHorizon }} Tage · Winner Runner, Prognoseziel, Buy and Hold, adaptive Marktrotation und S&amp;P 500 im direkten Vergleich</p>
+    <p class="subtitle">Ausführungshorizont {{ $executionHorizon }} Tage · gewählte Strategie und S&amp;P 500 im direkten Vergleich</p>
     <p class="meta">Bericht erstellt am {{ now()->timezone('Europe/Berlin')->format('d.m.Y H:i') }} Uhr · Lauf {{ $run->public_id }}</p>
 </div>
 
@@ -101,12 +118,15 @@
         @endif
     </div>
     <table style="margin-top:5px" class="comparison">
-        <thead><tr><th>Horizont</th><th>Gewichtung</th><th>Aktien</th><th>Trades</th><th>Hitrate</th><th>Ø Netto-Rendite/Trade</th><th>Profitfaktor</th></tr></thead>
+        <thead><tr><th>Horizont</th><th>Strategien</th><th>Gewichtung</th><th>Aktien</th><th>Trades</th><th>Hitrate</th><th>Ø Netto-Rendite/Trade</th><th>Profitfaktor</th></tr></thead>
         <tbody>
         @forelse ($horizonStatistics as $horizon)
-            @php($days = $horizon['horizon_days'])
+            @php
+                $days = $horizon['horizon_days'];
+            @endphp
             <tr>
                 <td><strong>{{ $days === null ? 'Gesamt' : $days.' Tage' }}</strong>{{ $days === $executionHorizon ? ' · gehandelt' : '' }}</td>
+                <td class="strategy-cell">{{ $selectedStrategiesLabel }}</td>
                 <td>{{ $days !== null && isset($optimizationWeights[$days]) ? number_format((float) $optimizationWeights[$days], 0, ',', '.').' %' : ($days === $executionHorizon && ! $multiHorizonOptimization ? '100 %' : '—') }}</td>
                 <td>{{ number_format((int) $horizon['instruments'], 0, ',', '.') }}</td>
                 <td>{{ number_format((int) $horizon['trades'], 0, ',', '.') }}</td>
@@ -115,17 +135,30 @@
                 <td>{{ $horizon['profit_factor'] === null ? '∞' : number_format((float) $horizon['profit_factor'], 2, ',', '.') }}</td>
             </tr>
         @empty
-            <tr><td colspan="7">Für die verwendeten Horizonte ist keine Walk-Forward-Gesamtstatistik verfügbar.</td></tr>
+            <tr><td colspan="8">Für die verwendeten Horizonte ist keine Walk-Forward-Gesamtstatistik verfügbar.</td></tr>
         @endforelse
         </tbody>
     </table>
+    @if (! empty($filters['entry_wait_5d_enabled']) || ! empty($filters['signal_change_exit_enabled']))
+        <table style="margin-top:6px">
+            <tr><th>WAIT &amp; BUY</th><th>Tatsächliche WAIT-Einstiege</th><th>Exit bei Signalwechsel</th><th>Tatsächliche Signalwechsel-Exits</th></tr>
+            <tr>
+                <td>{{ ! empty($filters['entry_wait_5d_enabled']) ? 'Aktiv · maximal 5 Tage' : 'Deaktiviert' }}</td>
+                <td><strong>{{ number_format((int) ($result['wait_entry_count'] ?? 0), 0, ',', '.') }}</strong></td>
+                <td>{{ ! empty($filters['signal_change_exit_enabled']) ? 'Aktiv' : 'Deaktiviert' }}</td>
+                <td><strong>{{ number_format((int) ($result['signal_change_exit_count'] ?? 0), 0, ',', '.') }}</strong></td>
+            </tr>
+        </table>
+    @endif
 </div>
 
+@if ($automaticComparison || $selectedExitStrategy === 'buy_and_hold')
 <div class="section">
     <div class="section-title">Buy-and-Hold-Vergleich</div>
     <table>
-        <tr><th>Erster Kauf</th><th>Endkapital</th><th>Performance</th><th>Max. Drawdown</th><th>Gekaufte Aktien</th><th>Money Manager</th></tr>
+        <tr><th>Strategie</th><th>Erster Kauf</th><th>Endkapital</th><th>Performance</th><th>Max. Drawdown</th><th>Gekaufte Aktien</th><th>Money Manager</th></tr>
         <tr>
+            <td class="strategy-cell">Buy and Hold</td>
             <td>{{ ! empty($result['buy_and_hold_entry_at']) ? date('d.m.Y', (int) ($result['buy_and_hold_entry_at'] / 1000)) : '—' }}</td>
             <td>{{ $formatMoney($result['buy_and_hold_final_capital']) }}</td>
             <td class="{{ $result['buy_and_hold_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['buy_and_hold_performance']) }}</td>
@@ -139,8 +172,9 @@
 <div class="section">
     <div class="section-title">Portfolio-Annahmen</div>
     <table>
-        <tr><th>Startkapital</th><th>Maximale Aktien</th><th>Grundanteil</th><th>Max. Anteil je Aktie</th><th>Kosten je Trade</th></tr>
+        <tr><th>Strategien</th><th>Startkapital</th><th>Maximale Aktien</th><th>Grundanteil</th><th>Max. Anteil je Aktie</th><th>Kosten je Trade</th></tr>
         <tr>
+            <td class="strategy-cell">{{ $selectedStrategiesLabel }}</td>
             <td>{{ $formatMoney($capital) }}</td>
             <td>{{ (int) data_get($settings, 'capital.max_parallel_positions', 5) }}</td>
             <td>{{ $formatMoney(data_get($settings, 'capital.position', $capital / max(1, (int) data_get($settings, 'capital.max_parallel_positions', 5)))) }}</td>
@@ -153,8 +187,6 @@
         <tr>
             <td><strong>{{ $selectedExitStrategyLabel }}</strong></td>
             <td>{{ match ($selectedExitStrategy) {
-                'winner_runner' => 'Gewinne laufen lassen, Schutz- und Trend-Exit',
-                'prediction_target' => 'Ausstieg beim Erreichen des Prognoseziels',
                 'buy_and_hold' => 'Gekaufte Aktien werden dauerhaft gehalten',
                 default => 'Ausstieg nach 20 Handelstagen',
             } }}</td>
@@ -163,32 +195,57 @@
         </tr>
     </table>
 </div>
+@endif
 
 <div class="section">
     <div class="section-title">Ergebnisvergleich</div>
     <table class="comparison">
-        <tr><th>Kennzahl</th><th>20 Tage</th><th>Winner Runner</th><th>Prognoseziel</th><th>Adaptive Rotation</th><th>S&amp;P 500</th></tr>
-        <tr><td>Endkapital</td><td>{{ $formatMoney($result['final_capital']) }}</td><td>{{ $formatMoney($result['winner_runner_final_capital']) }}</td><td>{{ $formatMoney($result['prediction_target_final_capital']) }}</td><td>{{ $formatMoney($result['adaptive_rotation_final_capital']) }}</td><td>{{ $formatMoney($result['benchmark_final_capital'] ?? 0) }}<br><small>{{ $benchmarkStartDate }}–{{ $benchmarkEndDate }}</small></td></tr>
-        <tr><td>Performance</td><td class="{{ $result['strategy_gross_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['strategy_gross_performance']) }}</td><td class="{{ $result['winner_runner_gross_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['winner_runner_gross_performance']) }}</td><td class="{{ $result['prediction_target_gross_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['prediction_target_gross_performance']) }}</td><td class="{{ $result['adaptive_rotation_gross_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['adaptive_rotation_gross_performance']) }}</td><td class="{{ $spPerformance >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($spPerformance) }}</td></tr>
-        <tr><td>Handelskosten</td><td>{{ $formatMoney($result['total_costs']) }}</td><td>{{ $formatMoney($result['winner_runner_executed_trades'] * $tradeCost) }}</td><td>{{ $formatMoney($result['prediction_target_executed_trades'] * $tradeCost) }}</td><td>{{ $formatMoney($result['adaptive_rotation_executed_trades'] * $tradeCost) }}</td><td>nicht berücksichtigt</td></tr>
-        <tr><td>Performance nach Kosten</td><td class="{{ $result['strategy_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['strategy_performance']) }}</td><td class="{{ $result['winner_runner_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['winner_runner_performance']) }}</td><td class="{{ $result['prediction_target_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['prediction_target_performance']) }}</td><td class="{{ $result['adaptive_rotation_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['adaptive_rotation_performance']) }}</td><td class="{{ $spPerformance >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($spPerformance) }}</td></tr>
+        <tr><th>Kennzahl</th><th>Gewählte Strategie</th>@if($showAdaptive)<th>Adaptive Rotation</th>@endif<th>S&amp;P 500</th></tr>
+        <tr><td>Endkapital</td><td>{{ $formatMoney($result['final_capital']) }}</td>@if($showAdaptive)<td>{{ $formatMoney($result['adaptive_rotation_final_capital']) }}</td>@endif<td>{{ $formatMoney($result['benchmark_final_capital'] ?? 0) }}<br><small>{{ $benchmarkStartDate }}–{{ $benchmarkEndDate }}</small></td></tr>
+        <tr><td>Performance</td><td class="{{ $result['strategy_gross_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['strategy_gross_performance']) }}</td>@if($showAdaptive)<td class="{{ $result['adaptive_rotation_gross_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['adaptive_rotation_gross_performance']) }}</td>@endif<td class="{{ $spPerformance >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($spPerformance) }}</td></tr>
+        <tr><td>Handelskosten</td><td>{{ $formatMoney($result['total_costs']) }}</td>@if($showAdaptive)<td>{{ $formatMoney($result['adaptive_rotation_executed_trades'] * $tradeCost) }}</td>@endif<td>nicht berücksichtigt</td></tr>
+        <tr><td>Performance nach Kosten</td><td class="{{ $result['strategy_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['strategy_performance']) }}</td>@if($showAdaptive)<td class="{{ $result['adaptive_rotation_performance'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($result['adaptive_rotation_performance']) }}</td>@endif<td class="{{ $spPerformance >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($spPerformance) }}</td></tr>
         @php
             $fixedDifference = (float) $result['strategy_performance'] - $spPerformance;
-            $runnerDifference = (float) $result['winner_runner_performance'] - $spPerformance;
-            $targetDifference = (float) $result['prediction_target_performance'] - $spPerformance;
             $adaptiveDifference = (float) $result['adaptive_rotation_performance'] - $spPerformance;
             $formatPoints = fn ($value) => ($value > 0 ? '+' : '').number_format((float) $value, 2, ',', '.').' Prozentpunkte';
         @endphp
-        <tr><td>Differenz zum S&amp;P 500</td><td class="{{ $fixedDifference >= 0 ? 'positive' : 'negative' }}">{{ $formatPoints($fixedDifference) }}</td><td class="{{ $runnerDifference >= 0 ? 'positive' : 'negative' }}">{{ $formatPoints($runnerDifference) }}</td><td class="{{ $targetDifference >= 0 ? 'positive' : 'negative' }}">{{ $formatPoints($targetDifference) }}</td><td class="{{ $adaptiveDifference >= 0 ? 'positive' : 'negative' }}">{{ $formatPoints($adaptiveDifference) }}</td><td>0,00 Prozentpunkte</td></tr>
-        <tr><td>Max. Portfolio-Drawdown</td><td class="negative">{{ $formatPercent($result['portfolio_max_drawdown']) }}</td><td class="negative">{{ $formatPercent($result['winner_runner_max_drawdown']) }}</td><td class="negative">{{ $formatPercent($result['prediction_target_max_drawdown']) }}</td><td class="negative">{{ $formatPercent($result['adaptive_rotation_max_drawdown']) }}</td><td class="negative">{{ $formatPercent($result['benchmark_max_drawdown']) }}</td></tr>
-        <tr><td>Ausgeführte Trades</td><td>{{ number_format($result['executed_trades'], 0, ',', '.') }}</td><td>{{ number_format($result['winner_runner_executed_trades'], 0, ',', '.') }}</td><td>{{ number_format($result['prediction_target_executed_trades'], 0, ',', '.') }}</td><td>{{ number_format($result['adaptive_rotation_executed_trades'], 0, ',', '.') }}</td><td>1</td></tr>
-        <tr><td>Aufgestockte Positionen</td><td>{{ $formatFactorUsage($result['position_factor_usage'] ?? []) }}</td><td>{{ $formatFactorUsage($result['winner_runner_position_factor_usage'] ?? []) }}</td><td>{{ $formatFactorUsage($result['prediction_target_position_factor_usage'] ?? []) }}</td><td>{{ $formatFactorUsage($result['adaptive_rotation_position_factor_usage'] ?? []) }}</td><td>—</td></tr>
-        <tr><td>Trades pro Monat</td><td>{{ number_format($result['trades_per_month'], 2, ',', '.') }}</td><td>{{ number_format($result['winner_runner_trades_per_month'], 2, ',', '.') }}</td><td>{{ number_format($result['prediction_target_trades_per_month'], 2, ',', '.') }}</td><td>{{ number_format($result['adaptive_rotation_trades_per_month'], 2, ',', '.') }}</td><td>{{ number_format(1 / max(1, (float) $result['backtest_months']), 2, ',', '.') }}</td></tr>
-        <tr><td>Übersprungene Signale</td><td>{{ number_format($result['skipped_trades'], 0, ',', '.') }}</td><td>{{ number_format($result['winner_runner_skipped_trades'], 0, ',', '.') }}</td><td>{{ number_format($result['prediction_target_skipped_trades'], 0, ',', '.') }}</td><td>{{ number_format($result['adaptive_rotation_skipped_trades'], 0, ',', '.') }}</td><td>0</td></tr>
-        <tr><td>Ø Kapitalbindung</td><td>{{ $formatPercent($result['average_capital_binding']) }}</td><td>{{ $formatPercent($result['winner_runner_average_capital_binding']) }}</td><td>{{ $formatPercent($result['prediction_target_average_capital_binding']) }}</td><td>{{ $formatPercent($result['adaptive_rotation_average_capital_binding']) }}</td><td>100,00 %</td></tr>
-        <tr><td>Max. Kapitalbindung</td><td>{{ $formatPercent($result['maximum_capital_binding']) }}</td><td>{{ $formatPercent($result['winner_runner_maximum_capital_binding']) }}</td><td>{{ $formatPercent($result['prediction_target_maximum_capital_binding']) }}</td><td>{{ $formatPercent($result['adaptive_rotation_maximum_capital_binding']) }}</td><td>100,00 %</td></tr>
+        <tr><td>Differenz zum S&amp;P 500</td><td class="{{ $fixedDifference >= 0 ? 'positive' : 'negative' }}">{{ $formatPoints($fixedDifference) }}</td>@if($showAdaptive)<td class="{{ $adaptiveDifference >= 0 ? 'positive' : 'negative' }}">{{ $formatPoints($adaptiveDifference) }}</td>@endif<td>0,00 Prozentpunkte</td></tr>
+        <tr><td>Max. Portfolio-Drawdown</td><td class="negative">{{ $formatPercent($result['portfolio_max_drawdown']) }}</td>@if($showAdaptive)<td class="negative">{{ $formatPercent($result['adaptive_rotation_max_drawdown']) }}</td>@endif<td class="negative">{{ $formatPercent($result['benchmark_max_drawdown']) }}</td></tr>
+        <tr><td>Ausgeführte Trades</td><td>{{ number_format($result['executed_trades'], 0, ',', '.') }}</td>@if($showAdaptive)<td>{{ number_format($result['adaptive_rotation_executed_trades'], 0, ',', '.') }}</td>@endif<td>1</td></tr>
+        <tr><td>Ausgewählte Strategien</td><td class="strategy-cell">{{ $selectedStrategiesLabel }}</td>@if($showAdaptive)<td class="strategy-cell">Adaptive Rotation</td>@endif<td class="strategy-cell">Buy and Hold</td></tr>
+        <tr><td>Aufgestockte Positionen</td><td>{{ $formatFactorUsage($result['position_factor_usage'] ?? []) }}</td>@if($showAdaptive)<td>{{ $formatFactorUsage($result['adaptive_rotation_position_factor_usage'] ?? []) }}</td>@endif<td>—</td></tr>
+        <tr><td>Trades pro Monat</td><td>{{ number_format($result['trades_per_month'], 2, ',', '.') }}</td>@if($showAdaptive)<td>{{ number_format($result['adaptive_rotation_trades_per_month'], 2, ',', '.') }}</td>@endif<td>{{ number_format(1 / max(1, (float) $result['backtest_months']), 2, ',', '.') }}</td></tr>
+        <tr><td>Übersprungene Signale</td><td>{{ number_format($result['skipped_trades'], 0, ',', '.') }}</td>@if($showAdaptive)<td>{{ number_format($result['adaptive_rotation_skipped_trades'], 0, ',', '.') }}</td>@endif<td>0</td></tr>
+        <tr><td>Ø Kapitalbindung</td><td>{{ $formatPercent($result['average_capital_binding']) }}</td>@if($showAdaptive)<td>{{ $formatPercent($result['adaptive_rotation_average_capital_binding']) }}</td>@endif<td>100,00 %</td></tr>
+        <tr><td>Max. Kapitalbindung</td><td>{{ $formatPercent($result['maximum_capital_binding']) }}</td>@if($showAdaptive)<td>{{ $formatPercent($result['adaptive_rotation_maximum_capital_binding']) }}</td>@endif<td>100,00 %</td></tr>
     </table>
 </div>
+
+@if ($automaticComparison)
+@php
+    $automaticReportVariants = collect([
+        'Gewählte Strategie' => ['final_capital' => data_get($result, 'final_capital'), 'performance' => data_get($result, 'strategy_performance'), 'max_drawdown' => data_get($result, 'portfolio_max_drawdown'), 'executed_trades' => data_get($result, 'executed_trades', 0)],
+        'Forecast-Score-Einstieg 5T' => ['final_capital' => data_get($result, 'forecast_score_rotation_final_capital'), 'performance' => data_get($result, 'forecast_score_rotation_performance'), 'max_drawdown' => data_get($result, 'forecast_score_rotation_max_drawdown'), 'executed_trades' => data_get($result, 'forecast_score_rotation_executed_trades', 0)],
+        'Sektorrotation' => ['final_capital' => data_get($result, 'sector_entry_rotation_final_capital'), 'performance' => data_get($result, 'sector_entry_rotation_performance'), 'max_drawdown' => data_get($result, 'sector_entry_rotation_max_drawdown'), 'executed_trades' => data_get($result, 'sector_entry_rotation_executed_trades', 0)],
+        'Indexrotation' => ['final_capital' => data_get($result, 'index_entry_rotation_final_capital'), 'performance' => data_get($result, 'index_entry_rotation_performance'), 'max_drawdown' => data_get($result, 'index_entry_rotation_max_drawdown'), 'executed_trades' => data_get($result, 'index_entry_rotation_executed_trades', 0)],
+        'Buy and Hold' => ['final_capital' => data_get($result, 'buy_and_hold_final_capital'), 'performance' => data_get($result, 'buy_and_hold_performance'), 'max_drawdown' => data_get($result, 'buy_and_hold_max_drawdown'), 'executed_trades' => data_get($result, 'buy_and_hold_executed_trades', 0)],
+    ])->merge(collect($result['automatic_exit_variants'] ?? [])->mapWithKeys(fn ($variant, $key) => [match($key) {
+        'auto_exit_fixed_20d' => 'Exit 20T', 'auto_exit_dynamic_horizon' => 'Dynamischer Horizont',
+        'auto_exit_support_stop' => 'Support-Stop', 'auto_exit_resistance_trailing' => 'Resistance-Trailing',
+        'auto_exit_signal_change' => 'Signalwechsel', 'auto_entry_wait_5d' => 'WAIT-Einstieg 5T', default => $key,
+    } => $variant]))->filter(fn ($variant) => (int) ($variant['executed_trades'] ?? 0) > 0);
+@endphp
+<div class="section">
+    <div class="section-title">Automatischer Entry-/Exitvergleich</div>
+    <table class="comparison">
+        <tr><th>Variante</th><th>Endkapital</th><th>Performance</th><th>Max. Drawdown</th><th>Trades</th><th>Auswahlprofil</th></tr>
+        @foreach($automaticReportVariants as $name => $variant)
+        <tr><td class="strategy-cell">{{ $name }}</td><td>{{ $formatMoney($variant['final_capital'] ?? 0) }}</td><td class="{{ ($variant['performance'] ?? 0) >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($variant['performance'] ?? 0) }}</td><td class="negative">{{ $formatPercent($variant['max_drawdown'] ?? 0) }}</td><td>{{ number_format((int) ($variant['executed_trades'] ?? 0), 0, ',', '.') }}</td><td>{{ match($filters['entry_risk_style'] ?? 'balanced') { 'conservative' => 'Konservativ', 'chance' => 'Chance', default => 'Ausgewogen' } }}</td></tr>
+        @endforeach
+    </table>
+</div>
+@endif
 
 <div class="section">
     <div class="section-title">Kapitalentwicklung</div>
@@ -200,6 +257,7 @@
     </div>
 </div>
 
+@if ($showAdaptive)
 <div class="section">
     <div class="section-title">Statistik der adaptiven Marktrotation</div>
     <table class="model-summary">
@@ -217,6 +275,7 @@
         <p class="meta" style="color:#52647a"><strong>KI-Score-Übergewichtung:</strong> bester Sektor {{ number_format($adaptiveStatistics->sector_overweights, 0, ',', '.') }} Trades · bester Index {{ number_format($adaptiveStatistics->index_overweights, 0, ',', '.') }} Trades · Gewichtungsfaktor maximal 1,5</p>
     @endif
 </div>
+@endif
 
 <div class="section">
     <div class="section-title">Verwendete Filter</div>
@@ -232,7 +291,7 @@
     </table>
 </div>
 
-<div class="note"><strong>Methodik:</strong> Alle aKI-Strategien verwenden dieselben Einstiegssignale, dasselbe Startkapital und dieselben Kosten. Neue Positionen werden nur eröffnet, wenn Kapital und ein freier Aktienplatz verfügbar sind. Bei aktivierter KI-Score-Rotation erhält der Sektor beziehungsweise Index mit dem höchsten damaligen Durchschnittsscore eine um 50 % erhöhte Positionsgröße; beide Faktoren werden nicht multipliziert. Winner Runner nutzt ATR-Hard-Stop, Gewinnschutz, Trendbruch, Exit-Modell und maximal 90 Handelstage. Die Prognoseziel-Strategie verkauft beim Erreichen der prognostizierten Rendite, andernfalls nach 20 Handelstagen. Historische Ergebnisse sind keine Garantie für zukünftige Wertentwicklungen und keine Anlageberatung.</div>
+<div class="note"><strong>Methodik:</strong> Die Strategien verwenden dieselben Einstiegssignale, dasselbe Startkapital und dieselben Kosten. Neue Positionen werden nur eröffnet, wenn Kapital und ein freier Aktienplatz verfügbar sind. Bei aktivierter KI-Score-Rotation erhält der Sektor beziehungsweise Index mit dem höchsten damaligen Durchschnittsscore eine um 50 % erhöhte Positionsgröße; beide Faktoren werden nicht multipliziert. Historische Ergebnisse sind keine Garantie für zukünftige Wertentwicklungen und keine Anlageberatung.</div>
 
 <div class="report-page">
     <div class="header">
@@ -282,12 +341,13 @@
         <div class="section-title">Ergebnisse nach Modellstufe</div>
         <table class="model-table">
             <thead>
-                <tr><th>Modellstufe</th><th>Modelle</th><th>Trades</th><th>Trade-Anteil</th><th>Gewichtete Hitrate</th><th>Performance</th><th>Max. Drawdown</th></tr>
+                <tr><th>Modellstufe</th><th>Strategien</th><th>Modelle</th><th>Trades</th><th>Trade-Anteil</th><th>Gewichtete Hitrate</th><th>Performance</th><th>Max. Drawdown</th></tr>
             </thead>
             <tbody>
             @foreach ($tierStatistics as $tier)
                 <tr>
                     <td><span class="tier">{{ $tier->tier }}</span></td>
+                    <td class="strategy-cell">{{ $selectedStrategiesLabel }}</td>
                     <td>{{ number_format($tier->models, 0, ',', '.') }}</td>
                     <td>{{ number_format($tier->trades, 0, ',', '.') }}</td>
                     <td>{{ $formatPercent($tier->share) }}</td>
@@ -304,12 +364,13 @@
         <div class="section-title">Ergebnisse nach Modell</div>
         <table class="model-table">
             <thead>
-                <tr><th>Modell</th><th>Qualitätsstufe</th><th>Trades</th><th>Hitrate</th><th>Performance</th><th>Profitfaktor</th><th>Max. Drawdown</th><th>Zeitraum</th></tr>
+                <tr><th>Modell</th><th>Strategien</th><th>Qualitätsstufe</th><th>Trades</th><th>Hitrate</th><th>Performance</th><th>Profitfaktor</th><th>Max. Drawdown</th><th>Zeitraum</th></tr>
             </thead>
             <tbody>
             @forelse ($modelStatistics as $model)
                 <tr>
                     <td>{{ $model->model_name }}</td>
+                    <td class="strategy-cell">{{ $selectedStrategiesLabel }}</td>
                     <td><span class="tier">{{ $model->quality_tier }}</span></td>
                     <td>{{ number_format((int) $model->trades, 0, ',', '.') }}</td>
                     <td class="{{ (float) $model->hit_rate >= 50 ? 'positive' : 'negative' }}">{{ $formatPercent($model->hit_rate) }}</td>
@@ -319,7 +380,7 @@
                     <td>{{ date('m/y', strtotime((string) $model->first_trade)) }}–{{ date('m/y', strtotime((string) $model->last_trade)) }}</td>
                 </tr>
             @empty
-                <tr><td colspan="8">Für diesen Lauf sind keine Modellstatistiken verfügbar.</td></tr>
+                <tr><td colspan="9">Für diesen Lauf sind keine Modellstatistiken verfügbar.</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -329,11 +390,9 @@
         <div class="section-title">Matrix Modell × Exit-Strategie</div>
         @php
             $exitStrategies = [
-                'fixed_20d' => '20 Tage',
-                'winner_runner' => 'Winner Runner',
-                'prediction_target' => 'Prognoseziel',
-                'adaptive_rotation_20d' => 'Adaptive Rotation',
+                'fixed_20d' => 'Exit '.$executionHorizon.'T',
             ];
+            if ($showAdaptive) $exitStrategies['adaptive_rotation_20d'] = 'Adaptive Rotation';
         @endphp
         <table class="exit-matrix">
             <thead>
@@ -344,7 +403,9 @@
                 <tr>
                     <td>{{ $modelName }}</td>
                     @foreach ($exitStrategies as $strategyCode => $strategyLabel)
-                        @php($cell = $strategyRows->firstWhere('strategy', $strategyCode))
+                        @php
+                            $cell = $strategyRows->firstWhere('strategy', $strategyCode);
+                        @endphp
                         <td>
                             @if ($cell)
                                 <strong class="{{ (float) $cell->average_return >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($cell->average_return) }}</strong>
@@ -365,12 +426,13 @@
     <div class="section">
         <div class="section-title">Im Backtest berücksichtigte Aktien ({{ number_format($backtestStocks->count(), 0, ',', '.') }})</div>
         <table class="stock-table">
-            <thead><tr><th>Symbol</th><th>Aktie</th><th>Land</th><th>Börse</th><th>Trades</th><th>Hitrate</th><th>Ø Rendite</th></tr></thead>
+            <thead><tr><th>Symbol</th><th>Aktie</th><th>Strategien</th><th>Land</th><th>Börse</th><th>Trades</th><th>Hitrate</th><th>Ø Rendite</th></tr></thead>
             <tbody>
             @forelse ($backtestStocks as $stock)
                 <tr>
                     <td>{{ $stock->symbol }}</td>
                     <td>{{ $stock->name }}</td>
+                    <td class="strategy-cell">{{ $selectedStrategiesLabel }}</td>
                     <td>{{ $stock->country ?: '—' }}</td>
                     <td>{{ $stock->exchange }}</td>
                     <td>{{ number_format((int) $stock->trades, 0, ',', '.') }}</td>
@@ -378,7 +440,7 @@
                     <td class="{{ (float) $stock->average_return >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($stock->average_return) }}</td>
                 </tr>
             @empty
-                <tr><td colspan="7">Für diesen Lauf sind keine Aktien verfügbar.</td></tr>
+                <tr><td colspan="8">Für diesen Lauf sind keine Aktien verfügbar.</td></tr>
             @endforelse
             </tbody>
         </table>

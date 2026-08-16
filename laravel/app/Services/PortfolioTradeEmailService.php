@@ -31,8 +31,9 @@ final class PortfolioTradeEmailService
                     ->where('execution.email_status', 'pending')
                     ->lockForUpdate()
                     ->select([
-                        'execution.id', 'execution.action', 'execution.position_factor', 'execution.allocated_capital',
+                        'execution.id', 'execution.action', 'execution.position_factor', 'execution.allocated_capital', 'execution.details',
                         'execution.sector_average_score', 'execution.created_at', 'strategy.name as strategy_name',
+                        'strategy.filters as strategy_filters',
                         'strategy.user_id', 'portfolio.id as portfolio_id', 'portfolio.name as portfolio_name',
                         'portfolio.currency as portfolio_currency', 'portfolio.meta as portfolio_meta',
                         'instrument.symbol', 'instrument.name as instrument_name',
@@ -91,6 +92,12 @@ final class PortfolioTradeEmailService
         $transactionMeta = is_string($row->transaction_meta ?? null)
             ? (json_decode($row->transaction_meta, true) ?: [])
             : (array) ($row->transaction_meta ?? []);
+        $strategyFilters = is_string($row->strategy_filters ?? null)
+            ? (json_decode($row->strategy_filters, true) ?: [])
+            : (array) ($row->strategy_filters ?? []);
+        $executionDetails = is_string($row->details ?? null)
+            ? (json_decode($row->details, true) ?: [])
+            : (array) ($row->details ?? []);
         $cashBalance = (float) DB::table('portfolio_cash_accounts')
             ->where('portfolio_id', $row->portfolio_id)
             ->where('currency', $row->portfolio_currency)
@@ -120,6 +127,12 @@ final class PortfolioTradeEmailService
             : (array) $row->portfolio_meta;
         $initialCapital = max(0.0, (float) data_get($portfolioMeta, 'automation.initial_capital', 0));
         $performance = $initialCapital > 0 ? (($totalValue / $initialCapital) - 1) * 100 : 0.0;
+        $maxPositions = max(1, (int) data_get($strategyFilters, 'max_positions', 5));
+        $basePositionCapital = $initialCapital / $maxPositions;
+        $positionFactor = max(1, (int) $row->position_factor);
+        $targetPositionCapital = $basePositionCapital * $positionFactor;
+        $sectorRotationEnabled = (bool) data_get($strategyFilters, 'sector_score_rotation', false);
+        $indexRotationEnabled = (bool) data_get($strategyFilters, 'index_score_rotation', false);
 
         return [
             'action' => (string) $row->action, 'symbol' => (string) $row->symbol,
@@ -129,7 +142,15 @@ final class PortfolioTradeEmailService
             'quantity' => (float) ($row->quantity ?? 0), 'price' => $price,
             'fees' => (float) ($row->fees ?? 0), 'allocated_capital' => (float) $row->allocated_capital,
             'currency' => (string) ($row->instrument_currency ?: $row->portfolio_currency),
-            'transaction_date' => $row->transaction_date, 'position_factor' => (int) $row->position_factor,
+            'transaction_date' => $row->transaction_date, 'position_factor' => $positionFactor,
+            'max_positions' => $maxPositions,
+            'base_position_capital' => $basePositionCapital,
+            'target_position_capital' => $targetPositionCapital,
+            'sector_rotation_enabled' => $sectorRotationEnabled,
+            'index_rotation_enabled' => $indexRotationEnabled,
+            'sector_average_score' => $row->sector_average_score !== null ? (float) $row->sector_average_score : null,
+            'index_average_score' => is_numeric(data_get($executionDetails, 'index_average_score'))
+                ? (float) data_get($executionDetails, 'index_average_score') : null,
             'score' => $score / 10, 'confidence' => $confidence,
             'target_price' => $target ?: null,
             'expected_return' => $price > 0 && $target > 0 ? (($target / $price) - 1) * 100 : null,

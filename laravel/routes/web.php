@@ -28,7 +28,6 @@ use App\Http\Controllers\SavedPredictionFilterController;
 use App\Http\Controllers\SignalEmailPreviewController;
 use App\Http\Controllers\QualityGateSetupController;
 use App\Http\Controllers\SmartSelectionLabelController;
-use App\Http\Controllers\ResearchLabController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\AkiChatController;
@@ -40,6 +39,7 @@ use Illuminate\Http\Request;
 Route::get('/', WelcomeController::class)->name('welcome');
 Route::get('/welcome', WelcomeController::class)->name('welcome.page');
 Route::get('/welcome-copy', [WelcomeController::class, 'copy'])->name('welcome.copy');
+Route::get('/welcome-original', [WelcomeController::class, 'original'])->name('welcome.original');
 Route::get('/easy-access', [EasyAccessController::class, 'index'])->name('easy-access');
 Route::post('/easy-access', [EasyAccessController::class, 'store'])
     ->middleware('throttle:10,1')
@@ -100,13 +100,37 @@ Route::get('/projektstatus', ProjectStatusController::class)
 // Beta invitations are deliberately restricted to administrators. The raw token is
 // generated once and only its SHA-256 digest is stored in the database.
 Route::middleware('auth')->group(function (): void {
+    Route::get('/admin/infrastruktur', [\App\Http\Controllers\InfrastructureAdminController::class, 'index'])
+        ->name('admin.infrastructure');
+    Route::post('/admin/infrastruktur/aktion', [\App\Http\Controllers\InfrastructureAdminController::class, 'action'])
+        ->middleware('throttle:10,1')
+        ->name('admin.infrastructure.action');
     Route::get('/beta/einladungen', [BetaInvitationController::class, 'index'])
         ->name('beta.invitations');
     Route::post('/beta/einladungen', [BetaInvitationController::class, 'store'])
         ->name('beta.invitations.store');
+    Route::get('/admin/beta-anfragen/{contactMessage}', [BetaInvitationController::class, 'review'])
+        ->name('beta.requests.review');
+    Route::post('/admin/beta-anfragen/{contactMessage}/freigeben', [BetaInvitationController::class, 'approve'])
+        ->middleware('throttle:10,1')
+        ->name('beta.requests.approve');
 });
 Route::get('/kontakt', [ContactController::class, 'create'])->name('contact');
 Route::post('/kontakt', [ContactController::class, 'store'])->middleware('throttle:5,1')->name('contact.store');
+Route::get('/rechtliches/{document}', function (string $document) {
+    $documents = [
+        'impressum' => 'Impressum',
+        'agb' => 'Allgemeine Geschäftsbedingungen',
+        'datenschutz' => 'Datenschutzerklärung',
+        'risikohinweise' => 'Risiko- und Nutzungshinweise',
+        'widerruf' => 'Widerrufsbelehrung',
+        'ki-transparenz' => 'KI- und Datentransparenz',
+    ];
+
+    abort_unless(isset($documents[$document]), 404);
+
+    return view('legal.show', ['document' => $document, 'title' => $documents[$document]]);
+})->where('document', 'impressum|agb|datenschutz|risikohinweise|widerruf|ki-transparenz')->name('legal.show');
 Route::get('/bewertungen', [ReviewController::class, 'index'])->name('reviews.index');
 Route::post('/bewertungen', [ReviewController::class, 'store'])->middleware(['auth', 'throttle:3,1'])->name('reviews.store');
 
@@ -205,6 +229,12 @@ Route::post('/locale/{locale}', function (Request $request, string $locale) {
     abort_unless(in_array($locale, ['de', 'en'], true), 404);
     $request->session()->put('locale', $locale);
 
+    if ($user = $request->user()) {
+        $preferences = (array) ($user->preferences ?? []);
+        $preferences['locale'] = $locale;
+        $user->forceFill(['preferences' => $preferences])->save();
+    }
+
     return back();
 })->name('locale.update');
 
@@ -225,32 +255,29 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::delete('/community/posts/{post}', [CommunityController::class, 'destroy'])->name('community.posts.destroy');
     Route::get('/email-preview/signal', SignalEmailPreviewController::class)->name('email-preview.signal');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::get('/setup/filter', [PredictionController::class, 'filterSetup'])->middleware('plan:pro')->name('setup.filter');
-    Route::get('/setup/quality', [PredictionController::class, 'qualitySetup'])->middleware('plan:plus')->name('setup.quality');
-    Route::get('/setup/research-lab', [ResearchLabController::class, 'index'])->middleware('plan:pro')->name('setup.research-lab');
-    Route::post('/setup/research-lab', [ResearchLabController::class, 'start'])->middleware('plan:pro')->name('setup.research-lab.start');
-    Route::get('/setup/research-lab/{experiment}/status', [ResearchLabController::class, 'status'])->middleware('plan:pro')->name('setup.research-lab.status');
-    Route::get('/setup/labels', [SmartSelectionLabelController::class, 'index'])->middleware('plan:plus')->name('setup.labels.index');
+    Route::get('/setup/filter', [PredictionController::class, 'filterSetup'])->name('setup.filter');
+    Route::get('/setup/quality', [PredictionController::class, 'qualitySetup'])->name('setup.quality');
+    Route::get('/setup/labels', [SmartSelectionLabelController::class, 'index'])->name('setup.labels.index');
     Route::post('/setup/quality/labels', [SmartSelectionLabelController::class, 'store'])->middleware('plan:plus')->name('setup.quality.labels.store');
     Route::patch('/setup/labels/{label}', [SmartSelectionLabelController::class, 'update'])->middleware('plan:plus')->name('setup.labels.update');
     Route::delete('/setup/labels/{label}', [SmartSelectionLabelController::class, 'destroy'])->middleware('plan:plus')->name('setup.labels.destroy');
-    Route::get('/setup/short', [PredictionController::class, 'shortStrategySetup'])->middleware('plan:pro')->name('setup.short');
+    Route::get('/setup/short', [PredictionController::class, 'shortStrategySetup'])->name('setup.short');
     Route::get('/setup/quality-gate', [QualityGateSetupController::class, 'edit'])->name('setup.quality-gate.edit');
     Route::put('/setup/quality-gate', [QualityGateSetupController::class, 'update'])->name('setup.quality-gate.update');
     Route::put('/setup/quality-gate/backtest', [QualityGateSetupController::class, 'backtest'])->middleware('plan:premium')->name('setup.quality-gate.backtest');
-    Route::get('/setup/filters', [SavedPredictionFilterController::class, 'index'])->middleware('plan:pro')->name('setup.saved-filters.index');
+    Route::get('/setup/filters', [SavedPredictionFilterController::class, 'index'])->name('setup.saved-filters.index');
     Route::post('/setup/filter/saved', [SavedPredictionFilterController::class, 'store'])->middleware('plan:pro')->name('setup.filter.saved.store');
     Route::patch('/setup/filter/saved/{savedFilter}', [SavedPredictionFilterController::class, 'update'])->middleware('plan:pro')->name('setup.filter.saved.update');
     Route::patch('/setup/filter/saved/{savedFilter}/link', [SavedPredictionFilterController::class, 'link'])->middleware('plan:pro')->name('setup.filter.saved.link');
     Route::patch('/setup/filter/saved/{savedFilter}/visibility', [SavedPredictionFilterController::class, 'updateVisibility'])->middleware('plan:pro')->name('setup.filter.saved.visibility');
     Route::post('/setup/filter/saved/{savedFilter}/import', [SavedPredictionFilterController::class, 'import'])->middleware('plan:pro')->name('setup.filter.saved.import');
     Route::delete('/setup/filter/saved/{savedFilter}', [SavedPredictionFilterController::class, 'destroy'])->middleware('plan:pro')->name('setup.filter.saved.destroy');
-    Route::post('/setup/filter/backtest', [PredictionController::class, 'startFilteredBacktest'])->middleware('plan:plus')->name('setup.filter.backtest');
-    Route::post('/setup/filter/optimize', [PredictionController::class, 'optimizeFilter'])->middleware('plan:plus')->name('setup.filter.optimize');
-    Route::get('/setup/filter/backtest/{publicId}/result', [PredictionController::class, 'filteredBacktestResult'])->middleware('plan:plus')->name('setup.filter.backtest.result');
-    Route::get('/setup/filter/backtest/{publicId}/status', [PredictionController::class, 'filteredBacktestStatus'])->middleware('plan:plus')->name('setup.filter.backtest.status');
-    Route::post('/setup/filter/backtest/{publicId}/cancel', [PredictionController::class, 'cancelFilteredBacktest'])->middleware('plan:plus')->name('setup.filter.backtest.cancel');
-    Route::get('/setup/filter/backtest/{publicId}/report', [PredictionController::class, 'downloadFilteredBacktestReport'])->middleware('plan:plus')->name('setup.filter.backtest.report');
+    Route::post('/setup/filter/backtest', [PredictionController::class, 'startFilteredBacktest'])->name('setup.filter.backtest');
+    Route::post('/setup/filter/optimize', [PredictionController::class, 'optimizeFilter'])->name('setup.filter.optimize');
+    Route::get('/setup/filter/backtest/{publicId}/result', [PredictionController::class, 'filteredBacktestResult'])->name('setup.filter.backtest.result');
+    Route::get('/setup/filter/backtest/{publicId}/status', [PredictionController::class, 'filteredBacktestStatus'])->name('setup.filter.backtest.status');
+    Route::post('/setup/filter/backtest/{publicId}/cancel', [PredictionController::class, 'cancelFilteredBacktest'])->name('setup.filter.backtest.cancel');
+    Route::get('/setup/filter/backtest/{publicId}/report', [PredictionController::class, 'downloadFilteredBacktestReport'])->name('setup.filter.backtest.report');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -259,6 +286,7 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     )->name('stocks.index');
 Route::get('/predictions', [PredictionController::class, 'index'])->name('predictions.index');
 Route::get('/predictions/signal-history', [\App\Http\Controllers\SignalTransitionController::class, 'index'])->name('predictions.signal-history');
+Route::get('/predictions/trade-performance/backtest', [\App\Http\Controllers\BacktestTradePerformanceController::class, 'index'])->name('predictions.trade-performance.backtest');
 Route::get('/reports/{analysisReport}/pdf', [\App\Http\Controllers\AnalysisReportController::class, 'pdf'])->middleware(['auth', 'verified', 'beta'])->name('analysis-reports.pdf');
 Route::get('/reports/{analysisReport}', [\App\Http\Controllers\AnalysisReportController::class, 'show'])->middleware(['auth', 'verified', 'beta'])->name('analysis-reports.show');
     Route::post('/predictions/filters', [PredictionController::class, 'storeTableFilter'])->name('predictions.filters.store');
@@ -294,6 +322,13 @@ Route::get('/reports/{analysisReport}', [\App\Http\Controllers\AnalysisReportCon
     Route::get('/stocks/{symbol}/report', [StockController::class, 'report'])->name('stocks.report');
     Route::get('/stocks/{symbol}', [StockController::class, 'show'])->name('stocks.show');
     Route::post('/stocks/{instrument}/entry-alert', [\App\Http\Controllers\EntrySignalAlertController::class, 'store'])->middleware('plan:pro')->name('stocks.entry-alert.store');
+    Route::post('/stocks/{instrument}/purchase-reminder', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'store'])->middleware('plan:pro')->name('stocks.purchase-reminder.store');
+    Route::patch('/notifications/entry-alerts/{alert}/disable', [\App\Http\Controllers\EntrySignalAlertController::class, 'disable'])->middleware('plan:pro')->name('notifications.entry-alerts.disable');
+    Route::patch('/notifications/entry-alerts/{alert}/enable', [\App\Http\Controllers\EntrySignalAlertController::class, 'enable'])->middleware('plan:pro')->name('notifications.entry-alerts.enable');
+    Route::delete('/notifications/entry-alerts/{alert}', [\App\Http\Controllers\EntrySignalAlertController::class, 'destroy'])->middleware('plan:pro')->name('notifications.entry-alerts.destroy');
+    Route::patch('/notifications/purchase-reminders/{reminder}/disable', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'disable'])->middleware('plan:pro')->name('notifications.purchase-reminders.disable');
+    Route::patch('/notifications/purchase-reminders/{reminder}/enable', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'enable'])->middleware('plan:pro')->name('notifications.purchase-reminders.enable');
+    Route::delete('/notifications/purchase-reminders/{reminder}', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'destroy'])->middleware('plan:pro')->name('notifications.purchase-reminders.destroy');
     Route::get('/sektoren', [SectorController::class, 'index'])->name('sectors.index');
     Route::get('/indizes', IndexScreenerController::class)->name('indices.index');
     Route::get('/watchlists', [WatchlistController::class, 'index'])->name('watchlists.index');

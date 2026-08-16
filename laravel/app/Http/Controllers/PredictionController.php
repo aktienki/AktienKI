@@ -7,6 +7,7 @@ use App\Jobs\RunFilteredBacktest;
 use App\Services\PythonEngineJobDispatcher;
 use App\Services\PlanAccessService;
 use App\Services\PersonalizedSignalService;
+use App\Services\FreeRegionalStockUniverseService;
 use App\Services\SavedFilterLimitService;
 use App\Services\UserQualityGateService;
 use App\Services\YahooIndexService;
@@ -17,8 +18,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -26,7 +29,7 @@ final class PredictionController extends Controller
 {
     private const TABLE_FILTER_KEYS = [
         'q', 'symbols', 'country', 'exchange', 'index', 'sector', 'smart_label', 'quality_tier', 'signal',
-        'score_min', 'confidence_min', 'drawdown_max', 'profit_factor_min', 'minimum_trades',
+        'score_min', 'confidence_min', 'drawdown_max', 'profit_per_trade_min', 'minimum_trades',
         'hit_rate_min', 'volatility_max', 'sort', 'direction',
     ];
 
@@ -216,7 +219,9 @@ final class PredictionController extends Controller
 
         $data = array_intersect_key($predictionData, array_flip([
             'heatmap',
+            'qualifiedHeatmapCells',
             'heatmapSummary',
+            'heatmapUniverseInstruments',
             'individualStats',
             'summary',
             'countries',
@@ -252,6 +257,7 @@ final class PredictionController extends Controller
         $predictionData = $predictionView->getData();
         $data = array_intersect_key($predictionData, array_flip([
             'heatmap',
+            'qualifiedHeatmapCells',
             'heatmapSummary',
             'summary',
             'countries',
@@ -267,13 +273,13 @@ final class PredictionController extends Controller
         ]));
         $data['indices'] = $this->activeIndexOptions();
         $data['setupMode'] = true;
-        $data['activeBacktestRun'] = $this->requestedUserBacktestRun($request)
-            ?? DB::table('backtest_runs')
-                ->whereRaw("settings->>'run_type' = 'user_filter'")
-                ->whereRaw("(settings->>'initiated_by_user_id')::bigint = ?", [$request->user()->id])
-                ->orderByDesc('id')
-                ->first();
+        // A previous personal result must never become the data source for a
+        // newly adjusted filter. Only keep a run active while its public ID is
+        // explicitly present in the URL (directly after starting/opening it).
+        $data['activeBacktestRun'] = $this->requestedUserBacktestRun($request);
         $data['savedFilters'] = $request->user()->savedPredictionFilters()->orderBy('name')->get();
+        $data['canImportStrategy'] = app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Pro);
+        $data['canSaveStrategy'] = app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Pro);
         $data['automationPortfolios'] = $request->user()->portfolios()
             ->where('type', 'paper')->where('active', true)->orderBy('name')->get();
         $data['savedFilterLimit'] = app(SavedFilterLimitService::class)->limitFor($request->user());
@@ -294,14 +300,25 @@ final class PredictionController extends Controller
             $data['activeBacktestRun'] = $run;
         }
         if ($run !== null && in_array((string) $run->status, ['completed', 'completed_with_errors'], true)) {
+            // Keep Smart Selection inside the user's tariff universe as well.
+            // Free users may evaluate only their regional 100-stock universe;
+            // Plus and Pro users keep the complete available universe.
+            $tariffInstrumentIds = app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Plus)
+                ? null
+                : app(FreeRegionalStockUniverseService::class)->instrumentIds($request->user());
             $latestQualityRankings = DB::table('model_quality_rankings')
                 ->selectRaw('trained_model_id, MAX(id) AS ranking_id')
                 ->groupBy('trained_model_id');
+            $latestFundamentalIds = DB::table('instrument_fundamentals')
+                ->selectRaw('instrument_id, MAX(id) AS fundamental_id')
+                ->groupBy('instrument_id');
+            $fundamentalValue = static fn (string $column, string $jsonKey): string =>
+                "COALESCE(fundamental.{$column}, CASE WHEN NULLIF(fundamental.data::jsonb->>'{$jsonKey}', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'{$jsonKey}')::numeric END)";
             $minimumQualityTiers = [
-                'top' => ['top'],
-                'strong' => ['top', 'strong'],
-                'solid' => ['top', 'strong', 'solid'],
-                'test' => ['top', 'strong', 'solid', 'test'],
+                'top' => ['strong'],
+                'strong' => ['strong'],
+                'solid' => ['strong', 'solid'],
+                'test' => ['strong', 'solid', 'test'],
             ];
             $backtestQuery = DB::table('backtest_trades as trade')
                 ->join('instruments as instrument', 'instrument.id', '=', 'trade.instrument_id')
@@ -310,7 +327,10 @@ final class PredictionController extends Controller
                 ->leftJoinSub($latestQualityRankings, 'latest_quality', fn ($join) => $join->on('latest_quality.trained_model_id', '=', 'trained_model.id'))
                 ->leftJoin('model_quality_rankings as model_quality', 'model_quality.id', '=', 'latest_quality.ranking_id')
                 ->leftJoin('model_quality_tiers as quality_tier', 'quality_tier.id', '=', 'model_quality.tier_id')
+                ->leftJoinSub($latestFundamentalIds, 'latest_fundamental', fn ($join) => $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
+                ->leftJoin('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental.fundamental_id')
                 ->where('trade.backtest_run_id', $run->id)
+                ->when($tariffInstrumentIds !== null, fn ($query) => $query->whereIn('instrument.id', $tariffInstrumentIds))
                 ->when($request->filled('q'), fn ($query) => $query->where(function ($nested) use ($request): void {
                     $term = '%'.strtolower(trim((string) $request->query('q'))).'%';
                     $nested->whereRaw('LOWER(instrument.symbol) LIKE ?', [$term])->orWhereRaw('LOWER(instrument.name) LIKE ?', [$term]);
@@ -338,6 +358,10 @@ final class PredictionController extends Controller
                 ->when(is_numeric($request->query('score_min')), fn ($query) => $query->where('trade.ki_score', '>=', (float) $request->query('score_min')))
                 ->when(is_numeric($request->query('confidence_min')), fn ($query) => $query->where('trade.confidence', '>=', (float) $request->query('confidence_min')))
                 ->when(is_numeric($request->query('drawdown_max')) && (float) $request->query('drawdown_max') < 50, fn ($query) => $query->whereRaw('ABS(trade.max_drawdown) * 100 <= ?', [(float) $request->query('drawdown_max')]))
+                ->when(is_numeric($request->query('pe_max')) && (float) $request->query('pe_max') < 100, fn ($query) => $query->whereRaw($fundamentalValue('trailing_pe', 'trailingPE').' <= ?', [(float) $request->query('pe_max')]))
+                ->when(is_numeric($request->query('dividend_yield_min')) && (float) $request->query('dividend_yield_min') > 0, fn ($query) => $query->whereRaw($fundamentalValue('dividend_yield', 'dividendYield').' >= ?', [(float) $request->query('dividend_yield_min') / 100]))
+                ->when(is_numeric($request->query('market_cap_min')) && (float) $request->query('market_cap_min') > 0, fn ($query) => $query->whereRaw($fundamentalValue('market_cap', 'marketCap').' >= ?', [(float) $request->query('market_cap_min') * 1_000_000_000]))
+                ->when(is_numeric($request->query('revenue_growth_min')) && (float) $request->query('revenue_growth_min') > -50, fn ($query) => $query->whereRaw($fundamentalValue('revenue_growth', 'revenueGrowth').' >= ?', [(float) $request->query('revenue_growth_min') / 100]))
                 ->get([
                     'trade.net_return', 'trade.max_drawdown', 'trade.entry_date',
                     'trade.ki_score', 'trade.confidence', 'trade.predicted_return', 'trade.signal',
@@ -347,7 +371,11 @@ final class PredictionController extends Controller
                     'exchange.code as exchange_code',
                 ]);
             $backtestRows = $backtestQuery;
-            $profitMinimum = is_numeric($request->query('profit_factor_min')) ? (float) $request->query('profit_factor_min') : 0.0;
+            // Candidates reflect the tariff and all selected dropdown/range
+            // filters. Qualification may reduce this number further through
+            // the per-stock performance requirements below.
+            $candidateInstrumentCount = $backtestRows->pluck('instrument_id')->filter()->unique()->count();
+            $profitMinimum = is_numeric($request->query('profit_per_trade_min')) ? (float) $request->query('profit_per_trade_min') : 0.0;
             $hitMinimum = is_numeric($request->query('hit_rate_min')) ? (float) $request->query('hit_rate_min') : 0.0;
             $minimumTrades = is_numeric($request->query('minimum_trades')) ? max(0, (int) $request->query('minimum_trades')) : 0;
             if ($profitMinimum > 0 || $hitMinimum > 0 || $minimumTrades > 0) {
@@ -407,7 +435,8 @@ final class PredictionController extends Controller
                 'countries' => $backtestRows->pluck('country')->filter()->unique()->count(),
             ];
             $data['heatmapSummary'] = (object) [
-                'candidates' => $backtestRows->pluck('instrument_id')->filter()->unique()->count(),
+                'instruments' => $backtestRows->pluck('instrument_id')->filter()->unique()->count(),
+                'candidates' => $candidateInstrumentCount,
                 'qualified' => $backtestRows->pluck('instrument_id')->filter()->unique()->count(),
                 'trades' => $backtestRows->count(),
                 'winning_trades' => $wins,
@@ -426,13 +455,21 @@ final class PredictionController extends Controller
             $walkForwardRunId = DB::table('walk_forward_backtest_runs')
                 ->where('status', 'completed')
                 ->where('horizon_days', 20)
+                ->orderByRaw('(SELECT COUNT(DISTINCT candidate_trade.instrument_id) FROM walk_forward_backtest_trades AS candidate_trade WHERE candidate_trade.run_id = walk_forward_backtest_runs.id) DESC')
                 ->orderByDesc('finished_at')
                 ->value('id');
 
             if ($walkForwardRunId) {
+                $latestFundamentalIds = DB::table('instrument_fundamentals')
+                    ->selectRaw('instrument_id, MAX(id) AS fundamental_id')
+                    ->groupBy('instrument_id');
+                $fundamentalValue = static fn (string $column, string $jsonKey): string =>
+                    "COALESCE(fundamental.{$column}, CASE WHEN NULLIF(fundamental.data::jsonb->>'{$jsonKey}', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'{$jsonKey}')::numeric END)";
                 $walkForwardRows = DB::table('walk_forward_backtest_trades as trade')
                     ->join('instruments as instrument', 'instrument.id', '=', 'trade.instrument_id')
                     ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
+                    ->leftJoinSub($latestFundamentalIds, 'latest_fundamental', fn ($join) => $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
+                    ->leftJoin('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental.fundamental_id')
                     ->where('trade.run_id', $walkForwardRunId)
                     ->when($request->filled('q'), function ($query) use ($request): void {
                         $term = '%'.strtolower(trim((string) $request->query('q'))).'%';
@@ -443,6 +480,10 @@ final class PredictionController extends Controller
                     ->when($request->filled('country'), fn ($query) => $query->where('instrument.country', strtoupper((string) $request->query('country'))))
                     ->when($request->filled('exchange'), fn ($query) => $query->where('exchange.code', strtoupper((string) $request->query('exchange'))))
                     ->when($request->filled('sector'), fn ($query) => $query->where('instrument.sector', (string) $request->query('sector')))
+                    ->when(is_numeric($request->query('pe_max')) && (float) $request->query('pe_max') < 100, fn ($query) => $query->whereRaw($fundamentalValue('trailing_pe', 'trailingPE').' <= ?', [(float) $request->query('pe_max')]))
+                    ->when(is_numeric($request->query('dividend_yield_min')) && (float) $request->query('dividend_yield_min') > 0, fn ($query) => $query->whereRaw($fundamentalValue('dividend_yield', 'dividendYield').' >= ?', [(float) $request->query('dividend_yield_min') / 100]))
+                    ->when(is_numeric($request->query('market_cap_min')) && (float) $request->query('market_cap_min') > 0, fn ($query) => $query->whereRaw($fundamentalValue('market_cap', 'marketCap').' >= ?', [(float) $request->query('market_cap_min') * 1_000_000_000]))
+                    ->when(is_numeric($request->query('revenue_growth_min')) && (float) $request->query('revenue_growth_min') > -50, fn ($query) => $query->whereRaw($fundamentalValue('revenue_growth', 'revenueGrowth').' >= ?', [(float) $request->query('revenue_growth_min') / 100]))
                     ->get([
                         'trade.instrument_id', 'trade.signal_date', 'trade.exit_date', 'trade.net_return',
                         'instrument.symbol', 'instrument.name', 'instrument.country', 'instrument.sector',
@@ -524,7 +565,7 @@ final class PredictionController extends Controller
                 })->values();
 
                 $minimumTrades = is_numeric($request->query('minimum_trades')) ? max(0, (int) $request->query('minimum_trades')) : 0;
-                $profitMinimum = is_numeric($request->query('profit_factor_min')) ? (float) $request->query('profit_factor_min') : 0.0;
+                $profitMinimum = is_numeric($request->query('profit_per_trade_min')) ? (float) $request->query('profit_per_trade_min') : 0.0;
                 $hitMinimum = is_numeric($request->query('hit_rate_min')) ? (float) $request->query('hit_rate_min') : 0.0;
                 $scoreMinimum = is_numeric($request->query('score_min')) ? max(0.0, min(10.0, (float) $request->query('score_min'))) : 0.0;
                 $confidenceMinimum = is_numeric($request->query('confidence_min')) ? max(0.0, min(100.0, (float) $request->query('confidence_min'))) : 0.0;
@@ -532,6 +573,7 @@ final class PredictionController extends Controller
                 $volatilityMaximum = is_numeric($request->query('volatility_max')) ? max(0.0, (float) $request->query('volatility_max')) : null;
                 $drawdownRangeMaximum = (float) data_get($data, 'rangeMaxima.drawdown', 50);
                 $volatilityRangeMaximum = (float) data_get($data, 'rangeMaxima.volatility', 100);
+                $allInstrumentStats = $instrumentStats;
                 $instrumentStats = $instrumentStats->filter(function (array $stat) use (
                     $minimumTrades, $profitMinimum, $hitMinimum, $scoreMinimum, $confidenceMinimum,
                     $drawdownMaximum, $volatilityMaximum, $drawdownRangeMaximum, $volatilityRangeMaximum
@@ -559,7 +601,11 @@ final class PredictionController extends Controller
                     : 0.0;
 
                 $data['individualStats'] = $instrumentStats->sortByDesc('trades')->take(200)->values();
-                $data['heatmap'] = $instrumentStats
+                $data['qualifiedHeatmapCells'] = $instrumentStats
+                    ->mapWithKeys(fn (array $stat): array => [
+                        min(9, max(0, (int) floor($stat['score']))).'-'.min(9, max(0, (int) floor($stat['confidence'] / 10))) => true,
+                    ]);
+                $data['heatmap'] = $allInstrumentStats
                     ->groupBy(fn (array $stat): string => min(9, max(0, (int) floor($stat['score']))).'-'.min(9, max(0, (int) floor($stat['confidence'] / 10))))
                     ->map(function ($stats): object {
                         $trades = (int) $stats->sum('trades');
@@ -611,6 +657,7 @@ final class PredictionController extends Controller
         $view = $this->filterSetup($request);
         $data = $view->getData();
         $data['qualitySetupMode'] = true;
+        $data['canSaveSmartLabel'] = app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Plus);
         $data['marketContextCounts'] ??= [
             'indices' => 0,
             'exchanges' => 0,
@@ -623,7 +670,7 @@ final class PredictionController extends Controller
         $data['indices'] = $this->activeIndexOptions();
         if ($data['activeBacktestRun'] === null) {
             $data['heatmapSummary'] = (object) [
-                'candidates' => 0, 'qualified' => 0, 'trades' => 0, 'winning_trades' => 0,
+                'instruments' => 0, 'candidates' => 0, 'qualified' => 0, 'trades' => 0, 'winning_trades' => 0,
                 'profit_factor' => 0, 'hit_rate' => 0, 'drawdown' => 0, 'volatility' => 0,
             ];
         }
@@ -672,7 +719,7 @@ final class PredictionController extends Controller
             'score_min' => ['nullable', 'numeric', 'between:0,10'],
             'confidence_min' => ['nullable', 'numeric', 'between:0,100'],
             'drawdown_max' => ['nullable', 'numeric', 'between:0,100'],
-            'profit_factor_min' => ['nullable', 'numeric', 'between:0,3'],
+            'profit_per_trade_min' => ['nullable', 'numeric', 'between:0,10'],
             'volatility_max' => ['nullable', 'numeric', 'between:0,1000000'],
             'pe_max' => ['nullable', 'numeric', 'between:0,1000000'],
             'dividend_yield_min' => ['nullable', 'numeric', 'between:0,1000000'],
@@ -681,16 +728,27 @@ final class PredictionController extends Controller
             'hit_rate_min' => ['nullable', 'numeric', 'between:0,100'],
             'risk_max' => ['nullable', 'numeric', 'between:0,100'],
             'predicted_return_min' => ['nullable', 'numeric', 'between:-50,100'],
-            'minimum_trades' => ['nullable', 'integer', 'between:1,10000'],
+            'minimum_trades' => ['nullable', 'integer', 'between:0,10000'],
             'positive_prediction_required' => ['nullable', 'boolean'],
             'ensemble_veto_required' => ['nullable', 'boolean'],
             'gate_mode' => ['nullable', 'in:system,personal'],
             'quality_setup' => ['nullable', 'boolean'],
             'sector_score_rotation' => ['nullable', 'boolean'],
             'index_score_rotation' => ['nullable', 'boolean'],
+            'forecast_score_rotation_5d_enabled' => ['nullable', 'boolean'],
+            'entry_strategy' => ['nullable', 'in:direct_buy,wait_5d,forecast_score_rotation_5d'],
+            'entry_risk_style' => ['nullable', 'in:conservative,balanced,chance'],
+            'automatic_strategy_comparison' => ['nullable', 'boolean'],
+            'strategy_priority' => ['nullable', 'required_if:forecast_score_rotation_5d_enabled,1', 'in:rotation_first,exit_first'],
             'automatic_optimization' => ['nullable', 'boolean'],
             'optimization_goal' => ['nullable', 'in:reduce_drawdown,fewer_trades,maximize_performance'],
-            'exit_strategy' => ['nullable', 'in:fixed_20d,winner_runner,prediction_target,buy_and_hold'],
+            'exit_strategy' => ['nullable', 'in:fixed_20d,signal_change,buy_and_hold'],
+            'fixed_20d_exit_enabled' => ['nullable', 'boolean'],
+            'dynamic_horizon_exit_enabled' => ['nullable', 'boolean'],
+            'support_stop_enabled' => ['nullable', 'boolean'],
+            'resistance_trailing_stop_enabled' => ['nullable', 'boolean'],
+            'entry_wait_5d_enabled' => ['nullable', 'boolean'],
+            'signal_change_exit_enabled' => ['nullable', 'boolean'],
             'initial_capital' => ['required', 'numeric', 'between:1000,1000000'],
             'max_positions' => ['required', 'integer', 'between:1,50'],
             'position_factor' => ['required', 'integer', 'between:1,50', 'lte:max_positions'],
@@ -703,10 +761,37 @@ final class PredictionController extends Controller
             $filters = $this->mergePersonalQualityGate($filters, $personalGate);
         }
         $initialCapital = (float) $filters['initial_capital'];
+        $filters['minimum_trades'] = max(1, (int) ($filters['minimum_trades'] ?? 1));
+        $filters['entry_strategy'] = in_array($filters['entry_strategy'] ?? null, ['direct_buy', 'wait_5d', 'forecast_score_rotation_5d'], true)
+            ? $filters['entry_strategy']
+            : 'direct_buy';
+        $filters['entry_risk_style'] = in_array($filters['entry_risk_style'] ?? null, ['conservative', 'balanced', 'chance'], true)
+            ? $filters['entry_risk_style']
+            : 'balanced';
+        $filters['automatic_strategy_comparison'] = $request->boolean('automatic_strategy_comparison') ? 1 : 0;
+        $filters['forecast_score_rotation_5d_enabled'] = $filters['entry_strategy'] === 'forecast_score_rotation_5d' ? 1 : 0;
+        $filters['entry_wait_5d_enabled'] = $filters['entry_strategy'] === 'wait_5d' ? 1 : 0;
+        $filters['signal_change_exit_enabled'] = ($filters['exit_strategy'] ?? 'fixed_20d') === 'signal_change' ? 1 : 0;
         $maxPositions = (int) $filters['max_positions'];
         $positionFactor = ($filters['exit_strategy'] ?? null) === 'buy_and_hold' ? 1 : (int) $filters['position_factor'];
         $filters['position_factor'] = $positionFactor;
+        foreach (['fixed_20d_exit_enabled', 'dynamic_horizon_exit_enabled', 'support_stop_enabled', 'resistance_trailing_stop_enabled'] as $disabledExitRule) {
+            $filters[$disabledExitRule] = 0;
+        }
+        $filters['automatic_optimization'] = 0;
+        unset($filters['optimization_goal']);
         $tradeCost = (float) $filters['trade_cost'];
+        DB::table('backtest_runs')
+            ->whereIn('status', ['queued', 'running'])
+            ->whereRaw("settings->>'run_type' = 'user_filter'")
+            ->whereRaw("(settings->>'initiated_by_user_id')::bigint = ?", [$request->user()->id])
+            ->where('updated_at', '<', now()->subMinutes(25))
+            ->update([
+                'status' => 'failed',
+                'finished_at' => now(),
+                'error_message' => __('Der Backtest-Worker wurde unerwartet beendet. Bitte starte den Strategietest erneut.'),
+                'updated_at' => now(),
+            ]);
         $activeRun = DB::table('backtest_runs')
             ->whereIn('status', ['queued', 'running'])
             ->whereRaw("settings->>'run_type' = 'user_filter'")
@@ -714,21 +799,21 @@ final class PredictionController extends Controller
             ->orderByDesc('id')
             ->first();
         if ($activeRun !== null) {
-            return redirect()->route($returnRoute, array_merge($filters, ['backtest_run' => $activeRun->public_id]))
+            return redirect()->route($returnRoute, array_merge($filters, ['backtest_run' => $activeRun->public_id, 'show_result' => 1]))
                 ->with('status', __('Ein Backtest läuft bereits.'));
         }
-        $sourceRun = DB::table('backtest_runs')
-            ->whereIn('status', ['completed', 'completed_with_errors'])
-            ->whereRaw("COALESCE(settings->>'run_type', 'system') <> 'user_filter'")
-            // Administrative/metadata runs can be marked completed without
-            // containing any trades.  They must never be used as the source
-            // for a user backtest, otherwise the job completes with zero
-            // candidates and the result table appears empty.
-            ->where('trades_count', '>', 0)
-            ->orderByDesc('id')
-            ->first();
+        // Always refresh the legacy-shaped source from the best completed
+        // 20-day walk-forward run first. Otherwise an older materialized run
+        // remains the newest system backtest forever and silently caps the
+        // strategy universe at its historical instrument count.
+        $sourceRun = $this->materializeWalkForwardSourceRun();
         if ($sourceRun === null) {
-            $sourceRun = $this->materializeWalkForwardSourceRun();
+            $sourceRun = DB::table('backtest_runs')
+                ->whereIn('status', ['completed', 'completed_with_errors'])
+                ->whereRaw("COALESCE(settings->>'run_type', 'system') <> 'user_filter'")
+                ->where('trades_count', '>', 0)
+                ->orderByDesc('id')
+                ->first();
         }
         abort_if($sourceRun === null, 422, __('Es ist kein abgeschlossener Drei-Jahres-Ausgangslauf vorhanden.'));
 
@@ -738,12 +823,24 @@ final class PredictionController extends Controller
             'initiated_by_user_id' => $request->user()->id,
             'source_run_id' => $sourceRun->id,
             'lookback_years' => 3,
-            'entry' => 'BUY signal with positive predicted return',
-            'exit' => 'close after 20 trading days',
+            'entry' => match ($filters['entry_strategy']) {
+                'wait_5d' => 'WAIT up to 5 trading days, then BUY at current price',
+                'forecast_score_rotation_5d' => 'forecast score entry selection every 5 trading days',
+                default => 'BUY signal with positive predicted return',
+            },
+            'exit' => match ($filters['exit_strategy'] ?? 'fixed_20d') {
+                'signal_change' => 'close on signal change',
+                'buy_and_hold' => 'buy and hold',
+                default => 'close after 20 trading days',
+            },
             'selection_filters' => $filters,
             'selection_metrics' => [
                 'drawdown' => 'maximum per instrument over source period',
-                'profit_factor' => 'aggregate per instrument over source period',
+                'profile' => $filters['entry_risk_style'],
+                'conservative' => 'drawdown asc, hit rate desc, profit factor desc',
+                'balanced' => 'hit rate desc, profit factor desc, drawdown asc',
+                'chance' => 'profit factor desc, hit rate desc, drawdown asc',
+                'profit_per_trade' => 'average net return per trade over source period',
             ],
             'capital' => [
                 'initial' => $initialCapital,
@@ -781,8 +878,7 @@ final class PredictionController extends Controller
             'updated_at' => now(),
         ]);
 
-        $exitStrategy = (string) ($filters['exit_strategy'] ?? 'fixed_20d');
-        if (config('aktienki.python_engine.backtests', false) && $exitStrategy !== 'fixed_20d') {
+        if (config('aktienki.python_engine.backtests', false)) {
             app(PythonEngineJobDispatcher::class)->dispatchFilteredBacktest(
                 (int) $request->user()->id,
                 $runId,
@@ -794,7 +890,7 @@ final class PredictionController extends Controller
             RunFilteredBacktest::dispatch($runId, (int) $sourceRun->id, $filters);
         }
 
-        return redirect()->route($returnRoute, array_merge($filters, ['backtest_run' => $publicId]))
+        return redirect()->route($returnRoute, array_merge($filters, ['backtest_run' => $publicId, 'show_result' => 1]))
             ->with('status', __('Der Drei-Jahres-Backtest wurde gestartet.'));
     }
 
@@ -914,14 +1010,16 @@ final class PredictionController extends Controller
             default => ['performance' => 1.00, 'drawdown' => 1.00, 'quality' => 1.00],
         };
         $profileLimits = match ($riskProfile) {
-            'cautious' => ['drawdown' => 25, 'volatility' => 45, 'consistency' => 75],
-            'opportunity_oriented' => ['drawdown' => 50, 'volatility' => 100, 'consistency' => 25],
-            default => ['drawdown' => 40, 'volatility' => 65, 'consistency' => 50],
+            'cautious' => ['drawdown' => 25, 'volatility' => 45, 'consistency' => 75, 'confidence' => 65, 'trades' => 20],
+            'opportunity_oriented' => ['drawdown' => 50, 'volatility' => 100, 'consistency' => 25, 'confidence' => 45, 'trades' => 10],
+            default => ['drawdown' => 40, 'volatility' => 65, 'consistency' => 50, 'confidence' => 55, 'trades' => 15],
         };
         $stats = $stats->filter(fn (array $stat): bool =>
             $stat['drawdown'] <= $profileLimits['drawdown']
             && $stat['volatility'] <= $profileLimits['volatility']
             && $stat['consistency'] >= $profileLimits['consistency']
+            && $stat['confidence'] >= $profileLimits['confidence']
+            && $stat['trades'] >= $profileLimits['trades']
         )->values();
         abort_if($stats->count() < 5, 422, __('Nach Anwendung deines Risikoprofils bleiben zu wenige Aktien für eine belastbare Optimierung übrig.'));
 
@@ -1040,6 +1138,12 @@ final class PredictionController extends Controller
     public function filteredBacktestResult(Request $request, string $publicId, ?YahooIndexService $indices = null): JsonResponse
     {
         $indices ??= app(YahooIndexService::class);
+        $resultCacheKey = 'filtered-backtest-result:v9:'.$request->user()->id.':'.$publicId;
+        $cachedResult = Cache::store('file')->get($resultCacheKey);
+        if (is_array($cachedResult)) {
+            return response()->json($cachedResult)->header('Cache-Control', 'private, max-age=60');
+        }
+
         $run = DB::table('backtest_runs')
             ->where('public_id', $publicId)
             ->whereRaw("settings->>'run_type' = 'user_filter'")
@@ -1048,11 +1152,85 @@ final class PredictionController extends Controller
             ->first();
         abort_if($run === null, 404);
 
+        // Completed backtests are immutable. Building all portfolio variants,
+        // rotations, benchmarks and chart series is expensive, so reuse the
+        // finished payload for the result modal and PDF report.
+        $pythonJob = DB::table('python_engine_jobs')
+            ->where('backtest_run_id', $run->id)
+            ->where('status', 'completed')
+            ->latest('id')
+            ->first(['result']);
+        $pythonResult = is_string($pythonJob?->result)
+            ? json_decode($pythonJob->result, true)
+            : (array) ($pythonJob?->result ?? []);
+        $earlyRunSettings = is_string($run->settings) ? (json_decode($run->settings, true) ?: []) : (array) $run->settings;
+        $scoreRotationRequested = (bool) data_get($earlyRunSettings, 'selection_filters.forecast_score_rotation_5d_enabled', false);
+        if ($scoreRotationRequested && ! DB::table('backtest_strategy_trades')
+            ->where('backtest_run_id', $run->id)
+            ->where('strategy', \App\Services\HistoricalForecastScoreRotationService::STRATEGY)
+            ->exists()) {
+            $rotationSummary = app(\App\Services\HistoricalForecastScoreRotationService::class)->apply(
+                (int) $run->id,
+                max(1, (int) data_get($earlyRunSettings, 'selection_filters.max_positions', 5)),
+                true,
+                (bool) data_get($earlyRunSettings, 'selection_filters.sector_score_rotation', false),
+                (bool) data_get($earlyRunSettings, 'selection_filters.index_score_rotation', false),
+                (string) data_get($earlyRunSettings, 'selection_filters.strategy_priority', 'rotation_first'),
+            );
+            $updatedSummary = is_string($run->summary) ? (json_decode($run->summary, true) ?: []) : (array) ($run->summary ?? []);
+            $updatedSummary['forecast_score_rotation_summary'] = $rotationSummary;
+            DB::table('backtest_runs')->where('id', $run->id)->update([
+                'summary' => json_encode($updatedSummary, JSON_THROW_ON_ERROR),
+                'updated_at' => now(),
+            ]);
+            $run->summary = json_encode($updatedSummary, JSON_THROW_ON_ERROR);
+        }
+        $adaptiveChart = collect(data_get($pythonResult, 'adaptive_rotation_chart', []));
+        $previousAdaptiveValue = null;
+        $adaptiveResultIsImplausible = $adaptiveChart->contains(function (array $point) use (&$previousAdaptiveValue): bool {
+            $value = (float) ($point['y'] ?? 0);
+            $jump = $previousAdaptiveValue === null ? 0.0 : abs($value - $previousAdaptiveValue);
+            $previousAdaptiveValue = $value;
+
+            // A diversified portfolio cannot gain ten times its starting
+            // capital in one exit event. Such jumps come from overlapping
+            // duplicate positions or unadjusted corporate-action prices.
+            return ! is_finite($value) || abs($value) > 1000 || $jump > 500;
+        });
+        // Version 2 used fractional capital blocks, charged only one fee per
+        // round trip and therefore produced materially more optimistic values
+        // than the strategy-depot simulator. Only reuse engine payloads that
+        // explicitly implement the depot-compatible transaction accounting.
+        if (data_get($pythonResult, 'calculation_version') === 'filtered-portfolio-v3-depot' && ! $adaptiveResultIsImplausible && ! $scoreRotationRequested) {
+            // Rebuild the DAX comparison from current price bars on every
+            // request. Older worker results may contain isolated provider
+            // values in the wrong unit, producing artificial -100% spikes.
+            $this->ensureIndexComparisonHistory(
+                '^GDAXI',
+                (int) data_get($pythonResult, 'period_start', 0),
+                (int) data_get($pythonResult, 'period_end', 0),
+                $indices,
+            );
+            $pythonResult = array_merge($pythonResult, $this->indexComparison(
+                '^GDAXI',
+                (int) data_get($pythonResult, 'period_start', 0),
+                (int) data_get($pythonResult, 'period_end', 0),
+                (float) data_get($pythonResult, 'initial_capital', 10000),
+                'dax',
+            ));
+            Cache::store('file')->put($resultCacheKey, $pythonResult, now()->addHours(12));
+
+            return response()->json($pythonResult)->header('Cache-Control', 'private, max-age=60');
+        }
+
         $tradePeriod = DB::table('backtest_trades')->where('backtest_run_id', $run->id)
             ->selectRaw('MIN(entry_date) AS starts_at, MAX(exit_date) AS ends_at')
             ->first();
         if ($tradePeriod?->starts_at === null || $tradePeriod?->ends_at === null) {
-            return response()->json(['strategy' => [], 'benchmark' => [], 'strategy_performance' => 0]);
+            $emptyResult = ['strategy' => [], 'benchmark' => [], 'strategy_performance' => 0];
+            Cache::store('file')->put($resultCacheKey, $emptyResult, now()->addHours(12));
+
+            return response()->json($emptyResult)->header('Cache-Control', 'private, max-age=60');
         }
 
         $runSettings = is_string($run->settings) ? (json_decode($run->settings, true) ?: []) : (array) $run->settings;
@@ -1075,6 +1253,7 @@ final class PredictionController extends Controller
         $candidateQuery = DB::table('backtest_trades')
             ->leftJoinLateral($entryAtrForCandidate, 'entry_atr')
             ->where('backtest_run_id', $run->id)
+            ->whereBetween('gross_return', [-1.0, 3.0])
             ->whereDate('entry_date', '>=', $period->starts_at)
             ->whereDate('exit_date', '<=', $period->ends_at)
             ->orderBy('entry_date')
@@ -1082,70 +1261,39 @@ final class PredictionController extends Controller
             ->orderByDesc('confidence');
         $candidates = $candidateQuery->orderBy('id')->get([
             'id', 'instrument_id', 'model_definition_id', 'trained_model_id',
-            'entry_date', 'exit_date', 'entry_price', 'gross_return', 'max_drawdown', 'entry_atr.atr_14 as entry_atr_14',
+            'entry_date', 'exit_date', 'entry_price', 'exit_price', 'gross_return', 'max_drawdown', 'metadata', 'entry_atr.atr_14 as entry_atr_14',
         ]);
-        $cash = $initialCapital;
-        $openPositions = [];
-        $executed = collect();
-        foreach ($candidates as $trade) {
-            foreach ($openPositions as $key => $position) {
-                if ($position['exit_date'] > (string) $trade->entry_date) continue;
-                $cash += $position['capital'] * (1 + $position['return']);
-                unset($openPositions[$key]);
-            }
-            if (count($openPositions) >= $maxPositions || $cash + 0.00001 < $basePositionCapital) continue;
-            $availableFactor = (int) floor(($cash + 0.00001) / $basePositionCapital);
-            $appliedFactor = min($positionFactor, $availableFactor);
-            if ($appliedFactor < 1) continue;
-            $allocatedCapital = $basePositionCapital * $appliedFactor;
-            $trade->allocated_capital = $allocatedCapital;
-            $trade->net_return_after_cost = (float) $trade->gross_return - ($tradeCost / $allocatedCapital);
-            $cash -= $allocatedCapital;
-            $openPositions[] = [
-                'exit_date' => (string) $trade->exit_date,
-                'capital' => $allocatedCapital,
-                'return' => $trade->net_return_after_cost,
-            ];
-            $executed->push($trade);
-        }
-
-        $events = [];
-        foreach ($executed as $trade) {
-            $events[(string) $trade->entry_date]['entries'][] = (float) $trade->allocated_capital;
-            $events[(string) $trade->exit_date]['exits'][] = [
-                'capital' => (float) $trade->allocated_capital,
-                'return' => (float) $trade->net_return_after_cost,
-            ];
-        }
-        $capitalBinding = $this->capitalBinding(
-            $events,
+        $portfolioSimulation = $this->simulatePortfolio(
+            $candidates,
+            $initialCapital,
+            $maxPositions,
+            $positionFactor,
+            $tradeCost,
             (string) $period->starts_at,
             (string) $period->ends_at,
-            $initialCapital,
         );
-        ksort($events);
-        $cash = $initialCapital;
-        $invested = 0.0;
-        $strategy = [['x' => strtotime((string) $period->starts_at) * 1000, 'y' => round($initialCapital, 2)]];
-        foreach ($events as $date => $event) {
-            foreach ($event['exits'] ?? [] as $exit) {
-                $invested -= $exit['capital'];
-                $cash += $exit['capital'] * (1 + $exit['return']);
-            }
-            foreach ($event['entries'] ?? [] as $capital) {
-                $cash -= $capital;
-                $invested += $capital;
-            }
-            $strategy[] = [
-                'x' => strtotime($date) * 1000,
-                'y' => round($cash + $invested, 2),
-            ];
-        }
-        $periodEnd = strtotime((string) $period->ends_at) * 1000;
-        if ($strategy[array_key_last($strategy)]['x'] < $periodEnd) {
-            $strategy[] = ['x' => $periodEnd, 'y' => (float) $strategy[array_key_last($strategy)]['y']];
-        }
-        $strategyValue = (float) ($strategy[array_key_last($strategy)]['y'] ?? $initialCapital);
+        $executed = $portfolioSimulation['executed_collection'];
+        $waitEntryCount = $executed->filter(function (object $trade): bool {
+            $metadata = is_string($trade->metadata ?? null)
+                ? (json_decode($trade->metadata, true) ?: [])
+                : (array) ($trade->metadata ?? []);
+
+            return (int) data_get($metadata, 'dynamic_exit.entry_wait_days', 0) > 0;
+        })->count();
+        $signalChangeExitCount = $executed->filter(function (object $trade): bool {
+            $metadata = is_string($trade->metadata ?? null)
+                ? (json_decode($trade->metadata, true) ?: [])
+                : (array) ($trade->metadata ?? []);
+
+            return data_get($metadata, 'dynamic_exit.reason') === 'signal_change';
+        })->count();
+
+        $capitalBinding = [
+            'average' => $portfolioSimulation['average_capital_binding'],
+            'maximum' => $portfolioSimulation['maximum_capital_binding'],
+        ];
+        $strategy = $portfolioSimulation['series'];
+        $strategyValue = $portfolioSimulation['final'];
         $netReturn = fn (object $trade): float => (float) $trade->net_return_after_cost;
         $winningReturn = $executed->sum(fn (object $trade): float => max(0, $netReturn($trade)));
         $losingReturn = abs($executed->sum(fn (object $trade): float => min(0, $netReturn($trade))));
@@ -1177,17 +1325,6 @@ final class PredictionController extends Controller
                 $netReturn($trade) / ((float) $trade->entry_atr_14 / (float) $trade->entry_price)
             )
             : 0.0;
-        $executedTradeIds = $executed->pluck('id')->map(fn ($id): int => (int) $id)->all();
-        $predictionReachedTrades = $executedTradeIds === []
-            ? 0
-            : DB::table('backtest_strategy_trades as target_trade')
-                ->join('backtest_trades as base_trade', 'base_trade.id', '=', 'target_trade.backtest_trade_id')
-                ->where('target_trade.backtest_run_id', $run->id)
-                ->where('target_trade.strategy', 'prediction_target')
-                ->whereIn('target_trade.backtest_trade_id', $executedTradeIds)
-                ->whereRaw('target_trade.gross_return >= base_trade.predicted_return - 0.000001')
-                ->count();
-
         $benchmarkBars = DB::table('price_bars as bar')
             ->join('instruments as instrument', 'instrument.id', '=', 'bar.instrument_id')
             ->where('instrument.symbol', '^GSPC')
@@ -1229,30 +1366,43 @@ final class PredictionController extends Controller
             : null;
         $benchmarkDrawdown = $this->maximumSeriesDrawdown($benchmark);
 
-        $winnerCandidates = DB::table('backtest_strategy_trades')
-            ->where('backtest_run_id', $run->id)
-            ->where('strategy', 'winner_runner')
-            ->orderBy('entry_date')
-            ->orderBy('id')
-            ->get(['entry_date', 'exit_date', 'gross_return', 'max_drawdown']);
-        $winner = $this->simulatePortfolio($winnerCandidates, $initialCapital, $maxPositions, $positionFactor, $tradeCost, (string) $period->starts_at, (string) $period->ends_at);
-        $winnerGross = $this->simulatePortfolio($winnerCandidates->map(fn (object $trade): object => clone $trade), $initialCapital, $maxPositions, $positionFactor, 0, (string) $period->starts_at, (string) $period->ends_at);
-        $targetCandidates = DB::table('backtest_strategy_trades')
-            ->where('backtest_run_id', $run->id)
-            ->where('strategy', 'prediction_target')
-            ->orderBy('entry_date')
-            ->orderBy('id')
-            ->get(['entry_date', 'exit_date', 'gross_return', 'max_drawdown']);
-        $target = $this->simulatePortfolio($targetCandidates, $initialCapital, $maxPositions, $positionFactor, $tradeCost, (string) $period->starts_at, (string) $period->ends_at);
-        $targetGross = $this->simulatePortfolio($targetCandidates->map(fn (object $trade): object => clone $trade), $initialCapital, $maxPositions, $positionFactor, 0, (string) $period->starts_at, (string) $period->ends_at);
         $adaptiveCandidates = DB::table('backtest_strategy_trades')
             ->where('backtest_run_id', $run->id)
             ->where('strategy', 'adaptive_rotation_20d')
+            ->whereBetween('gross_return', [-1.0, 3.0])
             ->orderBy('entry_date')
             ->orderBy('id')
-            ->get(['entry_date', 'exit_date', 'gross_return', 'max_drawdown', 'metadata']);
+            ->get(['instrument_id', 'entry_date', 'exit_date', 'gross_return', 'max_drawdown', 'metadata']);
         $adaptive = $this->simulatePortfolio($adaptiveCandidates, $initialCapital, $maxPositions, $positionFactor, $tradeCost, (string) $period->starts_at, (string) $period->ends_at);
         $adaptiveGross = $this->simulatePortfolio($adaptiveCandidates->map(fn (object $trade): object => clone $trade), $initialCapital, $maxPositions, $positionFactor, 0, (string) $period->starts_at, (string) $period->ends_at);
+        $scoreRotationCandidates = DB::table('backtest_strategy_trades')
+            ->where('backtest_run_id', $run->id)
+            ->where('strategy', \App\Services\HistoricalForecastScoreRotationService::STRATEGY)
+            ->whereBetween('gross_return', [-1.0, 3.0])
+            ->orderBy('entry_date')->orderBy('id')
+            ->get(['instrument_id', 'entry_date', 'exit_date', 'gross_return', 'max_drawdown', 'metadata']);
+        $scoreRotation = $this->simulatePortfolio($scoreRotationCandidates, $initialCapital, $maxPositions, $positionFactor, $tradeCost, (string) $period->starts_at, (string) $period->ends_at);
+        $scoreRotationGross = $this->simulatePortfolio($scoreRotationCandidates->map(fn (object $trade): object => clone $trade), $initialCapital, $maxPositions, $positionFactor, 0, (string) $period->starts_at, (string) $period->ends_at);
+        $simulateAreaEntry = function (string $strategy) use ($run, $initialCapital, $maxPositions, $positionFactor, $tradeCost, $period): array {
+            $rows = DB::table('backtest_strategy_trades')->where('backtest_run_id', $run->id)
+                ->where('strategy', $strategy)->whereBetween('gross_return', [-1.0, 3.0])
+                ->orderBy('entry_date')->orderBy('id')
+                ->get(['instrument_id', 'entry_date', 'exit_date', 'gross_return', 'max_drawdown', 'metadata']);
+            return $this->simulatePortfolio($rows, $initialCapital, $maxPositions, $positionFactor, $tradeCost, (string) $period->starts_at, (string) $period->ends_at);
+        };
+        $sectorEntryRotation = $simulateAreaEntry(\App\Services\HistoricalAreaEntryRotationService::SECTOR_STRATEGY);
+        $indexEntryRotation = $simulateAreaEntry(\App\Services\HistoricalAreaEntryRotationService::INDEX_STRATEGY);
+        $automaticExitVariants = collect(\App\Services\HistoricalDynamicExitService::AUTOMATIC_VARIANTS)
+            ->mapWithKeys(function (array $rules, string $strategy) use ($simulateAreaEntry, $initialCapital): array {
+                $simulation = $simulateAreaEntry($strategy);
+                return [$strategy => [
+                    'chart' => $this->performanceSeries($simulation['series'], $initialCapital),
+                    'performance' => $simulation['performance'],
+                    'final_capital' => $simulation['final'],
+                    'executed_trades' => $simulation['executed'],
+                    'max_drawdown' => $simulation['max_drawdown'],
+                ]];
+            })->all();
         $fixedGross = $this->simulatePortfolio($candidates->map(fn (object $trade): object => clone $trade), $initialCapital, $maxPositions, $positionFactor, 0, (string) $period->starts_at, (string) $period->ends_at);
         $buyAndHold = $this->simulateBuyAndHold(
             $candidates,
@@ -1267,19 +1417,27 @@ final class PredictionController extends Controller
             (strtotime((string) $period->ends_at) - strtotime((string) $period->starts_at)) / (86400 * 30.4375),
         );
 
-        return response()->json([
+        $resultPayload = [
             'period_start' => strtotime((string) $period->starts_at) * 1000,
             'period_end' => strtotime((string) $period->ends_at) * 1000,
             'strategy' => $strategy,
-            'winner_runner' => $winner['series'],
-            'prediction_target' => $target['series'],
             'adaptive_rotation' => $adaptive['series'],
             'buy_and_hold' => $buyAndHold['series'],
             'benchmark' => $benchmark,
             'strategy_chart' => $this->performanceSeries($strategy, $initialCapital),
-            'winner_runner_chart' => $this->performanceSeries($winner['series'], $initialCapital),
-            'prediction_target_chart' => $this->performanceSeries($target['series'], $initialCapital),
             'adaptive_rotation_chart' => $this->performanceSeries($adaptive['series'], $initialCapital),
+            'forecast_score_rotation' => $scoreRotation['series'],
+            'forecast_score_rotation_chart' => $this->performanceSeries($scoreRotation['series'], $initialCapital),
+            'sector_entry_rotation_chart' => $this->performanceSeries($sectorEntryRotation['series'], $initialCapital),
+            'index_entry_rotation_chart' => $this->performanceSeries($indexEntryRotation['series'], $initialCapital),
+            'selected_backtest_options' => [
+                'entry_strategy' => (string) data_get($runSettings, 'selection_filters.entry_strategy', 'direct_buy'),
+                'exit_strategy' => (string) data_get($runSettings, 'selection_filters.exit_strategy', 'fixed_20d'),
+                'sector_rotation' => (bool) data_get($runSettings, 'selection_filters.sector_score_rotation', false),
+                'index_rotation' => (bool) data_get($runSettings, 'selection_filters.index_score_rotation', false),
+                'automatic' => (bool) data_get($runSettings, 'selection_filters.automatic_strategy_comparison', false),
+            ],
+            'automatic_exit_variants' => $automaticExitVariants,
             'buy_and_hold_chart' => $this->performanceSeries($buyAndHold['series'], $initialCapital),
             'benchmark_chart' => $this->performanceSeries($benchmark, $initialCapital),
             'strategy_performance' => round((($strategyValue / $initialCapital) - 1) * 100, 2),
@@ -1288,21 +1446,28 @@ final class PredictionController extends Controller
             'benchmark_final_capital' => $benchmarkFinalCapital,
             'benchmark_profit' => $benchmarkProfit !== null ? round($benchmarkProfit, 2) : null,
             'benchmark_performance' => $benchmarkPerformance,
-            'winner_runner_performance' => $winner['performance'],
-            'winner_runner_gross_performance' => $winnerGross['performance'],
-            'winner_runner_final_capital' => $winner['final'],
-            'winner_runner_executed_trades' => $winner['executed'],
-            'winner_runner_skipped_trades' => $winner['skipped'],
-            'prediction_target_performance' => $target['performance'],
-            'prediction_target_gross_performance' => $targetGross['performance'],
-            'prediction_target_final_capital' => $target['final'],
-            'prediction_target_executed_trades' => $target['executed'],
-            'prediction_target_skipped_trades' => $target['skipped'],
             'adaptive_rotation_performance' => $adaptive['performance'],
             'adaptive_rotation_gross_performance' => $adaptiveGross['performance'],
             'adaptive_rotation_final_capital' => $adaptive['final'],
             'adaptive_rotation_executed_trades' => $adaptive['executed'],
-            'adaptive_rotation_skipped_trades' => max(0, $candidates->count() - $adaptive['executed']),
+            'adaptive_rotation_skipped_trades' => max(0, $adaptiveCandidates->count() - $adaptive['executed']),
+            'forecast_score_rotation_performance' => $scoreRotation['performance'],
+            'forecast_score_rotation_gross_performance' => $scoreRotationGross['performance'],
+            'forecast_score_rotation_final_capital' => $scoreRotation['final'],
+            'forecast_score_rotation_executed_trades' => $scoreRotation['executed'],
+            'sector_entry_rotation_performance' => $sectorEntryRotation['performance'],
+            'sector_entry_rotation_final_capital' => $sectorEntryRotation['final'],
+            'sector_entry_rotation_executed_trades' => $sectorEntryRotation['executed'],
+            'sector_entry_rotation_max_drawdown' => $sectorEntryRotation['max_drawdown'],
+            'index_entry_rotation_performance' => $indexEntryRotation['performance'],
+            'index_entry_rotation_final_capital' => $indexEntryRotation['final'],
+            'index_entry_rotation_executed_trades' => $indexEntryRotation['executed'],
+            'index_entry_rotation_max_drawdown' => $indexEntryRotation['max_drawdown'],
+            'forecast_score_rotation_replacements' => (int) data_get(
+                is_string($run->summary) ? (json_decode($run->summary, true) ?: []) : (array) ($run->summary ?? []),
+                'forecast_score_rotation_summary.replacements',
+                0,
+            ),
             'buy_and_hold_performance' => $buyAndHold['performance'],
             'buy_and_hold_final_capital' => $buyAndHold['final'],
             'buy_and_hold_executed_trades' => $buyAndHold['executed'],
@@ -1311,19 +1476,16 @@ final class PredictionController extends Controller
             'buy_and_hold_max_drawdown' => $buyAndHold['max_drawdown'],
             'backtest_months' => round($backtestMonths, 2),
             'trades_per_month' => round($executed->count() / $backtestMonths, 2),
-            'winner_runner_trades_per_month' => round($winner['executed'] / $backtestMonths, 2),
-            'prediction_target_trades_per_month' => round($target['executed'] / $backtestMonths, 2),
             'adaptive_rotation_trades_per_month' => round($adaptive['executed'] / $backtestMonths, 2),
             'initial_capital' => $initialCapital,
             'position_factor' => $positionFactor,
             'position_factor_usage' => $this->positionFactorUsage($executed, $basePositionCapital),
-            'winner_runner_position_factor_usage' => $winner['position_factor_usage'],
-            'prediction_target_position_factor_usage' => $target['position_factor_usage'],
             'adaptive_rotation_position_factor_usage' => $adaptive['position_factor_usage'],
             'model_statistics' => $this->executedModelStatistics($executed),
             'final_capital' => $strategyValue,
             'executed_trades' => $executed->count(),
-            'prediction_reached_trades' => $predictionReachedTrades,
+            'wait_entry_count' => $waitEntryCount,
+            'signal_change_exit_count' => $signalChangeExitCount,
             'winner_trades' => $winnerTrades,
             'loser_trades' => $loserTrades,
             'average_gain_factor' => $averageGainFactor !== null ? round($averageGainFactor, 3) : null,
@@ -1333,7 +1495,7 @@ final class PredictionController extends Controller
             'average_trade_return' => round($averageTradeReturn, 2),
             'skipped_trades' => $candidates->count() - $executed->count(),
             'trade_cost' => $tradeCost,
-            'total_costs' => round($executed->count() * $tradeCost, 2),
+            'total_costs' => round($executed->count() * $tradeCost * 2, 2),
             'hit_rate' => $executed->isNotEmpty()
                 ? round(($executed->filter(fn (object $trade): bool => $netReturn($trade) > 0)->count() / $executed->count()) * 100, 2)
                 : 0,
@@ -1341,22 +1503,32 @@ final class PredictionController extends Controller
             'max_drawdown' => round($executed->max(fn (object $trade): float => abs((float) $trade->max_drawdown)) * 100, 2),
             'portfolio_max_drawdown' => $this->maximumSeriesDrawdown($strategy),
             'benchmark_max_drawdown' => $benchmarkDrawdown,
-            'winner_runner_max_drawdown' => $winner['max_drawdown'],
-            'prediction_target_max_drawdown' => $target['max_drawdown'],
             'adaptive_rotation_max_drawdown' => $adaptive['max_drawdown'],
+            'forecast_score_rotation_max_drawdown' => $scoreRotation['max_drawdown'],
             'average_capital_binding' => $capitalBinding['average'],
             'maximum_capital_binding' => $capitalBinding['maximum'],
-            'winner_runner_average_capital_binding' => $winner['average_capital_binding'],
-            'winner_runner_maximum_capital_binding' => $winner['maximum_capital_binding'],
-            'prediction_target_average_capital_binding' => $target['average_capital_binding'],
-            'prediction_target_maximum_capital_binding' => $target['maximum_capital_binding'],
             'adaptive_rotation_average_capital_binding' => $adaptive['average_capital_binding'],
             'adaptive_rotation_maximum_capital_binding' => $adaptive['maximum_capital_binding'],
-        ]);
+        ];
+        Cache::store('file')->put($resultCacheKey, $resultPayload, now()->addHours(12));
+
+        return response()->json($resultPayload)->header('Cache-Control', 'private, max-age=60');
     }
 
     public function filteredBacktestStatus(Request $request, string $publicId): JsonResponse
     {
+        DB::table('backtest_runs')
+            ->where('public_id', $publicId)
+            ->whereRaw("settings->>'run_type' = 'user_filter'")
+            ->whereRaw("(settings->>'initiated_by_user_id')::bigint = ?", [$request->user()->id])
+            ->whereIn('status', ['queued', 'running'])
+            ->where('updated_at', '<', now()->subMinutes(25))
+            ->update([
+                'status' => 'failed',
+                'finished_at' => now(),
+                'error_message' => __('Der Backtest-Worker wurde unerwartet beendet. Bitte starte den Strategietest erneut.'),
+                'updated_at' => now(),
+            ]);
         $run = DB::table('backtest_runs')
             ->where('public_id', $publicId)
             ->whereRaw("settings->>'run_type' = 'user_filter'")
@@ -1452,14 +1624,40 @@ final class PredictionController extends Controller
         $backtestStocks = $this->backtestStockStatistics((int) $run->id);
         $adaptiveStatistics = $this->backtestAdaptiveStatistics((int) $run->id);
         $horizonStatistics = $this->backtestHorizonStatistics((int) $run->id, (bool) data_get($settings, 'selection_filters.automatic_optimization', false));
-        $chart = $this->reportChart([
-            '20 Tage' => ['color' => '#06b6d4', 'points' => $result['strategy_chart']],
-            'Winner Runner' => ['color' => '#6366f1', 'points' => $result['winner_runner_chart']],
-            'Prognoseziel' => ['color' => '#e11d48', 'points' => $result['prediction_target_chart']],
-            'Adaptive Rotation' => ['color' => '#22c55e', 'points' => $result['adaptive_rotation_chart']],
-            'S&P 500 (+'.number_format((float) $result['benchmark_performance'], 2, ',', '.').' %)' => ['color' => '#d97706', 'points' => $result['benchmark_chart']],
-            'Buy and Hold' => ['color' => '#38bdf8', 'points' => $result['buy_and_hold_chart']],
-        ]);
+        $reportSeries = ['Strategie' => ['color' => '#06b6d4', 'points' => $result['strategy_chart']]];
+        $automaticComparison = (bool) data_get($settings, 'selection_filters.automatic_strategy_comparison', false);
+        if ($automaticComparison || data_get($settings, 'selection_filters.entry_strategy') === 'forecast_score_rotation_5d') {
+            $reportSeries['Forecast-Score-Einstieg (5T)'] = ['color' => '#fbbf24', 'points' => $result['forecast_score_rotation_chart'] ?? []];
+        }
+        if ($automaticComparison || data_get($settings, 'selection_filters.sector_score_rotation', false)) {
+            $reportSeries['Sektorrotation'] = ['color' => '#a78bfa', 'points' => $result['sector_entry_rotation_chart'] ?? []];
+        }
+        if ($automaticComparison || data_get($settings, 'selection_filters.index_score_rotation', false)) {
+            $reportSeries['Indexrotation'] = ['color' => '#f472b6', 'points' => $result['index_entry_rotation_chart'] ?? []];
+        }
+        if (data_get($settings, 'selection_filters.adaptive_rotation_enabled', false)) {
+            $reportSeries['Adaptive Rotation'] = ['color' => '#22c55e', 'points' => $result['adaptive_rotation_chart']];
+        }
+        if ($automaticComparison || data_get($settings, 'selection_filters.exit_strategy') === 'buy_and_hold') {
+            $reportSeries['Buy and Hold'] = ['color' => '#38bdf8', 'points' => $result['buy_and_hold_chart']];
+        }
+        if ($automaticComparison) {
+            $automaticLabels = [
+                'auto_exit_fixed_20d' => 'Exit 20T', 'auto_exit_dynamic_horizon' => 'Dynamischer Horizont',
+                'auto_exit_support_stop' => 'Support-Stop', 'auto_exit_resistance_trailing' => 'Resistance-Trailing',
+                'auto_exit_signal_change' => 'Signalwechsel', 'auto_entry_wait_5d' => 'WAIT-Einstieg 5T',
+            ];
+            $automaticColors = ['#2dd4bf', '#60a5fa', '#fb923c', '#e879f9', '#f87171', '#84cc16'];
+            foreach (($result['automatic_exit_variants'] ?? []) as $strategy => $variant) {
+                if ((int) ($variant['executed_trades'] ?? 0) < 1) continue;
+                $reportSeries[$automaticLabels[$strategy] ?? $strategy] = [
+                    'color' => $automaticColors[count($reportSeries) % count($automaticColors)],
+                    'points' => $variant['chart'] ?? [],
+                ];
+            }
+        }
+        $reportSeries['S&P 500 (+'.number_format((float) $result['benchmark_performance'], 2, ',', '.').' %)'] = ['color' => '#d97706', 'points' => $result['benchmark_chart']];
+        $chart = $this->reportChart($reportSeries);
         $html = view('predictions.backtest-report', compact('run', 'result', 'settings', 'chart', 'modelStatistics', 'modelExitMatrix', 'backtestStocks', 'adaptiveStatistics', 'horizonStatistics'))->render();
         $options = new Options();
         $options->set('isRemoteEnabled', false);
@@ -1606,7 +1804,7 @@ final class PredictionController extends Controller
             ->join('backtest_trades as trade', 'trade.id', '=', 'strategy_trade.backtest_trade_id')
             ->leftJoin('model_definitions as model', 'model.id', '=', 'trade.model_definition_id')
             ->where('strategy_trade.backtest_run_id', $runId)
-            ->whereIn('strategy_trade.strategy', ['fixed_20d', 'winner_runner', 'prediction_target', 'adaptive_rotation_20d'])
+            ->whereIn('strategy_trade.strategy', ['fixed_20d', 'adaptive_rotation_20d'])
             ->groupBy('trade.model_definition_id', 'model.public_alias', 'strategy_trade.strategy')
             ->selectRaw("COALESCE(NULLIF(model.public_alias, ''), 'Unbekannt') AS model_name")
             ->addSelect('strategy_trade.strategy')
@@ -1676,6 +1874,12 @@ final class PredictionController extends Controller
     public function index(Request $request): View
     {
         $heatmapOnly = $request->attributes->getBoolean('heatmap_only');
+        // The visible stock universe follows the selected tariff even for
+        // administrators. Admin privileges must not bypass a Free-plan UI test.
+        $isFreeRegional = ! app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Plus);
+        $freeRegionalInstrumentIds = $isFreeRegional
+            ? app(FreeRegionalStockUniverseService::class)->instrumentIds($request->user())
+            : null;
 
         $modelIds = $this->requestedModelIds($request);
         $requestedSymbols = collect((array) $request->query('symbols', []))
@@ -1728,8 +1932,15 @@ final class PredictionController extends Controller
             ? DB::table('walk_forward_backtest_runs')
                 ->where('status', 'completed')
                 ->whereIn('horizon_days', [5, 10, 15, 20])
+                ->select(['id', 'horizon_days'])
+                ->selectSub(function ($query): void {
+                    $query->from('walk_forward_backtest_trades as score_run_trade')
+                        ->whereColumn('score_run_trade.run_id', 'walk_forward_backtest_runs.id')
+                        ->selectRaw('COUNT(DISTINCT score_run_trade.instrument_id)');
+                }, 'instrument_count')
+                ->orderByDesc('instrument_count')
                 ->orderByDesc('id')
-                ->get(['id', 'horizon_days'])
+                ->get()
                 ->unique('horizon_days')
                 ->pluck('id')
                 ->map(fn ($id): int => (int) $id)
@@ -1765,11 +1976,15 @@ final class PredictionController extends Controller
             ->when($hasWalkForwardTables, fn ($query) => $query
                 ->selectRaw('MAX(ABS(maximum_drawdown)) * 100 AS drawdown_percent')
                 ->selectRaw('AVG(NULLIF(profit_factor, 0)) AS profit_factor')
-                ->selectRaw('SUM(winning_trades)::numeric / NULLIF(SUM(trade_count), 0) * 100 AS hit_rate'))
+                ->selectRaw('(SELECT AVG(profit_trade.net_return) * 100 FROM walk_forward_backtest_trades AS profit_trade WHERE profit_trade.run_id = '.(int) $walkForwardRunId.' AND profit_trade.instrument_id = walk_forward_backtest_year_stats.instrument_id) AS profit_per_trade')
+                ->selectRaw('SUM(winning_trades)::numeric / NULLIF(SUM(trade_count), 0) * 100 AS hit_rate')
+                ->selectRaw('SUM(trade_count) AS trade_count'))
             ->when(! $hasWalkForwardTables, fn ($query) => $query
                 ->selectRaw('MAX(ABS(max_drawdown)) * 100 AS drawdown_percent')
                 ->selectRaw('SUM(CASE WHEN net_return > 0 THEN net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN net_return < 0 THEN net_return ELSE 0 END)), 0) AS profit_factor')
-                ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate'));
+                ->selectRaw('AVG(net_return) * 100 AS profit_per_trade')
+                ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
+                ->selectRaw('COUNT(*) AS trade_count'));
         $latestTechnicalIndicators = DB::table('technical_indicators')
             ->where('interval', '1d')
             ->groupBy('instrument_id')
@@ -1801,7 +2016,10 @@ final class PredictionController extends Controller
                 $join->on('year_range.instrument_id', '=', 'instrument.id'))
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
+            ->where('instrument.is_german_tradeable', true)
             ->whereNull('instrument.deleted_at')
+            ->when($freeRegionalInstrumentIds !== null, fn (Builder $query) =>
+                $query->whereIn('instrument.id', $freeRegionalInstrumentIds))
             // Die Produktionstabelle zeigt ausschließlich Aktien, deren
             // aktuellste Prognose mit dem neuen Daily-Makro-Standard erzeugt
             // wurde. Ältere Modelle bleiben in Historie und Detailansichten.
@@ -1820,10 +2038,10 @@ final class PredictionController extends Controller
         $confidenceSql = '(CASE WHEN prediction.confidence <= 1 THEN prediction.confidence * 100 ELSE prediction.confidence END)';
         $predictedReturnSql = '((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100';
         $minimumQualityTiers = [
-            'top' => ['top'],
-            'strong' => ['top', 'strong'],
-            'solid' => ['top', 'strong', 'solid'],
-            'test' => ['top', 'strong', 'solid', 'test'],
+            'top' => ['strong'],
+            'strong' => ['strong'],
+            'solid' => ['strong', 'solid'],
+            'test' => ['strong', 'solid', 'test'],
         ];
 
         $applyFilters = function (Builder $query, ?string $excluded = null, bool $includeNumericFilters = true) use ($request, $signalSql, $scoreSql, $confidenceSql, $predictedReturnSql, $minimumQualityTiers, $modelIds, $requestedSymbols): Builder {
@@ -1859,10 +2077,12 @@ final class PredictionController extends Controller
                 $query->whereNull('prediction.validated_at'))
             ->when($includeNumericFilters && $excluded !== 'confidence' && $request->filled('confidence_min') && is_numeric($request->query('confidence_min')), fn (Builder $query) =>
                 $query->whereRaw("{$confidenceSql} >= ?", [max(0, min(100, (float) $request->query('confidence_min')))]))
+            ->when($includeNumericFilters && $request->filled('score_min') && is_numeric($request->query('score_min')), fn (Builder $query) =>
+                $query->whereRaw("{$scoreSql} >= ?", [max(0, min(10, (float) $request->query('score_min')))]))
             ->when($includeNumericFilters && $request->filled('drawdown_max') && is_numeric($request->query('drawdown_max')) && (float) $request->query('drawdown_max') < 50, fn (Builder $query) =>
                 $query->where('backtest_stat.drawdown_percent', '<=', max(0, min(50, (float) $request->query('drawdown_max')))))
-            ->when($includeNumericFilters && $request->filled('profit_factor_min') && is_numeric($request->query('profit_factor_min')) && (float) $request->query('profit_factor_min') > 0, fn (Builder $query) =>
-                $query->where('backtest_stat.profit_factor', '>=', max(0, min(3, (float) $request->query('profit_factor_min')))))
+            ->when($includeNumericFilters && $request->filled('profit_per_trade_min') && is_numeric($request->query('profit_per_trade_min')) && (float) $request->query('profit_per_trade_min') > 0, fn (Builder $query) =>
+                $query->where('backtest_stat.profit_factor', '>=', max(0, min(10, (float) $request->query('profit_per_trade_min')))))
             ->when($includeNumericFilters && $request->filled('hit_rate_min') && is_numeric($request->query('hit_rate_min')) && (float) $request->query('hit_rate_min') > 0, fn (Builder $query) =>
                 $query->where('backtest_stat.hit_rate', '>=', max(0, min(100, (float) $request->query('hit_rate_min')))))
             ->when($includeNumericFilters && $request->filled('volatility_max') && is_numeric($request->query('volatility_max')) && (float) $request->query('volatility_max') < 100, fn (Builder $query) =>
@@ -1955,15 +2175,48 @@ final class PredictionController extends Controller
             ->orderBy($sortColumns[$sort], $direction)
             ->orderByDesc('prediction.id');
 
-        $predictions = $query->get();
+        // Every Smart Selection requires a current BUY signal. Apply this
+        // invariant in SQL instead of loading every non-matching prediction
+        // and discarding it later in PHP. This is especially important for
+        // the growing production universe.
+        if ($selectedSmartLabelId !== null) {
+            $query->whereRaw("({$signalSql}) = 'BUY'");
+            $selectedLabel = $smartLabels->firstWhere('id', $selectedSmartLabelId);
+            $criteria = is_string($selectedLabel?->criteria)
+                ? (json_decode($selectedLabel->criteria, true) ?: [])
+                : (array) ($selectedLabel?->criteria ?? []);
+            $query
+                ->when(filled($criteria['country'] ?? null), fn (Builder $query) => $query->where('instrument.country', strtoupper((string) $criteria['country'])))
+                ->when(filled($criteria['exchange'] ?? null), fn (Builder $query) => $query->where('exchange.code', strtoupper((string) $criteria['exchange'])))
+                ->when(filled($criteria['sector'] ?? null), fn (Builder $query) => $query->where('instrument.sector', (string) $criteria['sector']))
+                ->when((float) ($criteria['confidence_min'] ?? 0) > 0, fn (Builder $query) => $query->whereRaw("{$confidenceSql} >= ?", [(float) $criteria['confidence_min']]))
+                ->when((float) ($criteria['predicted_return_min'] ?? -50) > -50, fn (Builder $query) => $query->whereRaw("{$predictedReturnSql} >= ?", [(float) $criteria['predicted_return_min']]))
+                ->when((float) ($criteria['drawdown_max'] ?? 50) < 50, fn (Builder $query) => $query->where('backtest_stat.drawdown_percent', '<=', (float) $criteria['drawdown_max']))
+                ->when((float) ($criteria['profit_per_trade_min'] ?? $criteria['profit_factor_min'] ?? 0) > 0, fn (Builder $query) => $query->where('backtest_stat.profit_factor', '>=', (float) ($criteria['profit_per_trade_min'] ?? $criteria['profit_factor_min'])))
+                ->when((float) ($criteria['hit_rate_min'] ?? 0) > 0, fn (Builder $query) => $query->where('backtest_stat.hit_rate', '>=', (float) $criteria['hit_rate_min']))
+                ->when((int) ($criteria['minimum_trades'] ?? 0) > 0, fn (Builder $query) => $query->where('backtest_stat.trade_count', '>=', (int) $criteria['minimum_trades']) )
+                ->when((float) ($criteria['volatility_max'] ?? 100) < 100, fn (Builder $query) => $query->whereRaw('technical.volatility_20 * 100 <= ?', [(float) $criteria['volatility_max']]));
+        }
+
+        $predictionsPaginator = $query->paginate(50)->withQueryString();
+        $predictions = collect($predictionsPaginator->items());
         $predictionInstrumentIds = $predictions->pluck('instrument_id')->map(fn ($id): int => (int) $id)->unique()->values();
-        $recentPatternBars = $predictionInstrumentIds->isEmpty() ? collect() : DB::table('price_bars')
-            ->whereIn('instrument_id', $predictionInstrumentIds)
-            ->where('interval', '1d')
-            ->where('bar_time', '>=', now()->subDays(120))
-            ->orderBy('bar_time')
-            ->get(['instrument_id', 'bar_time', 'open', 'high', 'low', 'close'])
-            ->groupBy('instrument_id');
+        $recentPatternBars = collect();
+        if ($predictionInstrumentIds->isNotEmpty()) {
+            $rankedPatternBars = DB::table('price_bars')
+                ->whereIn('instrument_id', $predictionInstrumentIds)
+                ->where('interval', '1d')
+                ->where('bar_time', '>=', now()->subDays(60))
+                ->select(['instrument_id', 'bar_time', 'open', 'high', 'low', 'close'])
+                ->selectRaw('ROW_NUMBER() OVER (PARTITION BY instrument_id ORDER BY bar_time DESC) AS pattern_row');
+            $recentPatternBars = DB::query()
+                ->fromSub($rankedPatternBars, 'recent_pattern_bar')
+                ->where('pattern_row', '<=', 25)
+                ->orderBy('instrument_id')
+                ->orderBy('bar_time')
+                ->get(['instrument_id', 'bar_time', 'open', 'high', 'low', 'close'])
+                ->groupBy('instrument_id');
+        }
         $recentChartPatterns = $recentPatternBars->map(function ($bars): array {
             $bars = $bars->values();
             $found = [];
@@ -2124,14 +2377,17 @@ final class PredictionController extends Controller
             $volatility = is_numeric($rawVolatility) ? (float) $rawVolatility * 100 : null;
             $isBuy = strtoupper((string) $prediction->personalized_signal) === 'BUY';
 
-            $matching = $smartLabels->filter(function (object $label) use ($isBuy, $score, $confidence, $predictedReturn, $drawdown, $profitFactor, $volatility): bool {
+            $matching = $smartLabels->filter(function (object $label) use ($isBuy, $score, $confidence, $predictedReturn, $drawdown, $profitFactor, $volatility, $hitRate, $tradeCount): bool {
                 if (! $isBuy) return false;
                 $criteria = is_string($label->criteria) ? (json_decode($label->criteria, true) ?: []) : (array) $label->criteria;
                 if ($score === null || $score < (float) ($criteria['score_min'] ?? 0)) return false;
                 if ($confidence === null || $confidence < (float) ($criteria['confidence_min'] ?? 0)) return false;
                 if ($predictedReturn === null || $predictedReturn < (float) ($criteria['predicted_return_min'] ?? -20)) return false;
                 if ((float) ($criteria['drawdown_max'] ?? 50) < 50 && ($drawdown === null || $drawdown > (float) $criteria['drawdown_max'])) return false;
-                if ((float) ($criteria['profit_factor_min'] ?? 0) > 0 && ($profitFactor === null || $profitFactor < (float) $criteria['profit_factor_min'])) return false;
+                $profitFactorMinimum = (float) ($criteria['profit_per_trade_min'] ?? $criteria['profit_factor_min'] ?? 0);
+                if ($profitFactorMinimum > 0 && ($profitFactor === null || $profitFactor < $profitFactorMinimum)) return false;
+                if ((float) ($criteria['hit_rate_min'] ?? 0) > 0 && ($hitRate === null || $hitRate < (float) $criteria['hit_rate_min'])) return false;
+                if ((int) ($criteria['minimum_trades'] ?? 0) > 0 && $tradeCount < (int) $criteria['minimum_trades']) return false;
                 if ((float) ($criteria['volatility_max'] ?? 100) < 100 && ($volatility === null || $volatility > (float) $criteria['volatility_max'])) return false;
                 return true;
             })->map(fn (object $label): array => [
@@ -2159,29 +2415,26 @@ final class PredictionController extends Controller
         if ($selectedSmartLabelId !== null) {
             $predictions = $predictions->filter(fn (object $prediction): bool => collect($prediction->smart_labels)->contains('id', $selectedSmartLabelId))->values();
         }
+        $predictionsPaginator->setCollection($predictions);
+        $predictions = $predictionsPaginator;
         } else {
             $predictions = collect();
         }
 
         // Keep the summary cards in sync with exactly the same filters as the table.
-        $summary = $heatmapOnly ? (object) [
-            'total' => 0,
-            'instruments' => 0,
-            'validated' => 0,
-            'oldest_training' => null,
-            'latest_prediction' => null,
-        ] : $applyFilters($baseQuery())
+        $summary = $applyFilters($baseQuery())
             ->selectRaw('COUNT(*) AS total')
             ->selectRaw('COUNT(DISTINCT prediction.instrument_id) AS instruments')
             ->selectRaw('COUNT(prediction.validated_at) AS validated')
             ->selectRaw('MIN(trained_model.trained_at) AS oldest_training')
             ->selectRaw('MAX(prediction.prediction_time) AS latest_prediction')
             ->first();
-        if ($selectedSmartLabelId !== null || ($request->filled('score_min') && is_numeric($request->query('score_min')))) {
-            $summary->total = $predictions->count();
-            $summary->instruments = $predictions->pluck('instrument_id')->unique()->count();
-            $summary->validated = $predictions->whereNotNull('validated_at')->count();
-            $summary->latest_prediction = $predictions->max('prediction_time');
+        if (! $heatmapOnly && ($selectedSmartLabelId !== null || ($request->filled('score_min') && is_numeric($request->query('score_min'))))) {
+            $summary->total = $predictions instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator ? $predictions->total() : $predictions->count();
+            $summary->instruments = $summary->total;
+            $pagePredictions = collect($predictions->items());
+            $summary->validated = $pagePredictions->whereNotNull('validated_at')->count();
+            $summary->latest_prediction = $pagePredictions->max('prediction_time');
         }
 
         $aiTypes = $applyFilters($baseQuery(), 'ai_type', false)
@@ -2203,7 +2456,7 @@ final class PredictionController extends Controller
             ->selectRaw("COALESCE(quality_tier.name, 'Nicht qualifiziert') AS name")
             ->distinct()
             ->get()
-            ->sortBy(fn (object $tier): int => array_search($tier->code, ['top', 'strong', 'solid', 'test', 'unqualified'], true))
+            ->sortBy(fn (object $tier): int => array_search($tier->code, ['test', 'solid', 'strong', 'unqualified'], true))
             ->values();
 
         $signals = $applyFilters($baseQuery(), 'signal', false)
@@ -2249,12 +2502,27 @@ final class PredictionController extends Controller
             ->where('interval', '1d')
             ->selectRaw('instrument_id, MAX(id) AS technical_id')
             ->groupBy('instrument_id');
-        $fundamentalNumber = static fn (string $key): string =>
-            "(CASE WHEN NULLIF(fundamental.data::jsonb->>'{$key}', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'{$key}')::numeric END)";
+        $fundamentalNumber = static fn (string $key): string => match ($key) {
+            'trailingPE' => "COALESCE(fundamental.trailing_pe, CASE WHEN NULLIF(fundamental.data::jsonb->>'trailingPE', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'trailingPE')::numeric END)",
+            'dividendYield' => "COALESCE(fundamental.dividend_yield, CASE WHEN NULLIF(fundamental.data::jsonb->>'dividendYield', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'dividendYield')::numeric END)",
+            'marketCap' => "COALESCE(fundamental.market_cap, CASE WHEN NULLIF(fundamental.data::jsonb->>'marketCap', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'marketCap')::numeric END)",
+            'revenueGrowth' => "COALESCE(fundamental.revenue_growth, CASE WHEN NULLIF(fundamental.data::jsonb->>'revenueGrowth', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'revenueGrowth')::numeric END)",
+        };
         $selectedUserBacktest = $this->requestedUserBacktestRun($request);
         $isUserBacktestResult = $selectedUserBacktest !== null
             && in_array($selectedUserBacktest->status, ['completed', 'completed_with_errors'], true);
         $backtestRunId = $this->selectedBacktestRunId($request);
+        $selectedRunSettings = $isUserBacktestResult
+            ? (is_string($selectedUserBacktest->settings)
+                ? (json_decode($selectedUserBacktest->settings, true) ?: [])
+                : (array) $selectedUserBacktest->settings)
+            : [];
+        // A personal run only contains the stocks that matched at start time.
+        // Keep the complete source run as the heatmap universe so relaxing a
+        // filter can restore cells and values without starting another test.
+        $heatmapSourceRunId = $isUserBacktestResult
+            ? (int) data_get($selectedRunSettings, 'source_run_id', $backtestRunId)
+            : $backtestRunId;
         $rangeSource = DB::table('backtest_trades as range_trade')
             ->join('instruments as range_instrument', 'range_instrument.id', '=', 'range_trade.instrument_id')
             ->leftJoinSub($latestFundamentalIds, 'range_latest_fundamental', fn ($join) =>
@@ -2263,11 +2531,17 @@ final class PredictionController extends Controller
             ->leftJoinSub($latestTechnicalIds, 'range_latest_technical', fn ($join) =>
                 $join->on('range_latest_technical.instrument_id', '=', 'range_instrument.id'))
             ->leftJoin('technical_indicators as range_technical', 'range_technical.id', '=', 'range_latest_technical.technical_id')
-            ->where('range_trade.backtest_run_id', $backtestRunId)
+            ->where('range_trade.backtest_run_id', $heatmapSourceRunId)
             ->where('range_instrument.is_active', true)
-            ->whereNull('range_instrument.deleted_at');
-        $rangeFundamentalNumber = static fn (string $key): string =>
-            "(CASE WHEN NULLIF(range_fundamental.data::jsonb->>'{$key}', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (range_fundamental.data::jsonb->>'{$key}')::numeric END)";
+            ->whereNull('range_instrument.deleted_at')
+            ->when($freeRegionalInstrumentIds !== null, fn (Builder $query) =>
+                $query->whereIn('range_instrument.id', $freeRegionalInstrumentIds));
+        $rangeFundamentalNumber = static fn (string $key): string => match ($key) {
+            'trailingPE' => "COALESCE(range_fundamental.trailing_pe, CASE WHEN NULLIF(range_fundamental.data::jsonb->>'trailingPE', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (range_fundamental.data::jsonb->>'trailingPE')::numeric END)",
+            'dividendYield' => "COALESCE(range_fundamental.dividend_yield, CASE WHEN NULLIF(range_fundamental.data::jsonb->>'dividendYield', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (range_fundamental.data::jsonb->>'dividendYield')::numeric END)",
+            'marketCap' => "COALESCE(range_fundamental.market_cap, CASE WHEN NULLIF(range_fundamental.data::jsonb->>'marketCap', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (range_fundamental.data::jsonb->>'marketCap')::numeric END)",
+            'revenueGrowth' => "COALESCE(range_fundamental.revenue_growth, CASE WHEN NULLIF(range_fundamental.data::jsonb->>'revenueGrowth', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (range_fundamental.data::jsonb->>'revenueGrowth')::numeric END)",
+        };
         $rangeValues = (clone $rangeSource)
             ->selectRaw('MAX(range_trade.ki_score) AS score')
             ->selectRaw('MAX(range_trade.confidence) AS confidence')
@@ -2275,21 +2549,24 @@ final class PredictionController extends Controller
             ->selectRaw('MAX(range_trade.predicted_return) * 100 AS predicted_return')
             ->selectRaw('MAX(range_technical.volatility_20) * 100 AS volatility')
             ->selectRaw('MAX('.$rangeFundamentalNumber('trailingPE').') AS pe')
-            ->selectRaw('MAX('.$rangeFundamentalNumber('dividendYield').') AS dividend_yield')
+            ->selectRaw('MAX('.$rangeFundamentalNumber('dividendYield').') * 100 AS dividend_yield')
             ->selectRaw('MAX('.$rangeFundamentalNumber('marketCap').') / 1000000000 AS market_cap')
             ->selectRaw('MAX('.$rangeFundamentalNumber('revenueGrowth').') * 100 AS revenue_growth')
             ->first();
         $instrumentRangeStats = DB::table('backtest_trades as range_stat_trade')
             ->join('instruments as range_stat_instrument', 'range_stat_instrument.id', '=', 'range_stat_trade.instrument_id')
-            ->where('range_stat_trade.backtest_run_id', $backtestRunId)
+            ->where('range_stat_trade.backtest_run_id', $heatmapSourceRunId)
             ->where('range_stat_instrument.is_active', true)
             ->whereNull('range_stat_instrument.deleted_at')
+            ->when($freeRegionalInstrumentIds !== null, fn (Builder $query) =>
+                $query->whereIn('range_stat_instrument.id', $freeRegionalInstrumentIds))
             ->groupBy('range_stat_trade.instrument_id')
             ->selectRaw('COUNT(*) AS trade_count')
             ->selectRaw('AVG(CASE WHEN range_stat_trade.net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
+            ->selectRaw('AVG(range_stat_trade.net_return) * 100 AS profit_per_trade')
             ->selectRaw('SUM(CASE WHEN range_stat_trade.net_return > 0 THEN range_stat_trade.net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN range_stat_trade.net_return < 0 THEN range_stat_trade.net_return ELSE 0 END)), 0) AS profit_factor');
         $instrumentRangeValues = DB::query()->fromSub($instrumentRangeStats, 'range_stats')
-            ->selectRaw('MAX(trade_count) AS trade_count, MAX(hit_rate) AS hit_rate, MAX(profit_factor) AS profit_factor')
+            ->selectRaw('MAX(trade_count) AS trade_count, MAX(hit_rate) AS hit_rate, MAX(profit_factor) AS profit_factor, MAX(profit_per_trade) AS profit_per_trade')
             ->first();
         $ceilTo = static fn (mixed $value, float $step, float $fallback): float => is_numeric($value)
             ? max($step, ceil((float) $value / $step) * $step)
@@ -2299,6 +2576,7 @@ final class PredictionController extends Controller
             'confidence' => $ceilTo($rangeValues?->confidence, 5, 100),
             'drawdown' => $ceilTo($rangeValues?->drawdown, 5, 50),
             'profit_factor' => 3.0,
+            'profit_per_trade' => $ceilTo($instrumentRangeValues?->profit_per_trade, .1, 5),
             // Volatility is displayed as a percentage and is intentionally
             // capped at 100 for every German filter page.
             'volatility' => min(100.0, $ceilTo($rangeValues?->volatility, 5, 100)),
@@ -2310,11 +2588,9 @@ final class PredictionController extends Controller
             'hit_rate' => $ceilTo($instrumentRangeValues?->hit_rate, 5, 100),
             'trades' => $ceilTo($instrumentRangeValues?->trade_count, 10, 100),
         ];
-        $eligibleInstruments = $isUserBacktestResult
-            ? null
-            : $this->eligibleBacktestInstruments($backtestRunId, $request, $rangeMaxima);
+        $eligibleInstruments = $this->eligibleBacktestInstruments($heatmapSourceRunId, $request, $rangeMaxima);
         $entryAtrForHeatmap = $this->entryAtrSubquery('backtest_trade');
-        $heatmapQuery = DB::table('backtest_trades as backtest_trade')
+        $heatmapBaseQuery = DB::table('backtest_trades as backtest_trade')
             ->join('backtest_runs as backtest_run', 'backtest_run.id', '=', 'backtest_trade.backtest_run_id')
             ->join('instruments as instrument', 'instrument.id', '=', 'backtest_trade.instrument_id')
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
@@ -2331,11 +2607,15 @@ final class PredictionController extends Controller
                 $join->on('latest_technical.instrument_id', '=', 'instrument.id'))
             ->leftJoin('technical_indicators as technical', 'technical.id', '=', 'latest_technical.technical_id')
             ->leftJoinLateral($entryAtrForHeatmap, 'entry_atr')
-            ->where('backtest_trade.backtest_run_id', $backtestRunId)
-            ->when($eligibleInstruments !== null, fn (Builder $query) =>
-                $query->whereIn('backtest_trade.instrument_id', $eligibleInstruments))
+            ->where('backtest_trade.backtest_run_id', $heatmapSourceRunId)
             ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
+            ->when($freeRegionalInstrumentIds !== null, fn (Builder $query) =>
+                $query->whereIn('instrument.id', $freeRegionalInstrumentIds));
+
+        $heatmapQuery = (clone $heatmapBaseQuery)
+            ->when($eligibleInstruments !== null, fn (Builder $query) =>
+                $query->whereIn('backtest_trade.instrument_id', $eligibleInstruments))
             ->when($request->filled('q'), function (Builder $query) use ($request): void {
                 $term = '%'.strtolower(trim((string) $request->query('q'))).'%';
                 $query->where(fn (Builder $query) => $query
@@ -2363,7 +2643,7 @@ final class PredictionController extends Controller
             ->when($request->filled('pe_max') && is_numeric($request->query('pe_max')) && (float) $request->query('pe_max') < $rangeMaxima['pe'], fn (Builder $query) =>
                 $query->whereRaw($fundamentalNumber('trailingPE').' <= ?', [(float) $request->query('pe_max')]))
             ->when($request->filled('dividend_yield_min') && is_numeric($request->query('dividend_yield_min')) && (float) $request->query('dividend_yield_min') > 0, fn (Builder $query) =>
-                $query->whereRaw($fundamentalNumber('dividendYield').' >= ?', [(float) $request->query('dividend_yield_min')]))
+                $query->whereRaw($fundamentalNumber('dividendYield').' >= ?', [(float) $request->query('dividend_yield_min') / 100]))
             ->when($request->filled('market_cap_min') && is_numeric($request->query('market_cap_min')) && (float) $request->query('market_cap_min') > 0, fn (Builder $query) =>
                 $query->whereRaw($fundamentalNumber('marketCap').' >= ?', [(float) $request->query('market_cap_min') * 1_000_000_000]))
             ->when($request->filled('revenue_growth_min') && is_numeric($request->query('revenue_growth_min')) && (float) $request->query('revenue_growth_min') > -50, fn (Builder $query) =>
@@ -2380,6 +2660,12 @@ final class PredictionController extends Controller
             ->when($request->filled('predicted_return_min') && is_numeric($request->query('predicted_return_min')), fn (Builder $query) =>
                 $query->where('backtest_trade.predicted_return', '>=', max(-50, min(100, (float) $request->query('predicted_return_min'))) / 100));
 
+        $heatmapUniverseInstruments = (clone $heatmapBaseQuery)
+            ->distinct('backtest_trade.instrument_id')
+            ->count('backtest_trade.instrument_id');
+
+        $qualifiedHeatmapQuery = clone $heatmapSummaryQuery;
+
         $heatmapSummary = $heatmapSummaryQuery
             ->selectRaw('COUNT(*) AS trades')
             ->selectRaw('COUNT(DISTINCT backtest_trade.instrument_id) AS instruments')
@@ -2392,7 +2678,16 @@ final class PredictionController extends Controller
             ->selectRaw("COUNT(CASE WHEN backtest_trade.entry_date >= (COALESCE(backtest_run.started_at, NOW())::date - interval '3 years') AND entry_atr.atr_14 > 0 AND backtest_trade.entry_price > 0 THEN 1 END) AS normalized_trade_count")
             ->first();
 
-        $heatmap = $heatmapQuery
+        $qualifiedHeatmapCells = $qualifiedHeatmapQuery
+            ->selectRaw("{$tradeScoreBucketSql} AS score_bucket")
+            ->selectRaw("{$tradeConfidenceBucketSql} AS confidence_bucket")
+            ->groupByRaw("{$tradeScoreBucketSql}, {$tradeConfidenceBucketSql}")
+            ->get()
+            ->mapWithKeys(fn ($row): array => [$row->score_bucket.'-'.$row->confidence_bucket => true]);
+
+        // Metrics stay based on the complete historical universe. Filters
+        // only decide whether a populated cell is active or greyed out.
+        $heatmap = $heatmapBaseQuery
             ->selectRaw("{$tradeScoreBucketSql} AS score_bucket")
             ->selectRaw("{$tradeConfidenceBucketSql} AS confidence_bucket")
             ->selectRaw('COUNT(*) AS samples')
@@ -2431,12 +2726,17 @@ final class PredictionController extends Controller
             ->filter(fn (object $preset): bool => $preset->id !== '' && $preset->name !== '')
             ->sortBy('name')
             ->values();
-        $reportRecords = DB::table('analysis_reports')
-            ->orderByDesc('id')
-            ->whereNotNull('prediction_id')
-            ->get(['id', 'prediction_id', 'symbol', 'signal_from', 'signal_to', 'pdf_path'])
-            ->unique('prediction_id')
-            ->keyBy('prediction_id');
+        $visiblePredictionIds = $predictions instanceof \Illuminate\Contracts\Pagination\Paginator
+            ? collect($predictions->items())->pluck('id')
+            : $predictions->pluck('id');
+        $reportRecords = $visiblePredictionIds->isEmpty()
+            ? collect()
+            : DB::table('analysis_reports')
+                ->whereIn('prediction_id', $visiblePredictionIds)
+                ->orderByDesc('id')
+                ->get(['id', 'prediction_id', 'symbol', 'signal_from', 'signal_to', 'pdf_path'])
+                ->unique('prediction_id')
+                ->keyBy('prediction_id');
 
         return view('predictions.index', compact(
             'predictions',
@@ -2450,7 +2750,9 @@ final class PredictionController extends Controller
             'sectors',
             'exchanges',
             'heatmap',
+            'qualifiedHeatmapCells',
             'heatmapSummary',
+            'heatmapUniverseInstruments',
             'rangeMaxima',
             'userWatchlists',
             'watchlistMemberships',
@@ -2460,6 +2762,7 @@ final class PredictionController extends Controller
             'smartLabels',
             'savedPredictionFilters',
             'reportRecords',
+            'isFreeRegional',
         ));
     }
 
@@ -2468,6 +2771,13 @@ final class PredictionController extends Controller
         $requested = $this->requestedUserBacktestRun($request);
         if ($requested !== null && in_array($requested->status, ['completed', 'completed_with_errors'], true)) {
             return (int) $requested->id;
+        }
+
+        // Keep the setup and its counters on the same, most complete current
+        // walk-forward source that will also be used for a new strategy test.
+        $walkForwardSource = $this->materializeWalkForwardSourceRun();
+        if ($walkForwardSource !== null) {
+            return (int) $walkForwardSource->id;
         }
 
         return (int) DB::table('backtest_runs')
@@ -2495,8 +2805,9 @@ final class PredictionController extends Controller
         }
 
         $walkForwardRun = DB::table('walk_forward_backtest_runs')
-            ->where('status', 'completed')
+            ->whereIn('status', ['completed', 'completed_with_errors'])
             ->where('horizon_days', 20)
+            ->orderByRaw('(SELECT COUNT(DISTINCT source_trade.instrument_id) FROM walk_forward_backtest_trades AS source_trade WHERE source_trade.run_id = walk_forward_backtest_runs.id) DESC')
             ->orderByDesc('finished_at')
             ->first();
         if ($walkForwardRun === null) {
@@ -2541,8 +2852,8 @@ final class PredictionController extends Controller
                 ->join('predictions as prediction', 'prediction.id', '=', 'latest_prediction.prediction_id')
                 ->leftJoin('trained_models as trained_model', 'trained_model.id', '=', 'prediction.trained_model_id')
                 ->where('trade.run_id', $walkForwardRun->id)
-                ->orderBy('trade.id')
-                ->get([
+                ->select([
+                    'trade.id as trade_id',
                     'trade.instrument_id', 'trade.signal_date', 'trade.exit_date', 'trade.horizon_days',
                     'trade.signal', 'trade.entry_price', 'trade.exit_price', 'trade.predicted_return',
                     'trade.gross_return', 'trade.net_return', 'trade.metadata',
@@ -2553,7 +2864,7 @@ final class PredictionController extends Controller
                     'trained_model.model_definition_id',
                 ]);
 
-            foreach ($sourceTrades->chunk(500) as $chunk) {
+            $sourceTrades->chunkById(500, function ($chunk) use ($runId, $now): void {
                 DB::table('backtest_trades')->insertOrIgnore($chunk->map(function (object $trade) use ($runId, $now): array {
                     $rawScore = is_numeric($trade->ai_score) ? (float) $trade->ai_score : (float) ($trade->prediction_score ?? 0);
                     $score = $rawScore <= 1 ? $rawScore * 10 : ($rawScore <= 10 ? $rawScore : $rawScore / 10);
@@ -2587,7 +2898,7 @@ final class PredictionController extends Controller
                         'updated_at' => $now,
                     ];
                 })->all());
-            }
+            }, 'trade.id', 'trade_id');
 
             $summary = DB::table('backtest_trades')->where('backtest_run_id', $runId)
                 ->selectRaw('COUNT(*) AS trades, COUNT(DISTINCT instrument_id) AS instruments')
@@ -2640,8 +2951,8 @@ final class PredictionController extends Controller
         $drawdownMaximum = $request->filled('drawdown_max') && is_numeric($request->query('drawdown_max'))
             ? (float) $request->query('drawdown_max')
             : (float) ($rangeMaxima['drawdown'] ?? 50.0);
-        $profitFactorMinimum = $request->filled('profit_factor_min') && is_numeric($request->query('profit_factor_min'))
-            ? (float) $request->query('profit_factor_min')
+        $profitFactorMinimum = $request->filled('profit_per_trade_min') && is_numeric($request->query('profit_per_trade_min'))
+            ? (float) $request->query('profit_per_trade_min')
             : 0.0;
         $hitRateMinimum = $request->filled('hit_rate_min') && is_numeric($request->query('hit_rate_min'))
             ? (float) $request->query('hit_rate_min')
@@ -2662,7 +2973,7 @@ final class PredictionController extends Controller
                 $query->havingRaw('MAX(ABS(eligibility_trade.max_drawdown)) <= ?', [max(0, $drawdownMaximum) / 100]))
             ->when($profitFactorMinimum > 0, fn (Builder $query) =>
                 $query->havingRaw(
-                    'COALESCE(SUM(CASE WHEN eligibility_trade.net_return > 0 THEN eligibility_trade.net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN eligibility_trade.net_return < 0 THEN eligibility_trade.net_return ELSE 0 END)), 0), 999999) >= ?',
+                    'SUM(CASE WHEN eligibility_trade.net_return > 0 THEN eligibility_trade.net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN eligibility_trade.net_return < 0 THEN eligibility_trade.net_return ELSE 0 END)), 0) >= ?',
                     [$profitFactorMinimum],
                 ))
             ->when($hitRateMinimum > 0, fn (Builder $query) =>
@@ -2711,46 +3022,95 @@ final class PredictionController extends Controller
     ): array
     {
         $basePositionCapital = $initialCapital / max(1, $maxPositions);
-        $positionCapital = $basePositionCapital * max(1, min($maxPositions, $positionFactor));
         $cash = $initialCapital;
         $open = [];
         $executed = collect();
         foreach ($candidates as $trade) {
             if ($periodStart !== null && (string) $trade->entry_date < $periodStart) continue;
             if ($periodEnd !== null && (string) $trade->exit_date > $periodEnd) continue;
-            foreach ($open as $key => $position) {
-                if ($position['exit_date'] > (string) $trade->entry_date) continue;
-                $cash += $position['capital'] * (1 + $position['return']);
-                unset($open[$key]);
-            }
-            if (count($open) >= $maxPositions || $cash + 0.00001 < $basePositionCapital) continue;
             $metadata = is_string($trade->metadata ?? null)
                 ? (json_decode($trade->metadata, true) ?: [])
                 : (array) ($trade->metadata ?? []);
+            foreach ($open as $key => $position) {
+                if ($position['exit_date'] > $trade->entry_date) continue;
+                $cash += $position['exit_credit'];
+                unset($open[$key]);
+            }
+            $instrumentId = (int) ($trade->instrument_id ?? 0);
+            if ($instrumentId > 0 && collect($open)->contains(
+                fn (array $position): bool => (int) ($position['instrument_id'] ?? 0) === $instrumentId
+            )) continue;
+            if (count($open) >= $maxPositions || $cash + 0.00001 < $basePositionCapital) continue;
             $allocationWeight = max(1.0, min(1.5, (float) ($metadata['allocation_weight'] ?? 1.0)));
             $requestedFactor = max(1.0, min((float) $maxPositions, $positionFactor * $allocationWeight));
             $factorStep = $allocationWeight > 1.0 ? 0.5 : 1.0;
             $availableFactor = floor((($cash + 0.00001) / $basePositionCapital) / $factorStep) * $factorStep;
             $appliedFactor = min($requestedFactor, $availableFactor);
             if ($appliedFactor < 1.0) continue;
-            $allocatedCapital = $basePositionCapital * $appliedFactor;
-            $return = (float) $trade->gross_return - ($tradeCost / $allocatedCapital);
+            $entryPrice = (float) ($trade->entry_price ?? 0);
+            $exitPrice = (float) ($trade->exit_price ?? 0);
+            if ($entryPrice > 0) {
+                if ($exitPrice <= 0) {
+                    $exitPrice = $entryPrice * (1 + (float) $trade->gross_return);
+                }
+                $requestedCapital = min(max(0.0, $cash - $tradeCost), $basePositionCapital * $appliedFactor);
+                $quantity = (int) floor($requestedCapital / $entryPrice);
+                if ($quantity < 1) continue;
+                $allocatedCapital = $quantity * $entryPrice;
+                $entryDebit = $allocatedCapital + $tradeCost;
+                $exitCredit = max(0.0, ($quantity * $exitPrice) - $tradeCost);
+                $profit = $exitCredit - $entryDebit;
+                $return = $entryDebit > 0 ? $profit / $entryDebit : 0.0;
+                $trade->quantity = $quantity;
+                $trade->entry_debit = $entryDebit;
+                $trade->exit_credit = $exitCredit;
+            } else {
+                // Supplemental strategy rows currently persist returns but no
+                // prices. Keep them usable while applying both transaction
+                // fees, just like the depot simulator.
+                $allocatedCapital = $basePositionCapital * $appliedFactor;
+                $entryDebit = $allocatedCapital + $tradeCost;
+                if ($cash + 0.00001 < $entryDebit) continue;
+                $profit = ($allocatedCapital * (float) $trade->gross_return) - (2 * $tradeCost);
+                $return = $profit / $entryDebit;
+                $trade->quantity = null;
+                $trade->entry_debit = $entryDebit;
+                $trade->exit_credit = $entryDebit + $profit;
+            }
             $trade->allocated_capital = $allocatedCapital;
             $trade->net_return_after_cost = $return;
-            $cash -= $allocatedCapital;
-            $open[] = ['exit_date' => (string) $trade->exit_date, 'capital' => $allocatedCapital, 'return' => $return];
+            $cash -= $trade->entry_debit;
+            $open[] = [
+                'instrument_id' => $instrumentId,
+                'exit_date' => (string) $trade->exit_date,
+                'capital' => $allocatedCapital,
+                'entry_debit' => (float) $trade->entry_debit,
+                'exit_credit' => (float) $trade->exit_credit,
+                'return' => $return,
+            ];
             $executed->push($trade);
         }
         $events = [];
         foreach ($executed as $trade) {
-            $events[(string) $trade->entry_date]['entries'][] = (float) $trade->allocated_capital;
+            $events[(string) $trade->entry_date]['entries'][] = [
+                'capital' => (float) $trade->allocated_capital,
+                'cash_debit' => (float) $trade->entry_debit,
+            ];
             $events[(string) $trade->exit_date]['exits'][] = [
                 'capital' => (float) $trade->allocated_capital,
+                'cash_credit' => (float) $trade->exit_credit,
                 'return' => (float) $trade->net_return_after_cost,
             ];
         }
+        $bindingEvents = collect($events)->map(fn (array $event): array => [
+            'entries' => collect($event['entries'] ?? [])->pluck('capital')->all(),
+            'exits' => collect($event['exits'] ?? [])->map(fn (array $exit): array => [
+                'capital' => $exit['capital'],
+                'return' => $exit['return'],
+            ])->all(),
+        ])->all();
         $capitalBinding = $periodStart !== null && $periodEnd !== null
-            ? $this->capitalBinding($events, $periodStart, $periodEnd, $initialCapital)
+            ? $this->capitalBinding($bindingEvents, $periodStart, $periodEnd, $initialCapital)
             : ['average' => 0.0, 'maximum' => 0.0];
         ksort($events);
         $cash = $initialCapital;
@@ -2761,11 +3121,11 @@ final class PredictionController extends Controller
         foreach ($events as $date => $event) {
             foreach ($event['exits'] ?? [] as $exit) {
                 $invested -= $exit['capital'];
-                $cash += $exit['capital'] * (1 + $exit['return']);
+                $cash += $exit['cash_credit'];
             }
-            foreach ($event['entries'] ?? [] as $capital) {
-                $cash -= $capital;
-                $invested += $capital;
+            foreach ($event['entries'] ?? [] as $entry) {
+                $cash -= $entry['cash_debit'];
+                $invested += $entry['capital'];
             }
             $series[] = ['x' => strtotime($date) * 1000, 'y' => round($cash + $invested, 2)];
         }
@@ -2787,6 +3147,7 @@ final class PredictionController extends Controller
             'maximum_capital_binding' => $capitalBinding['maximum'],
             'max_drawdown' => $this->maximumSeriesDrawdown($series),
             'position_factor_usage' => $this->positionFactorUsage($executed, $basePositionCapital),
+            'executed_collection' => $executed,
         ];
     }
 
@@ -2821,6 +3182,94 @@ final class PredictionController extends Controller
         }
 
         return round($maximumDrawdown, 2);
+    }
+
+    private function indexComparison(string $symbol, int $periodStart, int $periodEnd, float $initialCapital, string $prefix): array
+    {
+        $bars = DB::table('price_bars as bar')
+            ->join('instruments as instrument', 'instrument.id', '=', 'bar.instrument_id')
+            ->where('instrument.symbol', $symbol)
+            ->where('bar.interval', '1d')
+            ->whereBetween('bar.bar_time', [
+                Carbon::createFromTimestampMsUTC($periodStart),
+                Carbon::createFromTimestampMsUTC($periodEnd)->endOfDay(),
+            ])
+            ->selectRaw('DISTINCT ON (DATE(bar.bar_time)) bar.bar_time, COALESCE(bar.adjusted_close, bar.close) AS close')
+            ->orderByRaw('DATE(bar.bar_time), bar.bar_time DESC')
+            ->get();
+        $validCloses = $bars->pluck('close')
+            ->filter(fn ($close): bool => is_numeric($close) && (float) $close > 0)
+            ->map(fn ($close): float => (float) $close)
+            ->sort()
+            ->values();
+        $median = (float) ($validCloses->get((int) floor($validCloses->count() / 2)) ?? 0);
+        if ($median > 0) {
+            $bars = $bars->filter(fn (object $bar): bool =>
+                (float) $bar->close >= $median * .5 && (float) $bar->close <= $median * 1.5
+            )->values();
+        }
+        $start = (float) ($bars->first()->close ?? 0);
+        $series = $start > 0 ? $bars->map(fn (object $bar): array => [
+            'x' => strtotime((string) $bar->bar_time) * 1000,
+            'y' => round(((float) $bar->close / $start) * $initialCapital, 2),
+        ])->values()->all() : [];
+        $final = $series !== [] ? (float) $series[array_key_last($series)]['y'] : null;
+        $performance = $final !== null && $initialCapital > 0 ? round((($final / $initialCapital) - 1) * 100, 2) : null;
+
+        return [
+            $prefix => $series,
+            $prefix.'_chart' => $this->performanceSeries($series, $initialCapital),
+            $prefix.'_final_capital' => $final,
+            $prefix.'_performance' => $performance,
+            $prefix.'_max_drawdown' => $this->maximumSeriesDrawdown($series),
+        ];
+    }
+
+    private function ensureIndexComparisonHistory(
+        string $symbol,
+        int $periodStart,
+        int $periodEnd,
+        YahooIndexService $indices,
+    ): void {
+        if ($periodStart <= 0 || $periodEnd <= $periodStart) return;
+
+        $instrumentId = DB::table('instruments')->where('symbol', $symbol)->value('id');
+        if (! $instrumentId) return;
+
+        $requiredStart = Carbon::createFromTimestampMsUTC($periodStart)->startOfDay();
+        $firstValidBar = DB::table('price_bars')
+            ->where('instrument_id', $instrumentId)
+            ->where('interval', '1d')
+            ->whereRaw('COALESCE(adjusted_close, close) > 1000')
+            ->min('bar_time');
+        if ($firstValidBar !== null && Carbon::parse($firstValidBar)->lte($requiredStart->copy()->addDays(7))) return;
+
+        $history = $indices->dailyHistory($symbol, '5y');
+        $rows = collect($history)
+            ->filter(fn (array $bar): bool =>
+                (int) ($bar['timestamp'] ?? 0) * 1000 >= $periodStart
+                && (int) ($bar['timestamp'] ?? 0) * 1000 <= $periodEnd
+                && (float) ($bar['close'] ?? 0) > 1000
+            )
+            ->map(fn (array $bar): array => [
+                'instrument_id' => $instrumentId,
+                'interval' => '1d',
+                'bar_time' => Carbon::createFromTimestampUTC((int) $bar['timestamp']),
+                'open' => $bar['open'],
+                'high' => $bar['high'],
+                'low' => $bar['low'],
+                'close' => $bar['close'],
+                'adjusted_close' => $bar['adjusted_close'],
+                'volume' => $bar['volume'],
+                'source' => 'yahoo_index_rest',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        foreach ($rows->chunk(500) as $chunk) {
+            DB::table('price_bars')->upsert($chunk->all(), ['instrument_id', 'interval', 'bar_time'], [
+                'open', 'high', 'low', 'close', 'adjusted_close', 'volume', 'source', 'updated_at',
+            ]);
+        }
     }
 
     private function capitalBinding(array $events, string $periodStart, string $periodEnd, float $initialCapital): array

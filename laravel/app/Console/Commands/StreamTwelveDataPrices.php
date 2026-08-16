@@ -55,7 +55,12 @@ class StreamTwelveDataPrices extends Command
                 $instruments = $this->requestedInstruments();
                 $wanted = $instruments
                     ->mapWithKeys(fn (object $instrument): array => [
-                        strtoupper((string) ($instrument->provider_symbol ?: $instrument->symbol)) => (string) $instrument->symbol,
+                        strtoupper((string) (
+                            strtoupper((string) $instrument->german_listing_currency) === 'EUR'
+                                && filled($instrument->german_listing_symbol)
+                                    ? $instrument->german_listing_symbol
+                                    : ($instrument->provider_symbol ?: $instrument->symbol)
+                        )) => (string) $instrument->symbol,
                     ])
                     ->all();
 
@@ -151,6 +156,6 @@ class StreamTwelveDataPrices extends Command
             ? collect()
             : DB::table('instruments')
                 ->whereIn('id', $ids)
-                ->get(['id', 'symbol', 'provider_symbol']);
+                ->get(['id', 'symbol', 'provider_symbol', 'german_listing_symbol', 'german_listing_currency']);
     }
 }

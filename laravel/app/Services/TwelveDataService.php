@@ -9,6 +9,69 @@ use Illuminate\Support\Facades\Http;
 
 class TwelveDataService
 {
+    public function usListing(?string $isin, string $name, string $symbol): ?array
+    {
+        foreach (array_filter([trim((string) $isin), trim($name), trim($symbol)]) as $term) {
+            $response = $this->request('symbol_search', ['symbol' => $term, 'outputsize' => 120]);
+            if (! $this->valid($response)) continue;
+
+            $match = collect($response->json('data', []))
+                ->filter(fn (array $item): bool => strtoupper((string) ($item['currency'] ?? '')) === 'USD')
+                ->filter(fn (array $item): bool => strtolower((string) ($item['country'] ?? '')) === 'united states'
+                    || in_array(strtoupper((string) ($item['mic_code'] ?? '')), ['XNAS', 'XNYS', 'ARCX', 'BATS'], true))
+                ->sortBy(fn (array $item): int => match (strtoupper((string) ($item['mic_code'] ?? ''))) {
+                    'XNAS' => 0, 'XNYS' => 1, 'ARCX' => 2, default => 3,
+                })->first();
+
+            if ($match) return [
+                'symbol' => (string) $match['symbol'],
+                'exchange' => (string) ($match['exchange'] ?? ''),
+                'mic_code' => (string) ($match['mic_code'] ?? ''),
+                'currency' => 'USD',
+            ];
+        }
+
+        return null;
+    }
+
+    public function germanListing(?string $isin, string $name, string $symbol): ?array
+    {
+        foreach (array_filter([trim((string) $isin), trim($name), trim($symbol)]) as $term) {
+            $response = $this->request('symbol_search', ['symbol' => $term, 'outputsize' => 120]);
+            if (! $this->valid($response)) {
+                continue;
+            }
+
+            $match = collect($response->json('data', []))
+                ->filter(fn (array $item): bool => strtoupper((string) ($item['currency'] ?? '')) === 'EUR')
+                ->filter(fn (array $item): bool => strtolower((string) ($item['country'] ?? '')) === 'germany'
+                    || in_array(strtoupper((string) ($item['mic_code'] ?? '')), ['XETR', 'XFRA', 'XMUN', 'XBER', 'XDUS', 'XSTU', 'XHAM', 'XHAN'], true))
+                ->sortBy(fn (array $item): int => match (strtoupper((string) ($item['mic_code'] ?? ''))) {
+                    'XETR' => 0, 'XFRA' => 1, default => 2,
+                })
+                ->first();
+
+            if ($match) {
+                return [
+                    'symbol' => (string) $match['symbol'],
+                    'exchange' => (string) ($match['exchange'] ?? ''),
+                    'mic_code' => (string) ($match['mic_code'] ?? ''),
+                    'currency' => 'EUR',
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    public function listingQuote(string $symbol, ?string $exchange = null): ?array
+    {
+        $providerSymbol = trim($symbol).($exchange ? ':'.trim($exchange) : '');
+        $quote = $this->quote($providerSymbol);
+
+        return $quote ?: $this->quote($symbol);
+    }
+
     public function quotes(array $symbols): array
     {
         return collect($symbols)

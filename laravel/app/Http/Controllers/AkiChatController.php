@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AkiChatBudgetService;
+use App\Services\FreeRegionalStockUniverseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 final class AkiChatController extends Controller
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request, AkiChatBudgetService $budgetService): JsonResponse
     {
         $data = $request->validate([
             'question' => ['required', 'string', 'max:1000'],
@@ -18,10 +21,26 @@ final class AkiChatController extends Controller
             'messages.*.role' => ['required', 'in:user,assistant'],
             'messages.*.content' => ['required', 'string', 'max:2000'],
             'filters' => ['sometimes', 'array'],
+            'mode' => ['sometimes', 'in:standard,deep'],
         ]);
 
         $apiKey = (string) env('OPENAI_API_KEY');
         abort_unless($apiKey !== '', 503, 'OpenAI-Chat ist nicht konfiguriert.');
+
+        $user = $request->user();
+        abort_unless($user !== null, 401);
+        $mode = $budgetService->modeFor($user, (string) ($data['mode'] ?? 'standard'));
+        $model = (string) config("aki_chat.models.$mode");
+        try {
+            $usageRequestId = $budgetService->reserve($user, $mode);
+        } catch (RuntimeException $exception) {
+            if ($exception->getMessage() !== 'AKI_MONTHLY_BUDGET_EXHAUSTED') throw $exception;
+            return response()->json([
+                'message' => 'Dein monatliches AKI-Budget ist aufgebraucht. Es wird zum Monatsanfang automatisch erneuert.',
+                'code' => 'aki_budget_exhausted',
+                'budget' => $budgetService->summary($user),
+            ], 429);
+        }
 
         $history = collect($data['messages'] ?? [])
             ->map(fn (array $message): array => [
@@ -79,29 +98,34 @@ final class AkiChatController extends Controller
             'strict' => true,
         ]];
 
-        $currentList = $this->currentPredictionList($data['filters'] ?? []);
+        $allowedInstrumentIds = $budgetService->planCode($user) === 'free'
+            ? app(FreeRegionalStockUniverseService::class)->instrumentIds($user)->all()
+            : null;
+        $currentList = $this->currentPredictionList($data['filters'] ?? [], $allowedInstrumentIds);
         $input = array_merge([
-            ['role' => 'developer', 'content' => 'Aktuelle Filter und die sichtbare Prognoseliste der Seite (diese Daten darfst du direkt auswerten): '.json_encode(['filters' => $data['filters'] ?? [], 'predictions' => $currentList], JSON_UNESCAPED_UNICODE)."\nAntworte immer auf Deutsch in kurzen Stichpunkten. Behaupte niemals, dass du keinen Zugriff auf die Datenbank oder Liste hast. Wenn aktuelle Werte gefragt werden, nutze die übergebenen Listendaten oder rufe das Backtest-Werkzeug auf."],
+            ['role' => 'developer', 'content' => 'Aktuelle Filter und die sichtbare Prognoseliste der Seite (diese Daten darfst du direkt auswerten): '.json_encode(['filters' => $data['filters'] ?? [], 'predictions' => $currentList], JSON_UNESCAPED_UNICODE)."\nAntworte immer in der aktuell ausgewählten Sprache ".(app()->getLocale() === 'en' ? 'Englisch' : 'Deutsch')." und in kurzen Stichpunkten. Behaupte niemals, dass du keinen Zugriff auf die Datenbank oder Liste hast. Wenn aktuelle Werte gefragt werden, nutze die übergebenen Listendaten oder rufe das Backtest-Werkzeug auf."],
         ], $history);
         $response = Http::withToken($apiKey)
             ->acceptJson()
             ->asJson()
             ->timeout(30)
             ->post('https://api.openai.com/v1/responses', [
-                'model' => (string) env('OPENAI_CHAT_MODEL', 'gpt-5.4-mini'),
+                'model' => $model,
                 'instructions' => 'Du bist AKI, ein deutschsprachiger Assistent für die Prognosetabelle. Nutze die übergebenen aktuellen Listendaten und Backtest-Werkzeuge aktiv. Empfehle und zeige ausschließlich Aktien mit positiver prognostizierter Rendite (predicted_return_min mindestens 0). Behaupte niemals, dass du keinen Zugriff auf die Datenbank oder Liste hast. Sobald du dem Nutzer konkrete Aktiensymbole nennst oder mehrere Aktien empfiehlst, rufe set_prediction_filters auf und übergib diese Symbole sowie predicted_return_min: 0, damit anschließend nur diese positiven Aktien angezeigt werden. Wenn der Nutzer ausdrücklich Filter setzen, anwenden oder konfigurieren möchte, rufe set_prediction_filters mit einer vollständigen, sinnvollen Konfiguration auf. Antworte ausschließlich in kurzen Stichpunkten (Zeilen mit •), niemals mit Gedankenstrichen als Satztrenner und ohne lange Absätze. Nutze get_smart_selection_backtest für Kennzahlen. Keine individuelle Anlageberatung und keine Kauf- oder Verkaufsempfehlungen.',
                 'input' => $input,
                 'tools' => $tools,
-                'max_output_tokens' => 220,
+                'max_output_tokens' => $mode === 'deep' ? 900 : 220,
                 'metadata' => ['feature' => 'smart-selection-chat'],
             ]);
 
         if ($response->failed()) {
+            $budgetService->release($usageRequestId);
             report(new \RuntimeException('OpenAI chat request failed: '.$response->status().' '.$response->body()));
             return response()->json(['message' => 'Die KI ist gerade nicht erreichbar.'], 502);
         }
 
         $payload = $response->json();
+        $allUsages = [(array) data_get($payload, 'usage', [])];
         $filterSuggestion = null;
         for ($round = 0; $round < 3; $round++) {
             $calls = collect(data_get($payload, 'output', []))->filter(fn (array $item): bool => data_get($item, 'type') === 'function_call');
@@ -111,19 +135,20 @@ final class AkiChatController extends Controller
                 $arguments = json_decode((string) data_get($call, 'arguments', '{}'), true) ?: [];
                 $result = data_get($call, 'name') === 'set_prediction_filters'
                     ? ['filters' => $filterSuggestion = $this->normaliseFilters($arguments), 'message' => 'Filterkonfiguration erstellt.']
-                    : $this->backtestStats($arguments);
+                    : $this->backtestStats($arguments, $allowedInstrumentIds);
                 $toolOutputs[] = ['type' => 'function_call_output', 'call_id' => data_get($call, 'call_id'), 'output' => json_encode($result, JSON_UNESCAPED_UNICODE)];
             }
             $followUp = Http::withToken($apiKey)->acceptJson()->asJson()->timeout(30)->post('https://api.openai.com/v1/responses', [
-                'model' => data_get($payload, 'model', env('OPENAI_CHAT_MODEL', 'gpt-5.4-mini')),
+                'model' => $model,
                 'instructions' => 'Beziehe die Werkzeugdaten in deine deutsche Antwort ein. Antworte ausschließlich in kurzen Stichpunkten mit •, niemals in langen Absätzen. Keine Anlageberatung.',
                 'previous_response_id' => data_get($payload, 'id'),
                 'input' => $toolOutputs,
                 'tools' => $tools,
-                'max_output_tokens' => 220,
+                'max_output_tokens' => $mode === 'deep' ? 900 : 220,
             ]);
             if ($followUp->failed()) break;
             $payload = $followUp->json();
+            $allUsages[] = (array) data_get($payload, 'usage', []);
         }
         $answer = data_get($payload, 'output_text');
         if (! is_string($answer) || trim($answer) === '') {
@@ -143,16 +168,31 @@ final class AkiChatController extends Controller
         if ($filterSuggestion === []) $filterSuggestion = null;
         $answer = $this->formatAsBullets((string) $answer);
 
+        $usage = $budgetService->mergeUsage(...$allUsages);
+        try {
+            $budgetService->complete($usageRequestId, $usage, $model);
+        } catch (\Throwable $exception) {
+            Log::warning('aki.chat.usage_persistence_failed', [
+                'request_id' => $usageRequestId,
+                'model' => $model,
+                'error' => $exception->getMessage(),
+            ]);
+            $budgetService->release($usageRequestId);
+        }
+
         Log::info('aki.chat.usage', [
             'user_id' => $request->user()?->id,
             'model' => data_get($payload, 'model', env('OPENAI_CHAT_MODEL', 'gpt-5.4-mini')),
-            'usage' => data_get($payload, 'usage', []),
+            'usage' => $usage,
+            'mode' => $mode,
         ]);
 
         return response()->json([
             'answer' => trim((string) $answer),
-            'model' => data_get($payload, 'model', env('OPENAI_CHAT_MODEL', 'gpt-5.4-mini')),
-                'usage' => data_get($payload, 'usage', []),
+            'model' => $model,
+            'mode' => $mode,
+            'usage' => $usage,
+            'budget' => $budgetService->summary($user),
             'filter_suggestion' => $filterSuggestion,
         ]);
     }
@@ -189,12 +229,13 @@ final class AkiChatController extends Controller
         return $lines->implode("\n");
     }
 
-    private function currentPredictionList(array $filters): array
+    private function currentPredictionList(array $filters, ?array $allowedInstrumentIds = null): array
     {
         return DB::table('predictions as prediction')
             ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
+            ->when($allowedInstrumentIds !== null, fn ($query) => $query->whereIn('instrument.id', $allowedInstrumentIds ?: [-1]))
             ->whereRaw('(prediction.predicted_price_20d - prediction.current_price) > 0')
             ->whereRaw('prediction.id = (SELECT latest.id FROM predictions latest WHERE latest.instrument_id = prediction.instrument_id ORDER BY latest.prediction_time DESC NULLS LAST, latest.id DESC LIMIT 1)')
             ->when(filled($filters['country'] ?? null), fn ($q) => $q->where('instrument.country', strtoupper((string) $filters['country'])))
@@ -209,7 +250,7 @@ final class AkiChatController extends Controller
             ->all();
     }
 
-    private function backtestStats(array $filters): array
+    private function backtestStats(array $filters, ?array $allowedInstrumentIds = null): array
     {
         if (isset($filters['index'])) {
             $indexCountry = DB::table('instruments')->where('type', 'index')->where('symbol', $filters['index'])->value('country');
@@ -223,6 +264,7 @@ final class AkiChatController extends Controller
             ->join('instruments as instrument', 'instrument.id', '=', 'trade.instrument_id')
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
             ->where('trade.backtest_run_id', $run->id)
+            ->when($allowedInstrumentIds !== null, fn ($query) => $query->whereIn('instrument.id', $allowedInstrumentIds ?: [-1]))
             ->when(isset($filters['country']), fn ($q) => $q->where('instrument.country', strtoupper($filters['country'])))
             ->when(isset($filters['exchange']), fn ($q) => $q->where('exchange.code', strtoupper($filters['exchange'])))
             ->when(isset($filters['sector']), fn ($q) => $q->where('instrument.sector', $filters['sector']))

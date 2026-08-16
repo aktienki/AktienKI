@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\PlanLevel;
 use App\Models\Watchlist;
 use App\Services\PlanAccessService;
+use App\Services\PersonalCollectionLimitService;
 use App\Services\PersonalizedSignalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
@@ -108,7 +109,9 @@ class WatchlistController extends Controller
         });
         $instrumentIndices = $this->instrumentIndices($instrumentIds);
 
-        return view('watchlists.index', compact('watchlists', 'currentPrices', 'latestPredictionIds', 'watchlistPerformance', 'instrumentIndices'));
+        $watchlistLimit = app(PersonalCollectionLimitService::class)->watchlists($request->user());
+
+        return view('watchlists.index', compact('watchlists', 'currentPrices', 'latestPredictionIds', 'watchlistPerformance', 'instrumentIndices', 'watchlistLimit'));
     }
 
     public function show(Request $request, int $watchlist): View
@@ -244,9 +247,13 @@ class WatchlistController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $isPlus = app(PlanAccessService::class)->level($request->user()) === PlanLevel::Plus;
-        if ($isPlus && Watchlist::query()->where('user_id', $request->user()->id)->where('active', true)->exists()) {
-            return back()->withErrors(['name' => __('Im Plus-Tarif ist eine Watchlist enthalten. Für weitere Watchlists ist Pro erforderlich.')]);
+        $limit = app(PersonalCollectionLimitService::class)->watchlists($request->user());
+        $currentCount = Watchlist::query()
+            ->where('user_id', $request->user()->id)
+            ->where('active', true)
+            ->count();
+        if ($limit !== null && $currentCount >= $limit) {
+            return back()->withErrors(['name' => __('Dein Tarif erlaubt maximal :count aktive Watchlists.', ['count' => $limit])]);
         }
 
         $validated = $request->validate([

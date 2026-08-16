@@ -34,6 +34,19 @@ Schedule::command('signals:send-entry-alerts')
     ->dailyAt('06:30')
     ->withoutOverlapping(10)
     ->runInBackground();
+Schedule::command('predictions:send-purchase-reminders')->dailyAt('07:00')->withoutOverlapping(10)->runInBackground();
+
+// Point-in-time context for sector and index rotation. This runs after the
+// daily stock prediction batch and is consumed by depot selection and emails.
+Schedule::command('predictions:market-context')
+    ->dailyAt('06:20')
+    ->withoutOverlapping(10)
+    ->runInBackground();
+
+Schedule::command('markets:generate-index-infos')
+    ->dailyAt('06:35')
+    ->withoutOverlapping(20)
+    ->runInBackground();
 
 if (config('aktienki.portfolio_automation.enabled', false)) {
     Schedule::command('portfolios:send-trade-emails --limit=100')

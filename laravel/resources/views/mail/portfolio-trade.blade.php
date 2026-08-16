@@ -9,8 +9,11 @@
     if ($trade['simulation'] ?? false) $actionLabel = __('Simulation') . ' · ' . $actionLabel;
 @endphp
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;margin:0 auto;background:#101f33;border:1px solid #263d55;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.35)">
-    <tr><td style="padding:25px 30px 20px;border-bottom:1px solid #263d55;background:#0c192b">
-        <img src="cid:aktienki-logo.png" width="282" alt="aktienKI.com" style="display:block;width:282px;max-width:72%;height:auto">
+    <tr><td style="padding:18px 26px;border-bottom:1px solid #29475e;background:#0b192b">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+            <td valign="middle" style="width:47%"><img src="cid:aktienki-logo.png" width="205" alt="aktienKI.com" style="display:block;width:205px;max-width:100%;height:auto"></td>
+            <td align="right" valign="middle" style="padding-left:16px"><div style="color:#64e5f2;font-size:10px;line-height:1.2;font-weight:800;letter-spacing:1.7px;text-transform:uppercase">AKTIENANALYSE</div><div style="margin-top:5px;color:#a9bac9;font-size:11px;line-height:1.35">Machine Learning · Klare Signale</div></td>
+        </tr></table>
     </td></tr>
     <tr><td style="padding:30px">
         <span style="display:inline-block;padding:7px 12px;border-radius:7px;background:{{ $soft }};border:1px solid {{ $accent }};color:{{ $accent }};font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">{{ $actionLabel }}</span>
@@ -28,6 +31,8 @@
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:18px;background:#0d1b2d;border:1px solid #29445e;border-radius:12px">
             <tr><td style="padding:14px 18px;color:#91a8bb">{{ __('Depot') }}</td><td align="right" style="padding:14px 18px;color:#edf6f7;font-weight:700">{{ $trade['portfolio_name'] }}</td></tr>
             <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Strategie') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:#edf6f7;font-weight:700">{{ $trade['strategy_name'] }}</td></tr>
+            <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Positionsberechnung') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:#edf6f7;font-weight:700">{{ number_format($trade['base_position_capital'], 2, ',', '.') }} {{ $trade['portfolio_currency'] }} × {{ $trade['position_factor'] }} = {{ number_format($trade['target_position_capital'], 2, ',', '.') }} {{ $trade['portfolio_currency'] }}<div style="margin-top:4px;color:#e5b95d;font-size:12px">{{ number_format($trade['target_position_capital'], 2, ',', '.') }} ÷ {{ number_format($trade['price'], 2, ',', '.') }} = {{ number_format(round($trade['quantity']), 0, ',', '.') }} {{ __('Stück') }}</div></td></tr>
+            <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Rotationsregeln') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:#edf6f7;font-weight:700">{{ __('Sektorrotation') }}: {{ $trade['sector_rotation_enabled'] ? __('aktiv') : __('aus') }} · {{ __('Indexrotation') }}: {{ $trade['index_rotation_enabled'] ? __('aktiv') : __('aus') }}@if($trade['sector_rotation_enabled'] && $trade['sector_average_score'] !== null)<div style="margin-top:4px;color:#e5b95d;font-size:12px">{{ __('Sektor-Score') }} {{ number_format($trade['sector_average_score'], 2, ',', '.') }} / 10</div>@endif @if($trade['index_rotation_enabled'] && $trade['index_average_score'] !== null)<div style="margin-top:4px;color:#e5b95d;font-size:12px">{{ __('Index-Score') }} {{ number_format($trade['index_average_score'], 2, ',', '.') }} / 10</div>@endif</td></tr>
             <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('KI-Score') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:#edf6f7;font-weight:700">{{ number_format($trade['score'], 1, ',', '.') }} / 10</td></tr>
             <tr><td style="padding:14px 18px;border-top:1px solid #203850;color:#91a8bb">{{ __('Modellqualität') }}</td><td align="right" style="padding:14px 18px;border-top:1px solid #203850;color:#edf6f7;font-weight:700">{{ number_format($trade['confidence'], 1, ',', '.') }} %</td></tr>
             @if($trade['target_price'])

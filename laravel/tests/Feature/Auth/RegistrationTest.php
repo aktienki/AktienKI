@@ -23,14 +23,15 @@ class RegistrationTest extends TestCase
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
+            'country_code' => 'DE',
             'accept_disclaimer' => '1',
-            'accept_risk_notice' => '1',
             'risk_level' => 'normal',
         ]);
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
         $this->assertSame('normal', auth()->user()->meta['risk_profile']['level']);
+        $this->assertSame('DE', auth()->user()->preferences['country_code']);
     }
 
     public function test_registration_requires_disclaimer_acceptance(): void
@@ -46,20 +47,6 @@ class RegistrationTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_registration_requires_risk_notice_acceptance(): void
-    {
-        $response = $this->post('/register', [
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'password' => 'password',
-            'password_confirmation' => 'password',
-            'accept_disclaimer' => '1',
-        ]);
-
-        $response->assertSessionHasErrors('accept_risk_notice');
-        $this->assertGuest();
-    }
-
     public function test_registration_requires_a_complete_risk_profile(): void
     {
         $response = $this->post('/register', [
@@ -68,7 +55,6 @@ class RegistrationTest extends TestCase
             'password' => 'password',
             'password_confirmation' => 'password',
             'accept_disclaimer' => '1',
-            'accept_risk_notice' => '1',
         ]);
 
         $response->assertSessionHasErrors([

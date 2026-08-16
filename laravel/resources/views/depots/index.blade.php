@@ -29,6 +29,10 @@
         $strategyDepotSummary = collect($depotExplorerData);
         $strategyPositionCount = $strategyDepotSummary->sum(fn ($depot) => count($depot['stocks'] ?? []));
         $strategyBestPerformance = (float) ($strategyDepotSummary->max('performance') ?? 0);
+        $paperDepotLimitReached = $paperMode
+            && isset($paperDepotLimit)
+            && $paperDepotLimit !== null
+            && $portfolios->where('active', true)->count() >= $paperDepotLimit;
     @endphp
     <div x-data="depotExplorer(@js($depotExplorerData))" class="ak-detail-design flex min-h-[calc(100dvh-89px)] flex-col py-3 text-[var(--ak-text)]">
         <div class="ak-detail-hero mb-3 flex shrink-0 flex-col gap-2 rounded-2xl border border-[var(--ak-border)] px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
@@ -77,7 +81,7 @@
             </section>
         @endunless
 
-        <section class="grid gap-3" :class="['idle', 'fading', 'returning', 'appearing'].includes(phase) ? '{{ $paperMode ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-2 xl:grid-cols-3' }}' : 'xl:grid-cols-12'">
+        <section class="grid gap-3" :class="['idle', 'fading', 'returning', 'appearing'].includes(phase) ? '{{ $portfolios->count() === 1 ? 'md:grid-cols-1 xl:grid-cols-2' : ($paperMode ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-2 xl:grid-cols-3') }}' : 'xl:grid-cols-12'">
             @foreach ($portfolios as $portfolio)
                 @php
                     $type = match ($portfolio->type) {
@@ -88,7 +92,7 @@
                     $performance = (float) $portfolio->performance_percent;
                     $isStrategyAccount = $paperMode && (bool) data_get($portfolio->meta, 'automation.live_enabled', false);
                 @endphp
-                <article x-data="{ strategyOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="ak-detail-panel relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--ak-card)] transition {{ $isStrategyAccount ? 'min-h-[29rem] border-orange-400/50 shadow-[0_0_0_1px_rgba(251,146,60,.08),0_18px_45px_rgba(251,146,60,.16)] xl:row-span-2' : 'min-h-52 border-[var(--ak-border)] shadow-[var(--ak-shadow)] hover:border-teal-500/35' }}" @if($isStrategyAccount) style="background:linear-gradient(155deg,rgba(251,146,60,.14) 0%,rgba(21,36,58,.96) 34%,rgba(21,36,58,1) 100%);" @endif>
+                <article x-data="{ strategyOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false, testPlanOpen: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="ak-detail-panel relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--ak-card)] transition {{ $isStrategyAccount ? 'min-h-[29rem] border-orange-400/50 shadow-[0_0_0_1px_rgba(251,146,60,.08),0_18px_45px_rgba(251,146,60,.16)] xl:row-span-2' : 'min-h-52 border-[var(--ak-border)] shadow-[var(--ak-shadow)] hover:border-teal-500/35' }}" @if($isStrategyAccount) style="background:linear-gradient(155deg,rgba(251,146,60,.14) 0%,rgba(21,36,58,.96) 34%,rgba(21,36,58,1) 100%);" @endif>
                     @if($isStrategyAccount)<div class="h-1 w-full shrink-0 bg-gradient-to-r from-orange-400/25 via-orange-400 to-sky-400/25 shadow-[0_0_12px_rgba(251,146,60,.45)]"></div>@endif
                     <div class="ak-detail-card-head flex items-start justify-between gap-3 border-b border-[var(--ak-border)] {{ $isStrategyAccount ? 'p-4' : 'p-3' }}">
                         <div class="flex min-w-0 items-center gap-3">
@@ -160,15 +164,33 @@
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
                         @if($portfolio->type === 'paper')
-                            <a href="{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => $paperMode ? 'paper' : 'depots', 'test' => 1]) }}" class="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-3 text-xs font-black text-white shadow-lg shadow-amber-950/20">
+                            @if($canTestPaperDepot)
+                            <a href="{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => $paperMode ? 'paper' : 'depots', 'test' => 1]) }}" class="inline-flex h-9 items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/[.09] px-3 text-xs font-black text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,.08)] transition hover:border-cyan-300/45 hover:bg-cyan-400/[.15]">
                                 <x-heroicon-o-play class="h-4 w-4" />{{ __('Depot testen') }}
                             </a>
+                            @else
+                            <button type="button" @click="testPlanOpen=true" class="inline-flex h-9 items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/[.09] px-3 text-xs font-black text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,.08)] transition hover:border-cyan-300/45 hover:bg-cyan-400/[.15]">
+                                <x-heroicon-o-play class="h-4 w-4" />{{ __('Depot testen') }}
+                            </button>
+                            @endif
                         @endif
                         <a href="{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => $paperMode ? 'paper' : 'depots']) }}" class="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:text-teal-700">
                             {{ __('Öffnen') }}<x-heroicon-o-arrow-right class="h-4 w-4" />
                         </a>
                         </div>
                     </div>
+
+                    @if($portfolio->type === 'paper' && ! $canTestPaperDepot)
+                        <div x-show="testPlanOpen" x-cloak class="fixed inset-0 z-[140] grid place-items-center bg-slate-950/80 p-4 backdrop-blur-sm" @keydown.escape.window="testPlanOpen=false" @click.self="testPlanOpen=false">
+                            <div class="w-full max-w-md rounded-2xl border border-cyan-300/30 bg-[#102238] p-6 text-left shadow-2xl shadow-cyan-950/30">
+                                <div class="flex items-start justify-between gap-4"><div class="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-200"><x-heroicon-o-play class="h-5 w-5" /></div><button type="button" @click="testPlanOpen=false" class="text-xl text-slate-400 hover:text-white" aria-label="{{ __('Schließen') }}">×</button></div>
+                                <p class="mt-4 text-[10px] font-black uppercase tracking-[.16em] text-cyan-300">{{ __('Musterdepot testen') }}</p>
+                                <h3 class="mt-1 text-xl font-black text-white">{{ __('Verfügbar ab Plus') }}</h3>
+                                <p class="mt-3 text-sm leading-6 text-slate-300">{{ __('Mit Plus kannst du deine gespeicherten Strategien anhand historischer Daten in einem Musterdepot testen.') }}</p>
+                                <div class="mt-5 flex justify-end gap-2"><button type="button" @click="testPlanOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Schließen') }}</button><a href="{{ route('pricing', ['standalone' => 1]) }}" target="_blank" rel="noopener noreferrer" class="inline-flex h-10 items-center rounded-lg bg-gradient-to-r from-cyan-300 to-teal-300 px-4 text-xs font-black text-slate-950">{{ __('Tarife anzeigen') }}</a></div>
+                            </div>
+                        </div>
+                    @endif
 
                     @if($portfolio->type === 'paper')
                         <div x-show="strategyOpen" x-cloak class="fixed inset-0 z-[130] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-sm" @keydown.escape.window="strategyOpen=false">
@@ -202,7 +224,7 @@
                         </div>
 
                         <div x-show="resetOpen" x-cloak class="fixed inset-0 z-[133] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-sm" @keydown.escape.window="resetOpen=false">
-                            <form method="POST" action="{{ route('depots.reset', $portfolio) }}" class="isolate w-full max-w-lg rounded-2xl border border-amber-300/25 p-6 shadow-2xl" style="background-color: rgba(22, 37, 58, 0.80);">@csrf<x-heroicon-o-arrow-path class="h-9 w-9 text-amber-300" /><h2 class="mt-4 text-xl font-black text-white">{{ __('Musterdepot zurücksetzen?') }}</h2><p class="mt-3 text-sm leading-6 text-slate-200">{{ __('Alle Positionen, Transaktionen, Kontobuchungen und Simulationsergebnisse werden endgültig gelöscht. Strategien und das Depot selbst bleiben erhalten; das Konto wird auf das Startkapital zurückgesetzt.') }}</p><label class="mt-4 flex gap-3 rounded-xl border border-amber-300/20 bg-amber-400/[.06] p-3 text-sm font-bold text-amber-100"><input required type="checkbox" name="confirm_reset" value="1" class="mt-0.5 h-4 w-4 rounded bg-slate-950 text-amber-500"><span>{{ __('Ich bestätige das Löschen der gesamten Depothistorie.') }}</span></label><div class="mt-5 flex justify-end gap-2"><button type="button" @click="resetOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Abbrechen') }}</button><button class="h-10 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-4 text-xs font-black text-white">{{ __('Depot zurücksetzen') }}</button></div></form>
+                            <form method="POST" action="{{ route('depots.reset', $portfolio) }}" class="isolate w-full max-w-lg rounded-2xl border border-amber-300/25 p-6 shadow-2xl" style="background-color: rgba(22, 37, 58, 0.80);">@csrf<x-heroicon-o-arrow-path class="h-9 w-9 text-amber-300" /><h2 class="mt-4 text-xl font-black text-white">{{ __('Musterdepot zurücksetzen?') }}</h2><p class="mt-3 text-sm leading-6 text-slate-200">{{ __('Alle Positionen, Transaktionen, Kontobuchungen und Simulationsergebnisse werden endgültig gelöscht. Strategien und das Depot selbst bleiben erhalten; das Konto wird auf das Startkapital zurückgesetzt.') }}</p><label class="mt-4 flex gap-3 rounded-xl border border-amber-300/25 bg-amber-400/[.07] p-3 text-sm font-bold text-amber-100"><input required type="checkbox" name="confirm_reset" value="1" class="mt-0.5 h-4 w-4 rounded border-amber-300/60 bg-slate-950 text-amber-400 accent-amber-400 focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900"><span>{{ __('Ich bestätige das Löschen der gesamten Depothistorie.') }}</span></label><div class="mt-5 flex justify-end gap-2"><button type="button" @click="resetOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Abbrechen') }}</button><button class="h-10 rounded-lg border border-amber-300/50 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-[0_0_18px_rgba(251,191,36,.18)] transition hover:bg-amber-300">{{ __('Depot zurücksetzen') }}</button></div></form>
                         </div>
 
                         <div x-show="deleteOpen" x-cloak class="fixed inset-0 z-[134] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-sm" @keydown.escape.window="deleteOpen=false">
@@ -268,6 +290,12 @@
                         </div>
                     @endforeach
                 @endunless
+                @if ($paperDepotLimitReached)
+                    <div x-show="!selected" x-transition.opacity.duration.1000ms class="col-span-full flex items-center justify-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/[.07] px-4 py-3 text-xs font-bold text-amber-200">
+                        <x-heroicon-o-information-circle class="h-4 w-4" />
+                        {{ __('Limit erreicht: :count Musterdepots', ['count' => $paperDepotLimit]) }}
+                    </div>
+                @else
                 <div x-data="{ open: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="ak-detail-panel {{ $paperMode ? 'min-h-52 p-3' : 'min-h-72 p-5' }} rounded-2xl border border-dashed border-[var(--ak-border)] bg-[var(--ak-card)]">
                     <button type="button" @click="open = !open" class="flex h-full w-full flex-col items-center justify-center text-center text-[var(--ak-muted)] transition hover:text-teal-700" x-show="!open">
                         <span class="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]"><x-heroicon-o-plus class="h-6 w-6" /></span>
@@ -292,6 +320,7 @@
                         <div class="flex gap-2"><button type="button" @click="open = false" class="h-10 flex-1 rounded-xl border border-[var(--ak-border)] text-xs font-bold text-[var(--ak-muted)]">{{ __('Abbrechen') }}</button><button type="submit" class="h-10 flex-1 rounded-xl bg-teal-700 text-xs font-black text-white">{{ __('Anlegen') }}</button></div>
                     </form>
                 </div>
+                @endif
             @endif
 
             <aside x-cloak x-show="phase === 'detail' && active" x-transition.opacity.duration.500ms class="min-w-0 space-y-4 xl:col-span-8">

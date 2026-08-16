@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 class StartPostBetaTrials extends Command
 {
     protected $signature = 'beta:start-post-phase-trials';
-    protected $description = 'Startet die dreimonatige Pro-Testphase nach Ende der Beta.';
+    protected $description = 'Startet das kostenlose Pro-Jahr für Betatester nach Ende der Beta.';
 
     public function handle(): int
     {
@@ -28,14 +28,15 @@ class StartPostBetaTrials extends Command
             ->where('is_beta_tester', true)
             ->where('beta_access_exempt', false)
             ->whereNull('tariff_ends_at')
-            ->chunkById(100, function ($users) use (&$started): void {
+            ->chunkById(100, function ($users) use (&$started, $proPlanId): void {
                 foreach ($users as $user) {
                     $startsAt = now();
-                    $endsAt = $startsAt->copy()->addMonths(3);
+                    $endsAt = $startsAt->copy()->addYear();
                     $metadata = (array) ($user->subscription_metadata ?? []);
                     $metadata['trial_starts_after_beta'] = false;
                     $metadata['trial_started_at'] = $startsAt->toIso8601String();
                     $metadata['trial_ends_at'] = $endsAt->toIso8601String();
+                    $metadata['trial_months'] = 12;
                     $user->forceFill([
                         'tariff_plan_id' => $proPlanId,
                         'tariff_status' => 'trialing',

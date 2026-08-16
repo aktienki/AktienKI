@@ -4,8 +4,11 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Enums\PlanLevel;
+use App\Services\FreeRegionalStockUniverseService;
 use App\Services\MarketService;
 use App\Services\IndexAiScoreService;
+use App\Services\PlanAccessService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +33,10 @@ class MarketData extends Component
     public array $signalTransitionStats = [];
 
     public array $macroCards = [];
+
+    public bool $isRegionalFreeView = false;
+
+    public string $regionalCountry = '';
 
     protected array $symbols = [
 
@@ -108,8 +115,20 @@ class MarketData extends Component
             $this->dailyAiScores,
             (string) $riskLevel,
         );
-        $ruleBasedAnalysis = $this->loadRuleBasedMarketAnalysis();
-        $this->marketAnalysis = $this->loadExternalMarketAnalysis($ruleBasedAnalysis) ?? $ruleBasedAnalysis;
+        $user = auth()->user();
+        $this->isRegionalFreeView = $user !== null
+            && app(PlanAccessService::class)->level($user) === PlanLevel::Free;
+        $regionalUniverseIds = collect();
+        if ($this->isRegionalFreeView && $user !== null) {
+            $universe = app(FreeRegionalStockUniverseService::class);
+            $regionalUniverseIds = $universe->instrumentIds($user);
+            $this->regionalCountry = $universe->country($user);
+        }
+
+        $ruleBasedAnalysis = $this->loadRuleBasedMarketAnalysis($regionalUniverseIds->all());
+        $this->marketAnalysis = $this->isRegionalFreeView
+            ? $ruleBasedAnalysis
+            : ($this->loadExternalMarketAnalysis($ruleBasedAnalysis) ?? $ruleBasedAnalysis);
         $this->marketComment = $this->marketAnalysis['summary'] ?? null;
 
         $this->sentiment = $marketService->sentiment($this->markets);
@@ -131,6 +150,8 @@ class MarketData extends Component
                 'marketAnalysis' => $this->marketAnalysis,
                 'signalTransitionStats' => $this->signalTransitionStats,
                 'macroCards' => $this->macroCards,
+                'isRegionalFreeView' => $this->isRegionalFreeView,
+                'regionalCountry' => $this->regionalCountry,
             ]
         );
     }
@@ -307,9 +328,11 @@ class MarketData extends Component
         });
     }
 
-    private function loadRuleBasedMarketAnalysis(): array
+    private function loadRuleBasedMarketAnalysis(array $instrumentIds = []): array
     {
-        return Cache::remember('markets.rule-based-analysis.v1', now()->addMinutes(2), function (): array {
+        $scopeKey = $instrumentIds === [] ? 'global' : sha1(implode(',', $instrumentIds));
+
+        return Cache::remember('markets.rule-based-analysis.v2.'.$scopeKey, now()->addMinutes(2), function () use ($instrumentIds): array {
             $latestPredictions = DB::table('predictions as prediction')
                 ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
                 ->join('trained_models as model', 'model.id', '=', 'prediction.trained_model_id')
@@ -320,6 +343,7 @@ class MarketData extends Component
                 ->where('prediction.position_side', 'long')
                 ->where('model.feature_set_version', 'triple_daily_macro_v1')
                 ->where('prediction.prediction_time', '>=', now()->subDays(7))
+                ->when($instrumentIds !== [], fn ($query) => $query->whereIn('instrument.id', $instrumentIds))
                 ->selectRaw('DISTINCT ON (prediction.instrument_id) prediction.instrument_id')
                 ->addSelect([
                     'instrument.symbol', 'instrument.name', 'instrument.sector',
@@ -506,7 +530,7 @@ class MarketData extends Component
 
     private function databaseMarkets(): array
     {
-        return Cache::remember('dashboard_index_market_bars', now()->addSeconds(30), function (): array {
+        return Cache::remember('dashboard_index_market_bars_v2', now()->addSeconds(30), function (): array {
             $bars = DB::table('instruments as instrument')
                 ->join('price_bars as bar', 'bar.instrument_id', '=', 'instrument.id')
                 ->whereIn('instrument.symbol', array_values($this->symbols))
@@ -523,11 +547,18 @@ class MarketData extends Component
             return collect($this->symbols)->mapWithKeys(function (string $symbol) use ($bars): array {
                 $symbolBars = $bars->get($symbol, collect());
                 $latest = $symbolBars->first();
-                $previousDaily = $symbolBars
-                    ->filter(fn (object $bar): bool => $bar->interval === '1d')
-                    ->values()
-                    ->get(1);
                 $price = $latest && is_numeric($latest->close) ? (float) $latest->close : null;
+                $latestDay = $latest ? Carbon::parse($latest->bar_time)->toDateString() : null;
+                $previousDaily = $symbolBars
+                    ->first(fn (object $bar): bool =>
+                        $bar->interval === '1d'
+                        && is_numeric($bar->close)
+                        && $latestDay !== null
+                        && Carbon::parse($bar->bar_time)->toDateString() < $latestDay
+                        // Reject incorrectly assigned or differently scaled
+                        // index rows (for example 47 instead of 26,000).
+                        && ($price === null || ((float) $bar->close >= $price * .5 && (float) $bar->close <= $price * 2))
+                    );
                 $previous = $previousDaily && is_numeric($previousDaily->close) ? (float) $previousDaily->close : null;
                 $candles = $symbolBars
                     ->filter(fn (object $bar): bool => $bar->interval === '1m')

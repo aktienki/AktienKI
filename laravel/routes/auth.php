@@ -47,7 +47,7 @@ Route::post('/beta/aktivieren', function (Request $request) {
     $proPlanId = DB::table('tariff_plans')->where('code', 'pro')->value('id');
     $phaseEnded = (bool) config('aktienki.beta.phase_ended', false);
     $trialStartsAt = $phaseEnded ? now() : null;
-    $trialEndsAt = $phaseEnded ? $trialStartsAt->copy()->addMonths(3) : null;
+    $trialEndsAt = $phaseEnded ? $trialStartsAt->copy()->addYear() : null;
     unset($meta['beta_registration']['code_hash'], $meta['beta_registration']['code_encrypted']);
     $user->forceFill([
         'account_status' => 'tester',
@@ -59,7 +59,7 @@ Route::post('/beta/aktivieren', function (Request $request) {
         'tariff_ends_at' => $trialEndsAt,
             'subscription_metadata' => array_merge((array) ($user->subscription_metadata ?? []), [
                 'source' => 'beta_trial',
-                'trial_months' => 3,
+                'trial_months' => 12,
                 'trial_starts_after_beta' => ! $phaseEnded,
                 'trial_started_at' => $trialStartsAt?->toIso8601String(),
                 'trial_ends_at' => $trialEndsAt?->toIso8601String(),

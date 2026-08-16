@@ -53,7 +53,7 @@
             <div class="ak-depot-detail-card ak-detail-panel relative h-full overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
                 <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-500/30 via-cyan-400 to-amber-400/45"></div>
                 <div class="mb-2 flex items-center justify-between"><div><p class="text-[8px] font-black uppercase tracking-[.16em] text-teal-300">{{ __('Depotdaten') }}</p><h2 class="mt-0.5 text-sm font-black">{{ __('Kapital und Bestand') }}</h2></div><x-heroicon-o-banknotes class="h-5 w-5 text-teal-300" /></div>
-                <div class="grid grid-cols-2 gap-x-4 xl:grid-cols-3">
+                <div class="ak-depot-metrics-grid grid grid-cols-2 gap-x-4 gap-y-2 xl:grid-cols-3">
                     @foreach ([
                         [__('Depotwert'), number_format($currentValue, 2, ',', '.').' '.$portfolio->currency, 'text-[var(--ak-text)]', 'portfolio-live-position-value'],
                         [__('Kontostand'), number_format($cashBalance, 2, ',', '.').' '.$portfolio->currency, 'text-[var(--ak-text)]'],
@@ -141,11 +141,6 @@
                 {{ $simulationRun->error_message }}
             </section>
         @endif
-
-        <section class="mt-4 overflow-hidden rounded-2xl border border-cyan-400/25 bg-cyan-400/[.018] p-4">
-            <div class="mb-3 flex items-center justify-between"><div><p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-400">{{ __('Musterdepot-Verlauf') }}</p><h2 class="mt-1 font-black">{{ __('Entwicklung des simulierten Depotwerts') }}</h2></div><span class="text-xs font-black text-amber-300">{{ number_format($totalValue,2,',','.') }} {{ $portfolio->currency }}</span></div>
-            @if($portfolioValueCurve->count() >= 2)<div id="manual-portfolio-value-chart" class="h-56 w-full"></div>@else<div class="grid h-32 place-items-center rounded-xl border border-dashed border-cyan-400/20 text-xs text-[var(--ak-muted)]">{{ __('Der Chart erscheint, sobald genügend Kursdaten für Positionen vorhanden sind.') }}</div>@endif
-        </section>
 
         <div x-show="automationOpen" x-cloak class="fixed inset-0 z-[125] grid place-items-center bg-slate-950/80 p-4 backdrop-blur-sm" @keydown.escape.window="automationOpen=false">
             <form method="POST" action="{{ route('depots.automation.update', $portfolio) }}" class="w-full max-w-lg rounded-2xl border border-orange-400/25 bg-[#16253a]/90 p-6 shadow-2xl" @click.outside="automationOpen=false">
@@ -310,8 +305,8 @@
             <form method="POST" action="{{ route('depots.reset', $portfolio) }}" class="w-full max-w-lg rounded-2xl border border-amber-300/25 bg-[#16253a]/90 p-6 shadow-2xl" @click.outside="resetOpen=false">@csrf
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300"><x-heroicon-o-arrow-path class="h-7 w-7" /></div><h2 class="mt-4 text-xl font-black">{{ __('Musterdepot zurücksetzen?') }}</h2>
                 <p class="mt-3 text-sm leading-6 text-slate-200">{{ __('Alle Positionen, Transaktionen, Kontobuchungen und Simulationsergebnisse werden endgültig gelöscht. Strategien und das Depot selbst bleiben erhalten; das Konto wird auf das Startkapital zurückgesetzt.') }}</p>
-                <label class="mt-4 flex gap-3 rounded-xl border border-amber-300/20 bg-amber-400/[.06] p-3 text-sm font-bold text-amber-100"><input required type="checkbox" name="confirm_reset" value="1" class="mt-0.5 h-4 w-4 rounded bg-slate-950 text-amber-500"><span>{{ __('Ich bestätige das Löschen der gesamten Depothistorie.') }}</span></label>
-                <div class="mt-5 flex justify-end gap-2"><button type="button" @click="resetOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Abbrechen') }}</button><button class="h-10 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-4 text-xs font-black text-white">{{ __('Depot zurücksetzen') }}</button></div>
+                <label class="mt-4 flex gap-3 rounded-xl border border-amber-300/25 bg-amber-400/[.07] p-3 text-sm font-bold text-amber-100"><input required type="checkbox" name="confirm_reset" value="1" class="mt-0.5 h-4 w-4 rounded border-amber-300/60 bg-slate-950 text-amber-400 accent-amber-400 focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900"><span>{{ __('Ich bestätige das Löschen der gesamten Depothistorie.') }}</span></label>
+                <div class="mt-5 flex justify-end gap-2"><button type="button" @click="resetOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Abbrechen') }}</button><button class="h-10 rounded-lg border border-amber-300/50 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-[0_0_18px_rgba(251,191,36,.18)] transition hover:bg-amber-300">{{ __('Depot zurücksetzen') }}</button></div>
             </form>
         </div>
 
@@ -410,8 +405,8 @@
       .ak-depot-sim-progress{height:6px;overflow:hidden;border:1px solid rgba(251,191,36,.18);border-radius:999px;background:rgba(15,23,42,.62);box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}.ak-depot-sim-progress span{display:block;width:34%;height:100%;border-radius:999px;background:linear-gradient(90deg,transparent,rgba(34, 211, 238,.95),#fbbf24,transparent);box-shadow:0 0 8px rgba(251,191,36,.35);animation:ak-depot-sim-progress 1.8s ease-in-out infinite}.ak-depot-sim-progress span.is-determinate{animation:none;background:linear-gradient(90deg,rgba(34, 211, 238,.82),rgba(251,191,36,.9));transition:width .35s ease}
       .ak-portfolio-line-chart{background:transparent !important}
       .ak-portfolio-line-chart .apexcharts-canvas,.ak-portfolio-line-chart svg{background:transparent !important}
-      .ak-portfolio-line-chart path.apexcharts-line{stroke:#fff !important;filter:drop-shadow(0 0 2px rgba(255,255,255,.72)) drop-shadow(0 0 7px rgba(125,211,252,.28))}
-      :root[data-theme="light"] .ak-portfolio-line-chart path.apexcharts-line{stroke:#0e7490 !important;filter:drop-shadow(0 0 2px rgba(14, 116, 144,.35)) drop-shadow(0 0 6px rgba(34,211,238,.18))}
+      .ak-portfolio-line-chart path.apexcharts-line{stroke:#22d3ee !important;filter:drop-shadow(0 0 3px rgba(34,211,238,.22))}
+      :root[data-theme="light"] .ak-portfolio-line-chart path.apexcharts-line{stroke:#0e7490 !important;filter:drop-shadow(0 0 2px rgba(14,116,144,.16))}
       @keyframes ak-depot-sim-spin{to{transform:rotate(360deg)}}@keyframes ak-depot-sim-dot{0%,65%,100%{opacity:.25;transform:translateY(0)}32%{opacity:1;transform:translateY(-2px)}}@keyframes ak-depot-sim-progress{from{transform:translateX(-110%)}to{transform:translateX(310%)}}
     </style>
     <script>
@@ -476,7 +471,7 @@
             },
           };
         });
-        new ApexCharts(chartNode,{chart:{type:'line',height:chartHeight,toolbar:{show:false},animations:{enabled:false},zoom:{enabled:false},background:'transparent'},series,colors:[isLightTheme?'#0e7490':'#ffffff'],stroke:{show:true,width:2.6,curve:'smooth',lineCap:'round'},fill:{type:'gradient',gradient:{shade:isLightTheme?'light':'dark',type:'vertical',shadeIntensity:.15,gradientToColors:[isLightTheme?'rgba(14, 116, 144,0)':'rgba(255,255,255,0)'],inverseColors:false,opacityFrom:.16,opacityTo:0,stops:[0,100]}},markers:{size:0,hover:{sizeOffset:0}},dataLabels:{enabled:false},legend:{show:false},annotations:{xaxis:[...yearBoundaries,...yearBadges]},xaxis:{type:'datetime',min:chartMin,max:chartMax+rightOffset,labels:{show:true,datetimeUTC:false,format:'dd.MM.yy',style:{colors:'#7f93a8',fontSize:'8px'},hideOverlappingLabels:true},axisBorder:{show:true,color:isLightTheme?'rgba(14, 116, 144,.25)':'rgba(255,255,255,.18)'},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{show:true,min:chartValueMin,max:chartValueMax,forceNiceScale:false,decimalsInFloat:0,labels:{show:true,minWidth:34,style:{colors:'#7f93a8',fontSize:'8px'},formatter:value=>`${moneyLabel(value)} {{ $portfolio->currency }}`},axisBorder:{show:false}},grid:{borderColor:isLightTheme?'rgba(14, 116, 144,.12)':'rgba(255,255,255,.12)',padding:{top:20,bottom:0,left:2,right:10}},theme:{mode:isLightTheme?'light':'dark'},tooltip:{shared:false,intersect:true,custom:({seriesIndex,dataPointIndex,w})=>{
+        new ApexCharts(chartNode,{chart:{type:'line',height:chartHeight,toolbar:{show:false},animations:{enabled:false},zoom:{enabled:false},background:'transparent'},series,colors:[isLightTheme?'#0e7490':'#22d3ee'],stroke:{show:true,width:1.65,curve:'smooth',lineCap:'round'},fill:{type:'gradient',gradient:{shade:isLightTheme?'light':'dark',type:'vertical',shadeIntensity:.12,gradientToColors:[isLightTheme?'rgba(14,116,144,0)':'rgba(34,211,238,0)'],inverseColors:false,opacityFrom:.12,opacityTo:0,stops:[0,100]}},markers:{size:0,hover:{sizeOffset:0}},dataLabels:{enabled:false},legend:{show:false},annotations:{xaxis:[...yearBoundaries,...yearBadges]},xaxis:{type:'datetime',min:chartMin,max:chartMax+rightOffset,labels:{show:true,datetimeUTC:false,format:'dd.MM.yy',style:{colors:'#7f93a8',fontSize:'8px'},hideOverlappingLabels:true},axisBorder:{show:true,color:isLightTheme?'rgba(14, 116, 144,.25)':'rgba(255,255,255,.18)'},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{show:true,min:chartValueMin,max:chartValueMax,forceNiceScale:false,decimalsInFloat:0,labels:{show:true,minWidth:34,style:{colors:'#7f93a8',fontSize:'8px'},formatter:value=>`${moneyLabel(value)} {{ $portfolio->currency }}`},axisBorder:{show:false}},grid:{borderColor:isLightTheme?'rgba(14, 116, 144,.12)':'rgba(255,255,255,.12)',padding:{top:20,bottom:0,left:2,right:10}},theme:{mode:isLightTheme?'light':'dark'},tooltip:{shared:false,intersect:true,custom:({seriesIndex,dataPointIndex,w})=>{
           const point=w.config.series[seriesIndex]?.data?.[dataPointIndex];
           if(!point?.trade){const value=Number(point?.y);const change=((value/baseValue)-1)*100;return `<div class="px-3 py-2 text-xs"><b>${escapeHtml(w.config.series[seriesIndex]?.name)}</b><div class="mt-1">${moneyLabel(value)} {{ $portfolio->currency }} · ${change>=0?'+':''}${change.toFixed(2)} %</div></div>`;}
           const trade=point.trade;const performance=Number(trade.performance);

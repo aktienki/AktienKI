@@ -1,15 +1,49 @@
 <x-app-layout>
-    <div class="min-h-[calc(100dvh-90px)] py-4 text-[var(--ak-text)]" x-data="researchLab()">
-        <header class="mb-4 flex flex-col gap-3 rounded-2xl border border-cyan-400/25 bg-[var(--ak-card)] p-5 shadow-[var(--ak-shadow)] lg:flex-row lg:items-center lg:justify-between">
+    <style>
+        .research-preview [inert] { opacity: .5 !important; }
+        .research-preview.is-enabled [inert] { opacity: 1 !important; }
+        .research-preview.is-enabled .pointer-events-none { pointer-events: auto !important; }
+        .research-preview.is-enabled :is(.opacity-35, .opacity-50) { opacity: 1 !important; }
+        .research-preview.is-enabled .select-none { user-select: auto !important; }
+        .research-preview { --research-violet:#a78bfa;--research-violet-soft:rgba(139,92,246,.12);--research-border:rgba(167,139,250,.28); }
+        .research-preview > header,.research-preview form > section,.research-preview > section { background:linear-gradient(145deg,rgba(31,25,58,.96),rgba(18,24,47,.97)) !important;border-color:var(--research-border) !important;box-shadow:0 16px 42px rgba(46,16,101,.18),inset 0 1px 0 rgba(221,214,254,.035) !important; }
+        .research-preview > header,.research-preview form > section:last-child,.research-preview > section { border-left:3px solid rgba(167,139,250,.72) !important; }
+        .research-preview [class*="text-cyan-"] { color:#c4b5fd !important; }
+        .research-preview [class*="border-cyan-"] { border-color:rgba(167,139,250,.32) !important; }
+        .research-preview [class*="bg-cyan-"] { background-color:rgba(139,92,246,.12) !important; }
+        .research-preview input:is([type="checkbox"],[type="range"]) { accent-color:#8b5cf6; }
+        .research-preview form { gap:.65rem !important; }
+        .research-preview form > section { padding:.75rem !important; }
+        .research-preview form > section:last-child > div { margin-top:.55rem !important; }
+        .research-preview form > section:last-child > div:nth-of-type(2),.research-preview form > section:last-child > div:nth-of-type(3) { gap:.45rem !important; }
+        .research-preview form > section:last-child > div:nth-of-type(2) > label,.research-preview form > section:last-child > div:nth-of-type(3) > label { padding:.5rem .6rem !important; }
+        .research-preview form > section:last-child :is(select.ak-input,input[type="number"].ak-input) { height:1.9rem !important;min-height:0 !important; }
+        .research-preview form > section:last-child > div:nth-of-type(4),.research-preview form > section:last-child > div:nth-of-type(5) { padding:.6rem !important;border-color:rgba(167,139,250,.2) !important;background:rgba(76,29,149,.08) !important; }
+        .research-preview form > section:last-child > div:nth-of-type(4) > div,.research-preview form > section:last-child > div:nth-of-type(5) > div { gap:.3rem !important; }
+        .research-preview form > section:last-child > div:nth-of-type(4) label,.research-preview form > section:last-child > div:nth-of-type(5) label { min-height:1.9rem;padding:.25rem .4rem !important;border-color:rgba(167,139,250,.18) !important;background:rgba(15,23,42,.22); }
+        .research-preview form > section:last-child > div:nth-of-type(4) input.ak-input,.research-preview form > section:last-child > div:nth-of-type(5) select.ak-input { height:1.55rem !important; }
+        @media (min-width:1024px) {
+            .research-preview form > section:last-child > div:nth-of-type(2),.research-preview form > section:last-child > div:nth-of-type(3) { grid-template-columns:repeat(4,minmax(0,1fr)) !important; }
+            .research-preview form > section:last-child > div:nth-of-type(2) > label:nth-child(3) { grid-column:span 2; }
+            .research-preview form > section:last-child > div:nth-of-type(4) > div { grid-template-columns:repeat(3,minmax(0,1fr)) !important; }
+            .research-preview form > section:last-child > div:nth-of-type(5) > div { grid-template-columns:repeat(4,minmax(0,1fr)) !important; }
+        }
+        @media (min-width:1440px) {
+            .research-preview form { grid-template-columns:.66fr 1.34fr !important; }
+            .research-preview form > section:last-child > div:nth-of-type(4) > div { grid-template-columns:repeat(5,minmax(0,1fr)) !important; }
+        }
+    </style>
+    <div class="research-preview {{ $researchLabEnabled ? 'is-enabled' : '' }} min-h-[calc(100dvh-90px)] py-4 text-[var(--ak-text)]" x-data="researchLab()" @if($researchLabEnabled) x-init="document.querySelectorAll('.research-preview [inert]').forEach((element) => element.removeAttribute('inert'))" @endif>
+        <header inert aria-disabled="true" class="pointer-events-none mb-4 flex select-none flex-col gap-3 rounded-2xl border border-cyan-400/25 bg-[var(--ak-card)] p-5 opacity-50 shadow-[var(--ak-shadow)] lg:flex-row lg:items-center lg:justify-between">
             <div class="flex items-center gap-3"><div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-300"><x-heroicon-o-beaker class="h-6 w-6" /></div><div><p class="text-[10px] font-black uppercase tracking-[.2em] text-cyan-300">{{ __('Research Lab · Pro') }}</p><h1 class="text-2xl font-black tracking-tight">{{ __('Modell-Labor') }}</h1><p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Variiere Indikatoren und Makrodaten und vergleiche deine Modelle mit dem Standard.') }}</p></div></div>
             <div class="flex flex-wrap items-center gap-2"><span class="rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-[11px] font-black text-amber-300">{{ number_format($universeCount, 0, ',', '.') }} / 5.000 {{ __('Aktien geladen') }}</span><a href="{{ route('dashboard') }}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] hover:text-cyan-300"><x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Dashboard') }}</a></div>
         </header>
 
-        @if(session('status'))<div class="mb-4 rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-3 text-xs font-bold text-cyan-200">{{ session('status') }}</div>@endif
-        @if($errors->any())<div class="mb-4 rounded-xl border border-rose-300/25 bg-rose-300/10 px-4 py-3 text-xs font-bold text-rose-200">{{ $errors->first() }}</div>@endif
-        @if($universeCount < 5000)<div class="mb-4 rounded-xl border border-amber-300/25 bg-amber-300/[.07] px-4 py-3 text-xs leading-5 text-amber-100"><strong class="text-amber-300">{{ __('Universum noch nicht vollständig importiert.') }}</strong> {{ __('Aktuell liegen :count aktive Aktien in der Datenbank. Für die geplante Liste der 5.000 größten Aktien muss der Universe-Import noch ausgeführt werden; die Research-Läufe können bereits mit der vorhandenen Auswahl getestet werden.', ['count' => number_format($universeCount, 0, ',', '.')]) }}</div>@endif
+        @if(session('status'))<div class="pointer-events-none mb-4 select-none rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-3 text-xs font-bold text-cyan-200 opacity-50">{{ session('status') }}</div>@endif
+        @if($errors->any())<div class="pointer-events-none mb-4 select-none rounded-xl border border-rose-300/25 bg-rose-300/10 px-4 py-3 text-xs font-bold text-rose-200 opacity-50">{{ $errors->first() }}</div>@endif
+        @if($universeCount < 5000)<div class="pointer-events-none mb-4 select-none rounded-xl border border-amber-300/25 bg-amber-300/[.07] px-4 py-3 text-xs leading-5 text-amber-100 opacity-35"><strong class="text-amber-300">{{ __('Universum noch nicht vollständig importiert.') }}</strong> {{ __('Aktuell liegen :count aktive Aktien in der Datenbank. Für die geplante Liste der 5.000 größten Aktien muss der Universe-Import noch ausgeführt werden; die Research-Läufe können bereits mit der vorhandenen Auswahl getestet werden.', ['count' => number_format($universeCount, 0, ',', '.')]) }}</div>@endif
 
-        <form method="POST" action="{{ route('setup.research-lab.start') }}" class="grid gap-4 xl:grid-cols-[.82fr_1.18fr]">@csrf
+        <form inert aria-disabled="true" method="POST" action="{{ route('setup.research-lab.start') }}" class="pointer-events-none grid select-none gap-4 opacity-50 xl:grid-cols-[.82fr_1.18fr]">@csrf
             <section class="ak-card p-4">
                 <div class="mb-3 flex items-center justify-between"><div><p class="text-[10px] font-black uppercase tracking-[.16em] text-amber-300">{{ __('Universum') }}</p><h2 class="mt-1 text-lg font-black">{{ __('Bis zu 5.000 Aktien') }}</h2></div><span class="rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2 py-1 text-[10px] font-black text-cyan-300" x-text="selected.length + ' / 50 ausgewählt'"></span></div>
                 <input type="search" x-model="search" placeholder="{{ __('Symbol oder Firmenname suchen …') }}" class="ak-input mb-2 h-10 w-full rounded-xl px-3 text-xs">
@@ -33,10 +67,23 @@
             </section>
         </form>
 
-        <section class="mt-4 ak-card p-4"><div class="flex items-center justify-between"><div><p class="text-[10px] font-black uppercase tracking-[.16em] text-amber-300">{{ __('Experimente') }}</p><h2 class="mt-1 text-lg font-black">{{ __('Deine Research-Läufe') }}</h2></div><span class="text-[10px] text-[var(--ak-muted)]">{{ __('Ergebnisse werden pro Lauf versioniert') }}</span></div><div class="mt-3 grid gap-2 lg:grid-cols-3">@forelse($experiments as $experiment)<article class="research-experiment rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3" data-status-url="{{ route('setup.research-lab.status', $experiment) }}"><div class="flex items-center justify-between"><b class="text-xs font-black text-cyan-300">{{ \Illuminate\Support\Str::limit(implode(', ', $experiment->symbols), 34) }}</b><span data-progress class="rounded-md border border-cyan-300/20 px-2 py-1 text-[10px] font-black text-cyan-200">{{ $experiment->progress }}%</span></div><p data-state class="mt-2 text-[10px] text-[var(--ak-muted)]">{{ $experiment->created_at?->format('d.m.Y H:i') }} · {{ __($experiment->stage) }} · {{ __($experiment->status) }}</p><div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-700"><span data-bar class="block h-full rounded-full bg-cyan-400 transition-all" style="width: {{ $experiment->progress }}%"></span></div></article>@empty<div class="rounded-xl border border-dashed border-[var(--ak-border)] p-6 text-center text-xs text-[var(--ak-muted)] lg:col-span-3">{{ __('Noch keine Research-Läufe gestartet.') }}</div>@endforelse</div></section>
+        <section inert aria-disabled="true" class="pointer-events-none mt-4 select-none ak-card p-4 opacity-35"><div class="flex items-center justify-between"><div><p class="text-[10px] font-black uppercase tracking-[.16em] text-amber-300">{{ __('Experimente') }}</p><h2 class="mt-1 text-lg font-black">{{ __('Deine Research-Läufe') }}</h2></div><span class="text-[10px] text-[var(--ak-muted)]">{{ __('Ergebnisse werden pro Lauf versioniert') }}</span></div><div class="mt-3 grid gap-2 lg:grid-cols-3">@forelse($experiments as $experiment)<article class="research-experiment rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3" data-status-url="{{ route('setup.research-lab.status', $experiment) }}"><div class="flex items-center justify-between"><b class="text-xs font-black text-cyan-300">{{ \Illuminate\Support\Str::limit(implode(', ', $experiment->symbols), 34) }}</b><span data-progress class="rounded-md border border-cyan-300/20 px-2 py-1 text-[10px] font-black text-cyan-200">{{ $experiment->progress }}%</span></div><p data-state class="mt-2 text-[10px] text-[var(--ak-muted)]">{{ $experiment->created_at?->format('d.m.Y H:i') }} · {{ __($experiment->stage) }} · {{ __($experiment->status) }}</p><div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-700"><span data-bar class="block h-full rounded-full bg-cyan-400 transition-all" style="width: {{ $experiment->progress }}%"></span></div></article>@empty<div class="rounded-xl border border-dashed border-[var(--ak-border)] p-6 text-center text-xs text-[var(--ak-muted)] lg:col-span-3">{{ __('Noch keine Research-Läufe gestartet.') }}</div>@endforelse</div></section>
+
+        <div x-show="developerNoticeOpen" x-cloak class="fixed inset-0 z-[150] grid place-items-center bg-slate-950/45 p-4 backdrop-blur-[2px]" @keydown.escape.window="developerNoticeOpen=false" @click.self="developerNoticeOpen=false">
+            <section x-show="developerNoticeOpen" x-transition:enter="transition duration-300 ease-out" x-transition:enter-start="scale-95 opacity-0" x-transition:enter-end="scale-100 opacity-100" class="w-full max-w-md overflow-hidden rounded-3xl border border-amber-300/35 bg-[#102238] shadow-[0_28px_90px_rgba(2,6,23,.65),0_0_40px_rgba(251,191,36,.12)]">
+                <div class="h-1 bg-gradient-to-r from-cyan-400 via-amber-300 to-orange-400"></div>
+                <div class="p-6">
+                    <div class="flex items-start justify-between gap-4"><span class="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-amber-200"><x-heroicon-o-code-bracket class="h-6 w-6" /></span><button type="button" @click="developerNoticeOpen=false" class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 text-xl text-slate-400 transition hover:bg-white/5 hover:text-white" aria-label="{{ __('Schließen') }}">×</button></div>
+                    <p class="mt-5 text-[10px] font-black uppercase tracking-[.2em] text-amber-300">{{ __('Developer Area') }}</p>
+                    <h2 class="mt-1 text-2xl font-black text-white">{{ __('Demnächst limitiert verfügbar') }}</h2>
+                    <p class="mt-3 text-sm leading-6 text-slate-300">{{ __('Das Research Lab wird schrittweise für eine begrenzte Anzahl von Entwicklern freigeschaltet. Weitere Informationen zur Teilnahme folgen in Kürze.') }}</p>
+                    <button type="button" @click="developerNoticeOpen=false" class="mt-6 inline-flex h-11 w-full items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-300/10 text-xs font-black text-cyan-200 transition hover:bg-cyan-300/15">{{ __('Verstanden') }}</button>
+                </div>
+            </section>
+        </div>
     </div>
     <script>
-        function researchLab(){const stocks=@json($stocks->map(fn($s)=>['symbol'=>$s->symbol,'name'=>$s->name,'country'=>$s->country])->values());return{stocks,search:'',selected:[],hit:55,pf:1.3,get filteredStocks(){const q=this.search.toLowerCase().trim();return q?this.stocks.filter(s=>(s.symbol+' '+(s.name||'')).toLowerCase().includes(q)):this.stocks.slice(0,500)}}}
+        function researchLab(){const stocks=@json($stocks->map(fn($s)=>['symbol'=>$s->symbol,'name'=>$s->name,'country'=>$s->country])->values());return{stocks,search:'',selected:[],hit:55,pf:1.3,developerNoticeOpen:@js(! $researchLabEnabled),get filteredStocks(){const q=this.search.toLowerCase().trim();return q?this.stocks.filter(s=>(s.symbol+' '+(s.name||'')).toLowerCase().includes(q)):this.stocks.slice(0,500)}}}
         document.addEventListener('DOMContentLoaded',()=>{const poll=async()=>{for(const card of document.querySelectorAll('.research-experiment')){try{const response=await fetch(card.dataset.statusUrl,{headers:{Accept:'application/json'}});if(!response.ok)continue;const data=await response.json();card.querySelector('[data-progress]').textContent=`${data.progress||0}%`;card.querySelector('[data-bar]').style.width=`${data.progress||0}%`;card.querySelector('[data-state]').textContent=`${data.stage||'—'} · ${data.status||'—'}`;}catch(error){/* transient polling errors are harmless */}}};poll();setInterval(poll,5000);});
     </script>
 </x-app-layout>

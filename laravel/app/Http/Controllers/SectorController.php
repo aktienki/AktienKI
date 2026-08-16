@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\PlanLevel;
+use App\Services\FreeRegionalStockUniverseService;
+use App\Services\PlanAccessService;
 use App\Services\PersonalizedSignalService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -10,8 +13,13 @@ use Illuminate\View\View;
 
 class SectorController extends Controller
 {
-    public function index(Request $request, PersonalizedSignalService $personalizedSignals): View
+    public function index(Request $request, PersonalizedSignalService $personalizedSignals, PlanAccessService $planAccess): View
     {
+        $isFreeRegional = $planAccess->level($request->user()) === PlanLevel::Free;
+        $regionalUniverse = app(FreeRegionalStockUniverseService::class);
+        $allowedInstrumentIds = $isFreeRegional ? $regionalUniverse->instrumentIds($request->user())->all() : [];
+        $regionalCountry = $regionalUniverse->country($request->user());
+        $realtimeQuotes = $planAccess->allowsTariff($request->user(), PlanLevel::Pro);
         $signalSql = $personalizedSignals->sql('prediction', auth()->user());
         $latestPredictions = DB::table('predictions')
             ->selectRaw('instrument_id, MAX(id) AS prediction_id')
@@ -42,6 +50,7 @@ class SectorController extends Controller
             ->whereNull('instrument.deleted_at')
             ->whereNotNull('instrument.sector')
             ->where('instrument.sector', '<>', '')
+            ->when($isFreeRegional, fn ($query) => $query->whereIn('instrument.id', $allowedInstrumentIds))
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $term = '%'.mb_strtolower(trim((string) $request->query('q'))).'%';
                 $query->whereRaw('LOWER(instrument.sector) LIKE ?', [$term]);
@@ -81,6 +90,18 @@ class SectorController extends Controller
             ->whereRaw('LOWER(provider) = ?', ['twelvedata'])
             ->selectRaw('instrument_id, MAX(id) AS quote_id')
             ->groupBy('instrument_id');
+        $rankedDailyBars = DB::table('price_bars')
+            ->where('interval', '1d')
+            ->select(['instrument_id', 'close', 'bar_time'])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY instrument_id ORDER BY bar_time DESC, id DESC) AS bar_rank');
+        $dailyCloses = DB::query()
+            ->fromSub($rankedDailyBars, 'ranked_bar')
+            ->where('bar_rank', '<=', 2)
+            ->groupBy('instrument_id')
+            ->select('instrument_id')
+            ->selectRaw('MAX(close) FILTER (WHERE bar_rank = 1) AS latest_daily_close')
+            ->selectRaw('MAX(close) FILTER (WHERE bar_rank = 2) AS previous_daily_close')
+            ->selectRaw('MAX(bar_time) FILTER (WHERE bar_rank = 1) AS latest_daily_time');
         $rankedSectorStocks = DB::table('instruments as instrument')
             ->joinSub($latestPredictions, 'latest', fn ($join) =>
                 $join->on('latest.instrument_id', '=', 'instrument.id'))
@@ -88,22 +109,30 @@ class SectorController extends Controller
             ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) =>
                 $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
             ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
+            ->leftJoinSub($dailyCloses, 'daily_close', fn ($join) =>
+                $join->on('daily_close.instrument_id', '=', 'instrument.id'))
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
             ->whereNotNull('instrument.sector')
             ->where('instrument.sector', '<>', '')
             ->whereNotNull('prediction.prediction_score')
+            ->when($isFreeRegional, fn ($query) => $query->whereIn('instrument.id', $allowedInstrumentIds))
             ->select([
                 'instrument.sector',
                 'instrument.id as instrument_id',
                 'instrument.symbol',
                 'instrument.name',
+                'instrument.country',
                 'instrument.currency',
+                'prediction.id as prediction_id',
                 'prediction.current_price as prediction_price',
                 'prediction.prediction_score as ai_score',
                 'current_quote.price as live_price',
                 'current_quote.quote_time',
+                'daily_close.latest_daily_close',
+                'daily_close.previous_daily_close',
+                'daily_close.latest_daily_time',
             ])
             ->selectRaw('COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) AS risk_score')
             ->selectRaw("({$signalSql}) AS personalized_signal")
@@ -111,12 +140,14 @@ class SectorController extends Controller
                 PARTITION BY instrument.sector
                 ORDER BY prediction.prediction_score DESC NULLS LAST, instrument.symbol
             ) AS sector_rank');
-        $topSectorStocks = Cache::remember('sectors_top_stocks_twelvedata_user_'.auth()->id().'_v1', now()->addSeconds(20), fn () => DB::query()
+        $topSectorStocks = Cache::remember('sectors_top_stocks_twelvedata_user_'.auth()->id().'_v4_'.($isFreeRegional ? sha1(implode(',', $allowedInstrumentIds)) : 'all'), now()->addSeconds(20), fn () => DB::query()
             ->fromSub($rankedSectorStocks, 'ranked_stock')
-            ->where('sector_rank', 1)
+            ->where('sector_rank', '<=', 3)
+            ->orderBy('sector')
+            ->orderBy('sector_rank')
             ->get()
-            ->keyBy('sector'));
-        $sectors->each(fn ($sector) => $sector->highest_score_stock = $topSectorStocks->get($sector->sector));
+            ->groupBy('sector'));
+        $sectors->each(fn ($sector) => $sector->top_stocks = $topSectorStocks->get($sector->sector, collect()));
 
         $sectorEtfCharts = DB::table('market_sectors as market_sector')
             ->join('price_bars as bar', 'bar.instrument_id', '=', 'market_sector.reference_instrument_id')
@@ -131,7 +162,7 @@ class SectorController extends Controller
             ])->values());
         $sectors->each(fn ($sector) => $sector->etf_chart_points = $sectorEtfCharts->get($sector->sector, collect()));
 
-        $latestAnalysis = DB::table('daily_market_ai_analyses')
+        $latestAnalysis = $isFreeRegional ? null : DB::table('daily_market_ai_analyses')
             ->orderByDesc('analysis_date')
             ->orderByDesc('id')
             ->first(['analysis_date', 'sector_analysis']);
@@ -139,6 +170,6 @@ class SectorController extends Controller
         $sectorComments = is_array($sectorComments) ? collect($sectorComments) : collect();
         $sectorAnalysisDate = $latestAnalysis?->analysis_date;
 
-        return view('sectors.index', compact('sectors', 'sectorComments', 'sectorAnalysisDate'));
+        return view('sectors.index', compact('sectors', 'sectorComments', 'sectorAnalysisDate', 'realtimeQuotes', 'isFreeRegional', 'regionalCountry'));
     }
 }

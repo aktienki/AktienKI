@@ -230,6 +230,7 @@
                                     <x-heroicon-o-star class="h-5 w-5" />
                                 </a>
                             @endif
+                            <x-paper-depot-buy :portfolios="$paperPortfolios" :instrument-id="$row->id" :instrument-name="$row->name ?: $row->symbol" :currency="$row->currency" :price="$row->current_price" :score="\App\Support\AiScore::toPercent($row->prediction_score)" compact />
                         </td>
                         <td class="px-3 py-3">
                             <a href="{{ route('stocks.show', $row->symbol) }}" class="group inline-flex items-center gap-2.5">

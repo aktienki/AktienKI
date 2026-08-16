@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
@@ -20,14 +21,14 @@ use App\Models\BetaInvitationLink;
 
 class RegisteredUserController extends Controller
 {
-    private const BETA_TESTER_LIMIT = 25;
+    private const BETA_TESTER_LIMIT = 20;
 
     /**
      * Display the registration view.
      */
     public function create(Request $request): View
     {
-        $invite = trim((string) $request->query('invite', ''));
+        $invite = Str::upper(trim((string) $request->query('invite', '')));
         $invitation = $invite !== ''
             ? BetaInvitationLink::query()->where('token_hash', hash('sha256', $invite))->first()
             : null;
@@ -35,6 +36,8 @@ class RegisteredUserController extends Controller
         return view('auth.register', [
             'invite' => $invite,
             'invitationValid' => $invitation?->isUsable() === true,
+            'betaCodeRequired' => (bool) config('aktienki.beta.enabled', true)
+                && ! (bool) config('aktienki.beta.phase_ended', false),
         ]);
     }
 
@@ -67,11 +70,12 @@ class RegisteredUserController extends Controller
                 Rules\Password::defaults(),
             ],
 
-            'accept_disclaimer' => [
-                'accepted',
+            'country_code' => [
+                'required',
+                Rule::in(['DE','AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','US','CA','CH','GB','AU','CN','HK','JP']),
             ],
 
-            'accept_risk_notice' => [
+            'accept_disclaimer' => [
                 'accepted',
             ],
 
@@ -81,17 +85,20 @@ class RegisteredUserController extends Controller
             ],
 
             'invite' => [
-                'nullable',
+                Rule::requiredIf(
+                    (bool) config('aktienki.beta.enabled', true)
+                    && ! (bool) config('aktienki.beta.phase_ended', false)
+                ),
                 'string',
                 'max:128',
             ],
         ]);
 
-        $legalVersion = '1.0';
+        $legalVersion = (string) config('legal.legal_version', '1.0-beta');
         $riskLevel = $request->string('risk_level')->toString();
         $betaCode = Str::upper(Str::random(4).'-'.Str::random(4));
 
-        $inviteToken = trim((string) $request->input('invite', ''));
+        $inviteToken = Str::upper(trim((string) $request->input('invite', '')));
 
         $user = DB::transaction(function () use ($request, $legalVersion, $riskLevel, $betaCode, $inviteToken) {
             if (DB::connection()->getDriverName() === 'pgsql') {
@@ -114,7 +121,9 @@ class RegisteredUserController extends Controller
 
             // A valid invitation always grants beta status, even if the public
             // registration switch has meanwhile been disabled.
-            $betaEnabled = (bool) config('aktienki.beta.enabled', true) || $invitation !== null;
+            $betaEnabled = (bool) config('aktienki.beta.enabled', true)
+                && ! (bool) config('aktienki.beta.phase_ended', false)
+                && $invitation !== null;
 
             $isBetaTester = DB::table('users')
                 ->where('account_status', 'tester')
@@ -124,6 +133,10 @@ class RegisteredUserController extends Controller
                 'name' => $request->name,
                 'email' => strtolower($request->email),
                 'password' => Hash::make($request->password),
+                'preferences' => [
+                    'country_code' => strtoupper((string) $request->input('country_code')),
+                    'country_code_change_count' => 0,
+                ],
                 'account_status' => $betaEnabled ? 'pending_beta' : ($isBetaTester ? 'tester' : 'active'),
                 'is_beta_tester' => $betaEnabled,
 
@@ -145,7 +158,7 @@ class RegisteredUserController extends Controller
                         'level' => $riskLevel,
                         'source' => 'registration_selection',
                     ],
-                    'beta_tester' => $isBetaTester ? [
+                    'beta_tester' => $betaEnabled ? [
                         'status' => 'tester',
                         'joined_at' => now()->toIso8601String(),
                         'permanent_pro_access' => true,
@@ -198,6 +211,7 @@ class RegisteredUserController extends Controller
         });
 
         event(new Registered($user));
+        Cache::forget('public.welcome.stats-v3');
 
         Auth::login($user);
 

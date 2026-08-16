@@ -11,10 +11,10 @@ class LocalizationTest extends TestCase
         $response = $this->withSession(['locale' => 'en'])->get('/welcome');
 
         $response->assertOk();
-        $response->assertSee('Stock analysis.');
-        $response->assertSee('Powered by AI.');
-        $response->assertSee('/scenes/machine-learning/en.svg', false);
-        $response->assertSee('/scenes/ai-score/en.svg', false);
+        $response->assertSee('Understand stocks.');
+        $response->assertSee('Spot signals earlier.');
+        $response->assertSee('AI Market Intelligence');
+        $response->assertSee('AI Signal Monitor');
     }
 
     public function test_animation_scenes_are_available_in_english(): void

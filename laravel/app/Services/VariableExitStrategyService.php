@@ -26,4 +26,35 @@ final class VariableExitStrategyService
             'validated' => $profile !== null,
         ];
     }
+
+    /**
+     * Prefer the horizon with the highest current forecast target. Historical
+     * exit profiles remain the fallback when the prediction has no usable
+     * multi-horizon targets.
+     */
+    public function resolveForPrediction(int $instrumentId, object $prediction): array
+    {
+        $targets = collect([5, 10, 15, 20])
+            ->mapWithKeys(function (int $days) use ($prediction): array {
+                $value = $prediction->{'predicted_price_'.$days.'d'} ?? null;
+
+                return [$days => is_numeric($value) && (float) $value > 0 ? (float) $value : null];
+            })
+            ->filter(fn (?float $value): bool => $value !== null);
+
+        if ($targets->isNotEmpty()) {
+            $holdingDays = (int) $targets->sortDesc()->keys()->first();
+
+            return [
+                'holding_days' => $holdingDays,
+                'target_price' => (float) $targets->get($holdingDays),
+                'source' => 'current_prediction_peak',
+                'profile_id' => null,
+                'model_signature' => null,
+                'validated' => false,
+            ];
+        }
+
+        return $this->resolve($instrumentId);
+    }
 }

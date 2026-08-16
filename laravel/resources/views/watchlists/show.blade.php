@@ -52,16 +52,16 @@
                 </div>
             @else
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[850px] border-collapse text-left">
+                    <table class="ak-watchlist-table {{ $canViewSignalChanges ? 'has-signal-change' : '' }} w-full min-w-[850px] border-collapse text-left">
                         <thead>
                             <tr class="border-b border-cyan-400/20 bg-cyan-400/[.045] text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">
                                 <th class="px-5 py-4">{{ __('Aktie') }}</th>
-                                <th class="px-4 py-4 text-right">{{ __('Einstiegskurs') }}</th>
-                                <th class="px-4 py-4 text-right">{{ __('Aktueller Kurs') }}</th>
+                                <th class="ak-watchlist-entry px-4 py-4 text-right"><span class="ak-watchlist-entry-desktop">{{ __('Einstiegskurs') }}</span><span class="ak-watchlist-entry-tablet">{{ __('Kurse') }}</span></th>
+                                <th class="ak-watchlist-current px-4 py-4 text-right">{{ __('Aktueller Kurs') }}</th>
+                                <th class="ak-watchlist-signal px-4 py-4 text-center">{{ __('Signal') }}</th>
                                 <th class="px-4 py-4 text-center">{{ __('KI-Bewertung') }}</th>
-                                @if ($canViewSignalChanges)<th class="px-4 py-4 text-center">{{ __('Signalwechsel') }}</th>@endif
-                                <th class="px-4 py-4 text-right">{{ __('Profit je Aktie') }}</th>
-                                <th class="px-4 py-4 text-right">{{ __('Profit') }}</th>
+                                @if ($canViewSignalChanges)<th class="ak-watchlist-signal-change px-4 py-4 text-center">{{ __('Signalwechsel') }}</th>@endif
+                                <th class="ak-watchlist-profit px-4 py-4 text-center">{{ __('Profit') }}</th>
                                 <th class="px-4 py-4 text-center">{{ __('Verlauf') }}</th>
                                 <th class="w-16 px-4 py-4"><span class="sr-only">{{ __('Aktionen') }}</span></th>
                             </tr>
@@ -140,7 +140,7 @@
                                         onkeydown="if (event.target === this && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); window.location.assign(this.dataset.href); }"
                                         class="cursor-pointer transition hover:bg-cyan-400/[.055] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400/70"
                                     >
-                                        <td class="px-5 py-4">
+                                        <td class="ak-watchlist-stock px-5 py-4">
                                             <a href="{{ route('stocks.show', ['symbol' => $item->instrument->symbol, 'prediction' => $prediction?->id, 'return_to' => request()->getRequestUri()]) }}" class="group flex min-w-0 items-center gap-3">
                                                 <span class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-cyan-400/25 bg-cyan-400/[.06]">
                                                     <span class="flex h-full w-full items-center justify-center bg-cyan-400/[.08] text-xs font-black leading-none text-cyan-300">
@@ -176,15 +176,21 @@
                                                 </span>
                                             </a>
                                         </td>
-                                        <td class="px-4 py-4 text-right text-sm font-bold text-[var(--ak-text)]">
-                                            {{ $entryPrice !== null ? number_format($entryPrice, 2, ',', '.').' '.$currency : '—' }}
+                                        <td class="ak-watchlist-entry px-4 py-4 text-right text-sm font-bold text-[var(--ak-text)]">
+                                            <span class="ak-watchlist-entry-desktop">{{ $entryPrice !== null ? number_format($entryPrice, 2, ',', '.').' '.$currency : '—' }}</span>
+                                            <span class="ak-watchlist-entry-tablet">
+                                                <small>{{ __('Einstieg') }}</small><b>{{ $entryPrice !== null ? number_format($entryPrice, 2, ',', '.').' '.$currency : '—' }}</b>
+                                                <small>{{ __('Aktuell') }}</small><b>{{ $currentPrice !== null ? number_format($currentPrice, 2, ',', '.').' '.$currency : '—' }}</b>
+                                            </span>
                                         </td>
-                                        <td class="px-4 py-4 text-right text-sm font-black text-[var(--ak-text)]">
-                                            {{ $currentPrice !== null ? number_format($currentPrice, 2, ',', '.').' '.$currency : '—' }}
+                                        <td class="ak-watchlist-current px-4 py-4 text-right text-sm font-black text-[var(--ak-text)]">
+                                            <span class="block whitespace-nowrap">{{ $currentPrice !== null ? number_format($currentPrice, 2, ',', '.').' '.$currency : '—' }}</span>
                                         </td>
-                                        <td class="px-4 py-4">
-                                            <div class="flex min-w-[27rem] items-center justify-center gap-3">
-                                                <span class="inline-flex min-w-16 shrink-0 items-center justify-center rounded-lg border px-2.5 py-2 text-[10px] font-black tracking-wide {{ $signalTone }}">{{ $personalizedSignal }}</span>
+                                        <td class="ak-watchlist-signal px-4 py-4 text-center">
+                                            <span class="inline-flex min-w-14 items-center justify-center rounded-md border px-2 py-1.5 text-[8px] font-black tracking-wide {{ $signalTone }}">{{ $personalizedSignal }}</span>
+                                        </td>
+                                        <td class="ak-watchlist-ai px-4 py-4">
+                                            <div class="ak-watchlist-ai-metrics flex min-w-[27rem] items-center justify-center gap-3">
                                                 @foreach ([
                                                     ['KI-Score', $scorePercent, $score !== null ? number_format($score, 1, ',', '.') : '—', $scoreDonutColor],
                                                     ['Konf.', $confidencePercent, $confidencePercent !== null ? number_format($confidencePercent, 0, ',', '.').'%' : '—', $qualityDonutColor($confidencePercent)],
@@ -200,7 +206,7 @@
                                             </div>
                                         </td>
                                         @if ($canViewSignalChanges)
-                                            <td class="px-4 py-4 text-center">
+                                            <td class="ak-watchlist-signal-change px-4 py-4 text-center">
                                                 @if ($signalChange)
                                                     <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-cyan-400/25 bg-cyan-400/[.07] px-2 py-1.5 text-[9px] font-black text-cyan-300" title="{{ __('Letzter Signalwechsel') }}">
                                                         {{ $signalChange['from'] }} <span aria-hidden="true">→</span> {{ $signalChange['to'] }}
@@ -211,17 +217,15 @@
                                                 @endif
                                             </td>
                                         @endif
-                                        <td class="px-4 py-4 text-right text-sm font-bold {{ ($profitAbsolute ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">
-                                            {{ $profitAbsolute !== null ? (($profitAbsolute > 0 ? '+' : '').number_format($profitAbsolute, 2, ',', '.').' '.$currency) : '—' }}
-                                        </td>
-                                        <td class="px-4 py-4 text-right">
-                                            <span class="inline-flex min-w-24 justify-center rounded-lg border px-3 py-2 text-sm font-black {{ $profitPercent === null ? 'border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-[var(--ak-muted)]' : ($profitPercent >= 0 ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-400' : 'border-rose-400/25 bg-rose-400/10 text-rose-400') }}">
+                                        <td class="ak-watchlist-profit px-4 py-4 text-center">
+                                            <span class="block whitespace-nowrap text-xs font-bold {{ ($profitAbsolute ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $profitAbsolute !== null ? (($profitAbsolute > 0 ? '+' : '').number_format($profitAbsolute, 2, ',', '.').' '.$currency) : '—' }}</span>
+                                            <span class="mt-1.5 inline-flex min-w-20 justify-center rounded-lg border px-2.5 py-1.5 text-xs font-black {{ $profitPercent === null ? 'border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-[var(--ak-muted)]' : ($profitPercent >= 0 ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-400' : 'border-rose-400/25 bg-rose-400/10 text-rose-400') }}">
                                                 {{ $profitPercent !== null ? (($profitPercent > 0 ? '+' : '').number_format($profitPercent, 2, ',', '.').' %') : '—' }}
                                             </span>
                                         </td>
-                                        <td class="px-4 py-4 text-center">
+                                        <td class="ak-watchlist-chart px-4 py-4 text-center">
                                             @if ($chartValues->count() >= 2)
-                                                <svg class="mx-auto h-10 w-32 overflow-visible" viewBox="0 0 {{ $chartWidth }} {{ $chartHeight }}" role="img" aria-label="{{ __('Performanceverlauf seit Aufnahme') }}">
+                                                <svg class="ak-watchlist-chart-svg mx-auto h-10 w-32 overflow-visible" viewBox="0 0 {{ $chartWidth }} {{ $chartHeight }}" role="img" aria-label="{{ __('Performanceverlauf seit Aufnahme') }}">
                                                     <line x1="{{ $chartPad }}" y1="{{ number_format($chartZeroY, 1, '.', '') }}" x2="{{ $chartWidth - $chartPad }}" y2="{{ number_format($chartZeroY, 1, '.', '') }}" stroke="currentColor" stroke-opacity=".16" stroke-width="1" />
                                                     <polyline points="{{ $chartPolyline }}" fill="none" stroke="{{ $chartPositive ? '#34d399' : '#fb7185' }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                                                 </svg>

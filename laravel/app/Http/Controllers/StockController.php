@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\PlanLevel;
 use App\Services\PlanAccessService;
+use App\Services\MarketDataEntitlementService;
 use App\Services\PersonalizedSignalService;
 use App\Services\TwelveDataService;
 use Carbon\CarbonImmutable;
@@ -45,10 +46,21 @@ class StockController extends Controller
             ? DB::table('trained_models as tm')->leftJoin('model_quality_rankings as mq', 'mq.trained_model_id', '=', 'tm.id')
                 ->leftJoin('model_definitions as md', 'md.id', '=', 'tm.model_definition_id')
                 ->where('tm.id', $prediction->trained_model_id)->orderByDesc('mq.id')
-                ->first(['md.public_alias as model_alias', 'mq.quality_score', 'mq.direction_accuracy as hit_rate', 'mq.profit_factor', 'mq.maximum_drawdown as max_drawdown', 'tm.trained_at'])
+                ->first([
+                    'md.public_alias as model_alias', 'mq.quality_score',
+                    'mq.direction_accuracy as hit_rate', 'mq.profit_factor',
+                    'mq.maximum_drawdown as max_drawdown', 'tm.trained_at',
+                    DB::raw("tm.metrics->>'stability' AS model_stability"),
+                ])
             : null;
-        $latestWalkForwardRunIds = DB::table('walk_forward_backtest_runs')->where('status', 'completed')
-            ->whereIn('horizon_days', [5, 10, 15, 20])->groupBy('horizon_days')->selectRaw('MAX(id) AS id')->pluck('id');
+        $latestWalkForwardRunIds = DB::table('walk_forward_backtest_runs as wf_run')
+            ->join('walk_forward_backtest_trades as wf_trade', 'wf_trade.run_id', '=', 'wf_run.id')
+            ->where('wf_run.status', 'completed')
+            ->where('wf_trade.instrument_id', $instrument->id)
+            ->whereIn('wf_run.horizon_days', [5, 10, 15, 20])
+            ->groupBy('wf_run.horizon_days')
+            ->selectRaw('MAX(wf_run.id) AS id')
+            ->pluck('id');
         $walkForwardStats = $latestWalkForwardRunIds->isEmpty() ? null : DB::table('walk_forward_backtest_trades')
             ->where('instrument_id', $instrument->id)->whereIn('run_id', $latestWalkForwardRunIds)
             ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
@@ -77,7 +89,7 @@ class StockController extends Controller
             ['label' => 'Konf.', 'value' => $toPercent($prediction?->confidence), 'display' => $toPercent($prediction?->confidence) !== null ? number_format($toPercent($prediction?->confidence), 0, ',', '.').'%' : '—', 'reverse' => false],
             ['label' => 'Hit-Rate', 'value' => is_numeric($walkForwardStats?->hit_rate) ? (float) $walkForwardStats->hit_rate : null, 'display' => is_numeric($walkForwardStats?->hit_rate) ? number_format((float) $walkForwardStats->hit_rate, 0, ',', '.').'%' : '—', 'reverse' => false],
             ['label' => 'Ø/Trade', 'value' => is_numeric($walkForwardStats?->average_profit_per_trade_percent) ? max(0, min(100, 50 + ((float) $walkForwardStats->average_profit_per_trade_percent * 25))) : null, 'display' => is_numeric($walkForwardStats?->average_profit_per_trade_percent) ? (((float) $walkForwardStats->average_profit_per_trade_percent > 0 ? '+' : '').number_format((float) $walkForwardStats->average_profit_per_trade_percent, 2, ',', '.').'%') : '—', 'reverse' => false],
-            ['label' => 'Stabilität', 'value' => $toPercent($prediction?->horizon_fusion_stability_score), 'display' => $toPercent($prediction?->horizon_fusion_stability_score) !== null ? number_format($toPercent($prediction?->horizon_fusion_stability_score), 0, ',', '.').'%' : '—', 'reverse' => false],
+            ['label' => 'Stabilität', 'value' => $toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability), 'display' => $toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability) !== null ? number_format($toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability), 0, ',', '.').'%' : '—', 'reverse' => false],
             ['label' => 'Risiko', 'value' => \App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown), 'display' => \App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown) !== null ? number_format(\App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown), 0, ',', '.').'%' : '—', 'reverse' => true],
         ];
         $reportDonuts = collect($reportDonuts)->map(function (array $donut): array {
@@ -169,13 +181,17 @@ class StockController extends Controller
         PersonalizedSignalService $personalizedSignals,
         PlanAccessService $planAccess,
         TwelveDataService $yahooFinance,
+        MarketDataEntitlementService $marketDataEntitlements,
     ): View
     {
         $instrument = $this->instrument($symbol);
         $canViewRealtime = $planAccess->allowsTariff($request->user(), PlanLevel::Pro);
-        $canUseChartIndicators = $canViewRealtime;
+        $canUseChartIndicators = $planAccess->allowsTariff($request->user(), PlanLevel::Plus);
+        $canViewChartPatterns = $canViewRealtime;
         $canUseChartZoom = $canViewRealtime;
         $marketSession = $this->marketSession($instrument);
+        $historicalChartAllowed = $marketDataEntitlements->historicalChartsAllowed($instrument);
+        $historicalChartRestrictionReason = $marketDataEntitlements->historicalChartRestrictionReason($instrument);
 
         $signalSql = $personalizedSignals->sql('prediction', auth()->user());
         $requestedPredictionId = $request->integer('prediction');
@@ -315,16 +331,19 @@ class StockController extends Controller
                     'model_quality.direction_accuracy',
                     'model_quality.trade_count',
                     'model_quality.maximum_drawdown',
+                    DB::raw("trained_model.metrics->>'stability' AS model_stability"),
                     'model_quality.eligible',
                     'quality_tier.code as tier_code',
                     'quality_tier.name as tier_name',
                 ])
             : null;
-        $latestWalkForwardRunIds = DB::table('walk_forward_backtest_runs')
-            ->where('status', 'completed')
-            ->whereIn('horizon_days', [5, 10, 15, 20])
-            ->groupBy('horizon_days')
-            ->selectRaw('MAX(id) AS id')
+        $latestWalkForwardRunIds = DB::table('walk_forward_backtest_runs as wf_run')
+            ->join('walk_forward_backtest_trades as wf_trade', 'wf_trade.run_id', '=', 'wf_run.id')
+            ->where('wf_run.status', 'completed')
+            ->where('wf_trade.instrument_id', $instrument->id)
+            ->whereIn('wf_run.horizon_days', [5, 10, 15, 20])
+            ->groupBy('wf_run.horizon_days')
+            ->selectRaw('MAX(wf_run.id) AS id')
             ->pluck('id');
         $detailWalkForwardStats = $latestWalkForwardRunIds->isEmpty()
             ? null
@@ -336,11 +355,11 @@ class StockController extends Controller
                 ->selectRaw('AVG(net_return) * 100 AS average_profit_per_trade_percent')
                 ->first();
         $qualityGateTier = DB::table('model_quality_tiers')
-            ->where('code', 'top')
+            ->where('code', 'test')
             ->where('enabled', true)
             ->first();
         $modelQualityGateReasons = collect();
-        if ($modelQuality && $qualityGateTier && $modelQuality->tier_code !== 'top') {
+        if ($modelQuality && $qualityGateTier && ! in_array($modelQuality->tier_code, ['test', 'solid', 'strong'], true)) {
             $qualityChecks = [
                 [__('Qualitätsscore'), $modelQuality->quality_score, $qualityGateTier->minimum_quality_score, 'min', 100, '%'],
                 [__('Profit-Faktor'), $modelQuality->profit_factor, $qualityGateTier->minimum_profit_factor, 'min', 1, ''],
@@ -502,9 +521,13 @@ class StockController extends Controller
         $predictionMetadata = $this->decodeJson($prediction?->metadata);
         $sectorRankings = $this->sectorRankings($instrument, $fundamentalData);
 
-        ['candles' => $chartCandles, 'source' => $chartSource] = $this->chartSeries($instrument, $yahooFinance, $chartFocusAt);
+        ['candles' => $chartCandles, 'source' => $chartSource] = $historicalChartAllowed
+            ? $this->chartSeries($instrument, $yahooFinance, $chartFocusAt)
+            : ['candles' => collect(), 'source' => 'license_restricted'];
         $chartPatterns = $this->recentChartPatterns($chartCandles);
-        $chartPatternStats = $this->chartPatternStatistics((int) $instrument->id);
+        $chartPatternStats = $historicalChartAllowed
+            ? $this->chartPatternStatistics((int) $instrument->id)
+            : [];
         $chartStartAt = $chartCandles->isNotEmpty()
             ? CarbonImmutable::createFromTimestampMs((int) $chartCandles->first()['x'])->startOfDay()
             : null;
@@ -566,6 +589,9 @@ class StockController extends Controller
                 ->whereIn('watchlist_id', $userWatchlists->pluck('id'))
                 ->pluck('watchlist_id')
                 ->map(fn ($id) => (int) $id);
+        $paperPortfolios = DB::table('portfolios')->leftJoin('portfolio_cash_accounts as cash', 'cash.portfolio_id', '=', 'portfolios.id')
+            ->where('portfolios.user_id', auth()->id())->where('portfolios.active', true)->where('portfolios.type', 'paper')
+            ->orderByDesc('portfolios.is_default')->get(['portfolios.id','portfolios.name','portfolios.currency','portfolios.meta',DB::raw('COALESCE(cash.balance - cash.reserved_balance, 0) AS available_capital')]);
 
         $predictionData = $prediction ? [
             'prediction_time' => $prediction->prediction_time,
@@ -678,13 +704,17 @@ class StockController extends Controller
             'watchlistEntry',
             'userWatchlists',
             'instrumentWatchlistIds',
+            'paperPortfolios',
             'indicatorCards',
             'stockHeatmap',
             'stockHeatmapSummary',
             'canViewRealtime',
             'canUseChartIndicators',
+            'canViewChartPatterns',
             'canUseChartZoom',
             'marketSession',
+            'historicalChartAllowed',
+            'historicalChartRestrictionReason',
             'horizonTargets',
             'horizonStability',
         ));
@@ -704,13 +734,19 @@ class StockController extends Controller
                 'message' => __('Die Börse ist aktuell geschlossen.'),
             ]);
         }
-        $providerSymbol = (string) ($instrument->provider_symbol ?: $instrument->symbol);
+        $usesGermanListing = filled($instrument->german_listing_symbol)
+            && strtoupper((string) $instrument->german_listing_currency) === 'EUR';
+        $providerSymbol = (string) ($usesGermanListing
+            ? $instrument->german_listing_symbol
+            : ($instrument->provider_symbol ?: $instrument->symbol));
         $streamQuote = Cache::get('twelve_data_stream_quote_'.sha1(strtoupper((string) $instrument->symbol)));
 
         try {
             $quote = is_numeric($streamQuote['price'] ?? null)
                 ? $streamQuote
-                : $marketData->liveQuote($providerSymbol);
+                : ($usesGermanListing
+                    ? $marketData->listingQuote($providerSymbol, $instrument->german_listing_exchange ?: null)
+                    : $marketData->liveQuote($providerSymbol));
         } catch (Throwable) {
             $quote = null;
         }
@@ -724,7 +760,7 @@ class StockController extends Controller
         return response()->json([
             'symbol' => (string) $instrument->symbol,
             'price' => (float) $quote['price'],
-            'currency' => (string) (($quote['currency'] ?? null) ?: $instrument->currency ?: ''),
+            'currency' => $usesGermanListing ? 'EUR' : (string) (($quote['currency'] ?? null) ?: $instrument->currency ?: ''),
             'change_percent' => is_numeric($quote['change_percent'] ?? null)
                 ? (float) $quote['change_percent']
                 : null,
@@ -738,9 +774,25 @@ class StockController extends Controller
         ]);
     }
 
-    public function chartData(Request $request, string $symbol, TwelveDataService $yahooFinance): JsonResponse
+    public function chartData(
+        Request $request,
+        string $symbol,
+        TwelveDataService $yahooFinance,
+        MarketDataEntitlementService $marketDataEntitlements,
+    ): JsonResponse
     {
         $instrument = $this->instrument($symbol);
+        if (! $marketDataEntitlements->historicalChartsAllowed($instrument)) {
+            return response()->json([
+                'symbol' => $instrument->symbol,
+                'candles' => [],
+                'source' => 'license_restricted',
+                'chart_patterns' => [],
+                'historical_chart_allowed' => false,
+                'message' => $marketDataEntitlements->historicalChartRestrictionReason($instrument),
+                'updated_at' => now()->toIso8601String(),
+            ]);
+        }
         $requestedPredictionId = $request->integer('prediction');
         $chartFocusAt = null;
 

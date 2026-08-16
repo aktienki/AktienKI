@@ -80,7 +80,7 @@ final class SendRecommendationDigest extends Command
             ->leftJoin('trained_models as model', 'model.id', '=', 'prediction.trained_model_id')
             ->leftJoin('model_definitions as definition', 'definition.id', '=', 'model.model_definition_id')
             ->where('selection.selection_date', $selectionDate)
-            ->where('instrument.is_active', true)->whereNull('instrument.deleted_at')
+            ->where('instrument.is_active', true)->where('instrument.is_german_tradeable', true)->whereNull('instrument.deleted_at')
             ->whereNotIn('prediction.id', $excludedPredictionIds ?: [0])
             ->orderBy('selection.rank')->limit($limit)
             ->get([
@@ -99,7 +99,7 @@ final class SendRecommendationDigest extends Command
                 ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
                 ->leftJoin('trained_models as model', 'model.id', '=', 'prediction.trained_model_id')
                 ->leftJoin('model_definitions as definition', 'definition.id', '=', 'model.model_definition_id')
-                ->where('instrument.is_active', true)->whereNull('instrument.deleted_at')
+                ->where('instrument.is_active', true)->where('instrument.is_german_tradeable', true)->whereNull('instrument.deleted_at')
                 ->whereNotIn('prediction.id', array_merge($excludedPredictionIds, $rows->pluck('prediction_id')->all(), [0]))
                 ->whereRaw('prediction.predicted_price_20d > prediction.current_price')
                 ->whereIn('prediction.signal', ['BUY', 'WATCH'])

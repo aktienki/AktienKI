@@ -5,7 +5,7 @@
         $qualitySetupMode = $qualitySetupMode ?? false;
         $heatmapFilterRoute = $qualitySetupMode ? 'setup.quality' : ($shortMode ? 'setup.short' : ($setupMode ? 'setup.filter' : 'predictions.heatmap'));
         $rangeMaxima = array_merge([
-            'score' => 10, 'confidence' => 100, 'drawdown' => 50, 'profit_factor' => 3,
+            'score' => 10, 'confidence' => 100, 'drawdown' => 50, 'profit_factor' => 3, 'profit_per_trade' => 5,
             'volatility' => 100, 'predicted_return' => 20, 'pe' => 100,
             'dividend_yield' => 10, 'market_cap' => 3000, 'revenue_growth' => 100,
             'hit_rate' => 100, 'trades' => 100,
@@ -18,8 +18,20 @@
          x-data="{
              akiChatOpen: false,
              individualStatsOpen: false,
+             strategyImportOpen: false,
+             planNoticeOpen: false,
+             planNoticeTitle: '',
+             planNoticeMessage: '',
+             planNoticePlan: '',
+             selectedStrategyUrl: '',
              akiQuestion: '',
              akiMessages: [{ role: 'assistant', text: '{{ __('Ich helfe dir bei der Auswahl sinnvoller Filter. Frage mich zum Beispiel nach Score, Konfidenz oder Profitfaktor.') }}' }],
+             showPlanNotice(title, message, plan) {
+                 this.planNoticeTitle = title;
+                 this.planNoticeMessage = message;
+                 this.planNoticePlan = plan;
+                 this.planNoticeOpen = true;
+             },
              askAki() {
                  const question = this.akiQuestion.trim();
                  if (!question) return;
@@ -47,16 +59,89 @@
                 </div>
             </div>
             <div class="flex shrink-0 items-center gap-2">
-                <button type="button" data-aki-chat-open class="inline-flex items-center gap-2 rounded-xl border border-orange-400/45 bg-orange-400/[.12] px-3 py-2 text-xs font-black text-orange-300 shadow-[0_8px_24px_rgba(251,146,60,.10)] transition hover:border-orange-300 hover:bg-orange-400/[.2]">
-                    <x-heroicon-o-sparkles class="h-4 w-4" />
-                    {{ __('AKI fragen') }}
-                </button>
-                <a href="{{ $setupMode ? route('dashboard') : route('predictions.index', request()->query()) }}" class="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:text-teal-400">
-                    <x-heroicon-o-arrow-left class="h-4 w-4" />
-                    {{ $setupMode ? __('Zurück zum Dashboard') : __('Zurück zu Prognosen') }}
-                </a>
+                @if ($setupMode && ! $shortMode)
+                    <button type="button" @if($canImportStrategy ?? false) @click="strategyImportOpen = true" @else @click="showPlanNotice(@js(__('Strategie importieren')), @js(__('Importiere gespeicherte Strategien und übernimm alle Filter, Rotationen und Positionsregeln direkt in den Strategietester.')), 'PRO')" @endif class="inline-flex items-center gap-2 rounded-xl border border-teal-300/30 bg-teal-400/[.09] px-3 py-2 text-xs font-black text-teal-200 transition hover:border-teal-300/55 hover:bg-teal-400/[.16]">
+                        <x-heroicon-o-arrow-down-tray class="h-4 w-4" />
+                        {{ __('Strategie importieren') }}
+                    </button>
+                @endif
+                @unless ($setupMode)
+                    <a href="{{ route('predictions.index', request()->query()) }}" class="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:text-teal-400">
+                        <x-heroicon-o-arrow-left class="h-4 w-4" />
+                        {{ __('Zurück zu Prognosen') }}
+                    </a>
+                @endunless
             </div>
         </header>
+
+        @if ($setupMode && ! $shortMode && ($canImportStrategy ?? false))
+        <template x-teleport="body">
+            <div x-show="strategyImportOpen" x-cloak class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm" @keydown.escape.window="strategyImportOpen = false">
+                <section class="w-full max-w-xl rounded-2xl border border-teal-300/25 bg-[#15243a] p-5 shadow-2xl" @click.outside="strategyImportOpen = false">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-[.14em] text-teal-300">{{ __('Gespeicherte Strategie') }}</p>
+                            <h2 class="mt-1 text-xl font-black text-white">{{ __('Strategie in den Tester importieren') }}</h2>
+                            <p class="mt-2 text-xs leading-5 text-slate-300">{{ __('Alle gespeicherten Filter, Rotationen, Positionsregeln und die Exitstrategie werden in den Strategietester übernommen.') }}</p>
+                        </div>
+                        <button type="button" @click="strategyImportOpen = false" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white" aria-label="{{ __('Dialog schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
+                    </div>
+
+                    @if ($savedFilters->isNotEmpty())
+                        <label class="mt-5 block">
+                            <span class="mb-2 block text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Strategie auswählen') }}</span>
+                            <select x-model="selectedStrategyUrl" class="ak-input h-12 w-full rounded-xl px-3 text-sm text-white">
+                                <option value="">{{ __('Bitte auswählen …') }}</option>
+                                @foreach ($savedFilters as $savedFilter)
+                                    <option value="{{ route('setup.filter', array_merge($savedFilter->filters ?? [], ['saved_filter' => $savedFilter->id])) }}">{{ $savedFilter->name }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <div class="mt-5 flex justify-end gap-2">
+                            <button type="button" @click="strategyImportOpen = false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300 hover:text-white">{{ __('Abbrechen') }}</button>
+                            <button type="button" :disabled="!selectedStrategyUrl" @click="if (selectedStrategyUrl) window.location.assign(selectedStrategyUrl)" class="inline-flex h-10 items-center gap-2 rounded-lg bg-teal-400 px-4 text-xs font-black text-slate-950 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:opacity-40">
+                                <x-heroicon-o-arrow-down-tray class="h-4 w-4" />{{ __('Auswahl übernehmen') }}
+                            </button>
+                        </div>
+                    @else
+                        <div class="mt-5 rounded-xl border border-amber-300/20 bg-amber-300/[.07] px-4 py-3 text-xs leading-5 text-amber-100">
+                            {{ __('Du hast noch keine Strategie gespeichert. Führe zuerst einen Backtest aus und speichere dessen Einstellungen als Strategie.') }}
+                        </div>
+                    @endif
+                </section>
+            </div>
+        </template>
+        @endif
+
+        <template x-teleport="body">
+            <div x-show="planNoticeOpen" x-cloak class="fixed inset-0 z-[10050] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md" @keydown.escape.window="planNoticeOpen = false">
+                <section class="relative w-full max-w-md overflow-hidden rounded-2xl border border-cyan-300/25 bg-[#102033] text-slate-100 shadow-[0_28px_90px_rgba(0,0,0,.55),0_0_35px_rgba(34,211,238,.10)]" role="dialog" aria-modal="true" @click.outside="planNoticeOpen = false">
+                    <div class="h-1 bg-gradient-to-r from-cyan-400 via-teal-300 to-amber-300"></div>
+                    <div class="p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-400/[.10] text-cyan-300">
+                                <x-heroicon-o-lock-closed class="h-6 w-6" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-300">{{ __('Tarif-Funktion') }}</span>
+                                    <span class="ak-plan-badge" :class="planNoticePlan === 'PLUS' ? 'ak-plan-badge--plus' : 'ak-plan-badge--pro'" x-text="planNoticePlan"></span>
+                                </div>
+                                <h2 class="mt-2 text-xl font-black text-white" x-text="planNoticeTitle"></h2>
+                                <p class="mt-2 text-sm leading-6 text-slate-300" x-text="planNoticeMessage"></p>
+                            </div>
+                            <button type="button" @click="planNoticeOpen = false" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/[.06] hover:text-white" aria-label="{{ __('Dialog schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
+                        </div>
+                        <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button type="button" @click="planNoticeOpen = false" class="h-11 rounded-xl border border-white/10 px-5 text-xs font-black text-slate-300 transition hover:bg-white/[.05] hover:text-white">{{ __('Später') }}</button>
+                            <a href="{{ route('pricing', ['standalone' => 1]) }}" target="_blank" rel="noopener noreferrer" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-300 to-teal-300 px-5 text-xs font-black text-slate-950 shadow-[0_8px_24px_rgba(45,212,191,.18)] transition hover:brightness-110">
+                                {{ __('Tarife ansehen') }}<x-heroicon-o-arrow-right class="h-4 w-4" />
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </template>
 
         <div id="aki-chat-modal" class="fixed inset-0 z-[200] place-items-center bg-slate-950/55 p-4 backdrop-blur-sm" style="display:none" data-aki-chat-modal>
             <section class="relative z-[201] w-full max-w-lg overflow-hidden rounded-2xl border border-violet-400/40 bg-slate-900 text-slate-100 shadow-2xl" style="background-color: var(--ak-card, #0f1b2d); color: var(--ak-text, #f8fafc);">
@@ -117,7 +202,8 @@
                         body: JSON.stringify({
                             question,
                             messages: window.akiChatHistory,
-                            filters: Object.fromEntries(new URLSearchParams(window.location.search))
+                            filters: Object.fromEntries(new URLSearchParams(window.location.search)),
+                            mode: 'standard'
                         })
                     });
                     const payload = await response.json();
@@ -133,10 +219,10 @@
         </script>
 
         @if ($qualitySetupMode)
-        <details class="ak-card ak-dashboard-card mb-3 shrink-0 overflow-hidden rounded-xl border-orange-400/35">
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-black text-[var(--ak-text)]">
+        <details class="ak-card mb-2 min-h-0 shrink-0 overflow-hidden rounded-lg border-orange-400/35">
+            <summary class="flex h-10 cursor-pointer list-none items-center justify-between gap-3 px-3 text-[10px] font-black text-[var(--ak-text)]">
                 <span class="flex items-center gap-2"><x-heroicon-o-question-mark-circle class="h-4 w-4 text-amber-300" />{{ __('Wie funktioniert Smart Selection?') }}</span>
-                <span class="text-[10px] font-bold text-[var(--ak-muted)]">{{ __('Kurzinfo öffnen') }}</span>
+                <span class="text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Kurzinfo öffnen') }}</span>
             </summary>
             <div class="border-t border-orange-400/15 px-4 py-3 text-[11px] leading-5 text-[var(--ak-muted)]">
                 {{ __('Setze links die Mindestanforderungen für Score, Konfidenz und Performance. Die beiden Karten zeigen anschließend nur die Backtest-Auswertung des gewählten Universums. Je enger der Filter, desto weniger Trades stehen für die Bewertung zur Verfügung.') }}
@@ -152,7 +238,7 @@
                 score: Number({{ $rangeValue('score_min', 0, 0, 'score') }}),
                 confidence: Number({{ $rangeValue('confidence_min', 0, 0, 'confidence') }}),
                 drawdown: Number({{ $rangeValue('drawdown_max', $rangeMaxima['drawdown'], 0, 'drawdown') }}),
-                profitFactor: Number({{ $rangeValue('profit_factor_min', 0, 0, 'profit_factor') }}),
+                profitPerTrade: Number({{ $rangeValue('profit_per_trade_min', 0, 0, 'profit_factor') }}),
                 volatility: Number({{ $rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility') }}),
                 predictedReturn: Number({{ $rangeValue('predicted_return_min', -20, -20, 'predicted_return') }}),
                 pe: Number({{ $rangeValue('pe_max', $rangeMaxima['pe'], 0, 'pe') }}),
@@ -167,28 +253,31 @@
                     window.clearTimeout(this.searchTimer);
                     const form = this.$el.closest('form');
                     this.searchTimer = window.setTimeout(() => form?.requestSubmit(), 450);
+                },
+                beginFilterUpdate() {
+                    this.loading = true;
+                    sessionStorage.setItem('aktienki-strategy-filter-scroll', String(window.scrollY));
                 }
             }"
-            @submit="loading = true"
+            @submit="beginFilterUpdate()"
             class="ak-prediction-filterboard relative z-50 mb-3 flex shrink-0 flex-col gap-1 {{ $qualitySetupMode ? 'bg-transparent p-0 shadow-none' : 'rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-2 shadow-[var(--ak-shadow)]' }}"
         >
-            @if ($qualitySetupMode)
-            <div x-show="loading" x-cloak class="absolute inset-0 z-[120] flex items-center justify-center rounded-xl bg-slate-950/70 p-6 backdrop-blur-sm">
-                <div class="flex flex-col items-center gap-3 text-center">
-                    <div class="ak-smart-calc-orbit" aria-hidden="true"><span></span><i></i><b></b></div>
-                    <div><strong class="block text-sm font-black uppercase tracking-[.14em] text-amber-200">{{ __('Smart Selection wird berechnet') }}</strong><span class="mt-1 block text-[10px] text-slate-300">{{ __('Backtest-Universum und Performance werden aktualisiert …') }}</span></div>
+            <div x-show="loading" x-cloak class="ak-filter-loading absolute inset-0 z-[120] flex items-center justify-center rounded-xl">
+                <div class="inline-flex items-center gap-2 rounded-lg border border-cyan-300/20 bg-slate-950/85 px-3 py-2 shadow-xl">
+                    <span class="ak-backtest-spinner" aria-hidden="true"></span>
+                    <span class="text-[10px] font-black uppercase tracking-[.1em] text-cyan-100">{{ $qualitySetupMode ? __('Smart Selection wird berechnet') : __('Filter werden angewendet') }}</span>
                 </div>
             </div>
-            @endif
             @if ($qualitySetupMode)<input type="hidden" name="quality_setup" value="1">@endif
+            @if (request()->filled('backtest_run'))<input type="hidden" name="backtest_run" value="{{ request('backtest_run') }}">@endif
             @if ($shortMode)<input type="hidden" name="signal" value="SELL">@endif
             @if ($qualitySetupMode)
-            <div class="ak-card ak-dashboard-card grid shrink-0 gap-2 rounded-xl border-orange-400/35 p-2 shadow-[var(--ak-shadow)]" style="grid-template-columns: repeat(5, minmax(0, 1fr)); background: var(--smart-card-bg) !important;">
-                <select name="index" onchange="this.form.requestSubmit()" class="ak-input h-10 rounded-lg px-2 text-[11px]"><option value="">{{ __('Alle Indizes') }}</option>@foreach (($indices ?? []) as $index)<option value="{{ $index->symbol }}" @selected(request('index') === $index->symbol)>{{ $index->name ?: $index->symbol }}</option>@endforeach</select>
-                <select name="country" onchange="this.form.requestSubmit()" class="ak-input h-10 rounded-lg px-2 text-[11px]"><option value="">{{ __('Alle Länder') }}</option>@foreach ($countries as $country)<option value="{{ $country }}" @selected(request('country') === $country)>{{ $country }}</option>@endforeach</select>
-                <select name="exchange" onchange="this.form.requestSubmit()" class="ak-input h-10 rounded-lg px-2 text-[11px]"><option value="">{{ __('Alle Börsen') }}</option>@foreach ($exchanges as $exchange)<option value="{{ $exchange->code }}" @selected(request('exchange') === $exchange->code)>{{ $exchange->name ?: $exchange->code }}</option>@endforeach</select>
-                <select name="sector" onchange="this.form.requestSubmit()" class="ak-input h-10 rounded-lg px-2 text-[11px]"><option value="">{{ __('Alle Sektoren') }}</option>@foreach ($sectors as $sector)<option value="{{ $sector }}" @selected(request('sector') === $sector)>{{ __($sector) }}</option>@endforeach</select>
-                <select name="quality_tier" onchange="this.form.requestSubmit()" class="ak-input h-10 rounded-lg px-2 text-[11px]" title="{{ __('Modellqualität / Quality Gate') }}">
+            <div class="ak-card ak-dashboard-card grid shrink-0 gap-2 rounded-xl border-orange-400/35 p-2 shadow-[var(--ak-shadow)]" style="min-height:0 !important;grid-template-columns:repeat(5,minmax(0,1fr));background:var(--smart-card-bg) !important;">
+                <select name="index" class="ak-input h-10 rounded-lg px-2 text-[11px]"><option value="">{{ __('Alle Indizes') }}</option>@foreach (($indices ?? []) as $index)<option value="{{ $index->symbol }}" @selected(request('index') === $index->symbol)>{{ $index->name ?: $index->symbol }}</option>@endforeach</select>
+                <select name="country" class="ak-input h-10 rounded-lg px-2 text-[11px]"><option value="">{{ __('Alle Länder') }}</option>@foreach ($countries as $country)<option value="{{ $country }}" @selected(request('country') === $country)>{{ $country }}</option>@endforeach</select>
+                <select name="exchange" class="ak-input h-10 rounded-lg px-2 text-[11px]"><option value="">{{ __('Alle Börsen') }}</option>@foreach ($exchanges as $exchange)<option value="{{ $exchange->code }}" @selected(request('exchange') === $exchange->code)>{{ $exchange->name ?: $exchange->code }}</option>@endforeach</select>
+                <select name="sector" class="ak-input h-10 rounded-lg px-2 text-[11px]"><option value="">{{ __('Alle Sektoren') }}</option>@foreach ($sectors as $sector)<option value="{{ $sector }}" @selected(request('sector') === $sector)>{{ __($sector) }}</option>@endforeach</select>
+                <select name="quality_tier" class="ak-input h-10 rounded-lg px-2 text-[11px]" title="{{ __('Modellqualität / Quality Gate') }}">
                     <option value="">{{ __('Modellqualität') }}</option>
                     @foreach (($qualityTiers ?? []) as $qualityTier)
                         <option value="{{ $qualityTier->code }}" @selected(request('quality_tier') === $qualityTier->code)>{{ __('Quality Gate') }} · {{ __($qualityTier->name) }}</option>
@@ -197,14 +286,19 @@
             </div>
             @endif
             @if (! $qualitySetupMode)
+            @if ($setupMode)
+            <div class="ak-filter-section-heading">
+                <strong>{{ __('Universum & Modell') }}</strong>
+                <span>{{ __('Markt, Modelle, Quality Gate und Positionslogik') }}</span>
+            </div>
+            @endif
             <div class="flex min-w-0 items-center gap-1">
             <div
                 class="grid min-w-0 flex-1 gap-1"
                 style="grid-template-columns: {{ $setupMode
-                    ? 'minmax(90px,1.05fr) repeat(6,minmax(66px,.85fr)) minmax(138px,1.45fr) minmax(82px,.85fr) 66px'
-                    : 'minmax(115px,1.15fr) repeat(6,minmax(82px,1fr)) 66px' }};"
+                    ? 'repeat(6,minmax(82px,1fr)) 66px'
+                    : 'repeat(6,minmax(82px,1fr)) 66px' }};"
             >
-            <input name="q" value="{{ request('q') }}" oninput="clearTimeout(this._filterTimer); this._filterTimer = setTimeout(() => this.form.requestSubmit(), 450)" placeholder="{{ __('Aktie') }}" class="ak-input h-10 min-w-0 rounded-[5px] px-2 text-[11px]">
             <select name="country" onchange="this.form.requestSubmit()" class="ak-input h-10 min-w-0 rounded-[5px] px-1.5 text-[11px]">
                 <option value="">{{ __('Land') }}</option>
                 @foreach ($countries as $country)<option value="{{ $country }}" @selected(strtoupper((string) request('country')) === strtoupper((string) $country))>{{ $country }}</option>@endforeach
@@ -216,10 +310,6 @@
             <select name="sector" onchange="this.form.requestSubmit()" class="ak-input h-10 min-w-0 rounded-[5px] px-1.5 text-[11px]">
                 <option value="">{{ __('Sektor') }}</option>
                 @foreach ($sectors as $sector)<option value="{{ $sector }}" @selected((string) request('sector') === (string) $sector)>{{ __($sector) }}</option>@endforeach
-            </select>
-            <select name="ai_type" onchange="this.form.requestSubmit()" class="ak-input h-10 min-w-0 rounded-[5px] px-1.5 text-[11px]">
-                <option value="">{{ __('KI-Typ') }}</option>
-                @foreach ($aiTypes as $aiType)<option value="{{ $aiType }}" @selected(request('ai_type') === $aiType)>{{ ucfirst((string) $aiType) }}</option>@endforeach
             </select>
             @php
                 $selectedModelIds = collect((array) request('model'))
@@ -258,25 +348,6 @@
                         </label>
                     @endfor
                 </div>
-                <div x-data="{ open: false }" class="relative min-w-0">
-                    <button type="button" @click="open = !open" class="ak-input flex h-10 w-full min-w-0 items-center justify-between rounded-[5px] px-2 text-[11px]">
-                        <span class="truncate">{{ __('KI-Rotation') }}</span>
-                        <span class="ak-filter-count-value ml-1 rounded bg-teal-400/15 px-1 text-[8px] font-black text-teal-300">{{ (int) request()->boolean('sector_score_rotation') + (int) request()->boolean('index_score_rotation') }}</span>
-                    </button>
-                    <div x-show="open" x-cloak @click.outside="open = false" class="ak-filter-dropdown-menu absolute right-0 top-9 z-[80] w-60 rounded-lg border border-[var(--ak-border)] bg-[#102b35] p-2 shadow-2xl">
-                        <label class="ak-filter-dropdown-option flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-white/[.05]">
-                            <input type="checkbox" name="sector_score_rotation" value="1" @checked(request()->boolean('sector_score_rotation')) class="ak-filter-checkbox h-4 w-4">
-                            <span class="min-w-0"><b class="block text-[10px] text-slate-100">{{ __('Sektorrotation') }}</b><small class="block truncate text-[8px] text-slate-400">{{ __('Bester Ø KI-Score +50 %') }}</small></span>
-                        </label>
-                        <label class="ak-filter-dropdown-option mt-1 flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-white/[.05]">
-                            <input type="checkbox" name="index_score_rotation" value="1" @checked(request()->boolean('index_score_rotation')) class="ak-filter-checkbox h-4 w-4">
-                            <span class="min-w-0"><b class="block text-[10px] text-slate-100">{{ __('Indexrotation') }}</b><small class="block truncate text-[8px] text-slate-400">{{ __('Bester Ø KI-Score +50 %') }}</small></span>
-                        </label>
-                        <button type="submit" class="mt-2 w-full rounded-md bg-teal-500 px-2 py-1.5 text-[9px] font-black uppercase tracking-[.08em] text-slate-950 hover:bg-teal-400">
-                            {{ __('Übernehmen') }}
-                        </button>
-                    </div>
-                </div>
             @endif
                 <a href="{{ route($heatmapFilterRoute) }}" class="ak-filter-reset inline-flex h-10 items-center justify-center gap-1.5 rounded-[5px] border border-[var(--ak-border)] px-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:text-teal-400" title="{{ __('Filter zurücksetzen') }}">
                     <x-heroicon-o-arrow-path class="h-4 w-4" />
@@ -288,10 +359,10 @@
                     <option value="system" @selected(request('gate_mode', 'system') === 'system')>{{ __('System-Gate') }}</option>
                     <option value="personal" @selected(request('gate_mode') === 'personal') @disabled(empty($hasPersonalQualityGate))>{{ __('Mein Quality Gate') }}</option>
                 </select>
-                <div class="ak-filter-result-count inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[5px] border border-teal-300/25 bg-teal-400/[.10] px-2.5 text-[10px] font-black text-teal-100" title="{{ __('Aktien, die allen Filtern entsprechen') }}">
+                <div class="ak-filter-result-count inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[5px] border border-teal-300/25 bg-teal-400/[.10] px-2.5 text-[10px] font-black text-teal-100" title="{{ __('Treffer im gesamten geprüften Aktienuniversum') }}">
                     <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0 text-teal-300" />
                     <span class="tabular-nums">{{ number_format((int) ($heatmapSummary->instruments ?? 0), 0, ',', '.') }}</span>
-                    <span class="text-teal-300/80">{{ __('Aktien') }}</span>
+                    <span class="text-teal-300/80">/ {{ number_format((int) ($heatmapUniverseInstruments ?? 0), 0, ',', '.') }} {{ __('Aktien') }}</span>
                 </div>
             @endif
             </div>
@@ -299,39 +370,54 @@
             @if ($qualitySetupMode)
             <div class="grid min-h-0 items-start gap-3 p-0 lg:grid-cols-3">
                 <div class="ak-card ak-dashboard-card min-h-[480px] self-start rounded-xl border-orange-400/35 p-3 shadow-[var(--ak-shadow)]" style="background: var(--smart-card-bg) !important;">
-                    <div class="mb-2 flex items-center gap-2"><span class="text-[10px] font-black uppercase tracking-[.15em] text-amber-300">{{ __('Label-Faktoren') }}</span><span class="h-px flex-1 bg-amber-300/15"></span><button type="button" @click="$dispatch('open-save-filter')" class="inline-flex shrink-0 items-center gap-1 rounded-md border border-teal-300/30 bg-teal-400/[.10] px-2 py-1 text-[8px] font-black uppercase tracking-[.08em] text-teal-200 transition hover:bg-teal-400/[.18]"><x-heroicon-o-bookmark class="h-3 w-3" />{{ __('Label speichern') }}</button><a href="{{ route('setup.quality', ['reset' => 1]) }}" class="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300/25 bg-amber-300/[.08] px-2 py-1 text-[8px] font-black uppercase tracking-[.08em] text-amber-200 transition hover:border-amber-200/50 hover:bg-amber-300/[.16]" title="{{ __('Alle Filter auf Standardwerte zurücksetzen') }}"><x-heroicon-o-arrow-path class="h-3 w-3" />{{ __('Reset') }}</a></div>
+                    <button type="submit" class="mb-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/35 bg-cyan-400/[.14] px-4 text-[10px] font-black uppercase tracking-[.1em] text-cyan-100 transition hover:bg-cyan-400/[.24]">
+                        <x-heroicon-o-calculator class="h-4 w-4" />{{ __('Berechnen') }}
+                    </button>
+                    <div class="mb-2 flex items-center gap-2"><span class="text-[10px] font-black uppercase tracking-[.15em] text-amber-300">{{ __('Label-Faktoren') }}</span><span class="h-px flex-1 bg-amber-300/15"></span><button type="button" @if($canSaveSmartLabel ?? false) @click="$dispatch('open-save-filter')" @else @click="showPlanNotice(@js(__('Label speichern')), @js(__('Speichere deine aktuelle Smart Selection als persönliches Label und verwende sie jederzeit erneut.')), 'PLUS')" @endif class="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[8px] font-black uppercase tracking-[.08em] transition {{ ($canSaveSmartLabel ?? false) ? 'border-teal-300/30 bg-teal-400/[.10] text-teal-200 hover:bg-teal-400/[.18]' : 'border-amber-300/25 bg-amber-300/[.07] text-amber-200 hover:bg-amber-300/[.14]' }}"><x-heroicon-o-bookmark class="h-3 w-3" />{{ __('Label speichern') }}</button><a href="{{ route('setup.quality', ['reset' => 1]) }}" class="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300/25 bg-amber-300/[.08] px-2 py-1 text-[8px] font-black uppercase tracking-[.08em] text-amber-200 transition hover:border-amber-200/50 hover:bg-amber-300/[.16]" title="{{ __('Alle Filter auf Standardwerte zurücksetzen') }}"><x-heroicon-o-arrow-path class="h-3 w-3" />{{ __('Reset') }}</a></div>
                     <div class="grid grid-cols-1 gap-3">
             @else
-            <div class="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-6">
+            @if ($setupMode)
+            <div class="ak-filter-section-heading">
+                <strong>{{ __('Performance & Risiko') }}</strong>
+                <span>{{ __('Historische Robustheit, Profit Factor und Mindestanzahl an Trades') }}</span>
+            </div>
+            @endif
+            <div class="grid grid-cols-2 gap-1 sm:grid-cols-4 xl:grid-cols-7">
             @endif
             <label class="ak-heatmap-range">
                 <span>{{ __('KI-Score') }} ≥ <b x-text="score.toFixed(1).replace('.', ',')">{{ number_format((float) request('score_min', 0), 1, ',', '.') }}</b></span>
-                <input name="score_min" type="range" min="0" max="{{ $rangeMaxima['score'] }}" step="0.5" value="{{ $rangeValue('score_min', 0, 0, 'score') }}" x-model.number="score" onchange="this.form.requestSubmit()">
+                <input name="score_min" type="range" min="0" max="{{ $rangeMaxima['score'] }}" step="0.5" value="{{ $rangeValue('score_min', 0, 0, 'score') }}" x-model.number="score" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()">
             </label>
             <label class="ak-heatmap-range">
                 <span>{{ __('Konfidenz') }} ≥ <b x-text="`${confidence}%`">{{ number_format((float) request('confidence_min', 0), 0, ',', '.') }}%</b></span>
-                <input name="confidence_min" type="range" min="0" max="{{ $rangeMaxima['confidence'] }}" step="5" value="{{ $rangeValue('confidence_min', 0, 0, 'confidence') }}" x-model.number="confidence" onchange="this.form.requestSubmit()">
+                <input name="confidence_min" type="range" min="0" max="{{ $rangeMaxima['confidence'] }}" step="5" value="{{ $rangeValue('confidence_min', 0, 0, 'confidence') }}" x-model.number="confidence" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()">
             </label>
             <label class="ak-heatmap-range">
                 <span>{{ __('Drawdown') }} ≤ <b x-text="drawdown >= {{ $rangeMaxima['drawdown'] }} ? '{{ __('Alle') }}' : `${drawdown}%`">{{ $rangeValue('drawdown_max', $rangeMaxima['drawdown'], 0, 'drawdown') >= $rangeMaxima['drawdown'] ? __('Alle') : number_format($rangeValue('drawdown_max', $rangeMaxima['drawdown'], 0, 'drawdown'), 0, ',', '.').'%' }}</b></span>
-                <input name="drawdown_max" type="range" min="0" max="{{ $rangeMaxima['drawdown'] }}" step="5" value="{{ $rangeValue('drawdown_max', $rangeMaxima['drawdown'], 0, 'drawdown') }}" x-model.number="drawdown" onchange="this.form.requestSubmit()">
+                <input name="drawdown_max" type="range" min="0" max="{{ $rangeMaxima['drawdown'] }}" step="5" value="{{ $rangeValue('drawdown_max', $rangeMaxima['drawdown'], 0, 'drawdown') }}" x-model.number="drawdown" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()">
             </label>
             <label class="ak-heatmap-range">
-                <span>{{ __('Profitfaktor') }} ≥ <b x-text="profitFactor <= 0 ? '{{ __('Alle') }}' : profitFactor.toFixed(1).replace('.', ',')">{{ (float) request('profit_factor_min', 0) <= 0 ? __('Alle') : number_format((float) request('profit_factor_min'), 1, ',', '.') }}</b></span>
-                <input name="profit_factor_min" type="range" min="0" max="{{ $rangeMaxima['profit_factor'] }}" step="0.1" value="{{ $rangeValue('profit_factor_min', 0, 0, 'profit_factor') }}" x-model.number="profitFactor" onchange="this.form.requestSubmit()">
+                <span>{{ __('Profit Factor je Aktie') }} ≥ <b x-text="profitPerTrade <= 0 ? '{{ __('Alle') }}' : profitPerTrade.toFixed(1).replace('.', ',')">{{ (float) request('profit_per_trade_min', 0) <= 0 ? __('Alle') : number_format((float) request('profit_per_trade_min'), 1, ',', '.') }}</b></span>
+                <input name="profit_per_trade_min" type="range" min="0" max="{{ $rangeMaxima['profit_factor'] }}" step="0.1" value="{{ $rangeValue('profit_per_trade_min', 0, 0, 'profit_factor') }}" x-model.number="profitPerTrade" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()">
             </label>
             <label class="ak-heatmap-range">
                 <span>{{ __('Volatilität') }} ≤ <b x-text="volatility >= {{ $rangeMaxima['volatility'] }} ? '{{ __('Alle') }}' : `${volatility}%`">{{ $rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility') >= $rangeMaxima['volatility'] ? __('Alle') : number_format($rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility'), 0, ',', '.').'%' }}</b></span>
-                <input name="volatility_max" type="range" min="0" max="{{ $rangeMaxima['volatility'] }}" step="5" value="{{ $rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility') }}" x-model.number="volatility" onchange="this.form.requestSubmit()">
+                <input name="volatility_max" type="range" min="0" max="{{ $rangeMaxima['volatility'] }}" step="5" value="{{ $rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility') }}" x-model.number="volatility" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()">
             </label>
             <label class="ak-heatmap-range">
                 <span>{{ __('Historische Trades') }} ≥ <b x-text="minimumTrades <= 0 ? '{{ __('Alle') }}' : minimumTrades">{{ (int) request('minimum_trades', 0) <= 0 ? __('Alle') : number_format((int) request('minimum_trades'), 0, ',', '.') }}</b></span>
-                <input name="minimum_trades" type="range" min="0" max="{{ (int) $rangeMaxima['trades'] }}" step="5" value="{{ $rangeValue('minimum_trades', 0, 0, 'trades') }}" x-model.number="minimumTrades" onchange="this.form.requestSubmit()">
+                <input name="minimum_trades" type="range" min="0" max="{{ (int) $rangeMaxima['trades'] }}" step="5" value="{{ $rangeValue('minimum_trades', 0, 0, 'trades') }}" x-model.number="minimumTrades" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()">
             </label>
+            @if ($setupMode && ! $shortMode)
+            <label class="ak-heatmap-range">
+                <span>{{ __('Hitrate') }} ≥ <b x-text="hitRate <= 0 ? '{{ __('Alle') }}' : `${hitRate.toFixed(0)} %`">{{ (float) request('hit_rate_min', 0) <= 0 ? __('Alle') : number_format((float) request('hit_rate_min'), 0, ',', '.').' %' }}</b></span>
+                <input name="hit_rate_min" type="range" min="0" max="{{ $rangeMaxima['hit_rate'] }}" step="5" value="{{ $rangeValue('hit_rate_min', 0, 0, 'hit_rate') }}" x-model.number="hitRate" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()">
+            </label>
+            @endif
             @if ($qualitySetupMode)
             <label class="ak-heatmap-range">
                 <span>{{ __('Rendite pro Aktie') }} ≥ <b x-text="predictedReturn <= -20 ? '{{ __('Alle') }}' : `${predictedReturn.toFixed(1).replace('.', ',')}%`">{{ (float) request('predicted_return_min', -20) <= -20 ? __('Alle') : number_format((float) request('predicted_return_min'), 1, ',', '.').'%' }}</b></span>
-                <input name="predicted_return_min" type="range" min="-20" max="{{ $rangeMaxima['predicted_return'] }}" step="0.5" value="{{ $rangeValue('predicted_return_min', -20, -20, 'predicted_return') }}" x-model.number="predictedReturn" onchange="this.form.requestSubmit()">
+                <input name="predicted_return_min" type="range" min="-20" max="{{ $rangeMaxima['predicted_return'] }}" step="0.5" value="{{ $rangeValue('predicted_return_min', -20, -20, 'predicted_return') }}" x-model.number="predictedReturn">
             </label>
             @endif
             @if ($qualitySetupMode)
@@ -358,27 +444,18 @@
                         $profitPerTrade = (float) ($heatmapSummary?->normalized_profit_per_trade ?? 0);
                         $profitPerTradeValue = max(0, min(100, 50 + ($profitPerTrade * 25)));
                         $profitPerTradeColor = $profitPerTrade > 0 ? '#34d399' : ($profitPerTrade < 0 ? '#fb7185' : '#fbbf24');
-                        $donut = static fn (float $value, string $color): string => "background:conic-gradient({$color} {$value}%, rgba(148,163,184,.18) {$value}% 100%);";
                     @endphp
                     <div class="grid grid-cols-2 gap-2">
                         @foreach ([['Gewonnene Trades', (int) ($heatmapSummary?->winning_trades ?? 0), 'text-emerald-300'],['Trades gesamt',(int) ($heatmapSummary?->trades ?? 0),'text-white'],['Trades/Monat',number_format((float) ($heatmapSummary?->trades_per_month ?? 0), 1, ',', '.'),'text-teal-300'],['Ø Profit je Trade · 3J WF',($profitPerTrade > 0 ? '+' : '').number_format($profitPerTrade, 2, ',', '.').' ATR',$profitPerTrade >= 0 ? 'text-emerald-300' : 'text-rose-300'],['Volatilität',number_format((float) ($heatmapSummary?->volatility ?? 0), 1, ',', '.').' %','text-orange-300']] as [$label,$value,$tone])
                             <div class="rounded-lg border border-white/[.07] bg-white/[.035] p-2"><strong class="block text-base font-black tabular-nums {{ $tone }}">{{ $value }}</strong><span class="text-[8px] font-bold uppercase text-slate-400">{{ __($label) }}</span></div>
                         @endforeach
-                        <div class="flex items-center gap-2 rounded-lg border border-cyan-300/15 bg-white/[.035] p-2">
-                            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full p-1" style="{{ $donut($hitRateValue, '#22d3ee') }}"><span class="grid h-full w-full place-items-center rounded-full bg-[var(--ak-card)] text-[10px] font-black text-cyan-300">{{ number_format($hitRateValue, 0, ',', '.') }}%</span></span>
-                            <span class="text-[8px] font-bold uppercase text-slate-400">{{ __('Trefferquote') }}</span>
-                        </div>
-                        <div class="flex items-center gap-2 rounded-lg border border-rose-300/15 bg-white/[.035] p-2">
-                            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full p-1" style="{{ $donut($drawdownValue, '#fb7185') }}"><span class="grid h-full w-full place-items-center rounded-full bg-[var(--ak-card)] text-[10px] font-black text-rose-300">{{ number_format($drawdownValue, 0, ',', '.') }}%</span></span>
-                            <span class="text-[8px] font-bold uppercase text-slate-400">{{ __('Max. Drawdown') }}</span>
-                        </div>
-                        <div class="flex items-center gap-2 rounded-lg border border-amber-300/15 bg-white/[.035] p-2">
-                            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full p-1" style="{{ $donut($profitPerTradeValue, $profitPerTradeColor) }}"><span class="grid h-full w-full place-items-center rounded-full bg-[var(--ak-card)] text-[9px] font-black" style="color:{{ $profitPerTradeColor }}">{{ ($profitPerTrade > 0 ? '+' : '').number_format($profitPerTrade, 2, ',', '.') }}</span></span>
-                            <span class="text-[8px] font-bold uppercase text-slate-400">{{ __('Ø ATR/Trade') }}</span>
-                        </div>
                     </div>
                     @php $profitBar = max(5, $profitPerTradeValue); $hit = min(100, max(5, (float) ($heatmapSummary?->hit_rate ?? 0))); @endphp
-                    <div class="mt-3 space-y-2"><div><div class="mb-1 flex justify-between text-[8px] font-bold uppercase text-slate-400"><span>{{ __('Volatilitätsnorm. Profit je Trade') }}</span><span>{{ ($profitPerTrade > 0 ? '+' : '').number_format($profitPerTrade, 2, ',', '.') }} ATR</span></div><div class="h-2 overflow-hidden rounded-full bg-white/[.08]"><div class="h-full rounded-full transition-[width] duration-500 ease-out" style="width: {{ $profitBar }}%;background:{{ $profitPerTradeColor }}"></div></div></div><div><div class="mb-1 flex justify-between text-[8px] font-bold uppercase text-slate-400"><span>{{ __('Trefferquote') }}</span><span>{{ number_format((float) ($heatmapSummary?->hit_rate ?? 0), 1, ',', '.') }} %</span></div><div class="h-2 overflow-hidden rounded-full bg-white/[.08]"><div class="h-full rounded-full bg-cyan-300 transition-[width] duration-500 ease-out" style="width: {{ $hit }}%"></div></div></div></div>
+                    <div class="mt-3 space-y-3">
+                        <div><div class="mb-1 flex justify-between text-[9px] font-bold uppercase text-slate-400"><span>{{ __('Volatilitätsnorm. Profit je Trade') }}</span><span>{{ ($profitPerTrade > 0 ? '+' : '').number_format($profitPerTrade, 2, ',', '.') }} ATR</span></div><div class="h-2.5 overflow-hidden rounded-full bg-white/[.08]"><div class="h-full rounded-full transition-[width] duration-500 ease-out" style="width: {{ $profitBar }}%;background:{{ $profitPerTradeColor }}"></div></div></div>
+                        <div><div class="mb-1 flex justify-between text-[9px] font-bold uppercase text-slate-400"><span>{{ __('Trefferquote') }}</span><span>{{ number_format($hitRateValue, 1, ',', '.') }} %</span></div><div class="h-2.5 overflow-hidden rounded-full bg-white/[.08]"><div class="h-full rounded-full bg-cyan-300 transition-[width] duration-500 ease-out" style="width: {{ $hit }}%"></div></div></div>
+                        <div><div class="mb-1 flex justify-between text-[9px] font-bold uppercase text-slate-400"><span>{{ __('Max. Drawdown') }}</span><span>{{ number_format($drawdownValue, 1, ',', '.') }} %</span></div><div class="h-2.5 overflow-hidden rounded-full bg-white/[.08]"><div class="h-full rounded-full bg-rose-400 transition-[width] duration-500 ease-out" style="width: {{ max(3, $drawdownValue) }}%"></div></div></div>
+                    </div>
                     <p class="mt-3 text-[9px] leading-4 text-slate-400">{{ __('Die Statistik aktualisiert sich mit den Reglern und hilft, einen robusten Filter zu finden.') }}</p>
                 </aside>
             </div>
@@ -386,6 +463,10 @@
             @if (! $qualitySetupMode)</div>@endif
 
         @if ($setupMode && ! $shortMode && ! $qualitySetupMode)
+            <div class="ak-filter-section-heading">
+                <strong>{{ __('Fundamentaldaten') }}</strong>
+                <span>{{ __('Bewertung, Ausschüttung, Unternehmensgröße und Wachstum') }}</span>
+            </div>
             <div
                 id="fundamental-heatmap-filters"
                 class="min-w-0 overflow-x-auto"
@@ -405,10 +486,6 @@
                 <label class="ak-fundamental-range">
                     <span>{{ __('Umsatzwachstum') }} ≥ <b x-text="revenueGrowth <= -50 ? '{{ __('Alle') }}' : `${revenueGrowth.toFixed(0)} %`">{{ (float) request('revenue_growth_min', -50) <= -50 ? __('Alle') : number_format((float) request('revenue_growth_min'), 0, ',', '.').' %' }}</b></span>
                     <input name="revenue_growth_min" type="range" min="-50" max="{{ $rangeMaxima['revenue_growth'] }}" step="1" value="{{ $rangeValue('revenue_growth_min', -50, -50, 'revenue_growth') }}" x-model.number="revenueGrowth" onchange="this.form.requestSubmit()">
-                </label>
-                <label class="ak-fundamental-range">
-                    <span>{{ __('Hitrate') }} ≥ <b x-text="hitRate <= 0 ? '{{ __('Alle') }}' : `${hitRate.toFixed(0)} %`">{{ (float) request('hit_rate_min', 0) <= 0 ? __('Alle') : number_format((float) request('hit_rate_min'), 0, ',', '.').' %' }}</b></span>
-                    <input name="hit_rate_min" type="range" min="0" max="{{ $rangeMaxima['hit_rate'] }}" step="5" value="{{ $rangeValue('hit_rate_min', 0, 0, 'hit_rate') }}" x-model.number="hitRate" onchange="this.form.requestSubmit()">
                 </label>
             </div>
         @endif
@@ -431,7 +508,7 @@
             @php
                 $selectedExitStrategy = (string) request('exit_strategy', $editingSavedFilter?->filters['exit_strategy'] ?? 'fixed_20d');
             @endphp
-            <section x-data="{ saveOpen: false, exitStrategy: @js($selectedExitStrategy), visibility: @js(old('visibility', $editingSavedFilter?->visibility ?? 'private')), automationEnabled: @js(request()->boolean('automatic_optimization')) }" @open-save-filter.window="saveOpen = true" class="contents">
+            <section x-data="{ saveOpen: @js($qualitySetupMode && ($canSaveSmartLabel ?? false) && request()->boolean('open_label_modal')), exitStrategy: @js($selectedExitStrategy), visibility: @js(old('visibility', $editingSavedFilter?->visibility ?? 'private')), automationEnabled: @js(request()->boolean('automatic_optimization')) }" @open-save-filter.window="if (@js($qualitySetupMode ? ($canSaveSmartLabel ?? false) : ($canSaveStrategy ?? false))) { saveOpen = true } else { showPlanNotice(@js($qualitySetupMode ? __('Label speichern') : __('Strategie speichern')), @js($qualitySetupMode ? __('Speichere diese Smart Selection als persönliches Label.') : __('Das Speichern persönlicher Strategien ist im Pro-Tarif verfügbar.')), @js($qualitySetupMode ? 'PLUS' : 'PRO')) }" class="contents">
                 <div class="hidden">
                     <x-heroicon-o-bookmark class="h-4 w-4" />
                     {{ __('Gespeicherte Filter') }}
@@ -459,10 +536,11 @@
                 <div x-show="saveOpen" x-cloak class="fixed inset-0 z-[9999] flex items-center justify-center p-4" style="background: rgb(7, 17, 31) !important; opacity: 1 !important;" @keydown.escape.window="saveOpen = false">
                     <form method="POST" action="{{ $qualitySetupMode ? route('setup.quality.labels.store') : route('setup.filter.saved.store') }}" class="relative isolate max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-teal-300/20 p-5 shadow-2xl" style="background: rgba(21, 36, 58, 0.90) !important; background-image: none !important; backdrop-filter: none !important;" @click.outside="saveOpen = false">
                         @csrf
-                        @if ($qualitySetupMode && request('backtest_run'))<input type="hidden" name="backtest_run" value="{{ request('backtest_run') }}">@endif
+                        @if (request('backtest_run'))<input type="hidden" name="backtest_run" value="{{ request('backtest_run') }}">@endif
                         @if ($editingSavedFilter)<input type="hidden" name="saved_filter" value="{{ $editingSavedFilter->id }}">@endif
                         @foreach (\App\Http\Controllers\SavedPredictionFilterController::FILTER_KEYS as $filterKey)
                             @continue($filterKey === 'exit_strategy')
+                            @continue($qualitySetupMode && in_array($filterKey, ['score_min', 'confidence_min', 'drawdown_max', 'profit_per_trade_min', 'volatility_max', 'predicted_return_min', 'hit_rate_min', 'minimum_trades', 'pe_max', 'dividend_yield_min', 'market_cap_min', 'revenue_growth_min'], true))
                             @php
                                 $filterValue = request(
                                     $filterKey,
@@ -476,7 +554,7 @@
                             @endif
                         @endforeach
                         <div class="flex items-start justify-between gap-4">
-                            <div><p class="text-[10px] font-black uppercase tracking-[.14em] text-teal-400">{{ $qualitySetupMode ? __('Smart Selection speichern') : __('Filter speichern') }}</p><h2 class="mt-1 text-xl font-black text-white">{{ $qualitySetupMode ? __('Name der Smart Selection') : __('Exitstrategie und Filtername') }}</h2></div>
+                            <div><p class="text-[10px] font-black uppercase tracking-[.14em] text-teal-400">{{ $qualitySetupMode ? __('Als Label speichern') : __('Filter speichern') }}</p><h2 class="mt-1 text-xl font-black text-white">{{ $qualitySetupMode ? __('Label konfigurieren') : __('Exitstrategie und Filtername') }}</h2></div>
                             <button type="button" @click="saveOpen = false" class="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white"><x-heroicon-o-x-mark class="h-4 w-4" /></button>
                         </div>
                         @if ($qualitySetupMode)
@@ -484,6 +562,33 @@
                                 <strong class="text-cyan-200">{{ __('Dynamische Konfiguration') }}</strong><br>
                                 {{ __('Gespeichert werden nur deine Filterregeln. Nach dem monatlichen Test und dem anschließenden Retest werden die enthaltenen Aktien automatisch neu bestimmt. So bleibt die Auswahl stets auf dem gewünschten Qualitätsniveau.') }}
                             </div>
+                            @php
+                                $labelCriteriaFields = [
+                                    ['score_min', __('KI-Score mindestens'), 0, 10, .1],
+                                    ['confidence_min', __('Konfidenz mindestens (%)'), 0, 100, 1],
+                                    ['profit_per_trade_min', __('Profit-Faktor pro Aktie'), 0, 10, .1],
+                                    ['hit_rate_min', __('Trefferquote mindestens (%)'), 0, 100, 1],
+                                    ['drawdown_max', __('Drawdown höchstens (%)'), 0, 100, 1],
+                                    ['volatility_max', __('Volatilität höchstens'), 0, 1000000, .1],
+                                    ['minimum_trades', __('Historische Trades mindestens'), 0, 10000, 1],
+                                    ['predicted_return_min', __('Prognose mindestens (%)'), -50, 100, .1],
+                                    ['pe_max', __('KGV höchstens'), 0, 10000, .1],
+                                    ['dividend_yield_min', __('Dividendenrendite mindestens (%)'), 0, 100, .1],
+                                    ['market_cap_min', __('Marktkapitalisierung mindestens'), 0, null, 1],
+                                    ['revenue_growth_min', __('Umsatzwachstum mindestens (%)'), -100, 10000, .1],
+                                ];
+                            @endphp
+                            <fieldset class="mt-4 rounded-xl border border-white/10 bg-slate-950/20 p-3">
+                                <legend class="px-1 text-[10px] font-black uppercase tracking-[.12em] text-cyan-200">{{ __('Filterregeln des Labels') }}</legend>
+                                <p class="mb-3 text-[10px] leading-4 text-slate-400">{{ __('Die Werte wurden aus dem Strategietester übernommen und können vor dem Speichern angepasst werden.') }}</p>
+                                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    @foreach ($labelCriteriaFields as [$field, $label, $min, $max, $step])
+                                        <label class="text-[9px] font-black uppercase tracking-wide text-slate-400">{{ $label }}
+                                            <input name="{{ $field }}" type="number" min="{{ $min }}" @if($max !== null) max="{{ $max }}" @endif step="{{ $step }}" value="{{ request($field, \App\Http\Controllers\SavedPredictionFilterController::FILTER_DEFAULTS[$field] ?? 0) }}" class="ak-input mt-1.5 h-10 w-full rounded-lg px-3 text-xs font-bold normal-case text-white">
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </fieldset>
                             <label class="mt-3 flex cursor-pointer items-start gap-2 rounded-xl border border-amber-300/20 bg-amber-300/[.06] px-3 py-2.5 text-[10px] leading-5 text-slate-300">
                                 <input type="hidden" name="email_notification_enabled" value="0">
                                 <input type="checkbox" name="email_notification_enabled" value="1" class="mt-1 h-4 w-4 rounded border-amber-300/40 bg-slate-900 text-amber-400 focus:ring-amber-400">
@@ -496,11 +601,10 @@
                                 <div><p class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Exitstrategie') }}</p><p class="mt-1 text-[10px] text-slate-500">{{ __('Wähle genau eine Ausstiegslogik für diesen Filter.') }}</p></div>
                                 <span class="rounded-md bg-teal-400/10 px-2 py-1 text-[9px] font-black text-teal-300">{{ __('Eine Auswahl') }}</span>
                             </div>
-                            <div class="mt-2 grid grid-cols-4 gap-2">
+                            <div class="mt-2 grid grid-cols-2 gap-2">
                                 @foreach ([
                                     ['fixed_20d', __('20 Tage'), __('Verkauf nach 20 Handelstagen'), 'save-exit-fixed'],
-                                    ['winner_runner', __('Winner Runner'), __('Gewinne laufen lassen · maximal 90 Tage'), 'save-exit-winner'],
-                                    ['prediction_target', __('Prognoseziel'), __('Verkauf beim Erreichen der erwarteten Rendite'), 'save-exit-target'],
+                                    ['signal_change', __('Signalwechsel'), __('Verkauf, sobald das historische Signal nicht mehr BUY ist'), 'save-exit-signal'],
                                     ['buy_and_hold', __('Buy and Hold'), __('Gekaufte Aktien werden dauerhaft gehalten'), 'save-exit-buy-hold'],
                                 ] as [$exitValue, $exitLabel, $exitDescription, $exitMetricId])
                                     <label class="cursor-pointer rounded-lg border p-2.5 transition" :class="exitStrategy === '{{ $exitValue }}' ? 'border-teal-300/35 bg-teal-400/[.10]' : 'border-white/[.08] bg-white/[.025]'">
@@ -529,6 +633,39 @@
                             @endif
                         </div>
                         @if (! $qualitySetupMode)
+                            <div x-data="{ icon: @js(data_get($editingSavedFilter?->filters, 'display_icon', 'chart-bar')), color: @js(data_get($editingSavedFilter?->filters, 'display_color', '#22d3ee')) }" class="mt-3 rounded-xl border border-white/[.08] bg-white/[.025] p-3">
+                                <input type="hidden" name="display_icon" x-model="icon">
+                                <input type="hidden" name="display_color" x-model="color">
+                                <div class="grid gap-4 md:grid-cols-[1fr_260px]">
+                                    <div>
+                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Symbol') }}</p>
+                                        <div class="mt-2 grid grid-cols-6 gap-2">
+                                            @foreach ([
+                                                ['chart-bar', 'heroicon-o-chart-bar', __('Analyse')],
+                                                ['bolt', 'heroicon-o-bolt', __('Momentum')],
+                                                ['shield-check', 'heroicon-o-shield-check', __('Qualität')],
+                                                ['arrow-path', 'heroicon-o-arrow-path', __('Rotation')],
+                                                ['trophy', 'heroicon-o-trophy', __('Favorit')],
+                                                ['rocket-launch', 'heroicon-o-rocket-launch', __('Chance')],
+                                            ] as [$iconValue, $iconComponent, $iconLabel])
+                                                <button type="button" @click="icon = @js($iconValue)" :style="icon === @js($iconValue) ? `border-color:${color}; color:${color}; background-color:${color}18` : ''" class="flex h-11 items-center justify-center rounded-lg border border-white/10 bg-slate-950/30 text-slate-400 transition hover:border-white/25 hover:text-white" title="{{ $iconLabel }}">
+                                                    <x-dynamic-component :component="$iconComponent" class="h-5 w-5" />
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Farbe') }}</p>
+                                        <div class="mt-2 grid grid-cols-6 gap-2">
+                                            @foreach (['#22d3ee', '#2dd4bf', '#84cc16', '#fbbf24', '#fb7185', '#a78bfa'] as $colorValue)
+                                                <button type="button" @click="color = @js($colorValue)" class="flex h-11 items-center justify-center rounded-lg border transition" :class="color === @js($colorValue) ? 'border-white/70 ring-2 ring-white/20' : 'border-white/10'" title="{{ $colorValue }}">
+                                                    <span class="h-5 w-5 rounded-full" style="background-color:{{ $colorValue }}"></span>
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="mt-3 grid gap-3 md:grid-cols-[1fr_290px]">
                                 <label class="block text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Kommentar') }} <span class="normal-case text-slate-600">({{ __('optional') }})</span>
                                     <textarea name="description" maxlength="1000" rows="3" class="ak-input mt-2 w-full rounded-lg px-3 py-2 text-xs font-normal normal-case leading-5 text-white" placeholder="{{ __('Beschreibe kurz Ziel, Auswahlregeln und Besonderheiten der Strategie.') }}">{{ old('description', $editingSavedFilter?->description) }}</textarea>
@@ -595,7 +732,7 @@
                         @endif
                         @error('exit_strategy')<p class="mt-2 text-[10px] font-bold text-rose-300">{{ $message }}</p>@enderror
                         <p class="mt-3 text-[10px] text-slate-400">{{ $qualitySetupMode ? __('Die Kriterien werden als eigene Smart-Selection-Kategorie gespeichert. Strategien und das systemweite Quality Gate bleiben unverändert.') : __('Dein Tarif erlaubt :count gespeicherte Filter.', ['count' => $savedFilterLimit]) }}</p>
-                        <div class="mt-5 flex justify-end gap-2"><button type="button" @click="saveOpen = false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-bold text-slate-300">{{ __('Abbrechen') }}</button><button type="submit" class="h-10 rounded-lg border border-teal-300/30 bg-teal-400/15 px-5 text-xs font-black text-teal-200 hover:bg-teal-400/20">{{ __('Speichern') }}</button></div>
+                        <div class="mt-5 flex justify-end gap-2"><button type="button" @click="saveOpen = false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-bold text-slate-300">{{ __('Abbrechen') }}</button><button type="submit" class="h-10 rounded-lg border border-teal-300/30 bg-teal-400/15 px-5 text-xs font-black text-teal-200 hover:bg-teal-400/20">{{ $qualitySetupMode ? __('Als Label speichern') : __('Speichern') }}</button></div>
                     </form>
                 </div>
                 </template>
@@ -606,15 +743,17 @@
                 $backtestIsComplete = isset($activeBacktestRun) && in_array($activeBacktestRun?->status, ['completed', 'completed_with_errors'], true);
                 $backtestFilters = [
                     'q', 'country', 'exchange', 'sector', 'ai_type', 'model', 'quality_tier', 'signal',
-                    'score_min', 'confidence_min', 'drawdown_max', 'profit_factor_min', 'volatility_max',
+                    'score_min', 'confidence_min', 'drawdown_max', 'profit_per_trade_min', 'volatility_max',
                     'pe_max', 'dividend_yield_min', 'market_cap_min', 'revenue_growth_min', 'hit_rate_min',
                     'risk_max', 'predicted_return_min', 'minimum_trades', 'positive_prediction_required', 'ensemble_veto_required', 'quality_gate_profile',
                     'gate_mode', 'quality_setup',
-                    'sector_score_rotation', 'index_score_rotation', 'position_factor', 'exit_strategy',
+                    'sector_score_rotation', 'index_score_rotation', 'entry_strategy', 'entry_risk_style', 'automatic_strategy_comparison', 'forecast_score_rotation_5d_enabled', 'strategy_priority', 'position_factor', 'exit_strategy',
+                    'fixed_20d_exit_enabled', 'dynamic_horizon_exit_enabled', 'support_stop_enabled',
+                    'resistance_trailing_stop_enabled', 'entry_wait_5d_enabled', 'signal_change_exit_enabled',
                 ];
             @endphp
             @if (! $qualitySetupMode)
-            <section x-data="{ capitalOpen: false, optimizeOpen: false, capital: 10000, positions: Number({{ max(1, min(50, (int) request('max_positions', 5))) }}), positionFactor: Number({{ request('exit_strategy') === 'buy_and_hold' ? 1 : max(1, (int) request('position_factor', 1)) }}), tradeCost: 10, moneyManagerEnabled: @js(request('exit_strategy') !== 'buy_and_hold') }" class="ak-backtest-strip relative mb-3 flex shrink-0 items-center justify-between gap-3 overflow-hidden rounded-xl border border-amber-300/20 bg-amber-300/[.055] px-3 py-2 {{ $backtestIsActive ? 'pb-4' : '' }}">
+            <section x-data="{ capitalOpen: @js(request()->boolean('new_backtest')), optimizeOpen: false, capital: 10000, positions: Number({{ max(1, min(50, (int) request('max_positions', 5))) }}), positionFactor: Number({{ request('exit_strategy') === 'buy_and_hold' ? 1 : max(1, (int) request('position_factor', 1)) }}), tradeCost: 10, moneyManagerEnabled: @js(request('exit_strategy') !== 'buy_and_hold') }" class="ak-backtest-strip relative mb-3 flex shrink-0 items-center justify-between gap-3 overflow-hidden rounded-xl border border-amber-300/20 bg-amber-300/[.055] px-3 py-2 {{ $backtestIsActive ? 'pb-4' : '' }}">
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">
                         @if ($backtestIsActive)
@@ -661,15 +800,13 @@
                     </form>
                 @elseif ($backtestIsComplete)
                     <div class="flex shrink-0 items-center gap-2">
-                        <button type="button" @click="optimizeOpen = true" class="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-400/[.08] px-3 text-[10px] font-black uppercase tracking-[.06em] text-cyan-200 transition hover:bg-cyan-400/[.15]">
-                            <x-heroicon-o-sparkles class="h-4 w-4" />{{ __('Automatisch optimieren') }}
-                        </button>
-                        <button type="button" onclick="window.dispatchEvent(new CustomEvent('open-save-filter'))" class="ak-backtest-save-action inline-flex h-9 items-center gap-2 rounded-lg border border-teal-300/25 bg-teal-400/[.09] px-3 text-[10px] font-black uppercase tracking-[.06em] text-teal-200 transition hover:bg-teal-400/[.16]">
-                            <x-heroicon-o-bookmark class="h-4 w-4" />{{ $qualitySetupMode ? __('Smart Selection speichern') : ($editingSavedFilter ? __('Änderungen speichern') : __('Strategie speichern')) }}
+                        @php $canSaveCurrentSelection = $qualitySetupMode ? ($canSaveSmartLabel ?? false) : ($canSaveStrategy ?? false); @endphp
+                        <button type="button" @if($canSaveCurrentSelection) @click="$dispatch('open-save-filter')" @else @click="showPlanNotice(@js($qualitySetupMode ? __('Label speichern') : __('Strategie speichern')), @js($qualitySetupMode ? __('Speichere diese Smart Selection als persönliches Label und verwende sie in deinen Auswertungen.') : __('Speichere alle Filter, Rotationen, Positionsregeln und die Exitstrategie für die spätere Wiederverwendung.')), @js($qualitySetupMode ? 'PLUS' : 'PRO'))" @endif class="ak-backtest-save-action inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-[10px] font-black uppercase tracking-[.06em] transition {{ !$canSaveCurrentSelection ? 'border-amber-300/25 bg-amber-300/[.07] text-amber-200 hover:bg-amber-300/[.14]' : 'border-teal-300/25 bg-teal-400/[.09] text-teal-200 hover:bg-teal-400/[.16]' }}">
+                            <x-heroicon-o-bookmark class="h-4 w-4" />{{ $qualitySetupMode ? __('Als Label speichern') : ($editingSavedFilter ? __('Änderungen speichern') : __('Strategie speichern')) }}
                         </button>
                         @if (app(\App\Services\PlanAccessService::class)->allows(auth()->user(), \App\Enums\PlanLevel::Premium))
-                            <a href="{{ route('setup.quality') }}" class="ak-backtest-smart-action inline-flex h-9 items-center gap-2 rounded-lg border border-amber-300/25 bg-amber-300/[.09] px-3 text-[10px] font-black uppercase tracking-[.06em] text-amber-200 transition hover:bg-amber-300/[.16]">
-                                <x-heroicon-o-shield-check class="h-4 w-4" />{{ __('Smart Selection') }}
+                            <a href="{{ route('setup.quality', array_merge(request()->query(), ['quality_setup' => 1, 'open_label_modal' => 1])) }}" class="ak-backtest-smart-action inline-flex h-9 items-center gap-2 rounded-lg border border-amber-300/25 bg-amber-300/[.09] px-3 text-[10px] font-black uppercase tracking-[.06em] text-amber-200 transition hover:bg-amber-300/[.16]">
+                                <x-heroicon-o-shield-check class="h-4 w-4" />{{ __('Als Label speichern') }}
                             </a>
                         @elseif (app(\App\Services\PlanAccessService::class)->allows(auth()->user(), \App\Enums\PlanLevel::Pro))
                             <button type="button" disabled title="{{ __('Verfügbar ab Premium') }}" class="ak-backtest-smart-disabled-action inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-lg border border-slate-500/15 bg-slate-500/[.05] px-3 text-[10px] font-black uppercase tracking-[.06em] text-slate-500 opacity-70">
@@ -677,22 +814,18 @@
                                 <span class="rounded bg-slate-400/10 px-1.5 py-0.5 text-[8px]">{{ __('Premium') }}</span>
                             </button>
                         @endif
-                        <a href="{{ route($qualitySetupMode ? 'setup.quality' : 'setup.filter', request()->except(['backtest_run', 'initial_capital', 'trade_cost'])) }}" class="ak-backtest-recalculate-action inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 px-3 text-[10px] font-black uppercase tracking-[.06em] text-slate-300 hover:text-white">
+                        <button type="button" @click="capitalOpen = true" class="ak-backtest-recalculate-action inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 px-3 text-[10px] font-black uppercase tracking-[.06em] text-slate-300 hover:text-white">
                             <x-heroicon-o-arrow-path class="h-4 w-4" />{{ __('Neu berechnen') }}
-                        </a>
+                        </button>
                         <button type="button" onclick="window.dispatchEvent(new CustomEvent('open-backtest-result'))" class="ak-backtest-primary-action inline-flex h-9 items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/12 px-4 text-[10px] font-black uppercase tracking-[.08em] text-amber-200 transition hover:bg-amber-300/20">
                             <x-heroicon-o-chart-bar class="h-4 w-4" />{{ __('Ergebnis anzeigen') }}
                         </button>
                     </div>
                 @else
                     <div class="flex shrink-0 items-center gap-2">
-                        <button type="button" @click="optimizeOpen = true" class="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-400/[.08] px-4 text-[10px] font-black uppercase tracking-[.07em] text-cyan-200 transition hover:bg-cyan-400/[.15]">
-                            <x-heroicon-o-sparkles class="h-4 w-4" />
-                            {{ __('Automatisch optimieren') }}
-                        </button>
                         <button type="button" @click="capitalOpen = true" class="ak-backtest-primary-action inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/12 px-4 text-[10px] font-black uppercase tracking-[.08em] text-amber-200 transition hover:bg-amber-300/20">
                             <x-heroicon-o-play class="h-4 w-4" />
-                            {{ __('Backtest starten') }}
+                            {{ __('Manuellen Backtest starten') }}
                         </button>
                     </div>
                 @endif
@@ -757,12 +890,20 @@
                             <div class="sticky -bottom-5 -mx-5 mt-5 flex justify-end gap-2 border-t border-white/10 bg-[#15243a] px-5 py-4"><button type="button" @click="optimizeOpen = false" :disabled="submitting" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-bold text-slate-300 disabled:opacity-50">{{ __('Abbrechen') }}</button><button type="submit" :disabled="submitting" class="inline-flex h-10 items-center gap-2 rounded-lg border border-cyan-300/30 bg-cyan-400/15 px-5 text-xs font-black text-cyan-100 hover:bg-cyan-400/20 disabled:cursor-wait disabled:opacity-60"><span x-show="submitting" class="ak-backtest-spinner h-4 w-4" aria-hidden="true"></span><x-heroicon-o-sparkles x-show="!submitting" class="h-4 w-4" /><span x-text="submitting ? @js(__('Wird optimiert …')) : @js(__('Optimierung berechnen'))"></span></button></div>
                         </form>
                     </div>
-                @if (! $backtestIsActive && ! $backtestIsComplete)
-                    <div x-show="capitalOpen" x-cloak class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" @keydown.escape.window="capitalOpen = false">
-                        <form method="POST" action="{{ route('setup.filter.backtest') }}" x-data="{ submitting: false }" @submit="submitting = true" class="ak-backtest-config-dialog w-full max-w-lg rounded-2xl border border-teal-300/20 bg-[#15243a]/90 p-5 shadow-2xl" @click.outside="capitalOpen = false">
+                @if (! $backtestIsActive)
+                    @php
+                        $modalEntryStrategy = (string) request('entry_strategy', request()->boolean('forecast_score_rotation_5d_enabled') ? 'forecast_score_rotation_5d' : (request()->boolean('entry_wait_5d_enabled') ? 'wait_5d' : 'direct_buy'));
+                        $modalExitStrategy = (string) request('exit_strategy', 'fixed_20d');
+                    @endphp
+                    <div x-show="capitalOpen" x-cloak class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md" @keydown.escape.window="capitalOpen = false">
+                        <form method="POST" action="{{ route('setup.filter.backtest') }}" x-data="{ submitting: false, entryStrategy: @js($modalEntryStrategy), exitStrategy: @js($modalExitStrategy) }" @submit="submitting = true" class="ak-backtest-config-dialog max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-teal-300/20 bg-[#15243a] p-5 shadow-2xl" style="background-color:#15243a !important; opacity:1 !important;" @click.outside="capitalOpen = false">
                             @csrf
+                            @if ($errors->any())
+                                <div class="mb-4 rounded-xl border border-rose-300/25 bg-rose-400/[.08] px-4 py-3 text-xs font-bold text-rose-200">{{ $errors->first() }}</div>
+                            @endif
                             @if ($qualitySetupMode)<input type="hidden" name="quality_setup" value="1">@endif
                             @foreach ($backtestFilters as $filter)
+                                @continue(in_array($filter, ['position_factor', 'strategy_priority', 'entry_strategy', 'entry_risk_style', 'automatic_strategy_comparison', 'exit_strategy', 'sector_score_rotation', 'index_score_rotation', 'forecast_score_rotation_5d_enabled', 'entry_wait_5d_enabled', 'signal_change_exit_enabled'], true))
                                 @if (request()->filled($filter) || $filter === 'position_factor')
                                     @if (is_array(request($filter)))
                                         @foreach (request($filter) as $item)<input type="hidden" name="{{ $filter }}[]" value="{{ $item }}">@endforeach
@@ -776,12 +917,83 @@
                                     <p class="text-[10px] font-black uppercase tracking-[.14em] text-amber-300">{{ __('Backtest konfigurieren') }}</p>
                                     <h2 class="mt-1 text-xl font-black text-white">{{ $qualitySetupMode ? __('Testbetrag') : __('Kapital und Positionsgröße') }}</h2>
                                     <p class="mt-1 text-xs text-slate-300">{{ $qualitySetupMode ? __('Lege den Betrag für den Vergleich deiner Smart Selection mit dem S&P 500 fest.') : __('Es werden nur neue Positionen eröffnet, wenn Kapital und ein freier Aktienplatz verfügbar sind.') }}</p>
+                                    @if (! $qualitySetupMode)
+                                        <div class="mt-3 inline-flex items-center gap-2 rounded-lg border border-teal-300/25 bg-teal-400/[.09] px-3 py-2 text-xs font-bold text-teal-100">
+                                            <x-heroicon-o-funnel class="h-4 w-4 text-teal-300" />
+                                            <strong class="text-base font-black tabular-nums">{{ number_format((int) ($heatmapSummary->instruments ?? 0), 0, ',', '.') }}</strong>
+                                            <span>{{ __('Aktien erfüllen die gewählten Kriterien') }}</span>
+                                        </div>
+                                    @endif
                                 </div>
                                 <button type="button" @click="capitalOpen = false" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
                             </div>
                             @if ($qualitySetupMode)
                                 <input type="hidden" name="max_positions" value="5">
                                 <input type="hidden" name="trade_cost" value="10">
+                                <input type="hidden" name="position_factor" value="1">
+                            @endif
+                            @if (! $qualitySetupMode)
+                            <div class="mb-4 grid gap-4 md:grid-cols-2">
+                                <fieldset class="rounded-xl border border-cyan-300/20 bg-cyan-400/[.055] p-3">
+                                    <legend class="px-1 text-[10px] font-black uppercase tracking-wide text-cyan-200">{{ __('Bevorzugte Entrystrategie') }}</legend>
+                                    <div class="mt-1 grid gap-1.5">
+                                        @foreach ([
+                                            ['direct_buy', __('Direktes BUY'), __('Kauf beim gültigen BUY-Signal.')],
+                                            ['wait_5d', __('WAIT bis 5 Tage'), __('Wartet höchstens fünf Handelstage auf BUY.')],
+                                            ['forecast_score_rotation_5d', __('Forecast-Score 5T'), __('Prüft neue Einstiege alle fünf Handelstage.')],
+                                        ] as [$value, $label, $description])
+                                            <label class="cursor-pointer rounded-lg border px-2.5 py-2 transition" :class="entryStrategy === @js($value) ? 'border-cyan-300/45 bg-cyan-400/[.10]' : 'border-white/[.08] bg-white/[.025]'">
+                                                <span class="flex items-start gap-2"><input type="radio" name="entry_strategy" value="{{ $value }}" x-model="entryStrategy" required class="mt-0.5 h-4 w-4 border-slate-500 bg-slate-900 text-cyan-500"><span><b class="block text-[10px] text-white">{{ $label }}</b><small class="block text-[8px] leading-3 text-slate-400">{{ $description }}</small></span></span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    <div class="mt-3 border-t border-cyan-300/15 pt-3">
+                                        <p class="mb-2 text-[9px] font-black uppercase tracking-wide text-cyan-200">{{ __('Zusätzliche Bereichspriorität') }}</p>
+                                        @foreach ([
+                                            ['sector_score_rotation', __('Sektorrotation')],
+                                            ['index_score_rotation', __('Indexrotation')],
+                                        ] as [$key, $label])
+                                            <label class="mt-1.5 flex cursor-pointer items-start gap-2 rounded-lg border border-white/[.08] bg-white/[.025] px-2.5 py-2">
+                                                <input type="checkbox" name="{{ $key }}" value="1" @checked(request()->boolean($key)) class="mt-0.5 h-4 w-4 rounded border-slate-500 bg-slate-900 text-cyan-500">
+                                                <span><b class="block text-[10px] text-white">{{ $label }}</b><small class="block text-[8px] leading-3 text-slate-400">{{ __('Bevorzugt passende Aktien, solange die 20T-Prognose höchstens 2 Prozentpunkte unter der besten Aktie liegt.') }}</small></span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </fieldset>
+                                <fieldset class="rounded-xl border border-amber-300/20 bg-amber-300/[.055] p-3">
+                                    <legend class="px-1 text-[10px] font-black uppercase tracking-wide text-amber-200">{{ __('Bevorzugte Exitstrategie') }}</legend>
+                                    <div class="mt-1 grid gap-1.5">
+                                        @foreach ([
+                                            ['fixed_20d', __('20 Tage'), __('Standard: Verkauf nach 20 Handelstagen.')],
+                                            ['signal_change', __('Signalwechsel'), __('Verkauft, sobald das Signal nicht mehr BUY ist.')],
+                                            ['buy_and_hold', __('Buy and Hold'), __('Hält Aktien ohne zeitbasierten Exit.')],
+                                        ] as [$value, $label, $description])
+                                            <label class="cursor-pointer rounded-lg border px-2.5 py-2 transition" :class="exitStrategy === @js($value) ? 'border-amber-300/45 bg-amber-300/[.10]' : 'border-white/[.08] bg-white/[.025]'">
+                                                <span class="flex items-start gap-2"><input type="radio" name="exit_strategy" value="{{ $value }}" x-model="exitStrategy" required class="mt-0.5 h-4 w-4 border-slate-500 bg-slate-900 text-amber-500"><span><b class="block text-[10px] text-white">{{ $label }}</b><small class="block text-[8px] leading-3 text-slate-400">{{ $description }}</small></span></span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </fieldset>
+                            </div>
+                            <fieldset class="mb-4 rounded-xl border border-violet-300/20 bg-violet-400/[.055] p-3">
+                                <legend class="px-1 text-[10px] font-black uppercase tracking-wide text-violet-200">{{ __('Auswahlprofil') }}</legend>
+                                <div class="mt-1 grid gap-2 sm:grid-cols-3">
+                                    @foreach ([
+                                        ['conservative', __('Konservativ'), __('Drawdown niedrig · Hit-Rate hoch · Profitfaktor hoch')],
+                                        ['balanced', __('Ausgewogen'), __('Hit-Rate hoch · Profitfaktor hoch · Drawdown niedrig')],
+                                        ['chance', __('Chance'), __('Profitfaktor hoch · Hit-Rate hoch · Drawdown niedrig')],
+                                    ] as [$value, $label, $description])
+                                        <label class="cursor-pointer rounded-lg border border-white/[.08] bg-white/[.025] px-2.5 py-2 has-[:checked]:border-violet-300/50 has-[:checked]:bg-violet-300/10">
+                                            <span class="flex items-start gap-2"><input type="radio" name="entry_risk_style" value="{{ $value }}" @checked(request('entry_risk_style', 'balanced') === $value) required class="mt-0.5 h-4 w-4 border-slate-500 bg-slate-900 text-violet-500"><span><b class="block text-[10px] text-white">{{ $label }}</b><small class="block text-[8px] leading-3 text-slate-400">{{ $description }}</small></span></span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                <p class="mt-2 text-[8px] leading-3 text-slate-400">{{ __('Die Pfeile zeigen die Sortierung: niedriger Drawdown sowie höhere Hit-Rate und höherer Profitfaktor werden bevorzugt.') }}</p>
+                            </fieldset>
+                            <label class="mb-4 flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-300/25 bg-emerald-400/[.07] px-4 py-3">
+                                <input type="checkbox" name="automatic_strategy_comparison" value="1" @checked(request()->boolean('automatic_strategy_comparison')) class="mt-0.5 h-4 w-4 rounded border-slate-500 bg-slate-900 text-emerald-500">
+                                <span><b class="block text-[11px] font-black uppercase tracking-wide text-emerald-200">{{ __('Automatik') }}</b><small class="mt-1 block text-[9px] leading-4 text-slate-300">{{ __('Berechnet alle verfügbaren Entry- und Exitstrategien und stellt sie im Bericht gegenüber. Das fest gewählte Auswahlprofil bleibt für alle Varianten unverändert.') }}</small></span>
+                            </label>
                             @endif
                             <div class="grid {{ $qualitySetupMode ? 'grid-cols-1' : 'grid-cols-3' }} gap-3">
                                 <label class="text-[10px] font-black uppercase tracking-wide text-slate-400">
@@ -790,7 +1002,7 @@
                                 </label>
                                 @if (! $qualitySetupMode)
                                 <label class="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                                    {{ __('Max. Aktien') }}
+                                    {{ __('Max. Depotpositionen') }}
                                     <input name="max_positions" type="number" min="1" max="50" step="1" x-model.number="positions" @input="positionFactor = Math.min(positionFactor, Math.max(1, positions))" required class="ak-input mt-2 h-11 w-full rounded-lg text-sm font-bold text-white">
                                 </label>
                                 <label class="text-[10px] font-black uppercase tracking-wide text-slate-400">
@@ -800,6 +1012,28 @@
                                 @endif
                             </div>
                             @if (! $qualitySetupMode)
+                            <fieldset x-show="entryStrategy === 'forecast_score_rotation_5d' && exitStrategy !== 'buy_and_hold'" x-cloak class="mt-4 rounded-xl border border-amber-300/25 bg-amber-300/[.07] px-4 py-3">
+                                <legend class="px-1 text-[10px] font-black uppercase tracking-wide text-amber-200">{{ __('Welche Strategie hat Priorität?') }}</legend>
+                                <p class="mb-3 text-[10px] leading-4 text-slate-300">{{ __('Rotation und Exit können am selben Prüftag auslösen. Lege fest, welche Regel zuerst angewendet wird.') }}</p>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <label class="cursor-pointer rounded-lg border border-white/10 bg-white/[.035] p-3 text-xs text-slate-200 has-[:checked]:border-amber-300/50 has-[:checked]:bg-amber-300/10"><input type="radio" name="strategy_priority" value="rotation_first" @checked(request('strategy_priority', 'rotation_first') === 'rotation_first') class="mr-2 text-amber-400" required><b>{{ __('Rotation zuerst') }}</b><small class="mt-1 block pl-6 text-[9px] text-slate-400">{{ __('Zuerst nach Sektor/Index und Forecast rotieren, anschließend die Exitregel prüfen.') }}</small></label>
+                                    <label class="cursor-pointer rounded-lg border border-white/10 bg-white/[.035] p-3 text-xs text-slate-200 has-[:checked]:border-amber-300/50 has-[:checked]:bg-amber-300/10"><input type="radio" name="strategy_priority" value="exit_first" @checked(request('strategy_priority') === 'exit_first') class="mr-2 text-amber-400" required><b>{{ __('Exit zuerst') }}</b><small class="mt-1 block pl-6 text-[9px] text-slate-400">{{ __('Zuerst die Exitregel ausführen, danach freie Positionen neu besetzen.') }}</small></label>
+                                </div>
+                            </fieldset>
+                            <div class="mt-4 rounded-xl border border-white/[.08] bg-white/[.035] px-4 py-3">
+                                <div class="mb-2 flex items-center justify-between gap-3">
+                                    <span class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Allocation je Aktie') }}</span>
+                                    <strong class="text-xs font-black text-amber-200" x-text="`${positionFactor}×`"></strong>
+                                </div>
+                                <div class="grid grid-cols-5 gap-1" role="radiogroup" aria-label="{{ __('Allocation je Aktie') }}">
+                                    @for ($factor = 1; $factor <= 5; $factor++)
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="position_factor" value="{{ $factor }}" x-model.number="positionFactor" class="peer sr-only">
+                                            <span class="flex h-9 items-center justify-center rounded-md border border-white/10 text-xs font-black text-slate-400 transition peer-checked:border-amber-300/45 peer-checked:bg-amber-300/15 peer-checked:text-amber-200">{{ $factor }}×</span>
+                                        </label>
+                                    @endfor
+                                </div>
+                            </div>
                             <div class="mt-4 rounded-xl border border-white/[.08] bg-white/[.035] px-4 py-3 text-xs text-slate-300">
                                 {{ __('Grundanteil je Aktie') }}: <strong class="text-white" x-text="`${Math.max(0, capital / Math.max(1, positions)).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}`"></strong>
                                 <span class="mx-2 text-slate-600">·</span>
@@ -958,7 +1192,8 @@
                             </div>
                             @for ($scoreBucket = 0; $scoreBucket <= 9; $scoreBucket++)
                                 @php
-                                    $cell = $heatmap->get($scoreBucket.'-'.$confidenceBucket);
+                                    $cellKey = $scoreBucket.'-'.$confidenceBucket;
+                                    $cell = $heatmap->get($cellKey);
                                     $samples = (int) ($cell->samples ?? 0);
                                     $rawValue = is_numeric(data_get($cell, $metric['key'])) ? (float) data_get($cell, $metric['key']) : null;
                                     $hasValue = $metric['key'] === 'drawdown'
@@ -1060,8 +1295,7 @@
                                         'volatility' => $volatilityCellPalette[$heatmapPaletteIndex],
                                     };
                                     $metricCellHex = $bar['palette'][$heatmapPaletteIndex];
-                                    $outsideSelectedArea = $scoreBucket < $heatmapScoreFilter
-                                        || ($confidenceBucket * 10) < $heatmapConfidenceFilter;
+                                    $outsideSelectedArea = ! $qualifiedHeatmapCells->has($cellKey);
                                     $cellClass = ! $hasValue
                                         ? 'border-white/[.05] bg-slate-500/[.07] text-slate-500'
                                         : 'border-teal-400/10 '.$metricCellClass;
@@ -1071,8 +1305,10 @@
                                             ? number_format($rawValue, 2, ',', '.')
                                             : number_format($rawValue, 0, ',', '.').$metric['suffix']);
                                 @endphp
-                                <div class="ak-heatmap-cell flex aspect-square min-h-0 min-w-0 cursor-default items-center justify-center self-center rounded-[4px] border {{ $outsideSelectedArea ? 'border-white/[.05] bg-slate-500/[.07] text-slate-500' : $cellClass.($hasValue && $metric['key'] !== 'drawdown' ? ' !border-teal-400/10' : '') }}"
-                                     @if (! $outsideSelectedArea && $hasValue) style="background-color: color-mix(in srgb, {{ $metricCellHex }} 24%, transparent); color: color-mix(in srgb, {{ $metricCellHex }} 42%, white); border-color: rgba(34, 211, 238, .10);" @endif
+                                <div class="ak-heatmap-cell relative flex aspect-square min-h-0 min-w-0 cursor-default items-center justify-center self-center rounded-[4px] border {{ $outsideSelectedArea ? 'border-white/[.08]' : $cellClass.($hasValue && $metric['key'] !== 'drawdown' ? ' !border-teal-400/10' : '') }}"
+                                     style="{{ $outsideSelectedArea
+                                         ? 'background-color: transparent !important; color: #f8fafc !important; opacity: 1 !important;'
+                                         : ($hasValue ? 'background-color: color-mix(in srgb, '.$metricCellHex.' 24%, transparent); color: color-mix(in srgb, '.$metricCellHex.' 42%, white); border-color: rgba(34, 211, 238, .10);' : '') }}"
                                      title="{{ __('Score :scoreFrom–:scoreTo · Konfidenz :confidenceFrom–:confidenceTo % · :metric: :value · :samples Trades', [
                                          'scoreFrom' => $scoreBucket,
                                          'scoreTo' => $scoreBucket + 1,
@@ -1082,7 +1318,10 @@
                                          'value' => $displayValue,
                                          'samples' => $samples,
                                     ]) }}">
-                                    <span class="text-[7px] font-black tabular-nums sm:text-[8px]">{{ $displayValue }}</span>
+                                    <span class="absolute inset-0 z-10 grid place-items-center text-[7px] font-black tabular-nums sm:text-[8px]"
+                                          style="visibility:visible !important; opacity:1 !important; color:{{ $outsideSelectedArea ? '#f8fafc' : 'inherit' }} !important; background:transparent !important;">
+                                        {{ $displayValue }}
+                                    </span>
                                 </div>
                             @endfor
                         @endfor
@@ -1098,6 +1337,11 @@
         <script>
             (() => {
                 const filterForm = document.getElementById('prediction-heatmap-filters');
+                const storedScroll = sessionStorage.getItem('aktienki-strategy-filter-scroll');
+                if (storedScroll !== null) {
+                    sessionStorage.removeItem('aktienki-strategy-filter-scroll');
+                    requestAnimationFrame(() => window.scrollTo({ top: Number(storedScroll) || 0, behavior: 'instant' }));
+                }
                 const scoreInput = filterForm?.querySelector('input[name="score_min"]');
                 const confidenceInput = filterForm?.querySelector('input[name="confidence_min"]');
 
@@ -1131,9 +1375,24 @@
     </div>
 
     @if (($setupMode ?? false) && !($qualitySetupMode ?? false) && ($backtestIsComplete ?? false))
-        @php $runSummary = json_decode((string) ($activeBacktestRun->summary ?? '{}'), true) ?: []; @endphp
-        <div x-data="{ open: true }" x-show="open" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" @open-backtest-result.window="open = true" @keydown.escape.window="open = false">
-            <section class="ak-backtest-result-dialog w-full max-w-5xl rounded-2xl border border-teal-300/20 bg-[#15243a]/90 p-5 shadow-2xl" @click.outside="open = false">
+        @php
+            $runSummary = json_decode((string) ($activeBacktestRun->summary ?? '{}'), true) ?: [];
+            $dynamicExitComparison = collect(data_get($runSummary, 'dynamic_exit_summary.comparison', []));
+            $activeRunSettings = json_decode((string) ($activeBacktestRun->settings ?? '{}'), true) ?: [];
+            $automaticComparisonActive = (bool) data_get($activeRunSettings, 'selection_filters.automatic_strategy_comparison', false);
+        @endphp
+        <div x-data="{ open: @js(request()->boolean('show_result')) }" x-show="open" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" @open-backtest-result.window="open = true" @automatic-strategy-selected.window="open = false" @keydown.escape.window="if (!@js($automaticComparisonActive)) open = false">
+            <section class="ak-backtest-result-dialog w-full max-w-5xl rounded-2xl border border-teal-300/20 bg-[#15243a]/90 p-5 shadow-2xl" @click.outside="if (!@js($automaticComparisonActive)) open = false">
+                <div id="filtered-backtest-result-loading" class="mb-4 flex items-center gap-3 rounded-xl border border-cyan-300/20 bg-cyan-400/[.06] px-4 py-3" role="status" aria-live="polite">
+                    <span class="relative flex h-8 w-8 shrink-0 items-center justify-center">
+                        <span class="absolute h-8 w-8 animate-ping rounded-full bg-cyan-300/15"></span>
+                        <span class="h-6 w-6 animate-spin rounded-full border-2 border-cyan-300/20 border-t-cyan-300"></span>
+                    </span>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-[.14em] text-cyan-200">{{ __('Auswertung läuft') }}</p>
+                        <p id="filtered-backtest-result-loading-text" class="mt-0.5 text-[10px] text-slate-300">{{ $automaticComparisonActive ? __('Strategievarianten werden berechnet und miteinander verglichen …') : __('Ergebnisse und Diagramm werden aufbereitet …') }}</p>
+                    </div>
+                </div>
                 <header class="mb-4 flex items-start justify-between gap-4">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-[.14em] text-amber-300">{{ __('Persönlicher 3-Jahres-Backtest') }}</p>
@@ -1146,14 +1405,17 @@
                             <x-heroicon-o-arrow-down-tray class="h-4 w-4" />{{ __('PDF-Bericht') }}
                         </a>
                         @endif
-                        <button type="button" @click="open = false" class="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white" aria-label="{{ __('Schließen') }}">
-                            <x-heroicon-o-x-mark class="h-5 w-5" />
+                        <button type="button" @click="open = false; window.dispatchEvent(new CustomEvent('cancel-backtest-result'))" class="inline-flex h-9 items-center gap-2 rounded-lg border border-rose-300/20 bg-rose-400/[.07] px-3 text-[10px] font-black uppercase tracking-wide text-rose-200 transition hover:bg-rose-400/15">
+                            <x-heroicon-o-x-mark class="h-4 w-4" />{{ __('Abbrechen') }}
                         </button>
+                        @unless ($automaticComparisonActive)<button type="button" @click="open = false" class="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white" aria-label="{{ __('Schließen') }}">
+                            <x-heroicon-o-x-mark class="h-5 w-5" />
+                        </button>@endunless
                     </div>
                 </header>
 
                 @if (! $qualitySetupMode)
-                <div class="mb-4 grid grid-cols-8 gap-2">
+                <div class="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
                     @foreach ([
                         [__('Startkapital'), '…', 'filtered-backtest-initial-capital'],
                         [__('Endkapital'), '…', 'filtered-backtest-final-capital'],
@@ -1162,19 +1424,18 @@
                         [__('Gesamtkosten'), '…', 'filtered-backtest-total-costs'],
                         [__('Hitrate'), '…', 'filtered-backtest-hit-rate'],
                         [__('Ø Profit je Trade (ATR · 3J WF)'), '…', 'filtered-backtest-profit-per-trade'],
-                        [__('Max. Drawdown'), '…', 'filtered-backtest-drawdown'],
+                        [__('Max. Portfolio-Drawdown'), '…', 'filtered-backtest-drawdown'],
                     ] as $index => $metric)
                         @php [$label, $value, $metricId] = array_pad($metric, 3, ''); @endphp
-                        <div class="rounded-xl border border-white/[.08] bg-white/[.035] px-3 py-2">
-                            <span class="block text-[9px] font-black uppercase tracking-wide text-slate-400">{{ $label }}</span>
-                            <strong @if ($metricId) id="{{ $metricId }}" @endif class="mt-1 block text-base font-black text-white">{{ $value }}</strong>
+                        <div class="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-white/[.08] bg-white/[.035] px-3 py-2">
+                            <span class="max-w-[58%] text-[8px] font-black uppercase leading-4 tracking-wide text-slate-400">{{ $label }}</span>
+                            <strong @if ($metricId) id="{{ $metricId }}" @endif class="shrink-0 text-right text-sm font-black tabular-nums text-white">{{ $value }}</strong>
                         </div>
                     @endforeach
                 </div>
                 @else
                 <div class="mb-4 grid grid-cols-5 gap-2">
                     @foreach ([
-                        [__('Prognose erreicht'), 'filtered-backtest-prediction-reached', 'text-amber-200'],
                         [__('Gewinner'), 'filtered-backtest-winner-trades', 'text-emerald-300'],
                         [__('Verlierer'), 'filtered-backtest-loser-trades', 'text-rose-300'],
                         [__('Ø Gewinnfaktor'), 'filtered-backtest-average-gain-factor', 'text-teal-200'],
@@ -1193,7 +1454,53 @@
                 </div>
                 @endif
                 @if (! $qualitySetupMode)
-                <div id="filtered-backtest-result-chart" class="h-[360px] w-full"></div>
+                <div class="rounded-xl border border-white/[.06] bg-slate-950/15 px-3 pt-1">
+                    <div id="filtered-backtest-result-chart" class="h-[285px] w-full"></div>
+                </div>
+                @if ($automaticComparisonActive)
+                    <div class="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-400/[.045] p-3">
+                        <div class="mb-2 flex items-center justify-between gap-3">
+                            <div><p class="text-[9px] font-black uppercase tracking-wide text-emerald-300">{{ __('Automatischer Strategievergleich') }}</p><p class="mt-1 text-[9px] text-slate-400">{{ __('Wähle eine Variante aus, bevor du das Ergebnis übernimmst.') }}</p></div>
+                            <span class="rounded-md border border-violet-300/20 bg-violet-400/[.08] px-2 py-1 text-[8px] font-black text-violet-200">{{ match(data_get($activeRunSettings, 'selection_filters.entry_risk_style', 'balanced')) { 'conservative' => __('Konservativ'), 'chance' => __('Chance'), default => __('Ausgewogen') } }}</span>
+                        </div>
+                        <div class="max-h-48 overflow-auto rounded-lg border border-white/[.07]">
+                            <table class="w-full min-w-[680px] text-left text-[9px] text-slate-300">
+                                <thead class="sticky top-0 bg-[#15243a] uppercase tracking-wide text-emerald-300"><tr><th class="px-2 py-2"></th><th class="px-2 py-2">{{ __('Strategie') }}</th><th class="px-2 py-2">{{ __('Endkapital') }}</th><th class="px-2 py-2">{{ __('Performance') }}</th><th class="px-2 py-2">{{ __('Drawdown') }}</th><th class="px-2 py-2">{{ __('Trades') }}</th></tr></thead>
+                                <tbody id="automatic-strategy-result-rows"></tbody>
+                            </table>
+                        </div>
+                        <div class="mt-3 flex justify-end"><button id="automatic-strategy-confirm" type="button" disabled class="h-9 rounded-lg border border-emerald-300/25 bg-emerald-400/10 px-4 text-[10px] font-black text-emerald-200 disabled:cursor-not-allowed disabled:opacity-35">{{ __('Auswahl übernehmen') }}</button></div>
+                    </div>
+                @endif
+                @if ($dynamicExitComparison->isNotEmpty())
+                    <div class="mt-4 max-h-52 overflow-auto rounded-xl border border-cyan-300/15">
+                        <table class="w-full min-w-[760px] text-left text-[10px] text-slate-300">
+                            <thead class="sticky top-0 bg-[#15243a] text-[9px] uppercase tracking-wide text-cyan-300">
+                                <tr><th class="px-3 py-2">#</th><th class="px-3 py-2">{{ __('Regeln') }}</th><th class="px-3 py-2">{{ __('Validierung') }}</th><th class="px-3 py-2">{{ __('Profitfaktor') }}</th><th class="px-3 py-2">{{ __('Hitrate') }}</th><th class="px-3 py-2">{{ __('Drawdown') }}</th><th class="px-3 py-2">{{ __('Trades') }}</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($dynamicExitComparison as $variant)
+                                    @php
+                                        $activeRules = collect((array) data_get($variant, 'rules', []))->filter()->keys()->map(fn ($rule) => match ($rule) {
+                                            'fixed_20d' => '20T', 'dynamic_horizon' => __('Horizont'), 'support_stop' => __('Support'),
+                                            'resistance_trailing_stop' => __('Widerstand'), 'entry_wait_5d' => 'WAIT 5T', default => $rule,
+                                        })->implode(' · ');
+                                    @endphp
+                                    <tr class="border-t border-white/[.06] {{ $loop->first ? 'bg-emerald-400/[.07]' : '' }}">
+                                        <td class="px-3 py-2 font-black {{ $loop->first ? 'text-emerald-300' : '' }}">{{ $loop->iteration }}</td>
+                                        <td class="px-3 py-2 font-bold">{{ $activeRules ?: __('Basis') }}</td>
+                                        <td class="px-3 py-2">{{ number_format((float) data_get($variant, 'validation.average_return', 0), 2, ',', '.') }} %/Trade</td>
+                                        <td class="px-3 py-2">{{ number_format((float) data_get($variant, 'validation.profit_factor', 0), 2, ',', '.') }}</td>
+                                        <td class="px-3 py-2">{{ number_format((float) data_get($variant, 'validation.hit_rate', 0), 1, ',', '.') }} %</td>
+                                        <td class="px-3 py-2">{{ number_format((float) data_get($variant, 'validation.max_drawdown', 0), 1, ',', '.') }} %</td>
+                                        <td class="px-3 py-2">{{ (int) data_get($variant, 'validation.trades', 0) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-2 text-[9px] text-slate-400">{{ __('Platz 1 ist die gewählte robuste Variante. Die Kennzahlen stammen aus dem chronologisch getrennten 30-%-Validierungsabschnitt und enthalten die hinterlegten Transaktionskosten.') }}</p>
+                @endif
                 <div class="mt-3 flex items-center justify-between gap-4 text-[10px] text-slate-400">
                     <span>{{ __('Portfolio-Verlauf auf Basis gleich gewichteter, am jeweiligen Ausstiegstag zusammengefasster Trades.') }}</span>
                     <span id="filtered-backtest-benchmark-performance" class="shrink-0 font-bold text-slate-300"></span>
@@ -1201,18 +1508,47 @@
                 @endif
             </section>
         </div>
+        @if ($automaticComparisonActive)
+        <div id="automatic-strategy-save-prompt" class="fixed inset-0 z-[110] hidden items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md">
+            <section class="w-full max-w-md rounded-2xl border border-emerald-300/25 bg-[#15243a] p-5 shadow-2xl">
+                <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-300/25 bg-emerald-400/10 text-emerald-300"><x-heroicon-o-bookmark class="h-5 w-5" /></span><div><p class="text-[10px] font-black uppercase tracking-wide text-emerald-300">{{ __('Strategie ausgewählt') }}</p><h3 class="mt-1 text-lg font-black text-white">{{ __('Als Strategie speichern?') }}</h3><p class="mt-2 text-xs leading-5 text-slate-300">{{ __('Möchtest du die ausgewählte Variante mit dem festgelegten Auswahlprofil für spätere Backtests und Depots speichern?') }}</p></div></div>
+                <div class="mt-5 flex justify-end gap-2"><button id="automatic-strategy-save-no" type="button" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-bold text-slate-300 hover:text-white">{{ __('Nur Ergebnis übernehmen') }}</button><button id="automatic-strategy-save-yes" type="button" class="h-10 rounded-lg border border-emerald-300/30 bg-emerald-400/15 px-4 text-xs font-black text-emerald-200 hover:bg-emerald-400/20">{{ __('Jetzt speichern') }}</button></div>
+            </section>
+        </div>
+        @endif
         <script>
             document.addEventListener('DOMContentLoaded', async () => {
                 const target = document.querySelector('#filtered-backtest-result-chart');
                 @if (! $qualitySetupMode)
                 if (!target || !window.ApexCharts) return;
                 @endif
-                const response = await fetch(@json(route('setup.filter.backtest.result', $activeBacktestRun->public_id)), {
-                    cache: 'no-store',
-                    headers: { Accept: 'application/json' },
-                });
-                if (!response.ok) return;
-                const result = await response.json();
+                const loading = document.querySelector('#filtered-backtest-result-loading');
+                const loadingText = document.querySelector('#filtered-backtest-result-loading-text');
+                const resultRequestController = new AbortController();
+                window.addEventListener('cancel-backtest-result', () => resultRequestController.abort(), { once: true });
+                let result;
+                try {
+                    const response = await fetch(@json(route('setup.filter.backtest.result', $activeBacktestRun->public_id)), {
+                        cache: 'no-store',
+                        headers: { Accept: 'application/json' },
+                        signal: resultRequestController.signal,
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    result = await response.json();
+                    loading?.classList.add('hidden');
+                } catch (error) {
+                    if (error?.name === 'AbortError') return;
+                    if (loading) {
+                        loading.classList.remove('border-cyan-300/20', 'bg-cyan-400/[.06]');
+                        loading.classList.add('border-rose-300/25', 'bg-rose-400/[.07]');
+                        const spinner = loading.querySelector('.animate-spin');
+                        spinner?.classList.remove('animate-spin', 'border-cyan-300/20', 'border-t-cyan-300');
+                        spinner?.classList.add('border-rose-300/40');
+                    }
+                    if (loadingText) loadingText.textContent = '{{ __('Die Auswertung konnte nicht geladen werden. Bitte versuche es erneut oder öffne das Ergebnis später noch einmal.') }}';
+                    console.error('Backtest result could not be loaded', error);
+                    return;
+                }
                 const performance = document.querySelector('#filtered-backtest-performance');
                 const finalCapital = document.querySelector('#filtered-backtest-final-capital');
                 const initialCapital = document.querySelector('#filtered-backtest-initial-capital');
@@ -1222,7 +1558,6 @@
                 const hitRate = document.querySelector('#filtered-backtest-hit-rate');
                 const profitPerTrade = document.querySelector('#filtered-backtest-profit-per-trade');
                 const drawdown = document.querySelector('#filtered-backtest-drawdown');
-                const predictionReached = document.querySelector('#filtered-backtest-prediction-reached');
                 const winnerTrades = document.querySelector('#filtered-backtest-winner-trades');
                 const loserTrades = document.querySelector('#filtered-backtest-loser-trades');
                 const averageGainFactor = document.querySelector('#filtered-backtest-average-gain-factor');
@@ -1247,8 +1582,7 @@
                 if (totalCosts) totalCosts.textContent = Number(result.total_costs).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
                 if (hitRate) hitRate.textContent = `${Number(result.hit_rate).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
                 if (profitPerTrade) profitPerTrade.textContent = `${Number(result.average_trade_return || 0) >= 0 ? '+' : ''}${Number(result.average_trade_return || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} ATR`;
-                if (drawdown) drawdown.textContent = `${Number(result.max_drawdown).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
-                if (predictionReached) predictionReached.textContent = Number(result.prediction_reached_trades || 0).toLocaleString('de-DE');
+                if (drawdown) drawdown.textContent = `${Number(result.portfolio_max_drawdown || 0).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
                 if (winnerTrades) winnerTrades.textContent = Number(result.winner_trades || 0).toLocaleString('de-DE');
                 if (loserTrades) loserTrades.textContent = Number(result.loser_trades || 0).toLocaleString('de-DE');
                 if (averageGainFactor) averageGainFactor.textContent = result.average_gain_factor === null ? '∞' : Number(result.average_gain_factor).toLocaleString('de-DE', { maximumFractionDigits: 2 });
@@ -1258,10 +1592,36 @@
                 if (qualityTotalCapital) qualityTotalCapital.textContent = Number(result.final_capital || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
                 if (winLossRatio) winLossRatio.textContent = result.win_loss_ratio === null ? '∞' : Number(result.win_loss_ratio).toLocaleString('de-DE', { maximumFractionDigits: 2 });
                 if (investmentDays) investmentDays.textContent = `${Number(result.total_investment_days || 0).toLocaleString('de-DE')} {{ __('Tage') }}`;
+                const automaticRows = document.querySelector('#automatic-strategy-result-rows');
+                if (automaticRows) {
+                    const variants = {
+                        selected_strategy: { label: '{{ __('Gewählte Strategie') }}', final_capital: result.final_capital, performance: result.strategy_performance, max_drawdown: result.portfolio_max_drawdown, executed_trades: result.executed_trades },
+                        forecast_entry: { label: '{{ __('Forecast-Score-Einstieg 5T') }}', final_capital: result.forecast_score_rotation_final_capital, performance: result.forecast_score_rotation_performance, max_drawdown: result.forecast_score_rotation_max_drawdown, executed_trades: result.forecast_score_rotation_executed_trades },
+                        sector_entry: { label: '{{ __('Sektorrotation') }}', final_capital: result.sector_entry_rotation_final_capital, performance: result.sector_entry_rotation_performance, max_drawdown: result.sector_entry_rotation_max_drawdown, executed_trades: result.sector_entry_rotation_executed_trades },
+                        index_entry: { label: '{{ __('Indexrotation') }}', final_capital: result.index_entry_rotation_final_capital, performance: result.index_entry_rotation_performance, max_drawdown: result.index_entry_rotation_max_drawdown, executed_trades: result.index_entry_rotation_executed_trades },
+                        buy_and_hold: { label: '{{ __('Buy and Hold') }}', final_capital: result.buy_and_hold_final_capital, performance: result.buy_and_hold_performance, max_drawdown: result.buy_and_hold_max_drawdown, executed_trades: result.buy_and_hold_executed_trades },
+                    };
+                    const automaticLabels = { auto_exit_fixed_20d: 'Exit 20T', auto_exit_dynamic_horizon: '{{ __('Dynamischer Horizont') }}', auto_exit_support_stop: 'Support-Stop', auto_exit_resistance_trailing: 'Resistance-Trailing', auto_exit_signal_change: '{{ __('Signalwechsel') }}', auto_entry_wait_5d: 'WAIT 5T' };
+                    Object.entries(result.automatic_exit_variants || {}).forEach(([key, value]) => variants[key] = { label: automaticLabels[key] || key, ...value });
+                    automaticRows.innerHTML = Object.entries(variants).filter(([, value]) => Number(value.executed_trades || 0) > 0).map(([key, value]) => `<tr class="border-t border-white/[.06]"><td class="px-2 py-2"><input type="radio" name="automatic_result_strategy" value="${key}" class="h-4 w-4 border-slate-500 bg-slate-900 text-emerald-500"></td><td class="px-2 py-2 font-bold text-white">${value.label}</td><td class="px-2 py-2">${Number(value.final_capital || 0).toLocaleString('de-DE', { style:'currency', currency:'EUR' })}</td><td class="px-2 py-2">${Number(value.performance || 0).toLocaleString('de-DE', { maximumFractionDigits:2 })} %</td><td class="px-2 py-2">${Number(value.max_drawdown || 0).toLocaleString('de-DE', { maximumFractionDigits:2 })} %</td><td class="px-2 py-2">${Number(value.executed_trades || 0).toLocaleString('de-DE')}</td></tr>`).join('');
+                    const confirm = document.querySelector('#automatic-strategy-confirm');
+                    automaticRows.addEventListener('change', event => { if (event.target.matches('input[type="radio"]')) confirm.disabled = false; });
+                    confirm?.addEventListener('click', () => {
+                        const selected = automaticRows.querySelector('input[type="radio"]:checked'); if (!selected) return;
+                        sessionStorage.setItem('aktienki-selected-backtest-strategy', selected.value);
+                        window.dispatchEvent(new CustomEvent('automatic-strategy-selected'));
+                        const prompt = document.querySelector('#automatic-strategy-save-prompt'); prompt?.classList.remove('hidden'); prompt?.classList.add('flex');
+                    });
+                    document.querySelector('#automatic-strategy-save-no')?.addEventListener('click', event => { const prompt = event.currentTarget.closest('#automatic-strategy-save-prompt'); prompt?.classList.add('hidden'); prompt?.classList.remove('flex'); });
+                    document.querySelector('#automatic-strategy-save-yes')?.addEventListener('click', event => {
+                        const prompt = event.currentTarget.closest('#automatic-strategy-save-prompt'); prompt?.classList.add('hidden'); prompt?.classList.remove('flex');
+                        const saveForm = document.querySelector('form[action*="/setup/filter/saved"]');
+                        if (saveForm) { let input = saveForm.querySelector('input[name="automatic_selected_strategy"]'); if (!input) { input = document.createElement('input'); input.type = 'hidden'; input.name = 'automatic_selected_strategy'; saveForm.appendChild(input); } input.value = sessionStorage.getItem('aktienki-selected-backtest-strategy') || ''; }
+                        window.dispatchEvent(new CustomEvent('open-save-filter'));
+                    });
+                }
                 @if (! $qualitySetupMode)
                 updateExitMetric('save-exit-fixed', result.strategy_performance, result.trades_per_month, result.portfolio_max_drawdown);
-                updateExitMetric('save-exit-winner', result.winner_runner_performance, result.winner_runner_trades_per_month, result.winner_runner_max_drawdown);
-                updateExitMetric('save-exit-target', result.prediction_target_performance, result.prediction_target_trades_per_month, result.prediction_target_max_drawdown);
                 if (benchmarkPerformance && result.benchmark_performance !== null) {
                     const benchmarkProfit = Number(result.benchmark_profit || 0);
                     benchmarkPerformance.textContent = `S&P 500: ${Number(result.benchmark_final_capital).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} · ${benchmarkProfit >= 0 ? '+' : ''}${benchmarkProfit.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} · ${result.benchmark_performance >= 0 ? '+' : ''}${Number(result.benchmark_performance).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %`;
@@ -1271,8 +1631,49 @@
                 const chartLabelColor = isLightTheme ? '#475569' : '#94a3b8';
                 const chartGridColor = isLightTheme ? 'rgba(14, 116, 144, .14)' : 'rgba(148,163,184,.10)';
                 const benchmarkColor = isLightTheme ? '#b45309' : '#f59e0b';
+                const selectedOptions = result.selected_backtest_options || {};
+                const comparisonSeries = [{ name: 'Strategie', data: result.strategy_chart }];
+                const comparisonColors = ['#22d3ee'];
+                const comparisonWidths = [3.5];
+                const comparisonDashes = [0];
+                if (selectedOptions.automatic || selectedOptions.entry_strategy === 'forecast_score_rotation_5d') {
+                    comparisonSeries.push({ name: 'Forecast-Score-Einstieg (5T)', data: result.forecast_score_rotation_chart || [] });
+                    comparisonColors.push('#fbbf24'); comparisonWidths.push(3); comparisonDashes.push(2);
+                }
+                if (selectedOptions.automatic || selectedOptions.sector_rotation) {
+                    comparisonSeries.push({ name: 'Sektorrotation', data: result.sector_entry_rotation_chart || [] });
+                    comparisonColors.push('#a78bfa'); comparisonWidths.push(2.5); comparisonDashes.push(4);
+                }
+                if (selectedOptions.automatic || selectedOptions.index_rotation) {
+                    comparisonSeries.push({ name: 'Indexrotation', data: result.index_entry_rotation_chart || [] });
+                    comparisonColors.push('#f472b6'); comparisonWidths.push(2.5); comparisonDashes.push(6);
+                }
+                if (selectedOptions.automatic || selectedOptions.exit_strategy === 'buy_and_hold') {
+                    comparisonSeries.push({ name: 'Buy and Hold', data: result.buy_and_hold_chart || [] });
+                    comparisonColors.push('#818cf8'); comparisonWidths.push(2.25); comparisonDashes.push(5);
+                }
+                if (selectedOptions.automatic) {
+                    const automaticLabels = {
+                        auto_exit_fixed_20d: 'Exit 20T', auto_exit_dynamic_horizon: 'Dynamischer Horizont',
+                        auto_exit_support_stop: 'Support-Stop', auto_exit_resistance_trailing: 'Resistance-Trailing',
+                        auto_exit_signal_change: 'Signalwechsel', auto_entry_wait_5d: 'WAIT-Einstieg 5T',
+                    };
+                    const automaticColors = ['#2dd4bf', '#60a5fa', '#fb923c', '#e879f9', '#f87171', '#84cc16'];
+                    Object.entries(result.automatic_exit_variants || {}).forEach(([key, variant], index) => {
+                        comparisonSeries.push({ name: automaticLabels[key] || key, data: variant.chart || [] });
+                        comparisonColors.push(automaticColors[index % automaticColors.length]);
+                        comparisonWidths.push(2); comparisonDashes.push(4 + index);
+                    });
+                }
+                comparisonSeries.push(
+                    { name: `S&P 500 Buy & Hold (${Number(result.benchmark_performance) >= 0 ? '+' : ''}${Number(result.benchmark_performance).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %)`, data: result.benchmark_chart },
+                    { name: `DAX (${Number(result.dax_performance) >= 0 ? '+' : ''}${Number(result.dax_performance || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %)`, data: result.dax_chart || [] },
+                );
+                comparisonColors.push(benchmarkColor, '#fb7185');
+                comparisonWidths.push(2.5, 2.5);
+                comparisonDashes.push(8, 3);
                 const chart = new window.ApexCharts(target, {
-                    chart: { type: 'line', height: 360, background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false } },
+                    chart: { type: 'line', height: 285, background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, fontFamily: 'inherit', foreColor: chartLabelColor },
                     @if ($qualitySetupMode)
                     series: [
                         { name: '{{ __('Smart Selection') }}', data: result.strategy_chart },
@@ -1281,27 +1682,16 @@
                     colors: ['#0891b2', benchmarkColor],
                     stroke: { width: [3, 3], curve: 'straight', dashArray: [0, 4] },
                     @else
-                    series: [
-                        { name: '20 Tage', data: result.strategy_chart },
-                        { name: 'Winner Runner', data: result.winner_runner_chart },
-                        { name: 'Prognoseziel', data: result.prediction_target_chart },
-                        { name: 'Adaptive Rotation', data: result.adaptive_rotation_chart },
-                        { name: 'Buy and Hold', data: result.buy_and_hold_chart },
-                        { name: `S&P 500 Buy & Hold (${Number(result.benchmark_performance) >= 0 ? '+' : ''}${Number(result.benchmark_performance).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %)`, data: result.benchmark_chart },
-                    ],
-                    colors: ['#0891b2', '#6366f1', '#e11d48', '#16a34a', '#0284c7', benchmarkColor],
-                    stroke: { width: [3, 3, 3, 3, 2.5, 3], curve: 'straight', dashArray: [0, 0, 0, 0, 0, 4] },
+                    series: comparisonSeries,
+                    colors: comparisonColors,
+                    stroke: { width: comparisonWidths, curve: 'straight', dashArray: comparisonDashes, lineCap: 'round' },
                     @endif
-                    xaxis: { type: 'datetime', min: result.period_start, max: result.period_end, labels: { style: { colors: chartLabelColor, fontSize: '10px' } }, axisBorder: { color: chartGridColor }, axisTicks: { color: chartGridColor } },
-                    yaxis: { labels: { formatter: value => `${value >= 0 ? '+' : ''}${value.toLocaleString('de-DE', { maximumFractionDigits: 0 })} %`, style: { colors: chartLabelColor, fontSize: '10px' } } },
-                    grid: { borderColor: chartGridColor, strokeDashArray: 4 },
-                    annotations: @if ($qualitySetupMode) {} @else result.buy_and_hold_entry_at ? { xaxis: [{
-                        x: Number(result.buy_and_hold_entry_at),
-                        borderColor: 'rgba(56,189,248,.75)',
-                        strokeDashArray: 4,
-                        label: { text: 'Buy & Hold Kauf', orientation: 'horizontal', offsetY: -4, style: { background: '#0ea5e9', color: '#f8fafc', fontSize: '9px', fontWeight: 700 } },
-                    }] } : {} @endif,
-                    legend: { labels: { colors: isLightTheme ? '#334155' : '#cbd5e1' }, markers: { size: 5 } },
+                    xaxis: { type: 'datetime', min: result.period_start, max: result.period_end, tickAmount: 6, labels: { datetimeUTC: false, format: 'MMM yyyy', hideOverlappingLabels: true, style: { colors: chartLabelColor, fontSize: '10px', fontWeight: 600 } }, axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false } },
+                    yaxis: { tickAmount: 5, forceNiceScale: true, labels: { minWidth: 54, formatter: value => `${value >= 0 ? '+' : ''}${value.toLocaleString('de-DE', { maximumFractionDigits: 0 })} %`, style: { colors: chartLabelColor, fontSize: '10px', fontWeight: 600 } } },
+                    grid: { borderColor: chartGridColor, strokeDashArray: 3, padding: { top: 4, right: 12, bottom: 0, left: 4 }, xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+                    annotations: { yaxis: [{ y: 0, borderColor: isLightTheme ? 'rgba(15,118,110,.35)' : 'rgba(94,234,212,.28)', strokeDashArray: 0 }] },
+                    legend: { position: 'top', horizontalAlign: 'left', offsetY: -2, fontSize: '11px', fontWeight: 700, itemMargin: { horizontal: 12, vertical: 4 }, labels: { colors: isLightTheme ? '#334155' : '#cbd5e1' }, markers: { size: 5, strokeWidth: 0 }, onItemHover: { highlightDataSeries: true } },
+                    markers: { size: 0, hover: { size: 5, sizeOffset: 2 } },
                     tooltip: { theme: isLightTheme ? 'light' : 'dark', x: { format: 'dd.MM.yyyy' }, y: { formatter: value => `${value >= 0 ? '+' : ''}${value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %` } },
                     dataLabels: { enabled: false },
                     noData: { text: '{{ __('Keine Vergleichsdaten verfügbar') }}', style: { color: chartLabelColor } },
@@ -1314,26 +1704,59 @@
     @endif
 
     <style>
-        /* Keep the current tester frame visible until the server-rendered
-           filter result is ready. This removes the blank repaint between
-           consecutive GET filter requests without animating the content. */
+        /* A short cross-fade keeps the existing tester visible while the
+           server-rendered filter result replaces it. */
         @view-transition {
             navigation: auto;
         }
 
         ::view-transition-old(root),
-        ::view-transition-new(root),
-        ::view-transition-group(root) {
-            animation: none !important;
+        ::view-transition-new(root) {
             mix-blend-mode: normal;
         }
 
         ::view-transition-old(root) {
-            opacity: 1;
+            animation: ak-filter-fade-out 180ms ease-out both;
         }
 
         ::view-transition-new(root) {
-            opacity: 1;
+            animation: ak-filter-fade-in 220ms ease-in both;
+        }
+
+        @keyframes ak-filter-fade-out { from { opacity: 1; } to { opacity: .82; } }
+        @keyframes ak-filter-fade-in { from { opacity: .82; } to { opacity: 1; } }
+
+        .ak-filter-loading {
+            background: rgb(2 12 23 / 22%);
+            backdrop-filter: blur(1px);
+        }
+
+        .ak-filter-section-heading {
+            display: flex;
+            min-width: 0;
+            align-items: center;
+            gap: 8px;
+            padding: 3px 2px 1px;
+        }
+
+        .ak-filter-section-heading strong {
+            flex: 0 0 auto;
+            color: #67e8f9;
+            font-size: 8px;
+            font-weight: 900;
+            letter-spacing: .12em;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .ak-filter-section-heading span {
+            overflow: hidden;
+            color: var(--ak-muted);
+            font-size: 8px;
+            font-weight: 650;
+            line-height: 1;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         #prediction-heatmap-filters .ak-position-factor input:checked + span {
@@ -1425,7 +1848,7 @@
 
         #fundamental-heatmap-filters {
             display: grid !important;
-            grid-template-columns: repeat(5, minmax(175px, 1fr)) !important;
+            grid-template-columns: repeat(4, minmax(175px, 1fr)) !important;
             gap: 4px;
         }
 

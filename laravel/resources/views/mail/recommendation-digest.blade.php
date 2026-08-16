@@ -1,9 +1,4 @@
 <x-mail::message>
-<div style="text-align:center;margin:0 0 22px">
-<img src="cid:aktienki-logo.png" alt="aktienKI.com" width="282" style="display:inline-block;max-width:82%;height:auto">
-<div style="color:#788da3;font-size:12px;margin-top:8px;letter-spacing:1.2px">RESEARCH · INTELLIGENCE · DECISIONS</div>
-</div>
-
 <div style="font-size:24px;font-weight:800;color:#17283e;margin-bottom:5px">{{ __('Aktuelle Signale') }}</div>
 <div style="font-size:13px;line-height:1.55;color:#687c91;margin-bottom:20px">{{ __('Deine aktuell stärksten qualifizierten aKI-Signale in einer kompakten Übersicht.') }}</div>
 

@@ -109,10 +109,6 @@
                     <a href="{{ route('predictions.index') }}" onclick="event.preventDefault(); const l=document.getElementById('prediction-page-loading'); if(l){l.classList.remove('hidden');l.classList.add('flex');l.style.display='flex';} const h=this.href; setTimeout(function(){window.location.href=h;},500);" class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-300/55 bg-amber-400/[.16] px-3 text-[10px] font-black text-amber-700 shadow-[0_8px_20px_rgba(245,158,11,.12)] transition hover:border-amber-200 hover:bg-amber-400/[.28] dark:text-amber-200" title="{{ __('Filter zurücksetzen') }}">
                         <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" /><span>{{ __('Reset') }}</span>
                     </a>
-                    <button type="button" data-aki-chat-open class="inline-flex items-center gap-2 rounded-xl border border-orange-400/45 bg-orange-400/[.12] px-3 py-2 text-xs font-black text-orange-300 shadow-[0_8px_24px_rgba(251,146,60,.10)] transition hover:border-orange-300 hover:bg-orange-400/[.2]" title="{{ __('AKI fragen') }}" aria-label="{{ __('AKI fragen') }}">
-                        <x-heroicon-o-sparkles class="h-4 w-4" />
-                        {{ __('AKI fragen') }}
-                    </button>
                 </div>
                 </div>
                 <div class="grid grid-cols-6 gap-1">
@@ -426,7 +422,25 @@
                                         <span class="text-[var(--ak-muted)]">—</span>
                                     @endif
                                 </td>
-                                <td class="border-b border-[var(--ak-border)] px-2 py-3">
+                                <td class="relative border-b border-[var(--ak-border)] px-2 py-3">
+                                    <span onclick="event.stopPropagation()" class="ak-tablet-name-watchlist absolute right-1 top-1 hidden">
+                                        @if ($userWatchlists->count() === 1)
+                                            @php $singleWatchlist = $userWatchlists->first(); @endphp
+                                            <form method="POST" action="{{ route('watchlists.items.toggle', [$singleWatchlist->id, $prediction->instrument_id]) }}" data-prediction-watchlist-form>
+                                                @csrf
+                                                <input type="hidden" name="prediction_id" value="{{ $prediction->id }}">
+                                                <button type="submit" class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[var(--ak-card)]/90 transition hover:bg-amber-300/10 {{ $isWatched ? 'text-amber-300' : 'text-slate-500 hover:text-amber-300' }}" title="{{ $isWatched ? __('Aus Watchlist entfernen') : __('Zur Watchlist hinzufügen') }}">
+                                                    @if ($isWatched)<x-heroicon-s-star class="h-4 w-4" />@else<x-heroicon-o-star class="h-4 w-4" />@endif
+                                                </button>
+                                            </form>
+                                        @elseif ($userWatchlists->count() > 1)
+                                            <button type="button" data-open-watchlist-picker data-instrument-id="{{ $prediction->instrument_id }}" data-prediction-id="{{ $prediction->id }}" data-symbol="{{ $prediction->symbol }}" data-name="{{ $prediction->name }}" data-memberships='@json($predictionWatchlistIds->values())' class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[var(--ak-card)]/90 transition hover:bg-amber-300/10 {{ $isWatched ? 'text-amber-300' : 'text-slate-500 hover:text-amber-300' }}" title="{{ __('Watchlist auswählen') }}">
+                                                @if ($isWatched)<x-heroicon-s-star class="h-4 w-4" />@else<x-heroicon-o-star class="h-4 w-4" />@endif
+                                            </button>
+                                        @else
+                                            <a href="{{ route('watchlists.index') }}" class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[var(--ak-card)]/90 text-slate-500 transition hover:text-amber-300" title="{{ __('Zuerst Watchlist erstellen') }}"><x-heroicon-o-star class="h-4 w-4" /></a>
+                                        @endif
+                                    </span>
                                     <div class="flex min-w-0 items-center gap-2">
                                         <span class="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-teal-500/20 bg-gradient-to-br from-teal-500/[.10] to-cyan-500/[.04] text-[9px] font-black uppercase tracking-tight text-teal-700">
                                             {{ strtoupper(substr((string) $prediction->symbol, 0, 2)) }}
@@ -535,6 +549,11 @@
                     </tbody>
                 </table>
             </div>
+            @if ($predictions instanceof \Illuminate\Contracts\Pagination\Paginator && $predictions->hasPages())
+                <div class="mt-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 py-3">
+                    {{ $predictions->onEachSide(1)->links() }}
+                </div>
+            @endif
 
             <style>
                 #predictions-page {
@@ -961,7 +980,7 @@
 
                 #predictions-page .ak-horizon-direction svg {
                     stroke-width: 2.5;
-                    filter: drop-shadow(0 1px 2px currentColor);
+                    filter: none;
                 }
 
                 #predictions-page .ak-horizon-column {
@@ -972,9 +991,13 @@
                 }
 
                 #predictions-page .ak-horizon-direction[data-direction="up"] {
-                    border-color: rgba(34, 211, 238, .72);
-                    background: rgba(8, 145, 178, .24);
-                    color: #67f5df;
+                    border-color: rgba(74, 222, 128, .52);
+                    background: rgba(22, 163, 74, .12);
+                    color: #6edb9c;
+                    box-shadow:
+                        inset 0 1px 0 rgba(190, 255, 214, .10),
+                        0 0 7px rgba(34, 197, 94, .12);
+                    text-shadow: none;
                 }
 
                 #predictions-page .ak-horizon-direction[data-direction="down"] {
@@ -987,7 +1010,13 @@
                     color: var(--ak-muted);
                 }
 
-                :root[data-theme="light"] #predictions-page .ak-horizon-direction[data-direction="up"] { color: #0e7490; }
+                :root[data-theme="light"] #predictions-page .ak-horizon-direction[data-direction="up"] {
+                    border-color: rgba(5, 150, 105, .62);
+                    background: rgba(16, 185, 129, .13);
+                    color: #047857;
+                    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 3px 8px rgba(15, 23, 42, .10);
+                    text-shadow: none;
+                }
                 :root[data-theme="light"] #predictions-page .ak-horizon-direction[data-direction="down"] { color: #be4059; }
 
                 @media (max-width: 639px) {
@@ -1334,7 +1363,7 @@
             pending.innerHTML = '<span>AKI denkt</span><span class="aki-thinking-dots" aria-hidden="true">•••</span>';
             messages.appendChild(pending);
             try {
-                const response = await fetch('{{ route('aki.chat') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }, body: JSON.stringify({ question, messages: akiChatHistory.slice(-8), filters: Object.fromEntries(new URLSearchParams(window.location.search)) }) });
+                const response = await fetch('{{ route('aki.chat') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }, body: JSON.stringify({ question, messages: akiChatHistory.slice(-8), filters: Object.fromEntries(new URLSearchParams(window.location.search)), mode: 'standard' }) });
                 const payload = await response.json();
                 pending.remove();
                 const answerText = response.ok ? (payload.answer || '{{ __('Keine Antwort erhalten.') }}') : (payload.message || '{{ __('Die KI ist gerade nicht erreichbar.') }}');

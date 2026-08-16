@@ -1,13 +1,13 @@
 <x-app-layout>
-    <div class="screener-page mx-auto max-w-7xl px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
-        <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-                <p class="text-[10px] font-black uppercase tracking-[.2em] text-cyan-400">{{ __('Einfacher Einstieg') }}</p>
-                <h1 class="mt-1 text-3xl font-black tracking-tight">{{ __('Aktienscreener') }}</h1>
-                <p class="mt-1 max-w-2xl text-sm text-[var(--ak-muted)]">{{ __('Die wichtigsten Informationen auf einen Blick – ohne technische Modellbegriffe.') }}</p>
-            </div>
+    <div class="screener-page mx-auto max-w-[96rem] px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
+        <header class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h1 class="text-3xl font-black tracking-tight">{{ __('Aktienscreener') }}</h1>
             <div class="flex flex-wrap gap-2"><a href="{{ route('screener.history') }}" class="inline-flex h-10 items-center justify-center rounded-xl border border-amber-400/35 bg-amber-400/[.08] px-4 text-xs font-black text-amber-300">{{ __('Ranking-Historie') }}</a><a href="{{ route('predictions.index') }}" class="inline-flex h-10 items-center justify-center rounded-xl border border-cyan-400/35 bg-cyan-400/[.08] px-4 text-xs font-black text-cyan-300 transition hover:bg-cyan-400/[.16]">{{ __('Prognosetabelle öffnen') }}</a></div>
         </header>
+
+        @if($isFreeRegional)
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[.06] px-4 py-3"><div><p class="text-[9px] font-black uppercase tracking-[.15em] text-amber-400">{{ __('Free · Regionales Top-100-Universum') }}</p><p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Der Aktienscreener zeigt ausschließlich die 100 wichtigsten Aktien deiner Region (:country).', ['country' => $regionalCountry]) }}</p></div><a href="{{ route('pricing') }}" class="text-[9px] font-black text-amber-300">{{ __('Alle Aktien ab Plus') }} →</a></div>
+        @endif
 
         @if (session('status'))
             <div class="mb-3 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-bold text-emerald-300">
@@ -45,11 +45,6 @@
             </select>
             <a href="{{ route('screener.index') }}" class="screener-filter-reset inline-flex h-10 shrink-0 items-center justify-center border border-amber-400/40 bg-amber-400/[.10] px-4 text-xs font-black text-amber-300 transition hover:bg-amber-400/[.18]">{{ __('Reset') }}</a>
         </form>
-
-        <div class="mb-3 flex items-center justify-between text-xs text-[var(--ak-muted)]">
-            <span>{{ trans_choice(':count Aktie|:count Aktien', $stocks->count(), ['count' => $stocks->count()]) }}</span>
-            <span>{{ __('Nur positive Renditen · höchster Ranking-Score zuerst') }}</span>
-        </div>
 
         <div class="screener-results-scroll">
         <section class="grid grid-cols-1 gap-4">
@@ -116,6 +111,37 @@
                     $returnClass = $return !== null && $return >= 0 ? 'text-emerald-300' : 'text-rose-300';
                     $chartPoints = collect($stock->chart_points ?? []);
                     $predictionPrice = is_numeric($stock->predicted_price_20d) ? (float) $stock->predicted_price_20d : null;
+                    $currencySymbol = static fn (?string $currency): string => match (strtoupper(trim((string) $currency))) {
+                        'EUR' => '€',
+                        'USD' => '$',
+                        'GBP' => '£',
+                        'JPY', 'CNY' => '¥',
+                        'HKD' => 'HK$',
+                        'CHF' => 'CHF',
+                        'CAD' => 'C$',
+                        'AUD' => 'A$',
+                        'SEK' => 'kr',
+                        default => strtoupper(trim((string) $currency)) ?: '—',
+                    };
+                    $displayCurrencySymbol = $currencySymbol($stock->currency);
+                    $originalCurrencySymbol = $currencySymbol($stock->original_currency ?? null);
+                    $currencyName = static fn (?string $currency): string => match (strtoupper(trim((string) $currency))) {
+                        'EUR' => __('Euro'),
+                        'USD' => __('US-Dollar'),
+                        'GBP' => __('Britisches Pfund'),
+                        'JPY' => __('Japanischer Yen'),
+                        'CNY' => __('Chinesischer Renminbi'),
+                        'HKD' => __('Hongkong-Dollar'),
+                        'CHF' => __('Schweizer Franken'),
+                        'CAD' => __('Kanadischer Dollar'),
+                        'AUD' => __('Australischer Dollar'),
+                        'SEK' => __('Schwedische Krone'),
+                        default => strtoupper(trim((string) $currency)) ?: __('Unbekannt'),
+                    };
+                    $originalCurrencyName = $currencyName($stock->original_currency ?? null);
+                    $showOriginalPrice = is_numeric($stock->original_price ?? null)
+                        && filled($stock->original_currency ?? null)
+                        && strtoupper((string) $stock->original_currency) !== strtoupper((string) $stock->currency);
                     $chartMin = $chartPoints->isNotEmpty() ? (float) $chartPoints->min() : 0;
                     $chartMax = $chartPoints->isNotEmpty() ? (float) $chartPoints->max() : 1;
                     if ($predictionPrice !== null) {
@@ -154,7 +180,7 @@
                     x-data="{ signalInfoOpen: false }"
                 >
                     <div class="grid h-full min-h-0 gap-2 md:grid-cols-2 xl:grid-cols-6">
-                        <div class="relative h-full min-h-0 rounded-xl border border-amber-400/25 bg-amber-400/[.05] p-3 pt-5 xl:col-span-2">
+                        <div class="screener-chart-panel relative h-full min-h-0 rounded-xl border border-transparent p-3 pt-5 xl:col-span-2">
                             <div class="grid gap-3 md:grid-cols-[.85fr_1fr]">
                                 <div>
                                     <p class="screener-border-title text-amber-300">{{ __('Globales Ranking') }} @if($stock->screening_rank)<strong>#{{ $stock->screening_rank }}</strong>@endif</p>
@@ -221,7 +247,14 @@
                                 </div>
                                 <div>
                                 <p class="text-[9px] font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Kurs') }}</p>
-                                <p class="mt-2 text-2xl font-black">{{ is_numeric($stock->current_price) ? number_format((float) $stock->current_price, 2, ',', '.') : '—' }} <span class="text-xs text-[var(--ak-muted)]">{{ $stock->currency }}</span></p>
+                                <div class="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                    <p class="text-2xl font-black">{{ is_numeric($stock->current_price) ? number_format((float) $stock->current_price, 2, ',', '.') : '—' }} <span class="text-sm text-[var(--ak-muted)]">{{ $displayCurrencySymbol }}</span></p>
+                                    @if($showOriginalPrice)
+                                        <p class="whitespace-nowrap text-[10px] font-bold text-[var(--ak-muted)]" title="{{ __('Originalkurs') }} · {{ $stock->original_currency }}">
+                                            {{ __('Originalwährung') }} ({{ $originalCurrencyName }}): {{ number_format((float) $stock->original_price, 2, ',', '.') }} {{ $originalCurrencySymbol }}
+                                        </p>
+                                    @endif
+                                </div>
                                 <p class="mt-3 text-[9px] font-black uppercase text-[var(--ak-muted)]">{{ __('Rendite · 20 Tage') }}</p>
                                 <p class="mt-1 text-lg font-black {{ $returnClass }}">{{ $return !== null ? sprintf('%+.2f %%', $return) : '—' }}</p>
                                 </div>
@@ -253,24 +286,7 @@
                                         @endforelse
                                     </div>
                                 </details>
-                                <details class="group relative">
-                                    <summary title="{{ $isInPaperPortfolio ? __('Im Musterdepot') : __('Musterdepot') }}" aria-label="{{ __('Musterdepot') }}" class="relative flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-md border border-cyan-400/30 bg-cyan-400/[.08] text-cyan-300 {{ $isInPaperPortfolio ? 'shadow-[0_0_12px_rgba(34,211,238,.30)]' : '' }}">
-                                        <x-heroicon-o-beaker class="h-3.5 w-3.5" />
-                                        @if($isInPaperPortfolio)<span class="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-400 text-[8px] font-black text-slate-950">✓</span>@endif
-                                    </summary>
-                                    <div class="absolute right-0 top-10 z-40 min-w-64 space-y-1 rounded-xl border border-cyan-400/25 bg-[var(--ak-card)] p-2 shadow-2xl">
-                                        @forelse($matchingPaperPortfolios as $portfolio)
-                                            <form method="POST" action="{{ route('paper-depots.instruments.store', ['portfolio' => $portfolio->id, 'instrument' => $stock->instrument_id]) }}" class="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-cyan-400/10">
-                                                @csrf
-                                                <span class="min-w-0 flex-1 truncate text-[10px] font-bold">{{ $portfolio->name }} @if($stockPaperPortfolioIds->contains((int) $portfolio->id))<span class="text-emerald-300">✓</span>@endif</span>
-                                                <input name="quantity" type="number" min="1" max="100000" value="1" aria-label="{{ __('Stückzahl') }}" class="ak-input h-7 w-16 px-2 text-[10px]">
-                                                <button type="submit" class="h-7 rounded-md bg-cyan-500/20 px-2 text-[10px] font-black text-cyan-300">{{ __('Kaufen') }}</button>
-                                            </form>
-                                        @empty
-                                            <a href="{{ route('paper-depots.index') }}" class="block rounded-lg px-2.5 py-2 text-[10px] font-bold text-cyan-300">{{ __('Passendes Musterdepot erstellen') }}</a>
-                                        @endforelse
-                                    </div>
-                                </details>
+                                <x-paper-depot-buy :portfolios="$paperPortfolios" :instrument-id="$stock->instrument_id" :instrument-name="$stock->name ?: $stock->symbol" :currency="$stock->currency" :price="$stock->current_price" :score="$rankingScorePercent" compact />
                                 <a href="{{ route('stocks.show', ['symbol' => $stock->symbol, 'prediction' => $stock->id, 'return_to' => request()->getRequestUri()]) }}" title="{{ __('Zur Aktiendetailseite') }}" aria-label="{{ __('Details zu :stock anzeigen', ['stock' => $stock->name ?: $stock->symbol]) }}" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-violet-400/30 bg-violet-400/[.08] text-violet-300 transition hover:bg-violet-400/[.16]">
                                     <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
                                 </a>
@@ -278,7 +294,7 @@
                             </div>
                         </div>
                         <div class="grid h-full min-h-0 gap-2 sm:grid-cols-2 xl:col-span-2 xl:grid-rows-[auto_auto_1fr]">
-                            <div class="relative rounded-xl border border-amber-400/25 bg-amber-400/[.05] p-3 sm:col-span-2">
+                            <div class="screener-transparent-panel relative rounded-xl border p-3 sm:col-span-2">
                             <div class="screener-ranking-donuts">
                                 <div class="screener-metric-donut screener-metric-donut-score" style="--donut-value: {{ number_format($rankingScorePercent, 2, '.', '') }}%; --donut-color: {{ $rankingScoreColor }}" role="meter" aria-label="{{ __('Ranking-Score') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($rankingScorePercent, 1, '.', '') }}">
                                     <span>{{ number_format($rankingScorePercent, 0, ',', '.') }}</span><small>{{ __('KI-Score') }}</small>
@@ -301,7 +317,7 @@
                             </div>
                             <div class="mt-16"></div>
                             </div>
-                            <div class="grid grid-cols-3 gap-2 rounded-xl border border-amber-400/25 bg-amber-400/[.05] px-3 py-2 sm:col-span-2">
+                            <div class="screener-transparent-panel grid grid-cols-3 gap-2 rounded-xl border px-3 py-2 sm:col-span-2">
                                 <div>
                                     <p class="text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ __('Dividende') }}</p>
                                     <p class="mt-0.5 text-xs font-black text-amber-200">{{ $dividendYield !== null ? number_format($dividendYield, 2, ',', '.').'%' : '—' }}</p>
@@ -315,7 +331,7 @@
                                     <p class="mt-0.5 text-xs font-black text-amber-200">{{ $stock->sector_rank ? '#'.$stock->sector_rank : '—' }}</p>
                                 </div>
                             </div>
-                            <details class="company-description-card screener-company-card relative z-20 flex h-full min-h-0 flex-col rounded-xl border border-amber-400/25 bg-amber-400/[.05] p-3 sm:col-span-2">
+                            <details class="screener-transparent-panel company-description-card screener-company-card relative z-20 flex h-full min-h-0 flex-col rounded-xl border p-3 sm:col-span-2">
                                 <summary class="flex cursor-pointer list-none items-center justify-between gap-2">
                                     <div class="min-w-0 flex-1">
                                         <p class="text-[9px] font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Unternehmen') }}</p>
@@ -330,7 +346,7 @@
                         </div>
                         <div class="grid h-full min-h-0 gap-3 md:col-span-2 xl:col-span-2">
                         @if ($stock->assessment_is_detailed_buy)
-                        <details class="assessment-details-card relative z-20 h-full min-h-0 rounded-xl border border-amber-400/25 bg-amber-400/[.05] p-3">
+                        <details class="screener-transparent-panel assessment-details-card relative z-20 h-full min-h-0 rounded-xl border p-3">
                             <summary class="flex min-h-0 cursor-pointer list-none flex-col">
                                 <div class="flex items-start justify-between gap-2">
                                 <div class="min-w-0 flex-1">
@@ -380,7 +396,7 @@
                             </div>
                         </details>
                         @else
-                        <details class="simple-assessment-card relative z-20 h-full min-h-0 rounded-xl border border-amber-400/25 bg-amber-400/[.05] p-3">
+                        <details class="screener-transparent-panel simple-assessment-card relative z-20 h-full min-h-0 rounded-xl border p-3">
                             <summary class="flex min-h-0 cursor-pointer list-none flex-col">
                             <div class="flex items-start justify-between gap-2">
                                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">

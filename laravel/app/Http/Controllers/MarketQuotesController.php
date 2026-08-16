@@ -62,6 +62,15 @@ class MarketQuotesController extends Controller
                         \Illuminate\Support\Carbon::parse($latest->bar_time)->startOfDay()
                     ));
             $price = (float) $latest->close;
+            if ($previous && (! is_numeric($previous->close) || (float) $previous->close < $price * .5 || (float) $previous->close > $price * 2)) {
+                $previous = $symbolBars->first(fn (object $bar): bool =>
+                    $bar->interval === '1d'
+                    && is_numeric($bar->close)
+                    && \Illuminate\Support\Carbon::parse($bar->bar_time)->lt(\Illuminate\Support\Carbon::parse($latest->bar_time)->startOfDay())
+                    && (float) $bar->close >= $price * .5
+                    && (float) $bar->close <= $price * 2
+                );
+            }
             $previousPrice = $previous && is_numeric($previous->close) ? (float) $previous->close : null;
 
             return [

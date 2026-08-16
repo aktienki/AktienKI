@@ -13,8 +13,14 @@ final class RequirePlanLevel
 
     public function handle(Request $request, Closure $next, string $level): Response
     {
-        if ($request->user() && $this->access->allows($request->user(), $level)) return $next($request);
+        if ($request->user() && $this->access->allowsTariff($request->user(), $level)) return $next($request);
 
-        return redirect()->route('pricing')->with('status', __('Der Strategietester steht ab dem Plus-Tarif zur Verfügung.'));
+        $requiredPlan = match (strtolower($level)) {
+            'premium' => 'Premium',
+            'pro' => 'Pro',
+            default => 'Plus',
+        };
+
+        return redirect()->route('pricing')->with('status', __('Diese Speicherfunktion ist im :plan-Tarif verfügbar.', ['plan' => $requiredPlan]));
     }
 }

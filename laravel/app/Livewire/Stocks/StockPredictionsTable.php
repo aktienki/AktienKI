@@ -273,6 +273,9 @@ final class StockPredictionsTable extends Component
                 ->whereNull('deleted_at')
                 ->first(['id', 'symbol', 'name'])
             : null;
+        $paperPortfolios = DB::table('portfolios')->leftJoin('portfolio_cash_accounts as cash', 'cash.portfolio_id', '=', 'portfolios.id')
+            ->where('portfolios.user_id', auth()->id())->where('portfolios.active', true)->where('portfolios.type', 'paper')
+            ->orderByDesc('portfolios.is_default')->get(['portfolios.id','portfolios.name','portfolios.currency','portfolios.meta',DB::raw('COALESCE(cash.balance - cash.reserved_balance, 0) AS available_capital')]);
 
         return view('livewire.stocks.stock-predictions-table', [
             'rows' => $query->get(),
@@ -282,6 +285,7 @@ final class StockPredictionsTable extends Component
             'userWatchlists' => $userWatchlists,
             'watchlistMemberships' => $watchlistMemberships,
             'watchlistPickerInstrument' => $watchlistPickerInstrument,
+            'paperPortfolios' => $paperPortfolios,
         ]);
     }
 
@@ -306,6 +310,7 @@ final class StockPredictionsTable extends Component
             ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
+            ->where('instrument.is_german_tradeable', true)
             ->whereNull('instrument.deleted_at')
             ->select([
                 'instrument.id', 'instrument.symbol', 'instrument.name', 'instrument.country',

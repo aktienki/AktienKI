@@ -41,5 +41,6 @@
             <p class="mt-7 text-center text-xs text-slate-500">{{ __('Du kannst die Benachrichtigungen jederzeit über den Abmeldelink in der E-Mail beenden.') }}</p>
         </section>
     </main>
+<x-cookie-consent />
 </body>
 </html>

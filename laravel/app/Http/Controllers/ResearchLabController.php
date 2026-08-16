@@ -14,6 +14,8 @@ final class ResearchLabController extends Controller
 {
     public function index(Request $request): View
     {
+        $researchLabEnabled = (bool) $request->user()->is_admin
+            || strtolower((string) ($request->user()->role ?? '')) === 'admin';
         $query = DB::table('instruments')
             ->where('type', 'stock')
             ->where('is_active', true)
@@ -39,11 +41,20 @@ final class ResearchLabController extends Controller
             'exchanges' => $exchanges,
             'experiments' => $experiments,
             'universeCount' => $stocks->count(),
+            'researchLabEnabled' => $researchLabEnabled,
         ]);
     }
 
     public function start(Request $request): RedirectResponse
     {
+        $researchLabEnabled = (bool) $request->user()->is_admin
+            || strtolower((string) ($request->user()->role ?? '')) === 'admin';
+        if (! $researchLabEnabled) {
+            return back()->withErrors([
+                'research_lab' => __('Die Developer Area ist derzeit eine nicht interaktive Vorschau und wird demnächst limitiert freigeschaltet.'),
+            ]);
+        }
+
         $validated = $request->validate([
             'symbols' => ['required', 'array', 'min:1', 'max:50'],
             'symbols.*' => ['string', 'max:32'],

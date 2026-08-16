@@ -27,6 +27,7 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
             'locale' => ['sometimes', Rule::in(['de', 'en'])],
+            'country_code' => ['required', 'string', 'size:2', 'regex:/^[A-Za-z]{2}$/'],
             'risk_level' => ['sometimes', Rule::in(['cautious', 'normal', 'opportunity_oriented'])],
             'email_service' => ['sometimes', 'boolean'],
             'email_market_summary' => ['sometimes', 'boolean'],
