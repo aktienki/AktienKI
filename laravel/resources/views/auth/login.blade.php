@@ -32,7 +32,7 @@
                 <a href="{{ route('reviews.index') }}" class="hidden h-10 w-10 items-center justify-center rounded-xl text-[var(--ak-muted)] transition hover:bg-[var(--ak-surface-muted)] hover:text-[var(--ak-text)] lg:flex" title="{{ __('Bewertungen') }}" aria-label="{{ __('Bewertungen') }}"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke-linejoin="round"/></svg></a>
                 <x-preference-controls />
                 <a href="{{ route('login') }}" class="hidden w-24 justify-center rounded-lg border border-orange-400/25 bg-orange-400/15 px-3 py-2.5 text-sm font-bold leading-5 text-orange-400 sm:inline-flex">{{ __('Anmelden') }}</a>
-                <a href="{{ route('register') }}" class="hidden w-40 whitespace-nowrap justify-center rounded-lg border border-orange-400/25 bg-orange-400/10 px-3 py-2.5 text-sm font-bold leading-5 text-orange-400 transition hover:bg-orange-400/20 lg:inline-flex">{{ __('Als Tester registrieren') }}</a>
+                <button type="button" disabled class="hidden w-40 cursor-not-allowed whitespace-nowrap justify-center rounded-lg border border-slate-600/30 bg-slate-700/20 px-3 py-2.5 text-sm font-bold leading-5 text-slate-500 lg:inline-flex" aria-disabled="true">{{ __('Registrierung deaktiviert') }}</button>
                 <x-public-mobile-menu />
             </div>
         </div>
@@ -79,7 +79,7 @@
                     <div class="flex items-center"><label class="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" name="remember" class="rounded border-slate-600 bg-[#0b1830] text-orange-4000 focus:ring-orange-4000"><span>{{ __('Angemeldet bleiben') }}</span></label></div>
                     <button type="submit" class="h-11 w-full rounded-lg border border-orange-400/35 bg-orange-400/20 font-bold text-orange-400 shadow-lg shadow-orange-400/20 transition hover:bg-orange-400/30">{{ __('Anmelden') }}</button>
                 </form>
-                <p class="mt-4 text-center text-xs text-slate-500">{{ __('Noch kein Konto?') }} <a href="{{ route('register') }}" class="font-bold text-orange-400 hover:text-white">{{ __('Jetzt registrieren') }}</a></p>
+                <p class="mt-4 text-center text-xs text-slate-500">{{ __('Registrierungen sind während der geschlossenen Betaphase deaktiviert.') }}</p>
             </div>
         </section>
     </main>
