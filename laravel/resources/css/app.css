@@ -1976,6 +1976,10 @@ body:not(.welcome-background) :is(
         margin-inline: auto;
     }
 
+    main.ak-container {
+        padding-top: 0 !important;
+    }
+
     .ak-page {
         min-height: calc(100vh - clamp(5rem, 9vh, 7rem));
         display: flex;
@@ -3685,7 +3689,7 @@ body:not(.welcome-background) :is(
     .ak-app-topbar nav .ak-top-link svg,
     .ak-app-topbar nav .ak-top-link-active svg { width: 1.15rem; height: 1.15rem; }
     .ak-nav-scroll-button { width: 2.3rem !important; height: 2.3rem !important; }
-    main.ak-container { padding-top: .55rem !important; }
+    main.ak-container { padding-top: 0 !important; }
     .ak-detail-design { width: 100% !important; max-width: none !important; padding-top: .35rem !important; padding-bottom: 1rem !important; }
     .ak-detail-design :is(.ak-detail-hero, .ak-detail-panel, .ak-dashboard-card, .ak-standard-card) { border-radius: 1rem !important; }
     .ak-detail-design :is(.ak-detail-hero, .ak-detail-panel, .ak-dashboard-card, .ak-standard-card) { padding: .85rem !important; }

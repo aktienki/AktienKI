@@ -21,7 +21,7 @@
     <div class="ak-page-shell">
         <x-app-topbar />
 
-        <main class="ak-container py-2">
+        <main class="ak-container pb-2 pt-0">
             @yield('content')
         </main>
     </div>
