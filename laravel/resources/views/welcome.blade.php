@@ -182,6 +182,31 @@
         .coverage-bars{margin:-5px 0 14px;padding:11px 13px;border:1px solid rgba(82,241,255,.14);border-radius:13px;background:rgba(3,18,28,.4)}.coverage-bars-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;color:#789ba4;font-size:7px;font-weight:850;letter-spacing:.12em;text-transform:uppercase}.coverage-bars-title b{color:#d9fdff;font-size:8px}.coverage-bar{display:grid;grid-template-columns:48px 1fr 28px;gap:8px;align-items:center;margin-top:7px}.coverage-bar-label{color:#83a4ad;font-size:8px}.coverage-bar-track{height:5px;overflow:hidden;background:rgba(82,241,255,.09)}.coverage-bar-fill{display:block;width:var(--coverage-width);height:100%;transform:scaleX(0);transform-origin:left;background:linear-gradient(90deg,#168c9d,#52f1ff);box-shadow:0 0 8px rgba(82,241,255,.28);animation:coverageBarGrow 1s var(--coverage-delay) cubic-bezier(.2,.8,.2,1) forwards}.coverage-bar-value{text-align:right;color:#d9fdff;font-size:8px;font-weight:850}@keyframes coverageBarGrow{to{transform:scaleX(1)}}
         .hero-data-overview{display:grid;grid-template-columns:190px 1fr;gap:13px;margin:15px 0 12px}.hero-validated,.hero-coverage{border:1px solid rgba(82,241,255,.16);border-radius:13px;background:rgba(5,29,38,.72)}.hero-validated{position:relative;display:flex;flex-direction:column;justify-content:center;padding:10px 13px;overflow:hidden;border-color:rgba(246,185,31,.55);background:linear-gradient(135deg,rgba(246,185,31,.16),rgba(42,34,16,.58) 48%,rgba(5,29,38,.82));box-shadow:0 0 25px rgba(246,185,31,.12),inset 0 0 18px rgba(246,185,31,.05)}.hero-validated:after{content:"";position:absolute;top:-35px;right:-28px;width:90px;height:90px;border-radius:50%;background:rgba(246,185,31,.18);filter:blur(25px);pointer-events:none}.hero-validated span,.hero-validated strong,.hero-validated small{position:relative;z-index:1}.hero-validated span{color:#f3d98b;font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.hero-validated strong{margin-top:4px;color:#ffd45d;font-size:22px;line-height:1;text-shadow:0 0 13px rgba(246,185,31,.3)}.hero-validated small{display:block;margin-top:5px;color:#b8b096;font-size:7px;line-height:1.35}.hero-validated small b{color:#fff0b5}.hero-coverage{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:11px 13px}.hero-coverage-item span{display:flex;align-items:center;justify-content:space-between;gap:7px}.hero-coverage-item b{color:#88a7ae;font-size:8px}.hero-coverage-item strong{color:#dffcff;font-size:9px}.hero-coverage-item i{display:block;height:4px;margin-top:7px;overflow:hidden;background:rgba(82,241,255,.09)}.hero-coverage-item em{display:block;height:100%;background:linear-gradient(90deg,#168c9d,#52f1ff)}@media(min-width:1181px){.hero-grid>div:first-child{display:flex;min-height:555px;height:auto;flex-direction:column;padding-bottom:24px}.hero-features{flex:none;align-items:stretch}.hero-feature{height:auto;min-height:0;box-sizing:border-box}}@media(max-width:620px){.hero-data-overview{grid-template-columns:1fr}.hero-coverage{gap:8px}}
         .hero-validated strong{color:#52f1ff;text-shadow:0 0 13px rgba(82,241,255,.38)}
+        /* Safari und kleinere Desktop-Fenster stellen deutlich weniger nutzbare
+           Viewport-Höhe bereit. In diesem Fall bleibt der komplette Hero sichtbar,
+           ohne das Animationsfenster oder die unteren Featurekarten abzuschneiden. */
+        @media (min-width:1181px) and (max-height:950px){
+            .hero,.market-demo{min-height:calc(100dvh - 76px);padding-top:112px;padding-bottom:18px}
+            .hero-grid>div:first-child{min-height:0;padding-bottom:0}
+            .hero-grid>div:first-child:before{margin-bottom:8px;font-size:8px}
+            .hero h1{margin-bottom:10px;font-size:clamp(34px,3.25vw,45px);line-height:1}
+            .hero .lead{padding:10px 12px;font-size:11px;line-height:1.4}
+            .hero .not-chatbot{margin-top:7px;padding:7px 8px;font-size:9px;line-height:1.35}
+            .hero-data-overview{margin:9px 0;gap:9px}
+            .hero-validated{padding:8px 11px}
+            .hero-validated strong{font-size:19px}
+            .hero-validated small{margin-top:3px;font-size:6px}
+            .hero-coverage{gap:8px;padding:9px 10px}
+            .hero-features{gap:8px;margin-top:8px}
+            .hero-feature{padding:10px;min-height:0}
+            .hero-feature-head{padding-bottom:7px}
+            .hero-feature-icon{width:24px;height:24px}
+            .hero-feature strong{font-size:10px}
+            .hero-feature ul{gap:4px;margin-top:7px}
+            .hero-feature li{font-size:8px;line-height:1.25}
+            .market-panel{height:calc(100dvh - 224px);min-height:520px;max-height:650px}
+            .market-chart{height:calc(100% - 36px)}
+        }
     </style>
 </head>
 <body>
