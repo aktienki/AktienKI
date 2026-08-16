@@ -256,6 +256,7 @@
                 max-height:none;
                 grid-template-rows:auto minmax(0,1fr) auto;
             }
+            .market-demo{padding-bottom:86px}
             .beta-ribbon{
                 position:relative;
                 inset:auto;
@@ -286,14 +287,23 @@
             .horizon small{font-size:6px;line-height:1}
             .horizon strong{margin:2px 0;font-size:8px;line-height:1.1;white-space:nowrap}
             .horizon em{font-size:6px;line-height:1}
-            .market-chart{height:auto;min-height:280px;padding:90px 8px 10px}
+            .market-chart{height:auto;min-height:280px;padding:78px 8px 10px}
+            .market-chart .price-head{top:40px;left:8px;right:8px}
             .market-chart .chart-badge{display:none}
             .market-chart .chart-stage{
                 position:absolute;
-                inset:90px 8px 10px;
+                inset:78px 8px 10px;
                 width:auto;
                 height:auto;
                 min-height:180px;
+            }
+            #screener .scanner{overflow:visible}
+            #screener .screen{
+                display:block;
+                width:100%;
+                min-height:360px;
+                margin-top:22px;
+                box-sizing:border-box;
             }
             .quality-sequence .quality-message h2{font-size:25px}
             .quality-sequence .quality-message p{font-size:10px;line-height:1.4}
