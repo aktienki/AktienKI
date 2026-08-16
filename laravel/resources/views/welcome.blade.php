@@ -218,6 +218,12 @@
                 margin-inline:auto;
                 padding-inline:0;
             }
+            .hero>.home-wrap,
+            .market-demo>.home-wrap{
+                width:calc(100% - 32px);
+                margin-inline:auto;
+                padding-inline:0;
+            }
             .beta-ribbon{
                 position:relative;
                 inset:auto;
