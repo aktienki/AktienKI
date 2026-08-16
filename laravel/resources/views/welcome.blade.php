@@ -186,7 +186,7 @@
            Viewport-Höhe bereit. In diesem Fall bleibt der komplette Hero sichtbar,
            ohne das Animationsfenster oder die unteren Featurekarten abzuschneiden. */
         @media (min-width:1181px) and (max-height:950px){
-            .hero,.market-demo{min-height:calc(100dvh - 76px);padding-top:112px;padding-bottom:18px}
+            .hero,.market-demo{min-height:calc(100dvh - 76px);padding-top:128px;padding-bottom:18px}
             .hero-grid>div:first-child{min-height:0;padding-bottom:0}
             .hero-grid>div:first-child:before{margin-bottom:8px;font-size:8px}
             .hero h1{margin-bottom:10px;font-size:clamp(34px,3.25vw,45px);line-height:1}
