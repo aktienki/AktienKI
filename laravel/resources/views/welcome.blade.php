@@ -209,6 +209,12 @@
             .market-chart{height:calc(100% - 36px)}
         }
         @media (max-width:760px){
+            main>section>.home-wrap,
+            main>.kpis>.home-wrap{
+                width:calc(100% - 32px);
+                margin-inline:auto;
+                padding-inline:0;
+            }
             .beta-ribbon{
                 position:relative;
                 inset:auto;
