@@ -224,6 +224,32 @@
                 margin-inline:auto;
                 padding-inline:0;
             }
+            .hero-data-overview,
+            .hero-features,
+            .features,
+            .kpi-grid,
+            .home-plan-grid,
+            .process,
+            .entry-exit-grid,
+            .command-grid,
+            .scanner{
+                grid-template-columns:minmax(0,1fr);
+            }
+            .hero-validated,
+            .hero-coverage,
+            .hero-feature,
+            .market-panel,
+            .quality-stage,
+            .feature,
+            .command-center,
+            .scanner,
+            .entry-exit-panel,
+            .home-pricing,
+            .home-plan,
+            .cta-box{
+                width:100%;
+                max-width:none;
+            }
             .beta-ribbon{
                 position:relative;
                 inset:auto;
