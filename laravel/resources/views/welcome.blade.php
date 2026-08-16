@@ -274,14 +274,23 @@
             .market-chart{height:378px;padding:98px 8px 14px}
             .market-chart .chart-stage{height:calc(100% - 24px)}
             .final-invitation{
-                inset:auto 0 0;
+                position:relative;
+                inset:auto;
+                grid-column:1/-1;
                 min-height:0;
                 height:auto;
-                padding:26px 18px;
-                border-top:1px solid rgba(82,241,255,.22);
+                max-height:0;
+                overflow:hidden;
+                padding:0 18px;
+                border-top:0 solid rgba(82,241,255,.22);
+                animation:finalInvitationMobileIn .65s 25s ease-out forwards!important;
             }
             .final-invitation h2{font-size:28px}
             .final-invitation p{margin:12px auto 16px;font-size:12px}
+            @keyframes finalInvitationMobileIn{
+                from{max-height:0;padding-block:0;border-top-width:0;opacity:0;visibility:hidden;transform:translateY(8px)}
+                to{max-height:360px;padding-block:26px;border-top-width:1px;opacity:1;visibility:visible;transform:translateY(0)}
+            }
         }
     </style>
 </head>
