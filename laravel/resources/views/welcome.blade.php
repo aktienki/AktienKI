@@ -236,6 +236,8 @@
                 padding:12px 6px;
             }
             .market-top .donut{width:68px;height:68px}
+            .market-chart{height:420px;padding:104px 8px 16px}
+            .market-chart .chart-stage{height:calc(100% - 24px)}
         }
     </style>
 </head>
