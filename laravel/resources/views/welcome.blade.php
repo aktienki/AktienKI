@@ -230,6 +230,12 @@
             .beta-request-button{margin-top:2px}
             .hero{padding-top:24px}
             .hero-grid>div:first-child:before{margin-bottom:12px;line-height:1.5}
+            .market-top .donuts{
+                grid-template-columns:repeat(3,minmax(0,1fr));
+                gap:10px 6px;
+                padding:12px 6px;
+            }
+            .market-top .donut{width:68px;height:68px}
         }
     </style>
 </head>
