@@ -334,6 +334,11 @@ BASH, 15);
             '-i', (string) $mini['identity_file'],
         ];
 
+        $knownHostsFile = (string) ($mini['known_hosts_file'] ?? '');
+        if ($knownHostsFile !== '') {
+            array_push($arguments, '-o', 'UserKnownHostsFile='.$knownHostsFile);
+        }
+
         $controlPath = (string) ($mini['control_path'] ?? '');
         if ($controlPath !== '' && file_exists($controlPath)) {
             array_push($arguments, '-o', 'ControlMaster=no', '-o', 'ControlPath='.$controlPath);

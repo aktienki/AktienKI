@@ -13,6 +13,7 @@ return [
 
             return rtrim($home, '/').'/.ssh/aktienki_macmini';
         })()),
+        'known_hosts_file' => env('MINI_PC_KNOWN_HOSTS_FILE'),
         'control_path' => env('MINI_PC_CONTROL_PATH', '/private/tmp/aktienki-mini-control'),
         'project_path' => env('MINI_PC_PROJECT_PATH', '/home/akiadmin/projects/ml/AktienKI-Python-Engine'),
         'database_tunnel_port' => (int) env('MINI_PC_DATABASE_TUNNEL_PORT', 25432),
