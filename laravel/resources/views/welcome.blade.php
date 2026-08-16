@@ -304,6 +304,9 @@
                 min-height:360px;
                 margin-top:22px;
                 box-sizing:border-box;
+                background-size:310% 100%;
+                background-position:left top;
+                background-repeat:no-repeat;
             }
             .quality-sequence .quality-message h2{font-size:25px}
             .quality-sequence .quality-message p{font-size:10px;line-height:1.4}
