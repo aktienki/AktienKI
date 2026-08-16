@@ -287,6 +287,7 @@
             .horizon strong{margin:2px 0;font-size:8px;line-height:1.1;white-space:nowrap}
             .horizon em{font-size:6px;line-height:1}
             .market-chart{height:auto;min-height:280px;padding:90px 8px 10px}
+            .market-chart .chart-badge{display:none}
             .market-chart .chart-stage{
                 position:absolute;
                 inset:90px 8px 10px;
