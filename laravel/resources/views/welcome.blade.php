@@ -301,10 +301,11 @@
             #screener .screen{
                 display:block;
                 width:100%;
-                min-height:360px;
+                min-height:0;
+                aspect-ratio:1.1;
                 margin-top:22px;
                 box-sizing:border-box;
-                background-size:310% 100%;
+                background-size:auto 100%;
                 background-position:left top;
                 background-repeat:no-repeat;
             }
