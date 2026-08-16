@@ -363,7 +363,7 @@
 </div></header>
 <aside class="beta-ribbon" aria-label="{{ __('Informationen zur Betaphase') }}">
     <div class="beta-current"><span class="pulse"></span><span class="beta-current-copy"><small>{{ __('AKTUELLE PHASE') }}</small><b>{{ __('Geschlossener Betatest') }}</b></span></div>
-    <div class="beta-preview"><span class="beta-preview-copy"><strong>{{ __('ÖFFENTLICHE BETA STARTET BALD') }}</strong><span><b>{{ __('Nur noch') }} {{ max(0, ($betaTesterLimit ?? 20) - ($betaTesterCount ?? 0)) }} {{ __('von') }} {{ $betaTesterLimit ?? 20 }} {{ __('Plätzen verfügbar') }}</b> · {{ __('1 Jahr Pro kostenlos · Aktive Mitarbeit erwünscht') }}</span></span><button type="button" class="beta-request-button" data-beta-request-open>{{ __('Beta-Zugang anfragen') }} →</button></div>
+    <div class="beta-preview"><span class="beta-preview-copy"><strong>{{ __('ÖFFENTLICHE BETA STARTET BALD') }}</strong><span><b>{{ __('Nur noch') }} {{ max(0, ($betaTesterLimit ?? 20) - ($betaTesterCount ?? 0)) }} {{ __('von') }} {{ $betaTesterLimit ?? 20 }} {{ __('Plätzen verfügbar') }}</b> · {{ __('1 Jahr Pro kostenlos · Möchtest du von Anfang an dabei sein?') }}</span></span><button type="button" class="beta-request-button" data-beta-request-open>{{ __('Beta-Zugang anfragen') }} →</button></div>
 </aside>
 <dialog class="beta-request-dialog" data-beta-request-dialog>
     @if (session('beta_request_success'))
