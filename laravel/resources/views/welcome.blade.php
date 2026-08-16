@@ -241,6 +241,15 @@
             .market-top .donut{width:68px;height:68px}
             .market-chart{height:420px;padding:104px 8px 16px}
             .market-chart .chart-stage{height:calc(100% - 24px)}
+            .final-invitation{
+                inset:auto 0 0;
+                min-height:0;
+                height:auto;
+                padding:26px 18px;
+                border-top:1px solid rgba(82,241,255,.22);
+            }
+            .final-invitation h2{font-size:28px}
+            .final-invitation p{margin:12px auto 16px;font-size:12px}
         }
     </style>
 </head>
