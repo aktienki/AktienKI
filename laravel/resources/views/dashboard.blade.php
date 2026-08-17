@@ -454,42 +454,70 @@
             .dashboard-bento-signals { grid-column: 9 / span 4; grid-row: 4 / span 3; }
         }
 
-        /*
-         * A desktop browser rarely has the full monitor height available. Keep the
-         * dense bento layout on tall screens, but never crop actions on laptops or
-         * in non-fullscreen browser windows. The dashboard then becomes one
-         * scrollable page while the card proportions stay intact.
-         */
+        /* Compact desktop mode: retain the complete dashboard within one viewport. */
         @media (min-width: 1280px) and (max-height: 1100px) {
             html:has(#personal-dashboard),
             body:has(#personal-dashboard) {
-                height: auto;
-                min-height: 100dvh;
-                overflow-x: hidden;
-                overflow-y: auto;
-                overscroll-behavior-y: auto;
+                height: 100dvh;
+                overflow: hidden;
+                overscroll-behavior: none;
             }
             #personal-dashboard {
-                height: auto !important;
-                min-height: calc(100dvh - 89px) !important;
-                overflow: visible !important;
+                height: calc(100dvh - 89px) !important;
+                min-height: 0 !important;
+                overflow: hidden !important;
             }
             #personal-dashboard > .ak-container {
-                height: auto !important;
-                min-height: calc(100dvh - 89px) !important;
+                height: 100% !important;
+                min-height: 0 !important;
+                padding-top: .75rem;
+                padding-bottom: .75rem;
             }
+            #personal-dashboard header { margin-bottom: .65rem; }
+            #personal-dashboard header h1 { margin-top: .1rem; font-size: 1.55rem; line-height: 1.8rem; }
             #personal-dashboard .dashboard-bento {
-                flex: none;
-                min-height: 920px;
+                flex: 1 1 0%;
+                min-height: 0;
+                gap: .6rem;
                 grid-template-rows: repeat(6, minmax(0, 1fr));
             }
+            #personal-dashboard .ak-dashboard-card { padding: .7rem; }
+            #personal-dashboard .dashboard-bento-strategy { min-height: 0; padding: .55rem .7rem; }
+            #personal-dashboard .dashboard-bento-personal > div:last-child,
+            #personal-dashboard .dashboard-bento-community > div:last-child { margin-top: .45rem; gap: .4rem; }
+            #personal-dashboard .dashboard-bento-personal a,
+            #personal-dashboard .dashboard-bento-personal button,
+            #personal-dashboard .dashboard-bento-personal > div:last-child > div,
+            #personal-dashboard .dashboard-bento-community > div:last-child > div { padding: .45rem .55rem; }
+            #personal-dashboard .dashboard-bento-personal a small,
+            #personal-dashboard .dashboard-bento-personal button small,
+            #personal-dashboard .dashboard-bento-personal > div:last-child > div small,
+            #personal-dashboard .dashboard-bento-community small { margin-top: .3rem; }
+            #personal-dashboard .dashboard-bento-market > div:nth-child(2) { margin-top: .65rem; }
+            #personal-dashboard .dashboard-bento-market > p { margin-top: .65rem; font-size: .7rem; line-height: 1.15rem; }
+            #personal-dashboard .dashboard-bento-models > div:first-child,
+            #personal-dashboard .dashboard-bento-signals > div:first-child { margin-bottom: .55rem; }
+            #personal-dashboard .dashboard-bento-models > div:last-child { gap: .3rem; }
+            #personal-dashboard .dashboard-bento-models > div:last-child > div { padding-top: .35rem; padding-bottom: .35rem; }
         }
 
         @media (min-width: 1280px) and (max-height: 850px) {
-            #personal-dashboard > .ak-container { padding-top: .75rem; padding-bottom: .75rem; }
-            #personal-dashboard header { margin-bottom: .75rem; }
-            #personal-dashboard .dashboard-bento { min-height: 880px; gap: .6rem; }
-            #personal-dashboard .ak-dashboard-card { padding: .8rem; }
+            #personal-dashboard > .ak-container { padding-top: .5rem; padding-bottom: .5rem; }
+            #personal-dashboard header { margin-bottom: .4rem; }
+            #personal-dashboard header h1 { font-size: 1.3rem; line-height: 1.5rem; }
+            #personal-dashboard .dashboard-bento { gap: .45rem; }
+            #personal-dashboard .ak-dashboard-card { padding: .55rem; }
+            #personal-dashboard .dashboard-bento-personal > div:first-child,
+            #personal-dashboard .dashboard-bento-community > div:first-child { transform: scale(.9); transform-origin: left top; }
+            #personal-dashboard .dashboard-bento-personal a,
+            #personal-dashboard .dashboard-bento-personal button,
+            #personal-dashboard .dashboard-bento-personal > div:last-child > div,
+            #personal-dashboard .dashboard-bento-community > div:last-child > div { padding: .3rem .45rem; }
+            #personal-dashboard .dashboard-bento-personal .h-8,
+            #personal-dashboard .dashboard-bento-community .h-8 { height: 1.55rem; width: 1.55rem; }
+            #personal-dashboard .dashboard-bento-personal .text-lg,
+            #personal-dashboard .dashboard-bento-community .text-lg { font-size: .9rem; }
+            #personal-dashboard .dashboard-bento-market > p { font-size: .65rem; line-height: 1rem; }
         }
         .dashboard-aki-dots { display: inline-block; min-width: 1.6em; letter-spacing: .12em; animation: dashboard-aki-pulse 1.1s steps(4, end) infinite; }
         @keyframes dashboard-aki-pulse { 0%,20% { opacity: .25; } 40% { opacity: .65; } 60%,100% { opacity: 1; } }
