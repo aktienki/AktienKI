@@ -9,6 +9,12 @@
             'aggressive' => __('Offensiv'),
         ];
         $isOpportunityProfile = in_array($riskProfile, ['opportunity_oriented', 'opportunity', 'aggressive'], true);
+        $dashboardDefaultTiles = ['paper-depots', 'watchlists', 'strategies', 'labels', 'reminders', 'best-buy', 'best-wait'];
+        $dashboardSelectedTiles = array_values(array_intersect(
+            (array) data_get(auth()->user()->preferences, 'dashboard.personal_tiles', $dashboardDefaultTiles),
+            ['paper-depots', 'watchlists', 'strategies', 'labels', 'reminders', 'best-buy', 'best-wait', 'watchlist-screener', 'predictions', 'smart-screener', 'market-report', 'stock-comparison']
+        ));
+        $dashboardTileVisible = fn (string $id): bool => in_array($id, $dashboardSelectedTiles, true);
     @endphp
 
     <main id="personal-dashboard" class="ak-body min-h-[calc(100dvh-73px)] xl:h-[calc(100dvh-89px)] xl:min-h-0 xl:overflow-hidden">
@@ -100,16 +106,16 @@
                                     <h2 class="mt-0.5 text-sm font-black text-[var(--ak-text)]">{{ __('Überblick') }}</h2>
                                 </div>
                             </div>
-                            <x-heroicon-o-arrow-up-right class="h-4 w-4 text-orange-400" />
+                            <button type="button" data-dashboard-layout-open class="grid h-9 w-9 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/[.08] text-orange-400 transition hover:border-orange-300/50 hover:bg-orange-400/[.16]" title="{{ __('Persönlichen Bereich anpassen') }}" aria-label="{{ __('Persönlichen Bereich anpassen') }}"><x-heroicon-o-cog-6-tooth class="h-4.5 w-4.5" /></button>
                         </div>
                         <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                             @foreach ([
-                                [__('Musterdepots'), $overview['paper_depots'], 'heroicon-o-beaker', route('paper-depots.index'), true, null],
-                                [__('Watchlists'), $overview['watchlists'], 'heroicon-o-star', route('watchlists.index'), true, null],
-                                [__('Strategien'), $overview['strategies'], 'heroicon-o-adjustments-horizontal', route('setup.saved-filters.index'), $canUsePro, 'PRO'],
-                                [__('Labels'), $overview['labels'], 'heroicon-o-tag', route('setup.quality'), $canUsePlus, 'PLUS'],
-                            ] as [$label, $count, $icon, $url, $allowed, $requiredPlan])
-                                <a href="{{ $allowed ? $url : route('pricing') }}" class="group relative min-w-0 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-3 transition {{ $allowed ? 'hover:border-orange-300/45 hover:bg-orange-400/[.10]' : 'dashboard-plan-locked' }}" title="{{ $allowed ? $label : __('Ab :plan verfügbar', ['plan' => $requiredPlan]) }}">
+                                ['paper-depots', __('Musterdepots'), $overview['paper_depots'], 'heroicon-o-beaker', route('paper-depots.index'), true, null],
+                                ['watchlists', __('Watchlists'), $overview['watchlists'], 'heroicon-o-star', route('watchlists.index'), true, null],
+                                ['strategies', __('Strategien'), $overview['strategies'], 'heroicon-o-adjustments-horizontal', route('setup.saved-filters.index'), $canUsePro, 'PRO'],
+                                ['labels', __('Labels'), $overview['labels'], 'heroicon-o-tag', route('setup.quality'), $canUsePlus, 'PLUS'],
+                            ] as [$tileId, $label, $count, $icon, $url, $allowed, $requiredPlan])
+                                <a href="{{ $allowed ? $url : route('pricing') }}" data-dashboard-tile="{{ $tileId }}" data-dashboard-tile-label="{{ $label }}" class="group relative min-w-0 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-3 transition {{ $dashboardTileVisible($tileId) ? '' : 'hidden' }} {{ $allowed ? 'hover:border-orange-300/45 hover:bg-orange-400/[.10]' : 'dashboard-plan-locked' }}" title="{{ $allowed ? $label : __('Ab :plan verfügbar', ['plan' => $requiredPlan]) }}">
                                     @unless($allowed)<span class="dashboard-plan-mini-badge">{{ $requiredPlan }}</span>@endunless
                                     <span class="flex items-center gap-2">
                                         <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400 group-hover:border-orange-200/45"><x-dynamic-component :component="$icon" class="h-4 w-4" /></span>
@@ -118,7 +124,7 @@
                                     <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $label }}</small>
                                 </a>
                             @endforeach
-                            <button type="button" @if($canManageMessages) data-message-settings-open @endif class="group relative min-w-0 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-3 text-left transition {{ $canManageMessages ? 'hover:border-orange-300/45 hover:bg-orange-400/[.10]' : 'cursor-not-allowed opacity-60' }}" title="{{ $canManageMessages ? __('Nachrichten verwalten') : __('Ab Pro verfügbar') }}">
+                            <button type="button" data-dashboard-tile="reminders" data-dashboard-tile-label="{{ __('E-Mail-Erinnerungen') }}" @if($canManageMessages) data-message-settings-open @endif class="group relative min-w-0 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-3 text-left transition {{ $dashboardTileVisible('reminders') ? '' : 'hidden' }} {{ $canManageMessages ? 'hover:border-orange-300/45 hover:bg-orange-400/[.10]' : 'cursor-not-allowed opacity-60' }}" title="{{ $canManageMessages ? __('Nachrichten verwalten') : __('Ab Pro verfügbar') }}">
                                 @unless($canManageMessages)<span class="ak-plan-badge ak-plan-badge--pro absolute right-2 top-2">PRO</span>@endunless
                                 <span class="flex items-center gap-2">
                                     <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400"><x-heroicon-o-envelope class="h-4 w-4" /></span>
@@ -128,28 +134,40 @@
                             </button>
                             @if ($topStockToday)
                                 @php $topStockScore = \App\Support\AiScore::toTen(is_numeric($topStockToday->ai_score) ? $topStockToday->ai_score : $topStockToday->prediction_score); @endphp
-                                <a href="{{ route('stocks.show', ['symbol' => $topStockToday->symbol, 'prediction' => $topStockToday->prediction_id, 'return_to' => '/dashboard']) }}" class="group min-w-0 rounded-xl border border-emerald-400/25 bg-emerald-400/[.055] px-3 py-3 transition hover:border-emerald-300/50 hover:bg-emerald-400/[.11]" title="{{ $topStockToday->name }}">
+                                <a href="{{ route('stocks.show', ['symbol' => $topStockToday->symbol, 'prediction' => $topStockToday->prediction_id, 'return_to' => '/dashboard']) }}" data-dashboard-tile="best-buy" data-dashboard-tile-label="{{ __('Beste BUY-Aktie') }}" class="group min-w-0 rounded-xl border border-emerald-400/25 bg-emerald-400/[.055] px-3 py-3 transition hover:border-emerald-300/50 hover:bg-emerald-400/[.11] {{ $dashboardTileVisible('best-buy') ? '' : 'hidden' }}" title="{{ $topStockToday->name }}">
                                     <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-emerald-400/25 bg-emerald-400/10 text-emerald-400"><x-heroicon-o-trophy class="h-4 w-4" /></span><span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $topStockToday->symbol }}</b><small class="block text-[8px] font-black text-emerald-400">{{ $topStockScore !== null ? number_format($topStockScore, 1, ',', '.').'/10' : '—' }}</small></span></span>
                                     <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Beste BUY-Aktie') }}</small>
                                 </a>
                             @else
-                                <div class="min-w-0 rounded-xl border border-orange-400/15 bg-orange-400/[.025] px-3 py-3 opacity-70"><span class="flex items-center gap-2"><span class="grid h-8 w-8 place-items-center rounded-lg border border-orange-400/20 text-orange-400"><x-heroicon-o-trophy class="h-4 w-4" /></span><b class="text-lg text-[var(--ak-muted)]">—</b></span><small class="mt-2 block truncate text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Beste BUY-Aktie') }}</small></div>
+                                <div data-dashboard-tile="best-buy" data-dashboard-tile-label="{{ __('Beste BUY-Aktie') }}" class="min-w-0 rounded-xl border border-orange-400/15 bg-orange-400/[.025] px-3 py-3 opacity-70 {{ $dashboardTileVisible('best-buy') ? '' : 'hidden' }}"><span class="flex items-center gap-2"><span class="grid h-8 w-8 place-items-center rounded-lg border border-orange-400/20 text-orange-400"><x-heroicon-o-trophy class="h-4 w-4" /></span><b class="text-lg text-[var(--ak-muted)]">—</b></span><small class="mt-2 block truncate text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Beste BUY-Aktie') }}</small></div>
                             @endif
                             @php
                                 $topWaitScore = $topWaitStock ? \App\Support\AiScore::toTen(is_numeric($topWaitStock->ai_score) ? $topWaitStock->ai_score : $topWaitStock->prediction_score) : null;
                             @endphp
                             @if ($topWaitStock && $canManageMessages)
-                                <a href="{{ route('stocks.show', ['symbol' => $topWaitStock->symbol, 'prediction' => $topWaitStock->prediction_id, 'return_to' => '/dashboard']) }}" class="group min-w-0 rounded-xl border border-amber-400/25 bg-amber-400/[.055] px-3 py-3 transition hover:border-amber-300/50 hover:bg-amber-400/[.11]" title="{{ $topWaitStock->name }}">
+                                <a href="{{ route('stocks.show', ['symbol' => $topWaitStock->symbol, 'prediction' => $topWaitStock->prediction_id, 'return_to' => '/dashboard']) }}" data-dashboard-tile="best-wait" data-dashboard-tile-label="{{ __('Beste WAIT-Aktie') }}" class="group min-w-0 rounded-xl border border-amber-400/25 bg-amber-400/[.055] px-3 py-3 transition hover:border-amber-300/50 hover:bg-amber-400/[.11] {{ $dashboardTileVisible('best-wait') ? '' : 'hidden' }}" title="{{ $topWaitStock->name }}">
                                     <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-amber-400/25 bg-amber-400/10 text-amber-400"><x-heroicon-o-clock class="h-4 w-4" /></span><span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $topWaitStock->symbol }}</b><small class="block text-[8px] font-black text-amber-400">{{ $topWaitScore !== null ? number_format($topWaitScore, 1, ',', '.').'/10' : '—' }}</small></span></span>
                                     <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Beste WAIT-Aktie') }}</small>
                                 </a>
                             @else
-                                <div class="relative min-w-0 rounded-xl border border-slate-500/20 bg-slate-500/[.035] px-3 py-3 opacity-55" title="{{ $canManageMessages ? __('Keine WAIT-Aktie verfügbar') : __('Ab Pro verfügbar') }}">
+                                <div data-dashboard-tile="best-wait" data-dashboard-tile-label="{{ __('Beste WAIT-Aktie') }}" class="relative min-w-0 rounded-xl border border-slate-500/20 bg-slate-500/[.035] px-3 py-3 opacity-55 {{ $dashboardTileVisible('best-wait') ? '' : 'hidden' }}" title="{{ $canManageMessages ? __('Keine WAIT-Aktie verfügbar') : __('Ab Pro verfügbar') }}">
                                     @unless($canManageMessages)<span class="ak-plan-badge ak-plan-badge--pro absolute right-2 top-2">PRO</span>@endunless
                                     <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-500/25 text-slate-400"><x-heroicon-o-clock class="h-4 w-4" /></span><span class="min-w-0"><b class="block truncate text-sm font-black text-slate-400">{{ $topWaitStock?->symbol ?: '—' }}</b><small class="block text-[8px] font-black text-slate-500">{{ $topWaitScore !== null ? number_format($topWaitScore, 1, ',', '.').'/10' : '—' }}</small></span></span>
                                     <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-slate-500">{{ __('Beste WAIT-Aktie') }}</small>
                                 </div>
                             @endif
+                            @foreach ([
+                                ['watchlist-screener', __('Watchlist im Screener'), 'heroicon-o-funnel', route('screener.index', ['source' => 'watchlist'])],
+                                ['predictions', __('Prognosetabelle'), 'heroicon-o-table-cells', route('predictions.index')],
+                                ['smart-screener', __('Smart Screener'), 'heroicon-o-magnifying-glass', route('screener.index')],
+                                ['market-report', __('Aktuelle Marktlage'), 'heroicon-o-globe-europe-africa', route('daily-market-analysis')],
+                                ['stock-comparison', __('Aktien vergleichen'), 'heroicon-o-scale', route('stocks.compare')],
+                            ] as [$tileId, $label, $icon, $url])
+                                <a href="{{ $url }}" data-dashboard-tile="{{ $tileId }}" data-dashboard-tile-label="{{ $label }}" class="group min-w-0 rounded-xl border border-cyan-400/20 bg-cyan-400/[.045] px-3 py-3 transition hover:border-cyan-300/45 hover:bg-cyan-400/[.10] {{ $dashboardTileVisible($tileId) ? '' : 'hidden' }}">
+                                    <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/25 bg-cyan-400/10 text-cyan-300"><x-dynamic-component :component="$icon" class="h-4 w-4" /></span><x-heroicon-o-arrow-up-right class="ml-auto h-4 w-4 text-cyan-300" /></span>
+                                    <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $label }}</small>
+                                </a>
+                            @endforeach
                         </div>
                     </article>
                     <a href="{{ route('community.index') }}" class="dashboard-bento-community ak-card ak-dashboard-card block shrink-0 overflow-hidden border-orange-400/35 p-4 transition hover:border-orange-200/60">
@@ -293,6 +311,36 @@
 
         </div>
 
+        <div id="dashboard-layout-modal" class="fixed inset-0 z-[185] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="dashboard-layout-title">
+            <section class="flex max-h-[min(760px,92dvh)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
+                <header class="flex items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-5 py-4">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-300"><x-heroicon-o-cog-6-tooth class="h-5 w-5" /></span>
+                        <div><p class="text-[9px] font-black uppercase tracking-[.18em] text-cyan-300">{{ __('Persönlicher Bereich') }}</p><h2 id="dashboard-layout-title" class="mt-1 text-lg font-black">{{ __('Dashboard anpassen') }}</h2></div>
+                    </div>
+                    <button type="button" data-dashboard-layout-close class="grid h-9 w-9 place-items-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)] transition hover:text-[var(--ak-text)]"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
+                </header>
+                <div class="min-h-0 overflow-y-auto p-4 sm:p-5">
+                    <p class="mb-4 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Ziehe Kacheln zwischen den Bereichen. In der linken Spalte kannst du außerdem ihre Reihenfolge verändern.') }}</p>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <section class="rounded-xl border border-cyan-400/25 bg-cyan-400/[.035] p-3">
+                            <div class="mb-3 flex items-center justify-between"><h3 class="text-xs font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Auf deinem Dashboard') }}</h3><span data-dashboard-layout-count class="text-[10px] font-black text-[var(--ak-muted)]"></span></div>
+                            <div data-dashboard-layout-active class="dashboard-layout-dropzone grid min-h-48 gap-2 rounded-lg border border-dashed border-cyan-400/20 p-2"></div>
+                        </section>
+                        <section class="rounded-xl border border-slate-400/20 bg-slate-400/[.025] p-3">
+                            <h3 class="mb-3 text-xs font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Verfügbare Kacheln') }}</h3>
+                            <div data-dashboard-layout-available class="dashboard-layout-dropzone grid min-h-48 gap-2 rounded-lg border border-dashed border-slate-400/20 p-2"></div>
+                        </section>
+                    </div>
+                    <p data-dashboard-layout-status class="mt-3 min-h-5 text-[10px] font-bold text-cyan-300"></p>
+                </div>
+                <footer class="flex flex-wrap items-center justify-between gap-2 border-t border-cyan-400/20 px-5 py-4">
+                    <button type="button" data-dashboard-layout-reset class="rounded-lg border border-[var(--ak-border)] px-3 py-2 text-[10px] font-black text-[var(--ak-muted)] transition hover:text-[var(--ak-text)]">{{ __('Standard wiederherstellen') }}</button>
+                    <div class="flex gap-2"><button type="button" data-dashboard-layout-close class="rounded-lg border border-[var(--ak-border)] px-4 py-2 text-xs font-black text-[var(--ak-muted)]">{{ __('Abbrechen') }}</button><button type="button" data-dashboard-layout-save class="rounded-lg bg-cyan-400 px-4 py-2 text-xs font-black text-slate-950 transition hover:bg-cyan-300">{{ __('Änderungen speichern') }}</button></div>
+                </footer>
+            </section>
+        </div>
+
         @if ($canManageMessages)
             <div id="message-settings-modal" class="fixed inset-0 z-[190] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="message-settings-title">
                 <section class="flex max-h-[min(720px,90dvh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
@@ -343,6 +391,91 @@
         </div>
     </main>
     <script>
+        (() => {
+            const modal = document.getElementById('dashboard-layout-modal');
+            const tileGrid = document.querySelector('.dashboard-bento-personal > div:last-child');
+            const activeZone = modal?.querySelector('[data-dashboard-layout-active]');
+            const availableZone = modal?.querySelector('[data-dashboard-layout-available]');
+            if (!modal || !tileGrid || !activeZone || !availableZone) return;
+
+            const defaults = @json($dashboardDefaultTiles);
+            const catalog = new Map([...tileGrid.querySelectorAll('[data-dashboard-tile]')].map((tile) => [tile.dataset.dashboardTile, {
+                id: tile.dataset.dashboardTile,
+                label: tile.dataset.dashboardTileLabel || tile.dataset.dashboardTile,
+                element: tile,
+            }]));
+            let selected = @json($dashboardSelectedTiles).filter((id) => catalog.has(id));
+            let dragged = null;
+
+            const createChoice = (item, active) => {
+                const choice = document.createElement('div');
+                choice.draggable = true;
+                choice.dataset.tileId = item.id;
+                choice.className = 'dashboard-layout-choice flex cursor-grab items-center gap-3 rounded-lg border border-cyan-400/20 bg-slate-950/25 px-3 py-2.5 active:cursor-grabbing';
+                choice.innerHTML = `<span class="text-cyan-300" aria-hidden="true">⠿</span><b class="min-w-0 flex-1 truncate text-xs"></b><button type="button" class="grid h-7 w-7 place-items-center rounded-md border border-cyan-400/20 text-cyan-300" aria-label="${active ? '{{ __('Entfernen') }}' : '{{ __('Hinzufügen') }}'}">${active ? '→' : '←'}</button>`;
+                choice.querySelector('b').textContent = item.label;
+                choice.querySelector('button').addEventListener('click', () => {
+                    (choice.parentElement === activeZone ? availableZone : activeZone).appendChild(choice);
+                    render();
+                });
+                choice.addEventListener('dragstart', () => { dragged = choice; choice.classList.add('opacity-40'); });
+                choice.addEventListener('dragend', () => { choice.classList.remove('opacity-40'); dragged = null; render(); });
+                return choice;
+            };
+
+            const syncSelected = () => {
+                selected = [...activeZone.querySelectorAll('[data-tile-id]')].map((item) => item.dataset.tileId);
+                modal.querySelector('[data-dashboard-layout-count]').textContent = `${selected.length} / 9`;
+            };
+            const render = () => {
+                [...activeZone.children].forEach((node) => {
+                    const button = node.querySelector('button'); if (button) button.textContent = '→';
+                });
+                [...availableZone.children].forEach((node) => {
+                    const button = node.querySelector('button'); if (button) button.textContent = '←';
+                });
+                syncSelected();
+                if (selected.length < 1) modal.querySelector('[data-dashboard-layout-status]').textContent = '{{ __('Bitte wähle mindestens eine Kachel aus.') }}';
+                else if (selected.length > 9) modal.querySelector('[data-dashboard-layout-status]').textContent = '{{ __('Bitte wähle höchstens neun Kacheln aus.') }}';
+                else modal.querySelector('[data-dashboard-layout-status]').textContent = '';
+            };
+            const populate = () => {
+                activeZone.replaceChildren(); availableZone.replaceChildren();
+                selected.forEach((id) => { const item = catalog.get(id); if (item) activeZone.appendChild(createChoice(item, true)); });
+                catalog.forEach((item, id) => { if (!selected.includes(id)) availableZone.appendChild(createChoice(item, false)); });
+                render();
+            };
+            const dragOver = (zone, event) => {
+                event.preventDefault();
+                if (!dragged) return;
+                const siblings = [...zone.querySelectorAll('[data-tile-id]:not(.opacity-40)')];
+                const next = siblings.find((item) => event.clientY < item.getBoundingClientRect().top + item.offsetHeight / 2);
+                zone.insertBefore(dragged, next || null);
+            };
+            [activeZone, availableZone].forEach((zone) => zone.addEventListener('dragover', (event) => dragOver(zone, event)));
+
+            const open = () => { populate(); modal.classList.remove('hidden'); modal.classList.add('grid'); };
+            const close = () => { modal.classList.add('hidden'); modal.classList.remove('grid'); };
+            document.querySelector('[data-dashboard-layout-open]')?.addEventListener('click', open);
+            modal.querySelectorAll('[data-dashboard-layout-close]').forEach((button) => button.addEventListener('click', close));
+            modal.querySelector('[data-dashboard-layout-reset]')?.addEventListener('click', () => { selected = [...defaults]; populate(); });
+            modal.querySelector('[data-dashboard-layout-save]')?.addEventListener('click', async () => {
+                syncSelected();
+                const status = modal.querySelector('[data-dashboard-layout-status]');
+                if (selected.length < 1) { status.textContent = '{{ __('Bitte wähle mindestens eine Kachel aus.') }}'; return; }
+                if (selected.length > 9) { status.textContent = '{{ __('Bitte wähle höchstens neun Kacheln aus.') }}'; return; }
+                status.textContent = '{{ __('Wird gespeichert …') }}';
+                const response = await fetch('{{ route('dashboard.layout.update') }}', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }, body: JSON.stringify({ tiles: selected }) });
+                if (!response.ok) { status.textContent = '{{ __('Die Auswahl konnte nicht gespeichert werden.') }}'; return; }
+                const selectedSet = new Set(selected);
+                selected.forEach((id) => { const tile = catalog.get(id)?.element; if (tile) { tile.classList.remove('hidden'); tileGrid.appendChild(tile); } });
+                catalog.forEach((item, id) => { if (!selectedSet.has(id)) item.element.classList.add('hidden'); });
+                status.textContent = '{{ __('Gespeichert.') }}';
+                window.setTimeout(close, 350);
+            });
+            modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+            selected.forEach((id) => { const tile = catalog.get(id)?.element; if (tile) tileGrid.appendChild(tile); });
+        })();
         (() => {
             const modal = document.getElementById('message-settings-modal');
             if (!modal) return;

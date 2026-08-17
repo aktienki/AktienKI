@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,24 @@ use App\Services\PlanAccessService;
 
 class DashboardController extends Controller
 {
+    public function updateLayout(Request $request): JsonResponse
+    {
+        $allowed = [
+            'paper-depots', 'watchlists', 'strategies', 'labels', 'reminders', 'best-buy', 'best-wait',
+            'watchlist-screener', 'predictions', 'smart-screener', 'market-report', 'stock-comparison',
+        ];
+        $validated = $request->validate([
+            'tiles' => ['required', 'array', 'min:1', 'max:9'],
+            'tiles.*' => ['required', 'string', 'distinct', 'in:'.implode(',', $allowed)],
+        ]);
+
+        $preferences = (array) ($request->user()->preferences ?? []);
+        data_set($preferences, 'dashboard.personal_tiles', array_values($validated['tiles']));
+        $request->user()->forceFill(['preferences' => $preferences])->save();
+
+        return response()->json(['saved' => true, 'tiles' => $validated['tiles']]);
+    }
+
     public function __invoke(Request $request): View
     {
         $user = $request->user();

@@ -242,6 +242,7 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::post('/aki/chat', AkiChatController::class)->middleware('throttle:10,1')->name('aki.chat');
     Route::post('/live-prices/subscribe', LivePriceSubscriptionController::class)->name('live-prices.subscribe');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::patch('/dashboard/layout', [DashboardController::class, 'updateLayout'])->name('dashboard.layout.update');
     Route::view('/maerkte/marktlage', 'markets.situation')->name('markets.situation');
     Route::get('/apple', AppleChartController::class)->name('stocks.apple');
     //Route::get('/stocks', StocksIndex::class)->name('stocks.index');
