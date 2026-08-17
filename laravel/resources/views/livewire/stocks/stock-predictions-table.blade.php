@@ -3,8 +3,26 @@
     $hasFilters = $search !== '' || $country !== '' || $sector !== '' || $signal !== '' || $exchange !== '' || $minScore !== '' || $maxScore !== '';
 @endphp
 
-<div class="flex h-full min-h-0 flex-col">
-    <div class="grid shrink-0 gap-3 border-b border-[var(--ak-border)] p-3 lg:grid-cols-[minmax(220px,1.4fr)_repeat(3,minmax(140px,.65fr))_minmax(190px,.8fr)_auto] sm:p-4">
+<div x-data="{ filtersOpen: false }" class="flex h-full min-h-0 flex-col">
+    <div class="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--ak-border)] px-3 py-2.5 sm:px-4">
+        <button
+            type="button"
+            @click="filtersOpen = ! filtersOpen"
+            :aria-expanded="filtersOpen"
+            class="inline-flex h-9 items-center gap-2 rounded-xl border border-teal-500/25 bg-teal-500/[.07] px-3 text-xs font-black text-teal-700 transition hover:border-teal-500/45 hover:bg-teal-500/[.12]"
+        >
+            <x-heroicon-o-funnel class="h-4 w-4" />
+            <span x-text="filtersOpen ? @js(__('Filter ausblenden')) : @js(__('Filter anzeigen'))"></span>
+            <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="filtersOpen ? 'rotate-180' : ''" />
+        </button>
+        @if ($hasFilters)
+            <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/25 bg-amber-400/[.08] px-2.5 py-1.5 text-[10px] font-black text-amber-300">
+                <span class="h-1.5 w-1.5 rounded-full bg-amber-300"></span>{{ __('Filter aktiv') }}
+            </span>
+        @endif
+    </div>
+
+    <div x-show="filtersOpen" x-transition style="display:none" class="grid shrink-0 gap-3 border-b border-[var(--ak-border)] p-3 lg:grid-cols-[minmax(220px,1.4fr)_repeat(3,minmax(140px,.65fr))_minmax(190px,.8fr)_auto] sm:p-4">
         <label class="relative block">
             <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ak-muted)]" />
             <input wire:model.live.debounce.350ms="search" type="search" placeholder="{{ __('Symbol, Unternehmen oder Branche') }}" class="ak-input h-10 pl-9 text-sm">
