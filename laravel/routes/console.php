@@ -70,3 +70,24 @@ Schedule::command('events:sync-twelve-data --days-back=7 --days-forward=60')
     ->dailyAt('03:00')
     ->withoutOverlapping(30)
     ->runInBackground();
+
+// Predictions run on the application server so production remains available
+// even when the training workstation is offline. The workstation only trains
+// and validates models; released artifacts are synchronized separately.
+if (config('aktienki.python_engine.server_predictions_enabled', false)) {
+    $limit = max(1, (int) config('aktienki.python_engine.prediction_limit', 5000));
+
+    Schedule::command("predictions:run-server other --limit={$limit}")
+        ->weekdays()
+        ->dailyAt('10:00')
+        ->timezone('Europe/Berlin')
+        ->withoutOverlapping(180)
+        ->runInBackground();
+
+    Schedule::command("predictions:run-server americas --limit={$limit}")
+        ->weekdays()
+        ->dailyAt('16:00')
+        ->timezone('Europe/Berlin')
+        ->withoutOverlapping(180)
+        ->runInBackground();
+}

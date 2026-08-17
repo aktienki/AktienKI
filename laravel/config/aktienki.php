@@ -20,6 +20,9 @@ return [
         'path' => env('AKTIENKI_PYTHON_ENGINE_PATH', '/Users/silviotaubert/Downloads/python-engine'),
         'executable' => env('AKTIENKI_PYTHON_EXECUTABLE'),
         'backtests' => (bool) env('PYTHON_ENGINE_BACKTESTS', false),
+        'server_predictions_enabled' => (bool) env('AKTIENKI_SERVER_PREDICTIONS_ENABLED', false),
+        'prediction_limit' => (int) env('AKTIENKI_SERVER_PREDICTION_LIMIT', 5000),
+        'prediction_timeout_seconds' => (int) env('AKTIENKI_SERVER_PREDICTION_TIMEOUT', 7200),
     ],
     'portfolio_automation' => [
         // Keep disabled throughout the test phase. Enabling this switch starts
