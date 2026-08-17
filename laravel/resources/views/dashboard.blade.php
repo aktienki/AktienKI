@@ -325,11 +325,11 @@
                     <div class="grid gap-4 md:grid-cols-2">
                         <section class="rounded-xl border border-cyan-400/25 bg-cyan-400/[.035] p-3">
                             <div class="mb-3 flex items-center justify-between"><h3 class="text-xs font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Auf deinem Dashboard') }}</h3><span data-dashboard-layout-count class="text-[10px] font-black text-[var(--ak-muted)]"></span></div>
-                            <div data-dashboard-layout-active class="dashboard-layout-dropzone grid min-h-48 grid-cols-2 auto-rows-[92px] gap-2 rounded-lg border border-dashed border-cyan-400/20 p-2"></div>
+                            <div data-dashboard-layout-active class="dashboard-layout-dropzone grid min-h-48 grid-cols-2 justify-center gap-2 rounded-lg border border-dashed border-cyan-400/20 p-2"></div>
                         </section>
                         <section class="rounded-xl border border-slate-400/20 bg-slate-400/[.025] p-3">
                             <h3 class="mb-3 text-xs font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Verfügbare Kacheln') }}</h3>
-                            <div data-dashboard-layout-available class="dashboard-layout-dropzone grid min-h-48 grid-cols-2 auto-rows-[92px] gap-2 rounded-lg border border-dashed border-slate-400/20 p-2"></div>
+                            <div data-dashboard-layout-available class="dashboard-layout-dropzone grid min-h-48 grid-cols-2 justify-center gap-2 rounded-lg border border-dashed border-slate-400/20 p-2"></div>
                         </section>
                     </div>
                     <p data-dashboard-layout-status class="mt-3 min-h-5 text-[10px] font-bold text-cyan-300"></p>
@@ -399,21 +399,50 @@
             if (!modal || !tileGrid || !activeZone || !availableZone) return;
 
             const defaults = @json($dashboardDefaultTiles);
+            const descriptions = @json([
+                'paper-depots' => __('Musterdepots öffnen und verwalten.'),
+                'watchlists' => __('Gespeicherte Aktienlisten anzeigen.'),
+                'strategies' => __('Eigene Anlagestrategien verwalten.'),
+                'labels' => __('Aktien mit persönlichen Labels ordnen.'),
+                'reminders' => __('E-Mail-Erinnerungen verwalten.'),
+                'best-buy' => __('Aktuell stärkste BUY-Aktie öffnen.'),
+                'best-wait' => __('Aktuell stärkste WAIT-Aktie öffnen.'),
+                'watchlist-screener' => __('Watchlist-Aktien direkt filtern.'),
+                'predictions' => __('Alle aktuellen Prognosen vergleichen.'),
+                'smart-screener' => __('Aktien nach eigenen Kriterien finden.'),
+                'market-report' => __('Die aktuelle Marktanalyse lesen.'),
+                'stock-comparison' => __('Mehrere Aktien direkt vergleichen.'),
+            ]);
             const catalog = new Map([...tileGrid.querySelectorAll('[data-dashboard-tile]')].map((tile) => [tile.dataset.dashboardTile, {
                 id: tile.dataset.dashboardTile,
                 label: tile.dataset.dashboardTileLabel || tile.dataset.dashboardTile,
+                description: descriptions[tile.dataset.dashboardTile] || '',
                 element: tile,
             }]));
             let selected = @json($dashboardSelectedTiles).filter((id) => catalog.has(id));
             let dragged = null;
+            let dashboardTileSize = { width: 0, height: 0 };
+
+            const measureDashboardTile = () => {
+                const reference = [...tileGrid.querySelectorAll('[data-dashboard-tile]')].find((tile) => !tile.classList.contains('hidden'));
+                if (!reference) return;
+                const rect = reference.getBoundingClientRect();
+                dashboardTileSize = { width: Math.round(rect.width), height: Math.round(rect.height) };
+                [activeZone, availableZone].forEach((zone) => {
+                    zone.style.gridTemplateColumns = `repeat(2, ${dashboardTileSize.width}px)`;
+                    zone.style.gridAutoRows = `${dashboardTileSize.height}px`;
+                });
+            };
 
             const createChoice = (item, active) => {
                 const choice = document.createElement('div');
                 choice.draggable = true;
                 choice.dataset.tileId = item.id;
                 choice.className = 'dashboard-layout-choice relative flex min-h-[92px] cursor-grab flex-col justify-between rounded-xl border border-cyan-400/20 bg-cyan-400/[.045] p-3 shadow-[inset_0_1px_0_rgba(34,211,238,.04)] transition hover:border-cyan-300/45 hover:bg-cyan-400/[.09] active:cursor-grabbing';
-                choice.innerHTML = `<span class="text-lg leading-none text-cyan-300" aria-hidden="true">⠿</span><b class="min-w-0 pr-8 text-xs leading-4"></b><button type="button" class="absolute bottom-2.5 right-2.5 grid h-8 w-8 place-items-center rounded-lg border border-cyan-400/25 bg-cyan-400/[.08] text-cyan-300 transition hover:bg-cyan-400/[.18]" aria-label="${active ? '{{ __('Entfernen') }}' : '{{ __('Hinzufügen') }}'}">${active ? '→' : '←'}</button>`;
+                if (dashboardTileSize.height) choice.style.height = `${dashboardTileSize.height}px`;
+                choice.innerHTML = `<span class="text-lg leading-none text-cyan-300" aria-hidden="true">⠿</span><span class="min-w-0 pr-8"><b class="block text-xs leading-4"></b><small class="mt-1 line-clamp-2 block text-[9px] leading-3 text-[var(--ak-muted)]"></small></span><button type="button" class="absolute bottom-2.5 right-2.5 grid h-8 w-8 place-items-center rounded-lg border border-cyan-400/25 bg-cyan-400/[.08] text-cyan-300 transition hover:bg-cyan-400/[.18]" aria-label="${active ? '{{ __('Entfernen') }}' : '{{ __('Hinzufügen') }}'}">${active ? '→' : '←'}</button>`;
                 choice.querySelector('b').textContent = item.label;
+                choice.querySelector('small').textContent = item.description;
                 choice.querySelector('button').addEventListener('click', () => {
                     (choice.parentElement === activeZone ? availableZone : activeZone).appendChild(choice);
                     render();
@@ -457,7 +486,7 @@
             };
             [activeZone, availableZone].forEach((zone) => zone.addEventListener('dragover', (event) => dragOver(zone, event)));
 
-            const open = () => { populate(); modal.classList.remove('hidden'); modal.classList.add('grid'); };
+            const open = () => { measureDashboardTile(); populate(); modal.classList.remove('hidden'); modal.classList.add('grid'); };
             const close = () => { modal.classList.add('hidden'); modal.classList.remove('grid'); };
             document.querySelector('[data-dashboard-layout-open]')?.addEventListener('click', open);
             modal.querySelectorAll('[data-dashboard-layout-close]').forEach((button) => button.addEventListener('click', close));
