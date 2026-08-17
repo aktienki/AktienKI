@@ -494,7 +494,7 @@
             #personal-dashboard .dashboard-bento-personal > div:last-child > div small,
             #personal-dashboard .dashboard-bento-community small { margin-top: .3rem; }
             #personal-dashboard .dashboard-bento-market > div:nth-child(2) { margin-top: .65rem; }
-            #personal-dashboard .dashboard-bento-market > p { margin-top: .65rem; font-size: .7rem; line-height: 1.15rem; }
+            #personal-dashboard .dashboard-bento-market > p { margin-top: .65rem; font-size: .78rem; line-height: 1.28rem; }
             #personal-dashboard .dashboard-bento-models > div:first-child,
             #personal-dashboard .dashboard-bento-signals > div:first-child { margin-bottom: .55rem; }
             #personal-dashboard .dashboard-bento-models > div:last-child { gap: .3rem; }
@@ -517,7 +517,7 @@
             #personal-dashboard .dashboard-bento-community .h-8 { height: 1.55rem; width: 1.55rem; }
             #personal-dashboard .dashboard-bento-personal .text-lg,
             #personal-dashboard .dashboard-bento-community .text-lg { font-size: .9rem; }
-            #personal-dashboard .dashboard-bento-market > p { font-size: .65rem; line-height: 1rem; }
+            #personal-dashboard .dashboard-bento-market > p { font-size: .72rem; line-height: 1.12rem; }
         }
         .dashboard-aki-dots { display: inline-block; min-width: 1.6em; letter-spacing: .12em; animation: dashboard-aki-pulse 1.1s steps(4, end) infinite; }
         @keyframes dashboard-aki-pulse { 0%,20% { opacity: .25; } 40% { opacity: .65; } 60%,100% { opacity: 1; } }
