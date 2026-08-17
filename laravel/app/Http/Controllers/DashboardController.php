@@ -15,6 +15,8 @@ class DashboardController extends Controller
 {
     public function updateLayout(Request $request): JsonResponse
     {
+        abort_unless(app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Pro), 403);
+
         $allowed = [
             'paper-depots', 'watchlists', 'strategies', 'labels', 'reminders', 'best-buy', 'best-wait',
             'watchlist-screener', 'predictions', 'smart-screener', 'market-report', 'stock-comparison',
