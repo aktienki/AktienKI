@@ -15,6 +15,20 @@
             ['paper-depots', 'watchlists', 'strategies', 'labels', 'reminders', 'best-buy', 'best-wait', 'watchlist-screener', 'predictions', 'smart-screener', 'market-report', 'stock-comparison']
         ));
         $dashboardTileVisible = fn (string $id): bool => in_array($id, $dashboardSelectedTiles, true);
+        $dashboardTileDescriptions = [
+            'paper-depots' => __('Musterdepots öffnen und verwalten.'),
+            'watchlists' => __('Gespeicherte Aktienlisten anzeigen.'),
+            'strategies' => __('Eigene Anlagestrategien verwalten.'),
+            'labels' => __('Aktien mit persönlichen Labels ordnen.'),
+            'reminders' => __('E-Mail-Erinnerungen verwalten.'),
+            'best-buy' => __('Aktuell stärkste BUY-Aktie öffnen.'),
+            'best-wait' => __('Aktuell stärkste WAIT-Aktie öffnen.'),
+            'watchlist-screener' => __('Watchlist-Aktien direkt filtern.'),
+            'predictions' => __('Alle aktuellen Prognosen vergleichen.'),
+            'smart-screener' => __('Aktien nach eigenen Kriterien finden.'),
+            'market-report' => __('Die aktuelle Marktanalyse lesen.'),
+            'stock-comparison' => __('Mehrere Aktien direkt vergleichen.'),
+        ];
     @endphp
 
     <main id="personal-dashboard" class="ak-body min-h-[calc(100dvh-73px)] xl:h-[calc(100dvh-89px)] xl:min-h-0 xl:overflow-hidden">
@@ -399,20 +413,7 @@
             if (!modal || !tileGrid || !activeZone || !availableZone) return;
 
             const defaults = @json($dashboardDefaultTiles);
-            const descriptions = @json([
-                'paper-depots' => __('Musterdepots öffnen und verwalten.'),
-                'watchlists' => __('Gespeicherte Aktienlisten anzeigen.'),
-                'strategies' => __('Eigene Anlagestrategien verwalten.'),
-                'labels' => __('Aktien mit persönlichen Labels ordnen.'),
-                'reminders' => __('E-Mail-Erinnerungen verwalten.'),
-                'best-buy' => __('Aktuell stärkste BUY-Aktie öffnen.'),
-                'best-wait' => __('Aktuell stärkste WAIT-Aktie öffnen.'),
-                'watchlist-screener' => __('Watchlist-Aktien direkt filtern.'),
-                'predictions' => __('Alle aktuellen Prognosen vergleichen.'),
-                'smart-screener' => __('Aktien nach eigenen Kriterien finden.'),
-                'market-report' => __('Die aktuelle Marktanalyse lesen.'),
-                'stock-comparison' => __('Mehrere Aktien direkt vergleichen.'),
-            ]);
+            const descriptions = @json($dashboardTileDescriptions);
             const catalog = new Map([...tileGrid.querySelectorAll('[data-dashboard-tile]')].map((tile) => [tile.dataset.dashboardTile, {
                 id: tile.dataset.dashboardTile,
                 label: tile.dataset.dashboardTileLabel || tile.dataset.dashboardTile,
