@@ -30,7 +30,7 @@ echo "database_port=$(ss -ltn 2>/dev/null | grep -c ':25432 ')"
 echo "vscode_tunnels=$(pgrep -fc '[c]ode tunnel')"
 echo "engine_worker=$(pgrep -fc '[p]ython -m app.cli.engine_worker')"
 echo "training=$(pgrep -fc '[a]ktienki-engine train-predict')"
-if systemctl --user is-active --quiet aktienki-all-stock-training.service 2>/dev/null || systemctl --user is-active --quiet aktienki-german-training.service 2>/dev/null; then
+if systemctl --user is-active --quiet aktienki-all-stock-training.service 2>/dev/null || systemctl --user is-active --quiet aktienki-german-training.service 2>/dev/null || systemctl --user is-active --quiet aktienki-missing-walk-forward.service 2>/dev/null; then
   echo 'german_queue=active'
 else
   echo 'german_queue=inactive'
@@ -43,7 +43,7 @@ echo "model_sync_status=$(cat "$project/logs/model_sync.status" 2>/dev/null || e
 echo "disk=$(df -P "$project" 2>/dev/null | awk 'NR==2 {print $5}')"
 echo '---DATABASE---'
 cd "$project" || exit 0
-log_file=$(ls -1t logs/all_stock_training.log logs/german_remaining_*.log logs/walk_forward_catchup_*.log 2>/dev/null | head -1)
+log_file=$(ls -1t logs/missing_walk_forward.log logs/all_stock_training.log logs/german_remaining_*.log logs/walk_forward_catchup_*.log 2>/dev/null | head -1)
 timeout 10 .venv/bin/python -c "from app.database import Database; d=Database(); r=d.fetch_one('SELECT current_database() AS database, inet_server_addr()::text AS server, inet_server_port() AS port'); print('ok|'+str(r['database'])+'|'+str(r['server'])+'|'+str(r['port'])); d.close()" 2>&1
 echo '---ERRORS---'
 test -n "$log_file" && grep -E 'ERROR|Error|Traceback|OperationalError|FAILED|Connection refused' "$log_file" 2>/dev/null | tail -35
@@ -217,8 +217,12 @@ BASH, 15);
 set -e
 new_service='aktienki-all-stock-training.service'
 old_service='aktienki-german-training.service'
+walk_forward_service='aktienki-missing-walk-forward.service'
 handoff_service='aktienki-training-handoff.service'
-if systemctl --user is-active --quiet "$new_service"; then
+if systemctl --user is-active --quiet "$walk_forward_service"; then
+  systemctl --user stop "$walk_forward_service"
+  echo 'training-stopped'
+elif systemctl --user is-active --quiet "$new_service"; then
   systemctl --user stop "$new_service"
   systemctl --user stop "$handoff_service" 2>/dev/null || true
   echo 'training-stopped'
