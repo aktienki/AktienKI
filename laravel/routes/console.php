@@ -67,6 +67,6 @@ Schedule::command('beta:send-trial-reminders')
     ->withoutOverlapping();
 
 Schedule::command('events:sync-twelve-data --days-back=7 --days-forward=60')
-    ->dailyAt('05:40')
+    ->dailyAt('03:00')
     ->withoutOverlapping(30)
     ->runInBackground();
