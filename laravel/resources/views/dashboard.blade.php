@@ -437,7 +437,7 @@
                 dashboardTileSize = { width: Math.round(rect.width), height: Math.round(rect.height) };
                 [activeZone, availableZone].forEach((zone) => {
                     zone.style.gridTemplateColumns = `repeat(2, ${dashboardTileSize.width}px)`;
-                    zone.style.gridAutoRows = `${dashboardTileSize.height}px`;
+                    zone.style.gridAutoRows = `minmax(0, ${dashboardTileSize.height}px)`;
                 });
             };
 
@@ -445,9 +445,9 @@
                 const choice = document.createElement('div');
                 choice.draggable = true;
                 choice.dataset.tileId = item.id;
-                choice.className = 'dashboard-layout-choice relative flex min-h-[92px] cursor-grab flex-col justify-between rounded-xl border border-cyan-400/20 bg-cyan-400/[.045] p-3 shadow-[inset_0_1px_0_rgba(34,211,238,.04)] transition hover:border-cyan-300/45 hover:bg-cyan-400/[.09] active:cursor-grabbing';
-                if (dashboardTileSize.height) choice.style.height = `${dashboardTileSize.height}px`;
-                choice.innerHTML = `<span class="text-lg leading-none text-cyan-300" aria-hidden="true">⠿</span><span class="min-w-0 pr-8"><b class="block text-xs leading-4"></b><small class="mt-1 line-clamp-2 block text-[9px] leading-3 text-[var(--ak-muted)]"></small></span><button type="button" class="absolute bottom-2.5 right-2.5 grid h-8 w-8 place-items-center rounded-lg border border-cyan-400/25 bg-cyan-400/[.08] text-cyan-300 transition hover:bg-cyan-400/[.18]" aria-label="${active ? '{{ __('Entfernen') }}' : '{{ __('Hinzufügen') }}'}">${active ? '→' : '←'}</button>`;
+                choice.className = 'dashboard-layout-choice relative flex h-full min-h-0 cursor-grab flex-col justify-between overflow-hidden rounded-xl border border-cyan-400/20 bg-cyan-400/[.045] p-3 shadow-[inset_0_1px_0_rgba(34,211,238,.04)] transition hover:border-cyan-300/45 hover:bg-cyan-400/[.09] active:cursor-grabbing';
+                if (dashboardTileSize.height) { choice.style.height = `${dashboardTileSize.height}px`; choice.style.minHeight = '0'; }
+                choice.innerHTML = `<span class="text-base leading-none text-cyan-300" aria-hidden="true">⠿</span><span class="min-w-0 pr-8"><b class="block truncate text-xs leading-4"></b><small class="mt-0.5 block overflow-hidden text-[9px] leading-3 text-[var(--ak-muted)]" style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-height:1.5rem"></small></span><button type="button" class="absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-lg border border-cyan-400/25 bg-cyan-400/[.08] text-cyan-300 transition hover:bg-cyan-400/[.18]" aria-label="${active ? '{{ __('Entfernen') }}' : '{{ __('Hinzufügen') }}'}">${active ? '→' : '←'}</button>`;
                 choice.querySelector('b').textContent = item.label;
                 choice.querySelector('small').textContent = item.description;
                 choice.querySelector('button').addEventListener('click', () => {
