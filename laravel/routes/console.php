@@ -65,3 +65,8 @@ if (config('aktienki.portfolio_automation.enabled', false)) {
 Schedule::command('beta:send-trial-reminders')
     ->dailyAt('09:00')
     ->withoutOverlapping();
+
+Schedule::command('events:sync-twelve-data --days-back=7 --days-forward=60')
+    ->dailyAt('05:40')
+    ->withoutOverlapping(30)
+    ->runInBackground();

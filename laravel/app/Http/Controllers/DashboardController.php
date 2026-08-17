@@ -152,12 +152,29 @@ class DashboardController extends Controller
             )
             ->sortBy(fn (array $reminder): string => $reminder['symbol'].'-'.$reminder['label'])
             ->values();
+        $corporateScheduleItems = DB::table('corporate_events as event')
+            ->join('instruments as instrument', 'instrument.id', '=', 'event.instrument_id')
+            ->where('instrument.type', 'stock')->where('instrument.is_active', true)
+            ->where('instrument.is_german_tradeable', true)->whereNull('instrument.deleted_at')
+            ->where('event.event_type', 'earnings')->whereBetween('event.event_date', [today(), today()->addDays(90)])
+            ->orderBy('event.event_date')->limit(12)
+            ->get(['event.id', 'event.event_date', 'event.event_time', 'event.eps_estimate', 'instrument.symbol', 'instrument.name'])
+            ->map(fn (object $event): array => [
+                'type' => 'earnings', 'symbol' => $event->symbol, 'name' => $event->name,
+                'label' => __('Quartalszahlen'),
+                'schedule' => \Illuminate\Support\Carbon::parse($event->event_date)->format('d.m.Y').($event->event_time ? ' · '.__($event->event_time) : ''),
+                'sort_at' => (string) $event->event_date,
+            ]);
+        $dashboardScheduleItems = $messageReminders->where('active', true)->map(fn (array $reminder): array => [
+            ...$reminder, 'sort_at' => $reminder['schedule'],
+        ])->concat($corporateScheduleItems)->sortBy('sort_at')->take(6)->values();
 
         return view('dashboard', compact(
             'riskProfile', 'strategyPortfolio', 'overview', 'marketSituation', 'continentPredictions',
             'recentSignalOverview',
             'communityOverview',
             'messageReminders',
+            'dashboardScheduleItems',
             'canManageMessages',
             'canUsePlus',
             'canUsePro',

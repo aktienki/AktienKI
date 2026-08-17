@@ -47,6 +47,11 @@ class Instrument extends Model
         return $this->hasMany(InstrumentDividend::class);
     }
 
+    public function corporateEvents(): HasMany
+    {
+        return $this->hasMany(CorporateEvent::class);
+    }
+
     public function exitProfiles(): HasMany
     {
         return $this->hasMany(InstrumentExitProfile::class);
