@@ -331,7 +331,7 @@
 
         @if ($canUsePro)
         <div id="dashboard-layout-modal" class="fixed inset-0 z-[185] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="dashboard-layout-title">
-            <section class="flex max-h-[min(760px,92dvh)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
+            <section class="flex max-h-[min(820px,92dvh)] w-full max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
                 <header class="flex items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-5 py-4">
                     <div class="flex min-w-0 items-center gap-3">
                         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-300"><x-heroicon-o-cog-6-tooth class="h-5 w-5" /></span>
@@ -343,12 +343,12 @@
                     <p class="mb-4 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Ziehe Kacheln zwischen den Bereichen. In der linken Spalte kannst du außerdem ihre Reihenfolge verändern.') }}</p>
                     <div class="grid gap-4 md:grid-cols-2">
                         <section class="rounded-xl border border-cyan-400/25 bg-cyan-400/[.035] p-3">
-                            <div class="mb-3 flex items-center justify-between"><h3 class="text-xs font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Auf deinem Dashboard') }}</h3><span data-dashboard-layout-count class="text-[10px] font-black text-[var(--ak-muted)]"></span></div>
-                            <div data-dashboard-layout-active class="dashboard-layout-dropzone grid min-h-48 grid-cols-2 justify-center gap-2 rounded-lg border border-dashed border-cyan-400/20 p-2"></div>
+                            <div class="mb-3 flex items-center justify-between border-b border-cyan-400/20 pb-3"><h3 class="text-xs font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Auf deinem Dashboard') }}</h3><span data-dashboard-layout-count class="text-[10px] font-black text-[var(--ak-muted)]"></span></div>
+                            <div data-dashboard-layout-active class="dashboard-layout-dropzone grid min-h-48 grid-cols-3 justify-center gap-2 rounded-lg border border-dashed border-cyan-400/20 p-2"></div>
                         </section>
                         <section class="rounded-xl border border-slate-400/20 bg-slate-400/[.025] p-3">
-                            <h3 class="mb-3 text-xs font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Verfügbare Kacheln') }}</h3>
-                            <div data-dashboard-layout-available class="dashboard-layout-dropzone grid min-h-48 grid-cols-2 justify-center gap-2 rounded-lg border border-dashed border-slate-400/20 p-2"></div>
+                            <h3 class="mb-3 border-b border-slate-400/20 pb-3 text-xs font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Verfügbare Kacheln') }}</h3>
+                            <div data-dashboard-layout-available class="dashboard-layout-dropzone grid min-h-48 grid-cols-3 justify-center gap-2 rounded-lg border border-dashed border-slate-400/20 p-2"></div>
                         </section>
                     </div>
                     <p data-dashboard-layout-status class="mt-3 min-h-5 text-[10px] font-bold text-cyan-300"></p>
@@ -436,7 +436,7 @@
                 const rect = reference.getBoundingClientRect();
                 dashboardTileSize = { width: Math.round(rect.width), height: Math.round(rect.height) };
                 [activeZone, availableZone].forEach((zone) => {
-                    zone.style.gridTemplateColumns = `repeat(2, ${dashboardTileSize.width}px)`;
+                    zone.style.gridTemplateColumns = `repeat(3, ${dashboardTileSize.width}px)`;
                     zone.style.gridAutoRows = `minmax(0, ${dashboardTileSize.height}px)`;
                 });
             };
@@ -498,19 +498,39 @@
             document.querySelector('[data-dashboard-layout-open]')?.addEventListener('click', open);
             modal.querySelectorAll('[data-dashboard-layout-close]').forEach((button) => button.addEventListener('click', close));
             modal.querySelector('[data-dashboard-layout-reset]')?.addEventListener('click', () => { selected = [...defaults]; populate(); });
-            modal.querySelector('[data-dashboard-layout-save]')?.addEventListener('click', async () => {
+            modal.querySelector('[data-dashboard-layout-save]')?.addEventListener('click', async (event) => {
                 syncSelected();
                 const status = modal.querySelector('[data-dashboard-layout-status]');
+                const saveButton = event.currentTarget;
                 if (selected.length < 1) { status.textContent = '{{ __('Bitte wähle mindestens eine Kachel aus.') }}'; return; }
                 if (selected.length > 9) { status.textContent = '{{ __('Bitte wähle höchstens neun Kacheln aus.') }}'; return; }
                 status.textContent = '{{ __('Wird gespeichert …') }}';
-                const response = await fetch('{{ route('dashboard.layout.update') }}', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }, body: JSON.stringify({ tiles: selected }) });
-                if (!response.ok) { status.textContent = '{{ __('Die Auswahl konnte nicht gespeichert werden.') }}'; return; }
-                const selectedSet = new Set(selected);
-                selected.forEach((id) => { const tile = catalog.get(id)?.element; if (tile) { tile.classList.remove('hidden'); tileGrid.appendChild(tile); } });
-                catalog.forEach((item, id) => { if (!selectedSet.has(id)) item.element.classList.add('hidden'); });
-                status.textContent = '{{ __('Gespeichert.') }}';
-                window.setTimeout(close, 350);
+                saveButton.disabled = true;
+                saveButton.textContent = '{{ __('Speichert …') }}';
+                try {
+                    const response = await fetch('{{ route('dashboard.layout.update') }}', {
+                        method: 'PATCH',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        },
+                        body: JSON.stringify({ tiles: selected }),
+                    });
+                    if (!response.ok) {
+                        const payload = await response.json().catch(() => ({}));
+                        throw new Error(payload.message || `HTTP ${response.status}`);
+                    }
+                    status.textContent = '{{ __('Gespeichert. Das Dashboard wird aktualisiert …') }}';
+                    saveButton.textContent = '{{ __('Gespeichert') }}';
+                    window.setTimeout(() => window.location.reload(), 300);
+                } catch (error) {
+                    status.textContent = `{{ __('Die Auswahl konnte nicht gespeichert werden.') }} ${error.message || ''}`;
+                    saveButton.disabled = false;
+                    saveButton.textContent = '{{ __('Änderungen speichern') }}';
+                }
             });
             modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
             selected.forEach((id) => { const tile = catalog.get(id)?.element; if (tile) tileGrid.appendChild(tile); });
