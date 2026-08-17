@@ -25,12 +25,35 @@ class DashboardController extends Controller
             'tiles' => ['required', 'array', 'min:1', 'max:9'],
             'tiles.*' => ['required', 'string', 'distinct', 'in:'.implode(',', $allowed)],
         ]);
-
         $preferences = (array) ($request->user()->preferences ?? []);
         data_set($preferences, 'dashboard.personal_tiles', array_values($validated['tiles']));
         $request->user()->forceFill(['preferences' => $preferences])->save();
 
         return response()->json(['saved' => true, 'tiles' => $validated['tiles']]);
+    }
+
+    public function updateCardLayout(Request $request): JsonResponse
+    {
+        abort_unless(app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Pro), 403);
+
+        $allowedCards = ['strategy', 'personal', 'community', 'market', 'models', 'signals', 'schedule'];
+        $validated = $request->validate([
+            'cards' => ['required', 'array', 'min:1', 'max:7'],
+            'cards.*.id' => ['required', 'string', 'distinct', 'in:'.implode(',', $allowedCards)],
+            'cards.*.size' => ['required', 'string', 'in:small,medium,large'],
+        ]);
+        $usedGridArea = collect($validated['cards'])->sum(fn (array $card): int => match ($card['size']) {
+            'small' => 4,
+            'medium' => 12,
+            'large' => 24,
+        });
+        abort_if($usedGridArea > 72, 422, __('Die gewählten Kartengrößen passen nicht auf eine Dashboard-Seite.'));
+
+        $preferences = (array) ($request->user()->preferences ?? []);
+        data_set($preferences, 'dashboard.cards', array_values($validated['cards']));
+        $request->user()->forceFill(['preferences' => $preferences])->save();
+
+        return response()->json(['saved' => true, 'cards' => $validated['cards']]);
     }
 
     public function __invoke(Request $request): View

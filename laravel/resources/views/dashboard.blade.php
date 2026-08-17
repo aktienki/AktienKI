@@ -29,6 +29,33 @@
             'market-report' => __('Die aktuelle Marktanalyse lesen.'),
             'stock-comparison' => __('Mehrere Aktien direkt vergleichen.'),
         ];
+        $dashboardCardDefaults = [
+            ['id' => 'strategy', 'size' => 'small'],
+            ['id' => 'personal', 'size' => 'medium'],
+            ['id' => 'community', 'size' => 'small'],
+            ['id' => 'market', 'size' => 'large'],
+            ['id' => 'models', 'size' => 'medium'],
+            ['id' => 'signals', 'size' => 'medium'],
+        ];
+        $dashboardMainCardLabels = [
+            'strategy' => __('Strategiedepot'), 'personal' => __('Persönlicher Bereich'),
+            'community' => __('Community'), 'market' => __('Aktuelle Marktlage'),
+            'models' => __('Letzte Prognosen'), 'signals' => __('Empfehlungen & Signalübergänge'),
+            'schedule' => __('Termine & Erinnerungen'),
+        ];
+        $dashboardMainCardDescriptions = [
+            'strategy' => __('Depotwert, Kapital und Performance.'), 'personal' => __('Deine persönlichen Schnellzugriffe.'),
+            'community' => __('Aktivität seit deinem letzten Login.'), 'market' => __('Ausblick und aktueller Marktbericht.'),
+            'models' => __('Globale Modellläufe nach Regionen.'), 'signals' => __('Neue Empfehlungen und Signalwechsel.'),
+            'schedule' => __('Anstehende E-Mails und Aktionen.'),
+        ];
+        $storedDashboardCards = data_get(auth()->user()->preferences, 'dashboard.cards');
+        $dashboardCardsCustomized = is_array($storedDashboardCards) && count($storedDashboardCards) > 0;
+        $dashboardCards = $dashboardCardsCustomized ? array_values($storedDashboardCards) : $dashboardCardDefaults;
+        $dashboardCardConfig = collect($dashboardCards)->keyBy('id');
+        $dashboardCardSize = fn (string $id): string => (string) data_get($dashboardCardConfig->get($id), 'size', 'medium');
+        $dashboardCardOrder = fn (string $id): int => (($index = array_search($id, array_column($dashboardCards, 'id'), true)) === false ? 99 : $index);
+        $dashboardCardVisible = fn (string $id): bool => $dashboardCardConfig->has($id);
     @endphp
 
     <main id="personal-dashboard" class="ak-body min-h-[calc(100dvh-73px)] xl:h-[calc(100dvh-89px)] xl:min-h-0 xl:overflow-hidden">
@@ -39,6 +66,11 @@
                     <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)] sm:text-3xl">{{ __('Mein Dashboard') }}</h1>
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-2">
+                    @if ($canUsePro)
+                        <button type="button" data-dashboard-cards-open class="relative inline-flex items-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-400/[.08] px-3 py-2 text-xs font-black text-cyan-300 transition hover:border-cyan-300/60 hover:bg-cyan-400/[.15]" title="{{ __('Gesamtes Dashboard anpassen') }}"><x-heroicon-o-view-columns class="h-4 w-4" />{{ __('Layout') }}<span class="ak-plan-badge ak-plan-badge--pro">PRO</span></button>
+                    @else
+                        <a href="{{ route('pricing') }}" class="relative inline-flex items-center gap-2 rounded-xl border border-slate-500/25 bg-slate-500/[.06] px-3 py-2 text-xs font-black text-slate-500" title="{{ __('Dashboard-Layout ab Pro') }}"><x-heroicon-o-view-columns class="h-4 w-4" />{{ __('Layout') }}<span class="ak-plan-badge ak-plan-badge--pro">PRO</span></a>
+                    @endif
                     <button type="button" @if($canUsePlus) data-dashboard-aki-open @endif @disabled(!$canUsePlus) title="{{ $canUsePlus ? __('AKI fragen') : __('Ab Plus verfügbar') }}" class="relative inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition {{ $canUsePlus ? 'border-orange-400/45 bg-orange-400/[.12] text-orange-300 shadow-[0_8px_24px_rgba(251,146,60,.10)] hover:border-orange-300 hover:bg-orange-400/[.2]' : 'cursor-not-allowed border-slate-500/25 bg-slate-500/[.06] text-slate-500 grayscale' }}">
                         <x-heroicon-o-sparkles class="h-4 w-4" />
                         {{ __('AKI fragen') }}
@@ -52,7 +84,7 @@
                 </div>
             </header>
 
-            <section class="dashboard-bento grid gap-3 sm:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-12 xl:grid-rows-6">
+            <section class="dashboard-bento grid gap-3 sm:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-12 xl:grid-rows-6" data-dashboard-card-layout="{{ $dashboardCardsCustomized ? 'custom' : 'default' }}">
                 <div class="dashboard-personal-column contents sm:col-span-2">
                 @if ($strategyPortfolio)
                     @php
@@ -61,7 +93,7 @@
                         $strategyEmailActive = $strategyPortfolioActive
                             && (bool) data_get($strategyPortfolio->meta, 'automation.transaction_email_enabled', false);
                     @endphp
-                    <a href="{{ $canUsePro ? route('depots.show', ['portfolio' => $strategyPortfolio, 'return_to' => 'paper']) : route('pricing') }}" class="dashboard-bento-strategy ak-card ak-dashboard-card group relative flex min-h-[94px] overflow-hidden p-3 transition {{ !$canUsePro ? 'dashboard-plan-locked' : ($strategyPortfolioActive ? 'border-orange-200/90 ring-1 ring-inset ring-orange-200/30 shadow-[0_0_35px_rgba(251,146,60,.24)] hover:border-orange-100' : 'border-orange-200/45 hover:border-orange-100/70') }}">
+                    <a href="{{ $canUsePro ? route('depots.show', ['portfolio' => $strategyPortfolio, 'return_to' => 'paper']) : route('pricing') }}" data-dashboard-card="strategy" data-dashboard-size="{{ $dashboardCardSize('strategy') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('strategy') }}" class="dashboard-bento-strategy ak-card ak-dashboard-card group relative flex min-h-[94px] overflow-hidden p-3 transition {{ $dashboardCardVisible('strategy') ? '' : 'hidden' }} {{ !$canUsePro ? 'dashboard-plan-locked' : ($strategyPortfolioActive ? 'border-orange-200/90 ring-1 ring-inset ring-orange-200/30 shadow-[0_0_35px_rgba(251,146,60,.24)] hover:border-orange-100' : 'border-orange-200/45 hover:border-orange-100/70') }}">
                         @unless($canUsePro)<span class="dashboard-plan-badge ak-plan-badge ak-plan-badge--pro">{{ __('Ab Pro') }}</span>@endunless
                         <span class="pointer-events-none absolute -left-8 -top-10 h-28 w-28 rounded-full {{ $strategyPortfolioActive ? 'bg-orange-400/35' : 'bg-orange-400/15' }} blur-2xl"></span>
                         <div class="relative flex w-full min-w-0 flex-col justify-between">
@@ -99,7 +131,7 @@
                         </div>
                     </a>
                 @else
-                    <article class="dashboard-bento-strategy ak-card ak-dashboard-card relative flex min-h-[94px] flex-col justify-between overflow-hidden border-orange-400/35 p-4 {{ $canUsePro ? '' : 'dashboard-plan-locked' }}">
+                    <article data-dashboard-card="strategy" data-dashboard-size="{{ $dashboardCardSize('strategy') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('strategy') }}" class="dashboard-bento-strategy ak-card ak-dashboard-card relative flex min-h-[94px] flex-col justify-between overflow-hidden border-orange-400/35 p-4 {{ $dashboardCardVisible('strategy') ? '' : 'hidden' }} {{ $canUsePro ? '' : 'dashboard-plan-locked' }}">
                         @unless($canUsePro)<span class="dashboard-plan-badge ak-plan-badge ak-plan-badge--pro">{{ __('Ab Pro') }}</span>@endunless
                         <div class="flex items-center gap-2">
                             <span class="grid h-8 w-8 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400"><x-heroicon-o-bolt class="h-4 w-4" /></span>
@@ -111,7 +143,7 @@
                         <a href="{{ $canUsePro ? route('paper-depots.index') : route('pricing') }}" class="mt-3 text-[10px] font-black text-orange-400 hover:text-orange-200">{{ $canUsePro ? __('Depot einrichten') : __('Pro entdecken') }} →</a>
                     </article>
                 @endif
-                    <article class="dashboard-bento-personal ak-card ak-dashboard-card shrink-0 overflow-hidden p-4">
+                    <article data-dashboard-card="personal" data-dashboard-size="{{ $dashboardCardSize('personal') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('personal') }}" class="dashboard-bento-personal ak-card ak-dashboard-card shrink-0 overflow-hidden p-4 {{ $dashboardCardVisible('personal') ? '' : 'hidden' }}">
                         <div class="flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2.5">
                                 <span class="grid h-9 w-9 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400"><x-heroicon-o-squares-2x2 class="h-4.5 w-4.5" /></span>
@@ -188,7 +220,7 @@
                             @endforeach
                         </div>
                     </article>
-                    <a href="{{ route('community.index') }}" class="dashboard-bento-community ak-card ak-dashboard-card block shrink-0 overflow-hidden border-orange-400/35 p-4 transition hover:border-orange-200/60">
+                    <a href="{{ route('community.index') }}" data-dashboard-card="community" data-dashboard-size="{{ $dashboardCardSize('community') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('community') }}" class="dashboard-bento-community ak-card ak-dashboard-card block shrink-0 overflow-hidden border-orange-400/35 p-4 transition hover:border-orange-200/60 {{ $dashboardCardVisible('community') ? '' : 'hidden' }}">
                         <div class="flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2.5">
                                 <span class="grid h-9 w-9 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400">
@@ -222,7 +254,7 @@
                     </a>
                 </div>
 
-                <article class="dashboard-bento-market ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-orange-400/40 p-4 sm:col-span-2">
+                <article data-dashboard-card="market" data-dashboard-size="{{ $dashboardCardSize('market') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('market') }}" class="dashboard-bento-market ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-orange-400/40 p-4 sm:col-span-2 {{ $dashboardCardVisible('market') ? '' : 'hidden' }}">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex min-w-0 items-center gap-3">
                             <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-orange-400/30 bg-orange-400/10 text-orange-400">
@@ -260,7 +292,7 @@
                 </article>
 
                 <div class="contents sm:col-span-2">
-                <article class="dashboard-bento-models ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-orange-400/40 p-4">
+                <article data-dashboard-card="models" data-dashboard-size="{{ $dashboardCardSize('models') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('models') }}" class="dashboard-bento-models ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-orange-400/40 p-4 {{ $dashboardCardVisible('models') ? '' : 'hidden' }}">
                     <div class="mb-3 flex items-start justify-between gap-3">
                         <div class="flex items-center gap-3">
                             <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-chart-bar-square class="h-5 w-5" /></span>
@@ -292,7 +324,7 @@
                         @endforeach
                     </div>
                 </article>
-                <article class="dashboard-bento-signals ak-card ak-dashboard-card flex min-h-[250px] flex-1 flex-col overflow-hidden border-orange-400/35 p-4">
+                <article data-dashboard-card="signals" data-dashboard-size="{{ $dashboardCardSize('signals') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('signals') }}" class="dashboard-bento-signals ak-card ak-dashboard-card flex min-h-[250px] flex-1 flex-col overflow-hidden border-orange-400/35 p-4 {{ $dashboardCardVisible('signals') ? '' : 'hidden' }}">
                     <div class="mb-3 flex items-center justify-between gap-3">
                         <div>
                             <p class="text-[9px] font-black uppercase tracking-[.16em] text-orange-400">{{ __('Letzte 48 Stunden') }}</p>
@@ -324,10 +356,40 @@
                         </div>
                     </div>
                 </article>
-                </div>
+                <article data-dashboard-card="schedule" data-dashboard-size="{{ $dashboardCardSize('schedule') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('schedule') }}" class="ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-orange-400/35 p-4 {{ $dashboardCardVisible('schedule') ? '' : 'hidden' }}">
+                    <div class="mb-3 flex items-center justify-between gap-3"><div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl border border-amber-400/25 bg-amber-400/10 text-amber-300"><x-heroicon-o-calendar-days class="h-5 w-5" /></span><div><p class="text-[9px] font-black uppercase tracking-[.16em] text-amber-300">{{ __('Planung') }}</p><h2 class="mt-1 text-base font-black text-[var(--ak-text)]">{{ __('Termine & Erinnerungen') }}</h2></div></div><button type="button" data-message-settings-open class="grid h-8 w-8 place-items-center rounded-lg border border-amber-400/25 text-amber-300" title="{{ __('Erinnerungen verwalten') }}"><x-heroicon-o-cog-6-tooth class="h-4 w-4" /></button></div>
+                    <div class="grid min-h-0 flex-1 gap-2 overflow-hidden">
+                        @forelse ($messageReminders->where('active', true)->take(4) as $reminder)
+                            <div class="flex items-center gap-2 rounded-lg border border-amber-400/15 bg-amber-400/[.045] px-2.5 py-2"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-amber-400/10 text-amber-300"><x-heroicon-o-envelope class="h-3.5 w-3.5" /></span><span class="min-w-0 flex-1"><b class="block truncate text-[10px] text-[var(--ak-text)]">{{ $reminder['symbol'] }} · {{ $reminder['label'] }}</b><small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $reminder['schedule'] }}</small></span></div>
+                        @empty
+                            <div class="grid min-h-24 place-items-center rounded-xl border border-dashed border-amber-400/20 text-center"><span><x-heroicon-o-calendar class="mx-auto h-5 w-5 text-amber-300" /><small class="mt-2 block text-[9px] text-[var(--ak-muted)]">{{ __('Keine bevorstehenden Aktionen oder E-Mails.') }}</small></span></div>
+                        @endforelse
+                    </div>
+                </article>
+                    </div>
             </section>
 
         </div>
+
+        @if ($canUsePro)
+        <div id="dashboard-cards-modal" class="fixed inset-0 z-[180] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="dashboard-cards-title">
+            <section class="flex max-h-[min(820px,92dvh)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
+                <header class="flex items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-5 py-4">
+                    <div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-300"><x-heroicon-o-view-columns class="h-5 w-5" /></span><div><p class="text-[9px] font-black uppercase tracking-[.18em] text-cyan-300">PRO · {{ __('12-Spalten-Raster') }}</p><h2 id="dashboard-cards-title" class="mt-1 text-lg font-black">{{ __('Gesamtes Dashboard anpassen') }}</h2></div></div>
+                    <button type="button" data-dashboard-cards-close class="grid h-9 w-9 place-items-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)]"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
+                </header>
+                <div class="min-h-0 overflow-y-auto p-4 sm:p-5">
+                    <p class="mb-4 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Ziehe Karten in die gewünschte Reihenfolge, blende sie aus oder wähle eine Größe. Auf Mobilgeräten werden die sichtbaren Karten automatisch untereinander angeordnet.') }}</p>
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
+                        <section class="rounded-xl border border-cyan-400/25 bg-cyan-400/[.035] p-3"><div class="mb-3 flex items-center justify-between border-b border-cyan-400/20 pb-3"><h3 class="text-xs font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Sichtbare Dashboard-Karten') }}</h3><span data-dashboard-cards-count class="text-[10px] font-black text-[var(--ak-muted)]"></span></div><div data-dashboard-cards-active class="grid min-h-64 gap-2 rounded-lg border border-dashed border-cyan-400/20 p-2 sm:grid-cols-2"></div></section>
+                        <section class="rounded-xl border border-slate-400/20 bg-slate-400/[.025] p-3"><h3 class="mb-3 border-b border-slate-400/20 pb-3 text-xs font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Ausgeblendete Karten') }}</h3><div data-dashboard-cards-hidden class="grid min-h-64 gap-2 rounded-lg border border-dashed border-slate-400/20 p-2"></div></section>
+                    </div>
+                    <p data-dashboard-cards-status class="mt-3 min-h-5 text-[10px] font-bold text-cyan-300"></p>
+                </div>
+                <footer class="flex flex-wrap items-center justify-between gap-2 border-t border-cyan-400/20 px-5 py-4"><button type="button" data-dashboard-cards-reset class="rounded-lg border border-[var(--ak-border)] px-3 py-2 text-[10px] font-black text-[var(--ak-muted)]">{{ __('Standardlayout wiederherstellen') }}</button><div class="flex gap-2"><button type="button" data-dashboard-cards-close class="rounded-lg border border-[var(--ak-border)] px-4 py-2 text-xs font-black text-[var(--ak-muted)]">{{ __('Abbrechen') }}</button><button type="button" data-dashboard-cards-save class="rounded-lg bg-cyan-400 px-4 py-2 text-xs font-black text-slate-950 hover:bg-cyan-300">{{ __('Layout speichern') }}</button></div></footer>
+            </section>
+        </div>
+        @endif
 
         @if ($canUsePro)
         <div id="dashboard-layout-modal" class="fixed inset-0 z-[185] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="dashboard-layout-title">
@@ -411,6 +473,70 @@
         </div>
     </main>
     <script>
+        (() => {
+            const modal = document.getElementById('dashboard-cards-modal');
+            const grid = document.querySelector('.dashboard-bento');
+            const activeZone = modal?.querySelector('[data-dashboard-cards-active]');
+            const hiddenZone = modal?.querySelector('[data-dashboard-cards-hidden]');
+            if (!modal || !grid || !activeZone || !hiddenZone) return;
+            const labels = @json($dashboardMainCardLabels);
+            const descriptions = @json($dashboardMainCardDescriptions);
+            const defaults = @json($dashboardCardDefaults);
+            let selected = @json($dashboardCards);
+            const catalog = new Map([...grid.querySelectorAll('[data-dashboard-card]')].map((card) => [card.dataset.dashboardCard, card]));
+            let dragged = null;
+
+            const createCard = (config, visible) => {
+                const item = document.createElement('div');
+                item.dataset.cardId = config.id; item.dataset.cardSize = config.size || 'medium'; item.draggable = true;
+                item.className = 'dashboard-card-choice relative cursor-grab rounded-xl border border-cyan-400/20 bg-cyan-400/[.045] p-3 active:cursor-grabbing';
+                item.innerHTML = `<div class="flex items-start gap-2"><span class="text-lg leading-none text-cyan-300">⠿</span><span class="min-w-0 flex-1"><b class="block text-xs"></b><small class="mt-1 block text-[9px] leading-3 text-[var(--ak-muted)]"></small></span><button type="button" data-card-toggle class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/25 text-cyan-300">${visible ? '→' : '←'}</button></div><div data-card-sizes class="mt-3 grid grid-cols-3 gap-1 border-t border-cyan-400/15 pt-2"></div>`;
+                item.querySelector('b').textContent = labels[config.id] || config.id;
+                item.querySelector('small').textContent = descriptions[config.id] || '';
+                const sizes = item.querySelector('[data-card-sizes]');
+                [['small','{{ __('Klein') }}'],['medium','{{ __('Mittel') }}'],['large','{{ __('Groß') }}']].forEach(([size, label]) => {
+                    const button = document.createElement('button'); button.type = 'button'; button.dataset.size = size; button.textContent = label;
+                    button.className = `rounded-md border px-1 py-1 text-[8px] font-black transition ${item.dataset.cardSize === size ? 'border-cyan-300 bg-cyan-400/20 text-cyan-200' : 'border-slate-500/20 text-slate-400'}`;
+                    button.addEventListener('click', () => { item.dataset.cardSize = size; refresh(); }); sizes.appendChild(button);
+                });
+                item.querySelector('[data-card-toggle]').addEventListener('click', () => { (item.parentElement === activeZone ? hiddenZone : activeZone).appendChild(item); refresh(); });
+                item.addEventListener('dragstart', () => { dragged = item; item.classList.add('opacity-40'); });
+                item.addEventListener('dragend', () => { item.classList.remove('opacity-40'); dragged = null; refresh(); });
+                return item;
+            };
+            const refresh = () => {
+                [...activeZone.querySelectorAll('[data-card-id]'), ...hiddenZone.querySelectorAll('[data-card-id]')].forEach((item) => {
+                    item.querySelector('[data-card-toggle]').textContent = item.parentElement === activeZone ? '→' : '←';
+                    item.querySelectorAll('[data-size]').forEach((button) => { const on = button.dataset.size === item.dataset.cardSize; button.classList.toggle('border-cyan-300', on); button.classList.toggle('bg-cyan-400/20', on); button.classList.toggle('text-cyan-200', on); button.classList.toggle('border-slate-500/20', !on); button.classList.toggle('text-slate-400', !on); });
+                });
+                const cards = [...activeZone.querySelectorAll('[data-card-id]')];
+                modal.querySelector('[data-dashboard-cards-count]').textContent = `${cards.length} / 7`;
+                const area = cards.reduce((sum, item) => sum + ({ small: 4, medium: 12, large: 24 }[item.dataset.cardSize] || 12), 0);
+                modal.querySelector('[data-dashboard-cards-status]').textContent = area > 72 ? '{{ __('Die gewählten Größen passen nicht auf eine Seite.') }}' : '';
+            };
+            const populate = () => {
+                activeZone.replaceChildren(); hiddenZone.replaceChildren();
+                selected.forEach((config) => { if (catalog.has(config.id)) activeZone.appendChild(createCard(config, true)); });
+                catalog.forEach((_, id) => { if (!selected.some((config) => config.id === id)) hiddenZone.appendChild(createCard({ id, size: 'small' }, false)); }); refresh();
+            };
+            const dragOver = (zone, event) => { event.preventDefault(); if (!dragged) return; const target = event.target.closest?.('[data-card-id]'); if (!target || target === dragged || target.parentElement !== zone) zone.appendChild(dragged); else { const rect = target.getBoundingClientRect(); zone.insertBefore(dragged, event.clientY > rect.top + rect.height / 2 ? target.nextSibling : target); } };
+            [activeZone, hiddenZone].forEach((zone) => zone.addEventListener('dragover', (event) => dragOver(zone, event)));
+            const open = () => { populate(); modal.classList.remove('hidden'); modal.classList.add('grid'); };
+            const close = () => { modal.classList.add('hidden'); modal.classList.remove('grid'); };
+            document.querySelector('[data-dashboard-cards-open]')?.addEventListener('click', open);
+            modal.querySelectorAll('[data-dashboard-cards-close]').forEach((button) => button.addEventListener('click', close));
+            modal.querySelector('[data-dashboard-cards-reset]').addEventListener('click', () => { selected = structuredClone(defaults); populate(); });
+            modal.querySelector('[data-dashboard-cards-save]').addEventListener('click', async (event) => {
+                const cards = [...activeZone.querySelectorAll('[data-card-id]')].map((item) => ({ id: item.dataset.cardId, size: item.dataset.cardSize }));
+                const area = cards.reduce((sum, item) => sum + ({ small:4, medium:12, large:24 }[item.size] || 12), 0); const status = modal.querySelector('[data-dashboard-cards-status]');
+                if (!cards.length) { status.textContent = '{{ __('Mindestens eine Karte muss sichtbar bleiben.') }}'; return; }
+                if (area > 72) { status.textContent = '{{ __('Die gewählten Größen passen nicht auf eine Seite.') }}'; return; }
+                const button = event.currentTarget; button.disabled = true; button.textContent = '{{ __('Speichert …') }}'; status.textContent = '{{ __('Wird gespeichert …') }}';
+                try { const response = await fetch('{{ route('dashboard.card-layout.update') }}', { method:'PATCH', credentials:'same-origin', headers:{ 'Content-Type':'application/json','Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content || '' }, body:JSON.stringify({ cards }) }); if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.message || `HTTP ${response.status}`); } status.textContent = '{{ __('Gespeichert. Das Dashboard wird aktualisiert …') }}'; window.setTimeout(() => window.location.reload(), 300); }
+                catch (error) { status.textContent = `{{ __('Das Layout konnte nicht gespeichert werden.') }} ${error.message || ''}`; button.disabled = false; button.textContent = '{{ __('Layout speichern') }}'; }
+            });
+            modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+        })();
         (() => {
             const modal = document.getElementById('dashboard-layout-modal');
             const tileGrid = document.querySelector('.dashboard-bento-personal > div:last-child');
@@ -541,7 +667,7 @@
             if (!modal) return;
             const open = () => { modal.classList.remove('hidden'); modal.classList.add('grid'); };
             const close = () => { modal.classList.add('hidden'); modal.classList.remove('grid'); };
-            document.querySelector('[data-message-settings-open]')?.addEventListener('click', open);
+            document.querySelectorAll('[data-message-settings-open]').forEach((button) => button.addEventListener('click', open));
             modal.querySelector('[data-message-settings-close]')?.addEventListener('click', close);
             modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
             document.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
@@ -711,6 +837,30 @@
             #personal-dashboard .dashboard-bento-personal .text-lg,
             #personal-dashboard .dashboard-bento-community .text-lg { font-size: .9rem; }
             #personal-dashboard .dashboard-bento-market > p { font-size: .72rem; line-height: 1.12rem; }
+        }
+        @media (min-width: 1280px) {
+            .dashboard-bento[data-dashboard-card-layout="custom"] {
+                grid-auto-flow: dense;
+                grid-template-columns: repeat(12, minmax(0, 1fr));
+                grid-template-rows: repeat(6, minmax(0, 1fr));
+            }
+            .dashboard-bento[data-dashboard-card-layout="custom"] [data-dashboard-card] {
+                order: var(--dashboard-card-order);
+                min-height: 0 !important;
+                grid-column: span 4 !important;
+                grid-row: span 3 !important;
+            }
+            .dashboard-bento[data-dashboard-card-layout="custom"] [data-dashboard-size="small"] {
+                grid-column: span 4 !important;
+                grid-row: span 1 !important;
+            }
+            .dashboard-bento[data-dashboard-card-layout="custom"] [data-dashboard-size="large"] {
+                grid-column: span 8 !important;
+                grid-row: span 3 !important;
+            }
+        }
+        @media (max-width: 1279px) {
+            .dashboard-bento [data-dashboard-card] { order: var(--dashboard-card-order); }
         }
         .dashboard-aki-dots { display: inline-block; min-width: 1.6em; letter-spacing: .12em; animation: dashboard-aki-pulse 1.1s steps(4, end) infinite; }
         @keyframes dashboard-aki-pulse { 0%,20% { opacity: .25; } 40% { opacity: .65; } 60%,100% { opacity: 1; } }
