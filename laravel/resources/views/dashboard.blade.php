@@ -325,11 +325,11 @@
                     <div class="grid gap-4 md:grid-cols-2">
                         <section class="rounded-xl border border-cyan-400/25 bg-cyan-400/[.035] p-3">
                             <div class="mb-3 flex items-center justify-between"><h3 class="text-xs font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Auf deinem Dashboard') }}</h3><span data-dashboard-layout-count class="text-[10px] font-black text-[var(--ak-muted)]"></span></div>
-                            <div data-dashboard-layout-active class="dashboard-layout-dropzone grid min-h-48 gap-2 rounded-lg border border-dashed border-cyan-400/20 p-2"></div>
+                            <div data-dashboard-layout-active class="dashboard-layout-dropzone grid min-h-48 grid-cols-2 auto-rows-[92px] gap-2 rounded-lg border border-dashed border-cyan-400/20 p-2"></div>
                         </section>
                         <section class="rounded-xl border border-slate-400/20 bg-slate-400/[.025] p-3">
                             <h3 class="mb-3 text-xs font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Verfügbare Kacheln') }}</h3>
-                            <div data-dashboard-layout-available class="dashboard-layout-dropzone grid min-h-48 gap-2 rounded-lg border border-dashed border-slate-400/20 p-2"></div>
+                            <div data-dashboard-layout-available class="dashboard-layout-dropzone grid min-h-48 grid-cols-2 auto-rows-[92px] gap-2 rounded-lg border border-dashed border-slate-400/20 p-2"></div>
                         </section>
                     </div>
                     <p data-dashboard-layout-status class="mt-3 min-h-5 text-[10px] font-bold text-cyan-300"></p>
@@ -411,8 +411,8 @@
                 const choice = document.createElement('div');
                 choice.draggable = true;
                 choice.dataset.tileId = item.id;
-                choice.className = 'dashboard-layout-choice flex cursor-grab items-center gap-3 rounded-lg border border-cyan-400/20 bg-slate-950/25 px-3 py-2.5 active:cursor-grabbing';
-                choice.innerHTML = `<span class="text-cyan-300" aria-hidden="true">⠿</span><b class="min-w-0 flex-1 truncate text-xs"></b><button type="button" class="grid h-7 w-7 place-items-center rounded-md border border-cyan-400/20 text-cyan-300" aria-label="${active ? '{{ __('Entfernen') }}' : '{{ __('Hinzufügen') }}'}">${active ? '→' : '←'}</button>`;
+                choice.className = 'dashboard-layout-choice relative flex min-h-[92px] cursor-grab flex-col justify-between rounded-xl border border-cyan-400/20 bg-cyan-400/[.045] p-3 shadow-[inset_0_1px_0_rgba(34,211,238,.04)] transition hover:border-cyan-300/45 hover:bg-cyan-400/[.09] active:cursor-grabbing';
+                choice.innerHTML = `<span class="text-lg leading-none text-cyan-300" aria-hidden="true">⠿</span><b class="min-w-0 pr-8 text-xs leading-4"></b><button type="button" class="absolute bottom-2.5 right-2.5 grid h-8 w-8 place-items-center rounded-lg border border-cyan-400/25 bg-cyan-400/[.08] text-cyan-300 transition hover:bg-cyan-400/[.18]" aria-label="${active ? '{{ __('Entfernen') }}' : '{{ __('Hinzufügen') }}'}">${active ? '→' : '←'}</button>`;
                 choice.querySelector('b').textContent = item.label;
                 choice.querySelector('button').addEventListener('click', () => {
                     (choice.parentElement === activeZone ? availableZone : activeZone).appendChild(choice);
@@ -448,9 +448,12 @@
             const dragOver = (zone, event) => {
                 event.preventDefault();
                 if (!dragged) return;
-                const siblings = [...zone.querySelectorAll('[data-tile-id]:not(.opacity-40)')];
-                const next = siblings.find((item) => event.clientY < item.getBoundingClientRect().top + item.offsetHeight / 2);
-                zone.insertBefore(dragged, next || null);
+                const target = event.target.closest?.('[data-tile-id]');
+                if (!target || target === dragged || target.parentElement !== zone) { zone.appendChild(dragged); return; }
+                const rect = target.getBoundingClientRect();
+                const after = event.clientY > rect.top + rect.height / 2
+                    || (Math.abs(event.clientY - (rect.top + rect.height / 2)) < rect.height / 3 && event.clientX > rect.left + rect.width / 2);
+                zone.insertBefore(dragged, after ? target.nextSibling : target);
             };
             [activeZone, availableZone].forEach((zone) => zone.addEventListener('dragover', (event) => dragOver(zone, event)));
 
