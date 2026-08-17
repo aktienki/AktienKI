@@ -453,6 +453,44 @@
             .dashboard-bento-models { grid-column: 9 / span 4; grid-row: 1 / span 3; }
             .dashboard-bento-signals { grid-column: 9 / span 4; grid-row: 4 / span 3; }
         }
+
+        /*
+         * A desktop browser rarely has the full monitor height available. Keep the
+         * dense bento layout on tall screens, but never crop actions on laptops or
+         * in non-fullscreen browser windows. The dashboard then becomes one
+         * scrollable page while the card proportions stay intact.
+         */
+        @media (min-width: 1280px) and (max-height: 1100px) {
+            html:has(#personal-dashboard),
+            body:has(#personal-dashboard) {
+                height: auto;
+                min-height: 100dvh;
+                overflow-x: hidden;
+                overflow-y: auto;
+                overscroll-behavior-y: auto;
+            }
+            #personal-dashboard {
+                height: auto !important;
+                min-height: calc(100dvh - 89px) !important;
+                overflow: visible !important;
+            }
+            #personal-dashboard > .ak-container {
+                height: auto !important;
+                min-height: calc(100dvh - 89px) !important;
+            }
+            #personal-dashboard .dashboard-bento {
+                flex: none;
+                min-height: 920px;
+                grid-template-rows: repeat(6, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 1280px) and (max-height: 850px) {
+            #personal-dashboard > .ak-container { padding-top: .75rem; padding-bottom: .75rem; }
+            #personal-dashboard header { margin-bottom: .75rem; }
+            #personal-dashboard .dashboard-bento { min-height: 880px; gap: .6rem; }
+            #personal-dashboard .ak-dashboard-card { padding: .8rem; }
+        }
         .dashboard-aki-dots { display: inline-block; min-width: 1.6em; letter-spacing: .12em; animation: dashboard-aki-pulse 1.1s steps(4, end) infinite; }
         @keyframes dashboard-aki-pulse { 0%,20% { opacity: .25; } 40% { opacity: .65; } 60%,100% { opacity: 1; } }
         #dashboard-aki-messages { scrollbar-width: thin; scrollbar-color: rgba(34, 211, 238,.7) rgba(15,23,42,.45); }
