@@ -424,6 +424,7 @@
                 id: tile.dataset.dashboardTile,
                 label: tile.dataset.dashboardTileLabel || tile.dataset.dashboardTile,
                 description: descriptions[tile.dataset.dashboardTile] || '',
+                icon: tile.querySelector('svg')?.outerHTML || '',
                 element: tile,
             }]));
             let selected = @json($dashboardSelectedTiles).filter((id) => catalog.has(id));
@@ -434,7 +435,7 @@
                 const reference = [...tileGrid.querySelectorAll('[data-dashboard-tile]')].find((tile) => !tile.classList.contains('hidden'));
                 if (!reference) return;
                 const rect = reference.getBoundingClientRect();
-                dashboardTileSize = { width: Math.round(rect.width), height: Math.round(rect.height) };
+                dashboardTileSize = { width: Math.round(rect.width), height: Math.max(Math.round(rect.height), 116) };
                 [activeZone, availableZone].forEach((zone) => {
                     zone.style.gridTemplateColumns = `repeat(3, ${dashboardTileSize.width}px)`;
                     zone.style.gridAutoRows = `minmax(0, ${dashboardTileSize.height}px)`;
@@ -445,9 +446,9 @@
                 const choice = document.createElement('div');
                 choice.draggable = true;
                 choice.dataset.tileId = item.id;
-                choice.className = 'dashboard-layout-choice relative flex h-full min-h-0 cursor-grab flex-col justify-between overflow-hidden rounded-xl border border-cyan-400/20 bg-cyan-400/[.045] p-3 shadow-[inset_0_1px_0_rgba(34,211,238,.04)] transition hover:border-cyan-300/45 hover:bg-cyan-400/[.09] active:cursor-grabbing';
+                choice.className = 'dashboard-layout-choice relative flex h-full min-h-0 cursor-grab flex-col overflow-hidden rounded-xl border border-orange-400/20 bg-orange-400/[.045] p-3 shadow-[inset_0_1px_0_rgba(251,146,60,.04)] transition hover:border-orange-300/45 hover:bg-orange-400/[.09] active:cursor-grabbing';
                 if (dashboardTileSize.height) { choice.style.height = `${dashboardTileSize.height}px`; choice.style.minHeight = '0'; }
-                choice.innerHTML = `<span class="text-base leading-none text-cyan-300" aria-hidden="true">⠿</span><span class="min-w-0 pr-8"><b class="block truncate text-xs leading-4"></b><small class="mt-0.5 block overflow-hidden text-[9px] leading-3 text-[var(--ak-muted)]" style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-height:1.5rem"></small></span><button type="button" class="absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-lg border border-cyan-400/25 bg-cyan-400/[.08] text-cyan-300 transition hover:bg-cyan-400/[.18]" aria-label="${active ? '{{ __('Entfernen') }}' : '{{ __('Hinzufügen') }}'}">${active ? '→' : '←'}</button>`;
+                choice.innerHTML = `<span class="flex items-center justify-between gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400 [&>svg]:h-4 [&>svg]:w-4">${item.icon}</span><span class="mr-8 text-base leading-none text-orange-400" aria-hidden="true">⠿</span></span><span class="mt-2 min-w-0 pr-8"><b class="block truncate text-xs leading-4"></b><small class="mt-1 block overflow-hidden text-[9px] leading-3 text-[var(--ak-muted)]" style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-height:1.5rem"></small></span><button type="button" class="absolute bottom-3 right-3 grid h-8 w-8 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/[.08] text-orange-400 transition hover:bg-orange-400/[.18]" aria-label="${active ? '{{ __('Entfernen') }}' : '{{ __('Hinzufügen') }}'}">${active ? '→' : '←'}</button>`;
                 choice.querySelector('b').textContent = item.label;
                 choice.querySelector('small').textContent = item.description;
                 choice.querySelector('button').addEventListener('click', () => {
