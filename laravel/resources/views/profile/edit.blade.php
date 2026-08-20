@@ -135,7 +135,7 @@
 
                 <fieldset class="mt-6">
                     <legend class="sr-only">{{ __('Gewünschtes Risikoprofil') }}</legend>
-                    <div class="grid gap-3 md:grid-cols-3">
+                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                         <label class="group relative cursor-pointer rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-orange-400/35 has-[:checked]:border-orange-400/60 has-[:checked]:bg-orange-400/[.08] has-[:checked]:ring-2 has-[:checked]:ring-orange-400/10">
                             <input class="sr-only" type="radio" name="risk_level" value="cautious" @checked($selectedRiskLevel === 'cautious')>
                             <span class="flex items-center justify-between gap-3">
@@ -162,6 +162,11 @@
                             </span>
                             <span class="mt-2 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Orientierung: höhere Volatilität und möglicher historischer beziehungsweise modellierter Drawdown über 25 %.') }}</span>
                         </label>
+                        <label class="group relative cursor-pointer rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-red-500/40 has-[:checked]:border-red-500/60 has-[:checked]:bg-red-500/[.08] has-[:checked]:ring-2 has-[:checked]:ring-red-500/10">
+                            <input class="sr-only" type="radio" name="risk_level" value="risk" @checked($selectedRiskLevel === 'risk')>
+                            <span class="flex items-center justify-between gap-3"><strong class="text-sm text-red-500">{{ __('Risk') }}</strong><x-heroicon-o-exclamation-triangle class="h-5 w-5 text-red-500 opacity-0 transition group-has-[:checked]:opacity-100" /></span>
+                            <span class="mt-2 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Zeigt das vollständige Aktienuniversum einschließlich SLEEP-Aktien mit einem validierten Profitfaktor unter 1,05.') }}</span>
+                        </label>
                     </div>
                     @error('risk_level')<p class="mt-3 text-xs text-rose-400">{{ $message }}</p>@enderror
                 </fieldset>
@@ -177,6 +182,7 @@
                     @foreach ([
                         ['email_service', __('E-Mail-Service aktivieren'), __('Hauptschalter für alle optionalen E-Mails')],
                         ['email_market_summary', __('Marktüberblick'), __('Regelmäßige Zusammenfassung wichtiger Marktbewegungen')],
+                        ['email_signal_cockpit', __('Signal-Cockpit & ChartView (Pro)'), __('Täglicher Marktbericht mit Signalwechseln, Top-5 KI-Scores, technischen Signalen und Chartmustern')],
                         ['email_price_alerts', __('Preis- und Signalsalarme'), __('Hinweise zu deinen Watchlists und festgelegten Signalen')],
                         ['email_product_updates', __('AktienKI Neuigkeiten'), __('Neue Funktionen, Verbesserungen und wichtige Produktinformationen')],
                     ] as [$key, $title, $copy])

@@ -103,7 +103,7 @@ final class AkiChatController extends Controller
             : null;
         $currentList = $this->currentPredictionList($data['filters'] ?? [], $allowedInstrumentIds);
         $input = array_merge([
-            ['role' => 'developer', 'content' => 'Aktuelle Filter und die sichtbare Prognoseliste der Seite (diese Daten darfst du direkt auswerten): '.json_encode(['filters' => $data['filters'] ?? [], 'predictions' => $currentList], JSON_UNESCAPED_UNICODE)."\nAntworte immer in der aktuell ausgewählten Sprache ".(app()->getLocale() === 'en' ? 'Englisch' : 'Deutsch')." und in kurzen Stichpunkten. Behaupte niemals, dass du keinen Zugriff auf die Datenbank oder Liste hast. Wenn aktuelle Werte gefragt werden, nutze die übergebenen Listendaten oder rufe das Backtest-Werkzeug auf."],
+            ['role' => 'developer', 'content' => 'Aktuelle Filter und die sichtbare Prognoseliste der Seite (diese Daten darfst du direkt auswerten): '.json_encode(['filters' => $data['filters'] ?? [], 'predictions' => $currentList], JSON_UNESCAPED_UNICODE)."\nVerwende ausnahmslos aktive Aktien (instruments.is_active = true) ohne SLEEP-Status. Nenne, bewerte oder filtere niemals inaktive oder SLEEP-Aktien. Antworte immer in der aktuell ausgewählten Sprache ".(app()->getLocale() === 'en' ? 'Englisch' : 'Deutsch')." und in kurzen Stichpunkten. Behaupte niemals, dass du keinen Zugriff auf die Datenbank oder Liste hast. Wenn aktuelle Werte gefragt werden, nutze die übergebenen Listendaten oder rufe das Backtest-Werkzeug auf."],
         ], $history);
         $response = Http::withToken($apiKey)
             ->acceptJson()
@@ -111,7 +111,7 @@ final class AkiChatController extends Controller
             ->timeout(30)
             ->post('https://api.openai.com/v1/responses', [
                 'model' => $model,
-                'instructions' => 'Du bist AKI, ein deutschsprachiger Assistent für die Prognosetabelle. Nutze die übergebenen aktuellen Listendaten und Backtest-Werkzeuge aktiv. Empfehle und zeige ausschließlich Aktien mit positiver prognostizierter Rendite (predicted_return_min mindestens 0). Behaupte niemals, dass du keinen Zugriff auf die Datenbank oder Liste hast. Sobald du dem Nutzer konkrete Aktiensymbole nennst oder mehrere Aktien empfiehlst, rufe set_prediction_filters auf und übergib diese Symbole sowie predicted_return_min: 0, damit anschließend nur diese positiven Aktien angezeigt werden. Wenn der Nutzer ausdrücklich Filter setzen, anwenden oder konfigurieren möchte, rufe set_prediction_filters mit einer vollständigen, sinnvollen Konfiguration auf. Antworte ausschließlich in kurzen Stichpunkten (Zeilen mit •), niemals mit Gedankenstrichen als Satztrenner und ohne lange Absätze. Nutze get_smart_selection_backtest für Kennzahlen. Keine individuelle Anlageberatung und keine Kauf- oder Verkaufsempfehlungen.',
+                'instructions' => 'Du bist AKI, ein deutschsprachiger Assistent für die Prognosetabelle. Nutze ausschließlich aktive Aktien (instruments.is_active = true) ohne SLEEP-Status; inaktive oder SLEEP-Aktien darfst du weder nennen noch bewerten, empfehlen oder filtern. Nutze die übergebenen aktuellen Listendaten und Backtest-Werkzeuge aktiv. Empfehle und zeige ausschließlich Aktien mit positiver prognostizierter Rendite (predicted_return_min mindestens 0). Behaupte niemals, dass du keinen Zugriff auf die Datenbank oder Liste hast. Sobald du dem Nutzer konkrete Aktiensymbole nennst oder mehrere Aktien empfiehlst, rufe set_prediction_filters auf und übergib diese Symbole sowie predicted_return_min: 0, damit anschließend nur diese positiven Aktien angezeigt werden. Wenn der Nutzer ausdrücklich Filter setzen, anwenden oder konfigurieren möchte, rufe set_prediction_filters mit einer vollständigen, sinnvollen Konfiguration auf. Antworte ausschließlich in kurzen Stichpunkten (Zeilen mit •), niemals mit Gedankenstrichen als Satztrenner und ohne lange Absätze. Nutze get_smart_selection_backtest für Kennzahlen. Keine individuelle Anlageberatung und keine Kauf- oder Verkaufsempfehlungen.',
                 'input' => $input,
                 'tools' => $tools,
                 'max_output_tokens' => $mode === 'deep' ? 900 : 220,
@@ -133,9 +133,15 @@ final class AkiChatController extends Controller
             $toolOutputs = [];
             foreach ($calls as $call) {
                 $arguments = json_decode((string) data_get($call, 'arguments', '{}'), true) ?: [];
-                $result = data_get($call, 'name') === 'set_prediction_filters'
-                    ? ['filters' => $filterSuggestion = $this->normaliseFilters($arguments), 'message' => 'Filterkonfiguration erstellt.']
-                    : $this->backtestStats($arguments, $allowedInstrumentIds);
+                if (data_get($call, 'name') === 'set_prediction_filters') {
+                    $filterSuggestion = $this->normaliseFilters($arguments);
+                    if (isset($filterSuggestion['symbols'])) {
+                        $filterSuggestion['symbols'] = $this->activeSymbols($filterSuggestion['symbols'], $allowedInstrumentIds);
+                    }
+                    $result = ['filters' => $filterSuggestion, 'message' => 'Filterkonfiguration erstellt.'];
+                } else {
+                    $result = $this->backtestStats($arguments, $allowedInstrumentIds);
+                }
                 $toolOutputs[] = ['type' => 'function_call_output', 'call_id' => data_get($call, 'call_id'), 'output' => json_encode($result, JSON_UNESCAPED_UNICODE)];
             }
             $followUp = Http::withToken($apiKey)->acceptJson()->asJson()->timeout(30)->post('https://api.openai.com/v1/responses', [
@@ -235,6 +241,7 @@ final class AkiChatController extends Controller
             ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
+            ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
             ->when($allowedInstrumentIds !== null, fn ($query) => $query->whereIn('instrument.id', $allowedInstrumentIds ?: [-1]))
             ->whereRaw('(prediction.predicted_price_20d - prediction.current_price) > 0')
             ->whereRaw('prediction.id = (SELECT latest.id FROM predictions latest WHERE latest.instrument_id = prediction.instrument_id ORDER BY latest.prediction_time DESC NULLS LAST, latest.id DESC LIMIT 1)')
@@ -264,6 +271,10 @@ final class AkiChatController extends Controller
             ->join('instruments as instrument', 'instrument.id', '=', 'trade.instrument_id')
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
             ->where('trade.backtest_run_id', $run->id)
+            ->where('instrument.type', 'stock')
+            ->where('instrument.is_active', true)
+            ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
+            ->whereNull('instrument.deleted_at')
             ->when($allowedInstrumentIds !== null, fn ($query) => $query->whereIn('instrument.id', $allowedInstrumentIds ?: [-1]))
             ->when(isset($filters['country']), fn ($q) => $q->where('instrument.country', strtoupper($filters['country'])))
             ->when(isset($filters['exchange']), fn ($q) => $q->where('exchange.code', strtoupper($filters['exchange'])))
@@ -276,5 +287,14 @@ final class AkiChatController extends Controller
         $loss = abs((float) $rows->where('net_return', '<', 0)->sum('net_return'));
         $profit = (float) $rows->where('net_return', '>', 0)->sum('net_return');
         return ['trades' => $rows->count(), 'winning_trades' => $wins, 'hit_rate' => $rows->count() ? round($wins / $rows->count() * 100, 1) : 0, 'profit_factor' => $loss ? round($profit / $loss, 2) : 0, 'max_drawdown' => round((float) $rows->max(fn ($r) => abs((float) $r->max_drawdown)) * 100, 1)];
+    }
+
+    private function activeSymbols(array $symbols, ?array $allowedInstrumentIds): array
+    {
+        return DB::table('instruments')->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at')
+            ->where(fn ($query) => $query->whereNull('risk_status')->orWhere('risk_status', '<>', 'sleep'))
+            ->whereIn(DB::raw('UPPER(symbol)'), collect($symbols)->map(fn ($symbol) => strtoupper((string) $symbol))->all())
+            ->when($allowedInstrumentIds !== null, fn ($query) => $query->whereIn('id', $allowedInstrumentIds ?: [-1]))
+            ->orderBy('symbol')->pluck('symbol')->all();
     }
 }

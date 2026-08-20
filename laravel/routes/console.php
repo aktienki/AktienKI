@@ -18,30 +18,46 @@ Schedule::command('instruments:generate-descriptions --limit=25 --sleep-ms=100')
     ->withoutOverlapping(30)
     ->runInBackground();
 
-// Store one deterministic Top-10 snapshot per day for the ranking history.
-// The live screener score is calculated exclusively from model and backtest data.
-Schedule::command('stocks:screen-top100 --limit=10')
-    ->dailyAt('06:15')
-    ->withoutOverlapping(30)
-    ->runInBackground();
-
 Schedule::command('signals:send-emails --since=30')
     ->everyFiveMinutes()
     ->withoutOverlapping(10)
     ->runInBackground();
 
-Schedule::command('signals:send-entry-alerts')
-    ->dailyAt('06:30')
+Schedule::command('opportunities:purge')
+    ->hourly()
     ->withoutOverlapping(10)
+    ->onOneServer()
     ->runInBackground();
-Schedule::command('predictions:send-purchase-reminders')->dailyAt('07:00')->withoutOverlapping(10)->runInBackground();
 
-// Point-in-time context for sector and index rotation. This runs after the
-// daily stock prediction batch and is consumed by depot selection and emails.
-Schedule::command('predictions:market-context')
-    ->dailyAt('06:20')
+// Retraining can move a stock out of SLEEP as soon as its validated profit
+// factor reaches 1.05. The classifier is intentionally independent of active.
+Schedule::command('stocks:classify-risk')
+    ->everyFiveMinutes()
     ->withoutOverlapping(10)
+    ->onOneServer()
     ->runInBackground();
+
+// Persist both language variants after the daily prediction batch. The report
+// command skips a prediction/locale pair that has already been generated.
+Schedule::command('reports:signal-change --locale=de')
+    ->weekdays()->dailyAt('08:30')->timezone('Europe/Berlin')
+    ->withoutOverlapping(30)->onOneServer()->runInBackground();
+Schedule::command('reports:signal-change --locale=en')
+    ->weekdays()->dailyAt('08:35')->timezone('Europe/Berlin')
+    ->withoutOverlapping(30)->onOneServer()->runInBackground();
+
+// Indicator and chart signals are prepared before the 08:00 prediction batch.
+// They are refreshed once more by predictions:run-server after the predictions.
+Schedule::command('chartview:refresh-signals')->dailyAt('06:10')->withoutOverlapping(60)->runInBackground();
+Schedule::command('market-factors:calculate --days=14')
+    ->weekdays()->dailyAt('06:25')->timezone('Europe/Berlin')
+    ->withoutOverlapping(60)->onOneServer()->runInBackground();
+
+// Keep the broad German stock universe current as market caps and the
+// available instrument catalogue grow. It is intentionally not labelled DAX.
+Schedule::command('indices:sync-germany-top500')
+    ->dailyAt('06:20')->timezone('Europe/Berlin')
+    ->withoutOverlapping(10)->onOneServer()->runInBackground();
 
 Schedule::command('markets:generate-index-infos')
     ->dailyAt('06:35')
@@ -71,23 +87,42 @@ Schedule::command('events:sync-twelve-data --days-back=7 --days-forward=60')
     ->withoutOverlapping(30)
     ->runInBackground();
 
+// ETF issuers usually refresh portfolio files daily. A weekly snapshot keeps
+// the reverse stock-to-ETF lookup current without unnecessary provider load.
+Schedule::command('etfs:sync-holdings')
+    ->weeklyOn(1, '03:30')
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping(120)
+    ->onOneServer()
+    ->runInBackground();
+
+// Der automatische Zertifikate-Import ist vorerst deaktiviert. Der manuelle
+// Befehl bleibt für einen späteren kontrollierten Neustart verfügbar.
+
+// Official company announcements are fetched incrementally. GPT only sees
+// newly stored releases and runs in compact batches before daily predictions.
+Schedule::command('news:sync-press-releases --limit=2500 --analyze --analysis-limit=1000')
+    ->weekdays()
+    ->dailyAt('04:45')
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping(150)
+    ->onOneServer()
+    ->runInBackground();
+
 // Predictions run on the application server so production remains available
 // even when the training workstation is offline. The workstation only trains
 // and validates models; released artifacts are synchronized separately.
 if (config('aktienki.python_engine.server_predictions_enabled', false)) {
     $limit = max(1, (int) config('aktienki.python_engine.prediction_limit', 5000));
 
-    Schedule::command("predictions:run-server other --limit={$limit}")
+    // One consistent prediction snapshot for every market. The digest is
+    // dispatched by the command immediately after a successful batch, giving
+    // users the longest possible time to react during the trading day.
+    Schedule::command("predictions:run-server all --limit={$limit} --send-digest")
         ->weekdays()
-        ->dailyAt('10:00')
+        ->dailyAt('08:00')
         ->timezone('Europe/Berlin')
         ->withoutOverlapping(180)
-        ->runInBackground();
-
-    Schedule::command("predictions:run-server americas --limit={$limit}")
-        ->weekdays()
-        ->dailyAt('16:00')
-        ->timezone('Europe/Berlin')
-        ->withoutOverlapping(180)
+        ->onOneServer()
         ->runInBackground();
 }

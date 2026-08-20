@@ -96,6 +96,7 @@ class PersonalizedSignalService
         return match ($level) {
             'cautious', 'conservative' => 'cautious',
             'opportunity_oriented', 'opportunity', 'aggressive' => 'opportunity_oriented',
+            'risk' => 'risk',
             default => 'normal',
         };
     }
@@ -105,6 +106,7 @@ class PersonalizedSignalService
         return match ($this->riskLevel($user)) {
             'cautious' => 'Konservativ',
             'opportunity_oriented' => 'Chance',
+            'risk' => 'Risk',
             default => 'Ausgewogen',
         };
     }
@@ -304,6 +306,7 @@ class PersonalizedSignalService
                   AND peer_technical.volatility_20 IS NOT NULL
                 ORDER BY peer_technical.bar_time DESC, peer_technical.id DESC LIMIT 1) AS peer_volatility ON TRUE
             WHERE peer_instrument.type = 'stock' AND peer_instrument.is_active = TRUE AND peer_instrument.deleted_at IS NULL
+              AND (peer_instrument.risk_status IS NULL OR peer_instrument.risk_status <> 'sleep')
               AND peer_instrument.sector IS NOT DISTINCT FROM (SELECT current_instrument.sector FROM instruments AS current_instrument
                   WHERE current_instrument.id = {$predictionAlias}.instrument_id))";
     }

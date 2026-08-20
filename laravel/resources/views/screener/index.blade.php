@@ -2,7 +2,7 @@
     <div class="screener-page mx-auto max-w-[96rem] px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
         <header class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h1 class="text-3xl font-black tracking-tight">{{ __('Aktienscreener') }}</h1>
-            <div class="flex flex-wrap gap-2"><a href="{{ route('screener.history') }}" class="inline-flex h-10 items-center justify-center rounded-xl border border-amber-400/35 bg-amber-400/[.08] px-4 text-xs font-black text-amber-300">{{ __('Ranking-Historie') }}</a><a href="{{ route('predictions.index') }}" class="inline-flex h-10 items-center justify-center rounded-xl border border-cyan-400/35 bg-cyan-400/[.08] px-4 text-xs font-black text-cyan-300 transition hover:bg-cyan-400/[.16]">{{ __('Prognosetabelle öffnen') }}</a></div>
+            <div class="flex flex-wrap gap-2"><a href="{{ route('predictions.index') }}" class="inline-flex h-10 items-center justify-center rounded-xl border border-cyan-400/35 bg-cyan-400/[.08] px-4 text-xs font-black text-cyan-300 transition hover:bg-cyan-400/[.16]">{{ __('Prognosetabelle öffnen') }}</a></div>
         </header>
 
         @if($isFreeRegional)
@@ -23,7 +23,12 @@
             <div class="mb-3 rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-xs font-bold text-rose-300">{{ $errors->first() }}</div>
         @endif
 
-        <form method="GET" action="{{ route('screener.index') }}" class="screener-filter-bar mb-5 flex flex-nowrap gap-2 overflow-x-auto rounded-lg border border-cyan-400/30 bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]">
+        <section x-data="{ filtersOpen: false }" class="screener-filter-shell mb-5 shrink-0">
+        <button type="button" @click="filtersOpen = ! filtersOpen" :aria-expanded="filtersOpen" class="flex h-10 w-full items-center justify-between rounded-xl border border-cyan-400/30 bg-[var(--ak-card)] px-4 text-xs font-black text-cyan-300 shadow-[var(--ak-shadow)]">
+            <span class="inline-flex items-center gap-2"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" />{{ __('Filter anzeigen') }}</span>
+            <x-heroicon-o-chevron-down class="h-4 w-4 transition" x-bind:class="filtersOpen && 'rotate-180'" />
+        </button>
+        <form x-cloak x-show="filtersOpen" method="GET" action="{{ route('screener.index') }}" class="screener-filter-bar mt-2 flex flex-nowrap gap-2 overflow-x-auto rounded-lg border border-cyan-400/30 bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]">
             <label class="relative min-w-[180px] flex-[1.5]">
                 <span class="sr-only">{{ __('Aktie suchen') }}</span>
                 <input name="q" value="{{ request('q') }}" oninput="clearTimeout(this._filterTimer); this._filterTimer = setTimeout(() => this.form.requestSubmit(), 500)" placeholder="{{ __('Aktie oder Symbol') }}" class="ak-input h-10 w-full text-sm" />
@@ -45,6 +50,7 @@
             </select>
             <a href="{{ route('screener.index') }}" class="screener-filter-reset inline-flex h-10 shrink-0 items-center justify-center border border-amber-400/40 bg-amber-400/[.10] px-4 text-xs font-black text-amber-300 transition hover:bg-amber-400/[.18]">{{ __('Reset') }}</a>
         </form>
+        </section>
 
         <div class="screener-results-scroll">
         <section class="grid grid-cols-1 gap-4">
@@ -62,6 +68,14 @@
                         default => 'border-amber-400/40 bg-amber-400/[.08] text-amber-300',
                     };
                     $signalLabel = $signal;
+                    $recentNews = $recentNewsByInstrument->get((int) $stock->instrument_id);
+                    $recentNewsSentiment = is_numeric($recentNews?->sentiment_score) ? (float) $recentNews->sentiment_score : null;
+                    [$recentNewsTone, $recentNewsLabel] = match (true) {
+                        $recentNews === null => ['border-slate-400/20 bg-slate-400/[.04] text-slate-500', __('Keine News in den letzten 48 Stunden')],
+                        $recentNewsSentiment !== null && $recentNewsSentiment >= .35 => ['border-emerald-400/45 bg-emerald-400/[.14] text-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.18)]', __('Positive News in den letzten 48 Stunden')],
+                        $recentNewsSentiment !== null && $recentNewsSentiment <= -.35 => ['border-rose-400/45 bg-rose-400/[.14] text-rose-400 shadow-[0_0_12px_rgba(251,113,133,.18)]', __('Negative News in den letzten 48 Stunden')],
+                        default => ['border-amber-400/45 bg-amber-400/[.14] text-amber-400 shadow-[0_0_12px_rgba(251,191,36,.16)]', __('Neutrale News in den letzten 48 Stunden')],
+                    };
                     $return = is_numeric($stock->expected_return_20d) ? (float) $stock->expected_return_20d : null;
                     $rankingScorePercent = is_numeric($stock->ranking_score)
                         ? max(0, min(100, (float) $stock->ranking_score))
@@ -142,20 +156,33 @@
                     $showOriginalPrice = is_numeric($stock->original_price ?? null)
                         && filled($stock->original_currency ?? null)
                         && strtoupper((string) $stock->original_currency) !== strtoupper((string) $stock->currency);
+                    // Price bars use the instrument's original listing currency, while
+                    // the visible quote can already have been converted to EUR. Anchor
+                    // the forecast to the last chart close and apply the model return so
+                    // both parts of the chart always use the same currency and scale.
+                    $latestChartPrice = $chartPoints->isNotEmpty() ? (float) $chartPoints->last() : null;
+                    $chartPredictionPrice = $latestChartPrice !== null && $return !== null
+                        ? $latestChartPrice * (1 + ($return / 100))
+                        : null;
                     $chartMin = $chartPoints->isNotEmpty() ? (float) $chartPoints->min() : 0;
                     $chartMax = $chartPoints->isNotEmpty() ? (float) $chartPoints->max() : 1;
-                    if ($predictionPrice !== null) {
-                        $chartMin = min($chartMin, $predictionPrice);
-                        $chartMax = max($chartMax, $predictionPrice);
+                    if ($chartPredictionPrice !== null) {
+                        $chartMin = min($chartMin, $chartPredictionPrice);
+                        $chartMax = max($chartMax, $chartPredictionPrice);
                     }
                     $chartRange = max($chartMax - $chartMin, 0.000001);
-                    $predictionY = $predictionPrice !== null ? 104 - (($predictionPrice - $chartMin) / $chartRange) * 90 : null;
+                    $latestChartY = $latestChartPrice !== null ? 104 - (($latestChartPrice - $chartMin) / $chartRange) * 90 : null;
+                    $predictionY = $chartPredictionPrice !== null ? 104 - (($chartPredictionPrice - $chartMin) / $chartRange) * 90 : null;
+                    $forecastStartX = 500.0;
+                    $predictionSignalDate = filled($stock->prediction_time ?? null)
+                        ? \Illuminate\Support\Carbon::parse($stock->prediction_time)->format('d.m.Y')
+                        : null;
                     $signalTransitionX = is_numeric($stock->signal_transition_x) ? (float) $stock->signal_transition_x : null;
                     $signalTransitionDate = $stock->signal_transition_at
                         ? \Illuminate\Support\Carbon::parse($stock->signal_transition_at)->format('d.m.Y')
                         : null;
                     $chartPolyline = $chartPoints->count() > 1
-                        ? $chartPoints->values()->map(fn (float $value, int $index): string => sprintf('%.1f,%.1f', $index * 600 / ($chartPoints->count() - 1), 104 - (($value - $chartMin) / $chartRange) * 90))->implode(' ')
+                        ? $chartPoints->values()->map(fn (float $value, int $index): string => sprintf('%.1f,%.1f', $index * $forecastStartX / ($chartPoints->count() - 1), 104 - (($value - $chartMin) / $chartRange) * 90))->implode(' ')
                         : '';
                 @endphp
                 @php
@@ -173,19 +200,74 @@
                         default => 'border-orange-400/35',
                     };
                     $hasLongCompanyName = mb_strlen((string) ($stock->name ?: $stock->symbol)) > 45;
+                    $mobileForecasts = collect([5, 10, 15, 20])->mapWithKeys(function (int $days) use ($stock): array {
+                        $value = $stock->{"expected_return_{$days}d"} ?? null;
+                        return [$days => is_numeric($value) ? (float) $value : null];
+                    });
+                    $priceChange = is_numeric($stock->price_change_percent ?? null) ? (float) $stock->price_change_percent : null;
                 @endphp
                 <article
                     data-ranking="{{ $ranking }}"
                     class="screener-stock-card {{ $hasLongCompanyName ? 'screener-stock-card-long-name' : '' }} ak-card ak-dashboard-card relative overflow-hidden p-3 {{ $rankClass }}"
-                    x-data="{ signalInfoOpen: false }"
+                    x-data="{ signalInfoOpen: false, mobileExpanded: false }"
                 >
-                    <div class="grid h-full min-h-0 gap-2 md:grid-cols-2 xl:grid-cols-6">
+                    <button type="button" class="screener-mobile-summary md:hidden" @click="mobileExpanded = ! mobileExpanded" :aria-expanded="mobileExpanded.toString()">
+                        <span class="screener-mobile-summary-top">
+                            <span class="screener-mobile-title-context">
+                                <span class="screener-mobile-name-row">
+                                    <b class="screener-mobile-rank">{{ $ranking > 0 ? '#'.$ranking : '—' }}</b>
+                                    <span class="screener-mobile-flag" aria-label="{{ $stock->country ?: __('Land') }}">{{ $countryFlag }}</span>
+                                    <span class="screener-mobile-name" title="{{ $stock->name ?: $stock->symbol }}">{{ $stock->name ?: $stock->symbol }}</span>
+                                    <x-stock-risk-status :status="$stock->risk_status ?? null" compact />
+                                </span>
+                                <span class="screener-mobile-header-meta">
+                                    <span title="{{ $stock->sector ?: __('Sektor nicht hinterlegt') }}"><x-sector-icon :sector="$stock->sector" class="h-3 w-3 shrink-0" /><small>{{ $stock->sector ?: '—' }}</small></span>
+                                    <span title="{{ $stock->primary_index_name ?: ($stock->primary_index_symbol ?: __('Index nicht hinterlegt')) }}"><x-heroicon-o-chart-bar-square class="h-3 w-3 shrink-0" /><small>{{ $stock->primary_index_name ?: ($stock->primary_index_symbol ?: '—') }}</small></span>
+                                </span>
+                            </span>
+                            <span class="screener-mobile-header-metric">
+                                <span class="screener-mobile-price"><b>{{ is_numeric($stock->current_price) ? number_format((float) $stock->current_price, 2, ',', '.') : '—' }} {{ $displayCurrencySymbol }}</b></span>
+                                <small>{{ __('Kurs') }}</small>
+                            </span>
+                            <span class="screener-mobile-header-metric">
+                                <span class="screener-mobile-change" data-tone="{{ $priceChange === null ? 'neutral' : ($priceChange > 0 ? 'positive' : ($priceChange < 0 ? 'negative' : 'neutral')) }}">{{ $priceChange !== null ? (($priceChange > 0 ? '+' : '').number_format($priceChange, 2, ',', '.').' %') : '—' }}</span>
+                                <small>{{ __('Änderung') }}</small>
+                            </span>
+                            <x-heroicon-o-chevron-down class="screener-mobile-chevron h-4 w-4" x-bind:class="mobileExpanded && 'rotate-180'" />
+                        </span>
+                        <span class="screener-mobile-summary-middle">
+                            <span class="screener-mobile-score-group">
+                                <span class="screener-mobile-donut" style="--mobile-donut-value:{{ number_format($rankingScorePercent, 2, '.', '') }}%;--mobile-donut-color:{{ $rankingScoreColor }}"><span><b>{{ number_format($rankingScorePercent, 0, ',', '.') }}</b><small>{{ __('Score') }}</small></span></span>
+                                <span class="screener-mobile-donut" style="--mobile-donut-value:{{ number_format($rankingRiskPercent ?? 0, 2, '.', '') }}%;--mobile-donut-color:{{ $riskDonutColor }}"><span><b>{{ $rankingRiskPercent !== null ? number_format($rankingRiskPercent, 0, ',', '.').'%' : '—' }}</b><small>{{ __('Risiko') }}</small></span></span>
+                            </span>
+                            <span class="screener-mobile-signal-group">
+                                <span class="screener-mobile-summary-metric">
+                                    <span class="screener-mobile-signal" data-signal="{{ strtolower($signal) }}">{{ $signalLabel }}</span>
+                                    <small>{{ __('Signal') }}</small>
+                                </span>
+                                <span class="screener-mobile-summary-metric">
+                                    <span class="screener-mobile-return" data-tone="{{ $mobileForecasts[20] === null ? 'neutral' : ($mobileForecasts[20] > 0 ? 'positive' : ($mobileForecasts[20] < 0 ? 'negative' : 'neutral')) }}" title="{{ __('Mögliche Rendite in 20 Tagen') }}">
+                                        {{ $mobileForecasts[20] === null ? '—' : (($mobileForecasts[20] > 0 ? '+' : '').number_format($mobileForecasts[20], 1, ',', '.').' %') }}
+                                    </span>
+                                    <small>{{ __('Mögliche Rendite') }}</small>
+                                </span>
+                                <span class="screener-mobile-summary-metric">
+                                    <span class="screener-mobile-indicator-arrow" data-tone="{{ $stock->indicator_ranking_direction }}" title="{{ __('Indikatorranking') }}">
+                                        <b>{{ $stock->indicator_ranking_direction === 'up' ? '↗' : ($stock->indicator_ranking_direction === 'down' ? '↘' : '→') }}</b>
+                                    </span>
+                                    <small>{{ __('Indikator') }}</small>
+                                </span>
+                            </span>
+                        </span>
+                    </button>
+                    <div class="screener-mobile-details grid h-full min-h-0 gap-2 md:grid-cols-2 xl:grid-cols-6" x-bind:class="mobileExpanded && 'is-mobile-open'">
                         <div class="screener-chart-panel relative h-full min-h-0 rounded-xl border border-transparent p-3 pt-5 xl:col-span-2">
                             <div class="grid gap-3 md:grid-cols-[.85fr_1fr]">
-                                <div>
+                                <div class="screener-expanded-identity">
                                     <p class="screener-border-title text-amber-300">{{ __('Globales Ranking') }} @if($stock->screening_rank)<strong>#{{ $stock->screening_rank }}</strong>@endif</p>
                                     <div class="mt-1 flex items-center gap-2">
                                         <p class="text-base font-black">{{ $stock->name ?: $stock->symbol }}</p>
+                                        <x-stock-risk-status :status="$stock->risk_status ?? null" />
                                     </div>
                                     <p class="text-xs font-black uppercase tracking-[.12em] text-cyan-300">{{ $stock->symbol }}</p>
                                     <p class="mt-2 text-sm">{{ $countryFlag }} {{ $stock->country ?: '—' }}</p>
@@ -245,7 +327,7 @@
                                         </div>
                                     </template>
                                 </div>
-                                <div>
+                                <div class="screener-expanded-price">
                                 <p class="text-[9px] font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Kurs') }}</p>
                                 <div class="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                     <p class="text-2xl font-black">{{ is_numeric($stock->current_price) ? number_format((float) $stock->current_price, 2, ',', '.') : '—' }} <span class="text-sm text-[var(--ak-muted)]">{{ $displayCurrencySymbol }}</span></p>
@@ -259,17 +341,36 @@
                                 <p class="mt-1 text-lg font-black {{ $returnClass }}">{{ $return !== null ? sprintf('%+.2f %%', $return) : '—' }}</p>
                                 </div>
                             <div class="md:col-span-2">
-                                <div class="mb-1 flex flex-wrap items-center justify-between gap-1 text-[9px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]"><span>{{ __('Chart · 1 Jahr') }}</span><span class="flex gap-2">@if ($signalTransitionDate)<span class="text-violet-300">│ {{ __('Signalwechsel') }} {{ $signalTransitionDate }}</span>@endif @if ($predictionPrice !== null)<span class="text-amber-300">— {{ __('Prognose 20 Tage') }}</span>@endif</span></div>
+                                <div class="mb-3 md:hidden">
+                                    <p class="text-[10px] font-black uppercase tracking-[.14em] text-cyan-300">{{ __('Mögliche Renditen') }}</p>
+                                    <div class="mt-2 grid grid-cols-4 gap-1.5">
+                                        @foreach($mobileForecasts as $days => $forecast)
+                                            <div class="rounded-lg border border-cyan-300/15 bg-cyan-400/[.05] px-1.5 py-2 text-center">
+                                                <p class="text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ $days }} {{ __('Tage') }}</p>
+                                                <p class="mt-1 text-[11px] font-black {{ $forecast === null ? 'text-slate-400' : ($forecast > 0 ? 'text-emerald-400' : ($forecast < 0 ? 'text-rose-400' : 'text-slate-400')) }}">
+                                                    {{ $forecast === null ? '—' : (($forecast > 0 ? '↗ +' : ($forecast < 0 ? '↘ ' : '→ ')).number_format($forecast, 2, ',', '.').' %') }}
+                                                </p>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                                <div class="mb-1 flex flex-wrap items-center justify-between gap-1 text-[9px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]"><span>{{ __('Chart · 1 Jahr') }} · {{ $stock->chart_currency ?? $stock->currency }}</span><span class="flex gap-2">@if ($signalTransitionDate)<span class="text-violet-300">│ {{ __('Signalwechsel') }} {{ $signalTransitionDate }}</span>@endif @if ($predictionPrice !== null)<span class="text-amber-300">— {{ __('Prognose 20 Tage') }}</span>@endif</span></div>
                                 @if ($chartPolyline !== '')
-                                    <svg viewBox="0 0 600 128" class="h-24 w-full" role="img" aria-label="{{ __('Kursverlauf des letzten Jahres mit Prognose') }}" preserveAspectRatio="none"><defs><linearGradient id="screener-line-{{ $stock->id }}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#67e8f9"/></linearGradient></defs><path d="M0 108H600" stroke="#67e8f9" stroke-opacity=".34" stroke-width="1.4"/>@foreach([0,150,300,450,600] as $tickX)<line x1="{{ $tickX }}" y1="108" x2="{{ $tickX }}" y2="112" stroke="#67e8f9" stroke-opacity=".34" stroke-width="1"/>@endforeach<g fill="#94a3b8" font-size="7" font-weight="700"><text x="0" y="124" text-anchor="start">−1J</text><text x="150" y="124" text-anchor="middle">−9M</text><text x="300" y="124" text-anchor="middle">−6M</text><text x="450" y="124" text-anchor="middle">−3M</text><text x="600" y="124" text-anchor="end">{{ __('Heute') }}</text></g>@if ($signalTransitionX !== null)<line x1="{{ number_format($signalTransitionX, 1, '.', '') }}" y1="4" x2="{{ number_format($signalTransitionX, 1, '.', '') }}" y2="108" stroke="#c084fc" stroke-width="2" stroke-dasharray="5 4"><title>{{ __('Signalwechsel') }} {{ $stock->signal_transition_from }} → {{ $signal }} · {{ $signalTransitionDate }}</title></line>@endif<polyline points="{{ $chartPolyline }}" fill="none" stroke="url(#screener-line-{{ $stock->id }})" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>@if ($predictionY !== null)<line x1="390" y1="{{ number_format($predictionY, 1, '.', '') }}" x2="600" y2="{{ number_format($predictionY, 1, '.', '') }}" stroke="#fbbf24" stroke-width="2" stroke-dasharray="7 5"/><circle cx="600" cy="{{ number_format($predictionY, 1, '.', '') }}" r="3" fill="#fbbf24"/>@endif</svg>
+                                    <svg viewBox="0 0 600 128" class="h-24 w-full" role="img" aria-label="{{ __('Kursverlauf des letzten Jahres mit Prognose') }}" preserveAspectRatio="none"><defs><linearGradient id="screener-line-{{ $stock->id }}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#67e8f9"/></linearGradient></defs><path d="M0 108H600" stroke="#67e8f9" stroke-opacity=".34" stroke-width="1.4"/>@foreach([0,125,250,375,500] as $tickX)<line x1="{{ $tickX }}" y1="108" x2="{{ $tickX }}" y2="112" stroke="#67e8f9" stroke-opacity=".34" stroke-width="1"/>@endforeach<g fill="#94a3b8" font-size="7" font-weight="700"><text x="0" y="124" text-anchor="start">−1J</text><text x="125" y="124" text-anchor="middle">−9M</text><text x="250" y="124" text-anchor="middle">−6M</text><text x="375" y="124" text-anchor="middle">−3M</text><text x="500" y="124" text-anchor="middle">{{ __('Heute') }}</text><text x="600" y="124" text-anchor="end">20T</text></g>@if ($signalTransitionX !== null)<line x1="{{ number_format($signalTransitionX * (500 / 600), 1, '.', '') }}" y1="4" x2="{{ number_format($signalTransitionX * (500 / 600), 1, '.', '') }}" y2="108" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="4 4"><title>{{ __('Signalwechsel') }} {{ $stock->signal_transition_from }} → {{ $signal }} · {{ $signalTransitionDate }}</title></line>@endif<polyline points="{{ $chartPolyline }}" fill="none" stroke="url(#screener-line-{{ $stock->id }})" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>@if ($predictionY !== null && $latestChartY !== null)<line x1="500" y1="4" x2="500" y2="108" stroke="#fbbf24" stroke-opacity=".85" stroke-width="1.5" stroke-dasharray="4 4"><title>{{ __('Signaldatum') }} {{ $predictionSignalDate ?: '—' }}</title></line><text x="494" y="11" text-anchor="end" fill="#fbbf24" font-size="7" font-weight="800">{{ __('Signal') }} {{ $predictionSignalDate }}</text><line x1="500" y1="{{ number_format($latestChartY, 1, '.', '') }}" x2="600" y2="{{ number_format($predictionY, 1, '.', '') }}" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="7 5"/><circle cx="500" cy="{{ number_format($latestChartY, 1, '.', '') }}" r="2.5" fill="#fbbf24"/><circle cx="600" cy="{{ number_format($predictionY, 1, '.', '') }}" r="3" fill="#fbbf24"/>@endif</svg>
                                 @else
                                     <div class="flex h-24 items-center justify-center text-xs italic text-[var(--ak-muted)]">{{ __('Keine Daten') }}</div>
                                 @endif
                             </div>
-                            <div class="absolute right-3 top-2 z-30 flex gap-2">
+                            <div class="screener-card-actions absolute right-3 top-2 z-30 flex gap-2">
+                                <a href="{{ route('setup.labels.index') }}" title="{{ __('Labels') }}" aria-label="{{ __('Labels verwalten') }}" class="inline-flex h-8 w-8 items-center justify-center rounded-xl border transition {{ $stock->has_matching_label ? 'border-cyan-400/30 bg-cyan-400/[.08] text-cyan-300 hover:bg-cyan-400/[.16]' : 'border-slate-500/15 bg-slate-500/[.04] text-slate-500/40 hover:text-cyan-300' }}">
+                                    <x-heroicon-o-tag class="h-4 w-4" />
+                                </a>
+                                <a href="{{ route('setup.saved-filters.index') }}" title="{{ __('Strategielabels') }}" aria-label="{{ __('Strategielabels verwalten') }}" class="inline-flex h-8 w-8 items-center justify-center rounded-xl border transition {{ $stock->has_matching_strategy ? 'border-teal-400/30 bg-teal-400/[.08] text-teal-300 hover:bg-teal-400/[.16]' : 'border-slate-500/15 bg-slate-500/[.04] text-slate-500/40 hover:text-teal-300' }}">
+                                    <x-heroicon-o-bookmark-square class="h-4 w-4" />
+                                </a>
                                 <details class="group relative">
-                                    <summary title="{{ $isOnWatchlist ? __('In Watchlist') : __('Watchlist') }}" aria-label="{{ __('Watchlist') }}" class="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-md border border-amber-400/30 bg-amber-400/[.08] text-amber-300 {{ $isOnWatchlist ? 'shadow-[0_0_12px_rgba(251,191,36,.30)]' : '' }}">
-                                        @if($isOnWatchlist)<x-heroicon-s-star class="h-3.5 w-3.5" />@else<x-heroicon-o-star class="h-3.5 w-3.5" />@endif
+                                    <summary title="{{ $isOnWatchlist ? __('In Watchlist') : __('Watchlist') }}" aria-label="{{ __('Watchlist') }}" class="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/[.08] text-amber-300 {{ $isOnWatchlist ? 'shadow-[0_0_12px_rgba(251,191,36,.30)]' : '' }}">
+                                        @if($isOnWatchlist)<x-heroicon-s-star class="h-4 w-4" />@else<x-heroicon-o-star class="h-4 w-4" />@endif
                                     </summary>
                                     <div class="absolute right-0 top-10 z-40 min-w-52 space-y-1 rounded-xl border border-amber-400/25 bg-[var(--ak-card)] p-2 shadow-2xl">
                                         @forelse($userWatchlists as $watchlist)
@@ -286,9 +387,22 @@
                                         @endforelse
                                     </div>
                                 </details>
-                                <x-paper-depot-buy :portfolios="$paperPortfolios" :instrument-id="$stock->instrument_id" :instrument-name="$stock->name ?: $stock->symbol" :currency="$stock->currency" :price="$stock->current_price" :score="$rankingScorePercent" compact />
-                                <a href="{{ route('stocks.show', ['symbol' => $stock->symbol, 'prediction' => $stock->id, 'return_to' => request()->getRequestUri()]) }}" title="{{ __('Zur Aktiendetailseite') }}" aria-label="{{ __('Details zu :stock anzeigen', ['stock' => $stock->name ?: $stock->symbol]) }}" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-violet-400/30 bg-violet-400/[.08] text-violet-300 transition hover:bg-violet-400/[.16]">
-                                    <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                                <x-paper-depot-buy :portfolios="$paperPortfolios" :instrument-id="$stock->instrument_id" :instrument-name="$stock->name ?: $stock->symbol" :currency="$stock->currency" :price="$stock->current_price" :score="$rankingScorePercent" :active="$isInPaperPortfolio" compact />
+                                <a href="{{ route('news.index', ['q' => $stock->symbol, 'days' => 2]) }}" title="{{ $recentNewsLabel }}{{ $recentNews ? ' · '.($recentNews->news_count ?? 1).' · '.$recentNews->headline : '' }}" aria-label="{{ $recentNewsLabel }}" class="relative inline-flex h-8 w-8 items-center justify-center rounded-xl border transition hover:brightness-110 {{ $recentNewsTone }}">
+                                    <x-heroicon-o-newspaper class="h-4 w-4" />
+                                    @if($recentNews && ($recentNews->news_count ?? 1) > 1)<span class="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--ak-card-strong)] px-1 text-[7px] font-black text-current">{{ $recentNews->news_count }}</span>@endif
+                                </a>
+                                @if(Route::has('certificates.index') && $certificateInstrumentIds->contains((int) $stock->instrument_id))
+                                    <a href="{{ route('certificates.index', ['underlying' => $stock->instrument_id]) }}" title="{{ __('Zertifikate zu :stock', ['stock' => $stock->name ?: $stock->symbol]) }}" aria-label="{{ __('Zertifikate zu :stock anzeigen', ['stock' => $stock->name ?: $stock->symbol]) }}" class="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/[.08] text-amber-300 transition hover:bg-amber-400/[.16]">
+                                        <x-heroicon-o-document-chart-bar class="h-4 w-4" />
+                                    </a>
+                                @else
+                                    <span title="{{ __('Keine Zertifikate für :stock verfügbar', ['stock' => $stock->name ?: $stock->symbol]) }}" aria-label="{{ __('Keine Zertifikate verfügbar') }}" aria-disabled="true" class="inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-xl border border-slate-500/15 bg-slate-500/[.04] text-slate-500/40">
+                                        <x-heroicon-o-document-chart-bar class="h-4 w-4" />
+                                    </span>
+                                @endif
+                                <a href="{{ route('stocks.show', ['symbol' => $stock->symbol, 'prediction' => $stock->id, 'return_to' => request()->getRequestUri()]) }}" title="{{ __('Zur Aktiendetailseite') }}" aria-label="{{ __('Details zu :stock anzeigen', ['stock' => $stock->name ?: $stock->symbol]) }}" class="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-violet-400/30 bg-violet-400/[.08] text-violet-300 transition hover:bg-violet-400/[.16]">
+                                    <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                                 </a>
                             </div>
                             </div>
@@ -296,26 +410,12 @@
                         <div class="grid h-full min-h-0 gap-2 sm:grid-cols-2 xl:col-span-2 xl:grid-rows-[auto_auto_1fr]">
                             <div class="screener-transparent-panel relative rounded-xl border p-3 sm:col-span-2">
                             <div class="screener-ranking-donuts">
-                                <div class="screener-metric-donut screener-metric-donut-score" style="--donut-value: {{ number_format($rankingScorePercent, 2, '.', '') }}%; --donut-color: {{ $rankingScoreColor }}" role="meter" aria-label="{{ __('Ranking-Score') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($rankingScorePercent, 1, '.', '') }}">
-                                    <span>{{ number_format($rankingScorePercent, 0, ',', '.') }}</span><small>{{ __('KI-Score') }}</small>
-                                </div>
-                                <div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingConfidencePercent, 2, '.', '') }}%; --donut-color: {{ $rankingConfidenceColor }}" role="meter" aria-label="{{ __('Konfidenz') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($rankingConfidencePercent, 1, '.', '') }}">
-                                    <span>{{ number_format($rankingConfidencePercent, 0, ',', '.') }}%</span><small>{{ __('Konf.') }}</small>
-                                </div>
-                                <div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingHitRatePercent, 2, '.', '') }}%; --donut-color: {{ $rankingHitRateColor }}" role="meter" aria-label="{{ __('Hit-Rate') }}" aria-valuemin="0" aria-valuemax="100" @if($rankingHitRateAvailable) aria-valuenow="{{ number_format($rankingHitRatePercent, 1, '.', '') }}" @endif>
-                                    <span>{{ $rankingHitRateAvailable ? number_format($rankingHitRatePercent, 0, ',', '.').'%' : '—' }}</span><small>{{ __('Hit-Rate') }}</small>
-                                </div>
-                                <div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingProfitPerTradePercent, 2, '.', '') }}%; --donut-color: {{ $rankingProfitPerTradeColor }}" role="meter" aria-label="{{ __('Durchschnittlicher Netto-Profit je Trade im dreijährigen Walk-Forward-Test') }}" @if($rankingProfitPerTradeAvailable) aria-valuenow="{{ number_format($rankingProfitPerTrade, 2, '.', '') }}" @endif>
-                                    <span>{{ $rankingProfitPerTradeAvailable ? (($rankingProfitPerTrade > 0 ? '+' : '').number_format($rankingProfitPerTrade, 2, ',', '.').'%') : '—' }}</span><small>{{ __('Ø/Trade') }}</small>
-                                </div>
-                                <div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingStabilityPercent, 2, '.', '') }}%; --donut-color: {{ $rankingStabilityColor }}" role="meter" aria-label="{{ __('Stabilitätsfilter') }}" aria-valuemin="0" aria-valuemax="100" @if($rankingStabilityAvailable) aria-valuenow="{{ number_format($rankingStabilityPercent, 1, '.', '') }}" @endif>
-                                    <span>{{ $rankingStabilityAvailable ? number_format($rankingStabilityPercent, 0, ',', '.').'%' : '—' }}</span><small>{{ __('Stabilität') }}</small>
-                                </div>
-                                <div class="screener-metric-donut screener-risk-donut" data-risk-tone="{{ $riskDonutTone }}" style="--donut-value: {{ number_format($rankingRiskPercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $riskDonutColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" @if($rankingRiskPercent !== null) aria-valuenow="{{ number_format($rankingRiskPercent, 1, '.', '') }}" @endif>
-                                    <span>{{ $rankingRiskPercent !== null ? number_format($rankingRiskPercent, 0, ',', '.').'%' : '—' }}</span><small>{{ __('Risiko') }}</small>
-                                </div>
+                                <div class="screener-metric-wrap"><div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingConfidencePercent, 2, '.', '') }}%; --donut-color: {{ $rankingConfidenceColor }}" role="meter" aria-label="{{ __('Konfidenz') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($rankingConfidencePercent, 1, '.', '') }}"><span>{{ number_format($rankingConfidencePercent, 0, ',', '.') }}</span></div><small>{{ __('Konf.') }} (%)</small></div>
+                                <div class="screener-metric-wrap"><div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingHitRatePercent, 2, '.', '') }}%; --donut-color: {{ $rankingHitRateColor }}" role="meter" aria-label="{{ __('Hit-Rate') }}" aria-valuemin="0" aria-valuemax="100" @if($rankingHitRateAvailable) aria-valuenow="{{ number_format($rankingHitRatePercent, 1, '.', '') }}" @endif><span>{{ $rankingHitRateAvailable ? number_format($rankingHitRatePercent, 0, ',', '.') : '—' }}</span></div><small>{{ __('Hit-Rate') }} (%)</small></div>
+                                <div class="screener-metric-wrap"><div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingProfitPerTradePercent, 2, '.', '') }}%; --donut-color: {{ $rankingProfitPerTradeColor }}" role="meter" aria-label="{{ __('Durchschnittlicher Netto-Profit je Trade im dreijährigen Walk-Forward-Test') }}" @if($rankingProfitPerTradeAvailable) aria-valuenow="{{ number_format($rankingProfitPerTrade, 2, '.', '') }}" @endif><span class="screener-metric-value-long">{{ $rankingProfitPerTradeAvailable ? (($rankingProfitPerTrade > 0 ? '+' : '').number_format($rankingProfitPerTrade, 2, ',', '.')) : '—' }}</span></div><small>{{ __('Ø/Trade') }} (%)</small></div>
+                                <div class="screener-metric-wrap"><div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingStabilityPercent, 2, '.', '') }}%; --donut-color: {{ $rankingStabilityColor }}" role="meter" aria-label="{{ __('Stabilitätsfilter') }}" aria-valuemin="0" aria-valuemax="100" @if($rankingStabilityAvailable) aria-valuenow="{{ number_format($rankingStabilityPercent, 1, '.', '') }}" @endif><span>{{ $rankingStabilityAvailable ? number_format($rankingStabilityPercent, 0, ',', '.') : '—' }}</span></div><small>{{ __('Stabilität') }} (%)</small></div>
                             </div>
-                            <div class="mt-16"></div>
+                            <div class="mt-20"></div>
                             </div>
                             <div class="screener-transparent-panel grid grid-cols-3 gap-2 rounded-xl border px-3 py-2 sm:col-span-2">
                                 <div>

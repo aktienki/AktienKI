@@ -32,6 +32,10 @@
                 'label' => __('Chancenorientiert'),
                 'classes' => 'border-rose-400/30 bg-rose-400/10 text-rose-300',
             ],
+            'risk' => [
+                'label' => __('Risk'),
+                'classes' => 'border-red-500/35 bg-red-500/10 text-red-400',
+            ],
         ];
         $profile = $profiles[$level] ?? $profiles['normal'];
     @endphp

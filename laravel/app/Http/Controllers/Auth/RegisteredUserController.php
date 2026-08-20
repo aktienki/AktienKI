@@ -81,7 +81,7 @@ class RegisteredUserController extends Controller
 
             'risk_level' => [
                 'required',
-                Rule::in(['cautious', 'normal', 'opportunity_oriented']),
+                Rule::in(['cautious', 'normal', 'opportunity_oriented', 'risk']),
             ],
 
             'invite' => [
@@ -136,6 +136,7 @@ class RegisteredUserController extends Controller
                 'preferences' => [
                     'country_code' => strtoupper((string) $request->input('country_code')),
                     'country_code_change_count' => 0,
+                    'tutorial' => ['completed_at' => null],
                 ],
                 'account_status' => $betaEnabled ? 'pending_beta' : ($isBetaTester ? 'tester' : 'active'),
                 'is_beta_tester' => $betaEnabled,

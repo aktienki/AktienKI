@@ -7,6 +7,7 @@ use App\Services\FreeRegionalStockUniverseService;
 use App\Services\PlanAccessService;
 use App\Services\PersonalizedSignalService;
 use App\Services\TwelveDataService;
+use App\Services\StockRiskClassificationService;
 use App\Support\AiScore;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
@@ -80,6 +81,9 @@ final class RecommendationController extends Controller
      */
     public function screener(Request $request): View
     {
+        $riskClassification = app(StockRiskClassificationService::class);
+        $riskUser = $riskClassification->userLevel($request->user()) === 'risk';
+        $visibleRiskStatuses = $riskClassification->visibleStatuses($request->user());
         $isFreeRegional = app(PlanAccessService::class)->level($request->user()) === PlanLevel::Free;
         $regionalUniverse = app(FreeRegionalStockUniverseService::class);
         $allowedInstrumentIds = $isFreeRegional ? $regionalUniverse->instrumentIds($request->user())->all() : [];
@@ -123,19 +127,21 @@ final class RecommendationController extends Controller
             ->orderBy('latest.instrument_id')
             ->orderByDesc('latest.prediction_time')
             ->orderByDesc('latest.id');
-        $walkForwardRunIds = DB::table('walk_forward_backtest_runs')
-            ->where('status', 'completed')
-            ->whereIn('horizon_days', [5, 10, 15, 20])
-            ->orderByDesc('id')
-            ->get(['id', 'horizon_days'])
-            ->unique('horizon_days')
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->values();
-        $profitFactorByInstrument = $walkForwardRunIds->isNotEmpty()
+        $latestWalkForwardRunByInstrument = DB::table('walk_forward_backtest_trades as latest_trade')
+            ->join('walk_forward_backtest_runs as latest_run', 'latest_run.id', '=', 'latest_trade.run_id')
+            ->where('latest_run.status', 'completed')
+            ->whereIn('latest_run.horizon_days', [5, 10, 15, 20])
+            ->selectRaw('DISTINCT ON (latest_trade.instrument_id, latest_run.horizon_days) latest_trade.instrument_id, latest_run.horizon_days, latest_run.id AS run_id')
+            ->orderBy('latest_trade.instrument_id')
+            ->orderBy('latest_run.horizon_days')
+            ->orderByDesc('latest_run.id');
+        $hasWalkForwardRuns = DB::query()->fromSub(clone $latestWalkForwardRunByInstrument, 'latest_wf_check')->exists();
+        $profitFactorByInstrument = $hasWalkForwardRuns
             ? DB::table('walk_forward_backtest_trades as walk_forward_trade')
                 ->join('walk_forward_backtest_runs as walk_forward_run', 'walk_forward_run.id', '=', 'walk_forward_trade.run_id')
-                ->whereIn('walk_forward_trade.run_id', $walkForwardRunIds)
+                ->joinSub(clone $latestWalkForwardRunByInstrument, 'latest_wf', fn ($join) => $join
+                    ->on('latest_wf.instrument_id', '=', 'walk_forward_trade.instrument_id')
+                    ->on('latest_wf.run_id', '=', 'walk_forward_trade.run_id'))
                 ->where('walk_forward_trade.signal_date', '>=', now()->subYears(3)->toDateString())
                 ->groupBy('walk_forward_trade.instrument_id', 'walk_forward_trade.run_id', 'walk_forward_run.horizon_days')
                 ->select('walk_forward_trade.instrument_id', 'walk_forward_trade.run_id', 'walk_forward_run.horizon_days')
@@ -146,14 +152,33 @@ final class RecommendationController extends Controller
                 ->get()
                 ->groupBy('instrument_id')
             : collect();
-        $drawdownByInstrument = $walkForwardRunIds->isNotEmpty()
+        $drawdownByInstrument = $hasWalkForwardRuns
             ? DB::table('walk_forward_backtest_year_stats')
-                ->whereIn('run_id', $walkForwardRunIds)
+                ->joinSub(clone $latestWalkForwardRunByInstrument, 'latest_wf', fn ($join) => $join
+                    ->on('latest_wf.instrument_id', '=', 'walk_forward_backtest_year_stats.instrument_id')
+                    ->on('latest_wf.run_id', '=', 'walk_forward_backtest_year_stats.run_id'))
                 ->whereNotNull('maximum_drawdown')
-                ->groupBy('instrument_id', 'run_id')
-                ->select('instrument_id', 'run_id')
+                ->groupBy('walk_forward_backtest_year_stats.instrument_id', 'walk_forward_backtest_year_stats.run_id')
+                ->select('walk_forward_backtest_year_stats.instrument_id', 'walk_forward_backtest_year_stats.run_id')
                 ->selectRaw('PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY ABS(maximum_drawdown)) * 100 AS drawdown_p90')
                 ->get()->groupBy('instrument_id')
+            : collect();
+        $stabilityPeriodsByInstrument = $hasWalkForwardRuns
+            ? DB::table('walk_forward_backtest_trades as stability_trade')
+                ->join('walk_forward_backtest_runs as stability_run', 'stability_run.id', '=', 'stability_trade.run_id')
+                ->joinSub(clone $latestWalkForwardRunByInstrument, 'latest_wf', fn ($join) => $join
+                    ->on('latest_wf.instrument_id', '=', 'stability_trade.instrument_id')
+                    ->on('latest_wf.run_id', '=', 'stability_trade.run_id'))
+                ->where('stability_trade.signal_date', '>=', now()->subYears(3)->toDateString())
+                ->groupBy('stability_trade.instrument_id', 'stability_trade.run_id', 'stability_run.horizon_days')
+                ->groupByRaw("DATE_PART('year', stability_trade.signal_date)")
+                ->select('stability_trade.instrument_id', 'stability_trade.run_id', 'stability_run.horizon_days')
+                ->selectRaw("DATE_PART('year', stability_trade.signal_date) AS trade_year")
+                ->selectRaw('COUNT(*) AS trade_count')
+                ->selectRaw('AVG(stability_trade.net_return) AS average_return')
+                ->selectRaw('AVG(CASE WHEN stability_trade.net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
+                ->get()
+                ->groupBy('instrument_id')
             : collect();
         $latestQualityRankings = DB::table('model_quality_rankings')
             ->selectRaw('trained_model_id, MAX(id) AS ranking_id')
@@ -165,7 +190,10 @@ final class RecommendationController extends Controller
             ->leftJoin('model_quality_rankings as ranking_quality', 'ranking_quality.id', '=', 'latest_ranking_quality.ranking_id')
             ->whereIn('ranked_prediction.id', clone $latestIds)
             ->where('ranked_instrument.type', 'stock')
-            ->where('ranked_instrument.is_active', true)
+            ->where(fn ($query) => $riskUser
+                ? $query->where('ranked_instrument.is_active', true)->orWhere('ranked_instrument.risk_status', 'sleep')
+                : $query->where('ranked_instrument.is_active', true))
+            ->when(! $riskUser, fn ($query) => $query->whereIn('ranked_instrument.risk_status', $visibleRiskStatuses))
             ->whereNull('ranked_instrument.deleted_at')
             ->when($isFreeRegional, fn ($query) => $query->whereIn('ranked_instrument.id', $allowedInstrumentIds))
             ->get([
@@ -179,7 +207,7 @@ final class RecommendationController extends Controller
                 'ranked_instrument.sector',
                 'ranking_quality.quality_score as model_quality_score',
             ])
-            ->map(function (object $row) use ($profitFactorByInstrument, $drawdownByInstrument): object {
+            ->map(function (object $row) use ($profitFactorByInstrument, $drawdownByInstrument, $stabilityPeriodsByInstrument): object {
                 $grossReturn = (float) $row->current_price !== 0.0
                     ? (((float) $row->predicted_price_20d - (float) $row->current_price) / (float) $row->current_price) * 100
                     : 0.0;
@@ -217,13 +245,35 @@ final class RecommendationController extends Controller
                     ? max(0, min(100, (float) $row->model_quality_score * 100))
                     : null;
                 $noiseAvailable = $row->horizon_fusion_noise_passed !== null;
-                $stabilityAvailable = $row->horizon_fusion_stability_passed !== null;
+                $fusionStabilityAvailable = is_numeric($row->horizon_fusion_stability_score);
                 $noisePassed = $row->horizon_fusion_noise_passed === true;
-                $stabilityPassed = $row->horizon_fusion_stability_passed === true;
                 $noiseScore = $noisePassed ? 100.0 : 0.0;
-                $stabilityScore = $stabilityPassed && is_numeric($row->horizon_fusion_stability_score)
+                $stabilityPeriods = collect($stabilityPeriodsByInstrument->get($row->instrument_id, collect()))
+                    ->filter(fn (object $period): bool => (int) ($period->trade_count ?? 0) >= 3
+                        && is_numeric($period->average_return ?? null)
+                        && is_numeric($period->hit_rate ?? null));
+                $backtestStability = null;
+                if ($stabilityPeriods->count() >= 2 && (int) $stabilityPeriods->sum('trade_count') >= 10) {
+                    $returns = $stabilityPeriods->pluck('average_return')->map(fn ($value): float => (float) $value);
+                    $hitRatesForStability = $stabilityPeriods->pluck('hit_rate')->map(fn ($value): float => (float) $value);
+                    $returnMean = (float) $returns->avg();
+                    $returnDeviation = sqrt((float) $returns->avg(fn (float $value): float => ($value - $returnMean) ** 2));
+                    $hitMean = (float) $hitRatesForStability->avg();
+                    $hitDeviation = sqrt((float) $hitRatesForStability->avg(fn (float $value): float => ($value - $hitMean) ** 2));
+                    $positivePeriodScore = ($returns->filter(fn (float $value): bool => $value > 0)->count() / $returns->count()) * 100;
+                    $returnConsistency = max(0, 100 - min(100, ($returnDeviation / max(abs($returnMean), 0.005)) * 25));
+                    $hitRateConsistency = max(0, 100 - min(100, $hitDeviation * 3));
+                    $backtestStability = max(0, min(100,
+                        ($positivePeriodScore * 0.50) + ($returnConsistency * 0.25) + ($hitRateConsistency * 0.25)
+                    ));
+                }
+                $stabilityScore = $fusionStabilityAvailable
                     ? max(0, min(100, (float) $row->horizon_fusion_stability_score * 100))
-                    : 0.0;
+                    : $backtestStability;
+                $stabilityAvailable = $stabilityScore !== null;
+                $stabilityPassed = $row->horizon_fusion_stability_passed !== null
+                    ? $row->horizon_fusion_stability_passed === true
+                    : ($stabilityAvailable && $stabilityScore >= 55);
                 $components = collect([
                     ['value' => $profitFactor !== null ? max(0, min(100, (($profitFactor - 0.5) / 2.0) * 100)) : null, 'weight' => 20],
                     ['value' => $profitPerTrade !== null ? max(0, min(100, 50 + ($profitPerTrade * 12.5))) : null, 'weight' => 10],
@@ -234,11 +284,14 @@ final class RecommendationController extends Controller
                     ['value' => $modelQuality, 'weight' => 5],
                     ['value' => $noiseAvailable ? $noiseScore : null, 'weight' => 2.5],
                     ['value' => $stabilityAvailable ? $stabilityScore : null, 'weight' => 2.5],
-                ])->filter(fn (array $component): bool => $component['value'] !== null);
-                $availableWeight = (float) $components->sum('weight');
-                $row->ranking_score = round($availableWeight > 0
-                    ? (float) $components->sum(fn (array $component): float => $component['value'] * $component['weight']) / $availableWeight
-                    : max(0, min(100, (float) $row->prediction_score)), 2);
+                ]);
+                $availableWeight = (float) $components->filter(fn (array $component): bool => $component['value'] !== null)->sum('weight');
+                // Missing validation evidence must not increase the score by
+                // redistributing its weight to the remaining positive inputs.
+                $row->ranking_score = round((float) $components->sum(
+                    fn (array $component): float => (float) ($component['value'] ?? 0) * $component['weight']
+                ) / 100, 2);
+                $row->ranking_evidence_percent = $availableWeight;
                 $row->expected_return_20d = $return;
                 $row->profit_factor = $profitFactor;
                 $row->normalized_profit_per_trade = $profitPerTrade;
@@ -294,19 +347,29 @@ final class RecommendationController extends Controller
             ->orderBy('latest_fundamental.instrument_id')
             ->orderByDesc('latest_fundamental.snapshot_date')
             ->orderByDesc('latest_fundamental.id');
+        $latestTechnicalIndicators = DB::table('technical_indicators')
+            ->where('interval', '1d')
+            ->selectRaw('instrument_id, MAX(id) AS technical_id')
+            ->groupBy('instrument_id');
 
         $query = DB::table('predictions as prediction')
             ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
             ->leftJoinSub($latestFundamentals, 'fundamental', fn ($join) => $join->on('fundamental.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($latestTechnicalIndicators, 'latest_technical', fn ($join) => $join->on('latest_technical.instrument_id', '=', 'instrument.id'))
+            ->leftJoin('technical_indicators as technical', 'technical.id', '=', 'latest_technical.technical_id')
             ->whereIn('prediction.id', $latestIds)
             ->where('instrument.type', 'stock')
-            ->where('instrument.is_active', true)
+            ->where(fn ($query) => $riskUser
+                ? $query->where('instrument.is_active', true)->orWhere('instrument.risk_status', 'sleep')
+                : $query->where('instrument.is_active', true))
+            ->when(! $riskUser, fn ($query) => $query->whereIn('instrument.risk_status', $visibleRiskStatuses))
             ->where('instrument.is_german_tradeable', true)
             ->whereNull('instrument.deleted_at')
             ->select([
                 'prediction.id', 'prediction.instrument_id', 'prediction.prediction_time',
-                'prediction.current_price', 'prediction.predicted_price_20d',
+                'prediction.current_price', 'prediction.predicted_price_5d', 'prediction.predicted_price_10d',
+                'prediction.predicted_price_15d', 'prediction.predicted_price_20d',
                 'prediction.signal as model_signal',
                 'prediction.timeframe', 'prediction.ai_type', 'prediction.model_scope',
                 'prediction.prediction_horizon_minutes',
@@ -314,10 +377,13 @@ final class RecommendationController extends Controller
                 'prediction.risk_score', 'prediction.drawdown_risk_factor',
                 'prediction.quality_gate_blockers',
                 'instrument.symbol', 'instrument.name', 'instrument.isin', 'instrument.country', 'instrument.currency', 'instrument.sector',
+                'instrument.risk_status', 'instrument.risk_profit_factor', 'instrument.risk_confidence', 'instrument.risk_max_drawdown',
                 'instrument.german_listing_symbol', 'instrument.german_listing_exchange',
                 'instrument.german_listing_currency', 'instrument.german_listing_verified_at',
                 'exchange.name as exchange_name', 'exchange.code as exchange_code',
                 'fundamental.trailing_pe', 'fundamental.forward_pe', 'fundamental.dividend_yield',
+                'technical.sma_50 as indicator_sma_50', 'technical.sma_200 as indicator_sma_200',
+                'technical.macd as indicator_macd', 'technical.macd_signal as indicator_macd_signal',
             ])
             ->when($hasBusinessSummary, fn ($builder) => $builder->addSelect('instrument.business_summary'))
             ->when($hasBusinessSummaryEn, fn ($builder) => $builder->addSelect('instrument.business_summary_en'))
@@ -399,6 +465,15 @@ final class RecommendationController extends Controller
             $stocks = $stocks->take($resultLimit);
         }
         $stocks = $stocks->values();
+        $stocks->each(function (object $stock): void {
+            $votes = collect([
+                is_numeric($stock->current_price) && is_numeric($stock->indicator_sma_50) ? ((float) $stock->current_price >= (float) $stock->indicator_sma_50 ? 1 : -1) : null,
+                is_numeric($stock->indicator_sma_50) && is_numeric($stock->indicator_sma_200) ? ((float) $stock->indicator_sma_50 >= (float) $stock->indicator_sma_200 ? 1 : -1) : null,
+                is_numeric($stock->indicator_macd) && is_numeric($stock->indicator_macd_signal) ? ((float) $stock->indicator_macd >= (float) $stock->indicator_macd_signal ? 1 : -1) : null,
+            ])->filter(fn ($vote) => $vote !== null);
+            $balance = (int) $votes->sum();
+            $stock->indicator_ranking_direction = $votes->isEmpty() ? 'neutral' : ($balance > 0 ? 'up' : ($balance < 0 ? 'down' : 'neutral'));
+        });
 
         // German listings are the canonical customer-facing prices. Preserve
         // the model's forecast return when translating its target from the
@@ -410,6 +485,14 @@ final class RecommendationController extends Controller
         $stocks->each(function (object $stock) use ($marketData, $preferEuro): void {
             $stock->original_price = is_numeric($stock->current_price) ? (float) $stock->current_price : null;
             $stock->original_currency = strtoupper((string) $stock->currency);
+            $stock->display_history_provider_symbol = null;
+            foreach ([5, 10, 15, 20] as $days) {
+                $target = $stock->{"predicted_price_{$days}d"} ?? null;
+                $stock->{"expected_return_{$days}d"} = $stock->original_price
+                    && is_numeric($target)
+                    ? (((float) $target / $stock->original_price) - 1) * 100
+                    : null;
+            }
 
             if (! $preferEuro && strtoupper((string) $stock->currency) === 'USD') {
                 return;
@@ -444,6 +527,8 @@ final class RecommendationController extends Controller
             $stock->current_price = (float) $quote['price'];
             $stock->predicted_price_20d = $forecastRatio !== null ? $stock->current_price * $forecastRatio : null;
             $stock->currency = $preferredListing['currency'];
+            $stock->display_history_provider_symbol = trim((string) $preferredListing['symbol'])
+                .(filled($preferredListing['exchange'] ?? null) ? ':'.trim((string) $preferredListing['exchange']) : '');
             $stock->expected_return_20d = $forecastRatio !== null ? ($forecastRatio - 1) * 100 : $stock->expected_return_20d;
         });
         $latestAssessments = collect();
@@ -514,11 +599,37 @@ final class RecommendationController extends Controller
             ->orderBy('bar_time')
             ->get(['instrument_id', 'bar_time', 'close'])
             ->groupBy('instrument_id');
-        $stocks->each(function (object $stock) use ($barsByInstrument, $signalHistoryByInstrument): void {
+        // Converted EUR quotes also need an EUR history. Twelve Data responses
+        // are cached for a day by the service, so a missing series is fetched
+        // once and subsequent screener requests do not consume more credits.
+        $eurHistoryByInstrument = $stocks
+            ->filter(fn (object $stock): bool => strtoupper((string) $stock->currency) === 'EUR'
+                && filled($stock->display_history_provider_symbol ?? null))
+            ->mapWithKeys(function (object $stock) use ($marketData): array {
+                try {
+                    $history = collect($marketData->dailyHistory((string) $stock->display_history_provider_symbol, 270))
+                        ->filter(fn (array $bar): bool => is_numeric($bar['close'] ?? null))
+                        ->values();
+                } catch (Throwable) {
+                    $history = collect();
+                }
+
+                return [(int) $stock->instrument_id => $history];
+            });
+        $stocks->each(function (object $stock) use ($barsByInstrument, $signalHistoryByInstrument, $eurHistoryByInstrument): void {
             $bars = collect($barsByInstrument->get($stock->instrument_id, collect()))
                 ->filter(fn (object $bar): bool => is_numeric($bar->close))
                 ->values();
-            $closes = $bars->map(fn (object $bar): float => (float) $bar->close);
+            $eurHistory = collect($eurHistoryByInstrument->get((int) $stock->instrument_id, collect()));
+            $closes = $eurHistory->isNotEmpty()
+                ? $eurHistory->map(fn (array $bar): float => (float) $bar['close'])
+                : $bars->map(fn (object $bar): float => (float) $bar->close);
+            $latestClose = $closes->count() >= 1 ? (float) $closes->last() : null;
+            $previousClose = $closes->count() >= 2 ? (float) $closes->get($closes->count() - 2) : null;
+            $stock->price_change_percent = $latestClose !== null && $previousClose !== null && $previousClose > 0
+                ? (($latestClose - $previousClose) / $previousClose) * 100
+                : null;
+            $stock->chart_currency = $eurHistory->isNotEmpty() ? 'EUR' : $stock->original_currency;
             $transitionAt = null;
             $transitionFrom = null;
             $previousSignal = null;
@@ -618,6 +729,53 @@ final class RecommendationController extends Controller
             );
             $stock->simple_assessment_is_stored = $storedPros !== [] || $storedCons !== [];
         });
+        $primaryIndexByInstrument = DB::table('index_memberships as membership')
+            ->join('market_indices as market_index', 'market_index.id', '=', 'membership.market_index_id')
+            ->whereIn('membership.instrument_id', $stocks->pluck('instrument_id')->all())
+            ->whereNull('membership.removed_at')
+            ->where('market_index.is_active', true)
+            ->orderBy('market_index.global_rank')
+            ->get(['membership.instrument_id', 'market_index.symbol', 'market_index.name'])
+            ->groupBy('instrument_id')
+            ->map(fn ($memberships) => $memberships->first());
+        $stocks->each(function (object $stock) use ($primaryIndexByInstrument): void {
+            $index = $primaryIndexByInstrument->get($stock->instrument_id);
+            $stock->primary_index_symbol = $index?->symbol;
+            $stock->primary_index_name = $index?->name;
+        });
+        $labeledInstrumentIds = Schema::hasTable('smart_selection_label_instruments')
+            ? DB::table('smart_selection_label_instruments as membership')
+                ->join('smart_selection_labels as label', 'label.id', '=', 'membership.smart_selection_label_id')
+                ->where('label.user_id', $request->user()->id)
+                ->where('label.is_active', true)
+                ->whereIn('membership.instrument_id', $stocks->pluck('instrument_id'))
+                ->pluck('membership.instrument_id')->map(fn ($id) => (int) $id)->unique()
+            : collect();
+        $savedStrategies = Schema::hasTable('saved_prediction_filters')
+            ? DB::table('saved_prediction_filters')->where('user_id', $request->user()->id)->get(['filters'])
+            : collect();
+        $matchesSelection = static function (object $stock, mixed $rawCriteria): bool {
+            $criteria = is_string($rawCriteria) ? (json_decode($rawCriteria, true) ?: []) : (array) $rawCriteria;
+            $score = is_numeric($stock->score_10 ?? null) ? (float) $stock->score_10 : null;
+            $confidence = is_numeric($stock->confidence_percent ?? null) ? (float) $stock->confidence_percent : null;
+            $expectedReturn = is_numeric($stock->expected_return_20d ?? null) ? (float) $stock->expected_return_20d : null;
+            $drawdown = is_numeric($stock->ranking_drawdown ?? null) ? (float) $stock->ranking_drawdown : null;
+            $profit = is_numeric($stock->display_profit_per_trade_percent ?? null) ? (float) $stock->display_profit_per_trade_percent : null;
+            $hitRate = is_numeric($stock->ranking_hit_rate ?? null) ? (float) $stock->ranking_hit_rate : null;
+            if ($score === null || $score < (float) ($criteria['score_min'] ?? 0)) return false;
+            if ($confidence === null || $confidence < (float) ($criteria['confidence_min'] ?? 0)) return false;
+            if ($expectedReturn === null || $expectedReturn < (float) ($criteria['predicted_return_min'] ?? -20)) return false;
+            if ((float) ($criteria['drawdown_max'] ?? 50) < 50 && ($drawdown === null || $drawdown > (float) $criteria['drawdown_max'])) return false;
+            $profitMinimum = (float) ($criteria['profit_per_trade_min'] ?? $criteria['profit_factor_min'] ?? 0);
+            if ($profitMinimum > 0 && ($profit === null || $profit < $profitMinimum)) return false;
+            if ((float) ($criteria['hit_rate_min'] ?? 0) > 0 && ($hitRate === null || $hitRate < (float) $criteria['hit_rate_min'])) return false;
+            return true;
+        };
+        $stocks->each(function (object $stock) use ($labeledInstrumentIds, $savedStrategies, $matchesSelection): void {
+            $stock->has_matching_label = $labeledInstrumentIds->contains((int) $stock->instrument_id);
+            $stock->has_matching_strategy = $savedStrategies->contains(fn (object $strategy): bool => $matchesSelection($stock, $strategy->filters));
+        });
+
         $countries = DB::table('instruments')->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at')->whereNotNull('country')->when($isFreeRegional, fn ($query) => $query->whereIn('id', $allowedInstrumentIds))->distinct()->orderBy('country')->pluck('country');
         $sectors = DB::table('instruments')->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at')->whereNotNull('sector')->when($isFreeRegional, fn ($query) => $query->whereIn('id', $allowedInstrumentIds))->distinct()->orderBy('sector')->pluck('sector');
         $indices = DB::table('market_indices as market_index')
@@ -642,7 +800,47 @@ final class RecommendationController extends Controller
             ->whereIn('instrument_id', $stocks->pluck('instrument_id'))->get(['portfolio_id', 'instrument_id'])
             ->groupBy('instrument_id')->map(fn ($items) => $items->pluck('portfolio_id')->map(fn ($id) => (int) $id)->all());
 
-        return view('screener.index', compact('stocks', 'countries', 'sectors', 'indices', 'userWatchlists', 'paperPortfolios', 'watchlistMemberships', 'paperPortfolioMemberships', 'isFreeRegional', 'regionalCountry'));
+        $rankedCertificateStockPrices = DB::table('price_bars')
+            ->where('interval', '1d')
+            ->where('close', '>', 0)
+            ->whereIn('instrument_id', $stocks->pluck('instrument_id'))
+            ->select(['instrument_id', 'close'])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY instrument_id ORDER BY bar_time DESC, id DESC) AS price_rank');
+        $latestCertificateStockPrices = DB::query()
+            ->fromSub($rankedCertificateStockPrices, 'ranked_certificate_stock_price')
+            ->where('price_rank', 1)
+            ->select(['instrument_id', 'close']);
+        $certificateInstrumentIds = DB::table('linked_securities')
+            ->leftJoinSub($latestCertificateStockPrices, 'certificate_stock_price', fn ($join) => $join
+                ->on('certificate_stock_price.instrument_id', '=', 'linked_securities.underlying_instrument_id'))
+            ->whereIn('linked_securities.underlying_instrument_id', $stocks->pluck('instrument_id'))
+            ->where('linked_securities.is_active', true)
+            ->whereNotNull('linked_securities.german_tradeability_verified_at')
+            ->where(fn ($query) => $query->whereNull('linked_securities.maturity_date')->orWhereDate('linked_securities.maturity_date', '>=', today()))
+            ->where(fn ($query) => $query
+                ->whereNull('linked_securities.cap')
+                ->orWhereNull('certificate_stock_price.close')
+                ->orWhereRaw('linked_securities.cap >= certificate_stock_price.close * 0.95'))
+            ->distinct()
+            ->pluck('linked_securities.underlying_instrument_id')
+            ->map(fn ($id) => (int) $id);
+
+        $recentNewsStats = DB::table('news')
+            ->whereIn('instrument_id', $stocks->pluck('instrument_id'))
+            ->where('published_at', '>=', now()->subHours(48))
+            ->groupBy('instrument_id')
+            ->get(['instrument_id', DB::raw('MAX(id) AS latest_news_id'), DB::raw('COUNT(*) AS news_count')]);
+        $recentNewsByInstrument = DB::table('news')
+            ->whereIn('id', $recentNewsStats->pluck('latest_news_id'))
+            ->get(['id', 'instrument_id', 'headline', 'sentiment_score', 'published_at'])
+            ->keyBy('instrument_id');
+        $recentNewsStats->each(function (object $stat) use ($recentNewsByInstrument): void {
+            if ($news = $recentNewsByInstrument->get((int) $stat->instrument_id)) {
+                $news->news_count = (int) $stat->news_count;
+            }
+        });
+
+        return view('screener.index', compact('stocks', 'countries', 'sectors', 'indices', 'userWatchlists', 'paperPortfolios', 'watchlistMemberships', 'paperPortfolioMemberships', 'certificateInstrumentIds', 'recentNewsByInstrument', 'isFreeRegional', 'regionalCountry'));
     }
 
     public function screeningHistory(Request $request): View
