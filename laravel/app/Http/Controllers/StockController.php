@@ -7,6 +7,7 @@ use App\Services\PlanAccessService;
 use App\Services\MarketDataEntitlementService;
 use App\Services\PersonalizedSignalService;
 use App\Services\TwelveDataService;
+use App\Support\ProfitFactor;
 use Carbon\CarbonImmutable;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -23,6 +24,11 @@ class StockController extends Controller
 {
     public function report(Request $request, string $symbol): Response
     {
+        $locale = in_array($request->query('locale'), ['de', 'en'], true)
+            ? (string) $request->query('locale')
+            : app()->getLocale();
+        app()->setLocale($locale);
+        $english = $locale === 'en';
         $instrument = $this->instrument($symbol);
         $prediction = DB::table('predictions')->where('instrument_id', $instrument->id)
             ->when($request->integer('prediction') > 0, fn ($query) => $query->where('id', $request->integer('prediction')))
@@ -53,6 +59,9 @@ class StockController extends Controller
                     DB::raw("tm.metrics->>'stability' AS model_stability"),
                 ])
             : null;
+        if ($trainedModel) {
+            $trainedModel->profit_factor = ProfitFactor::cap($trainedModel->profit_factor);
+        }
         $latestWalkForwardRunIds = DB::table('walk_forward_backtest_runs as wf_run')
             ->join('walk_forward_backtest_trades as wf_trade', 'wf_trade.run_id', '=', 'wf_run.id')
             ->where('wf_run.status', 'completed')
@@ -86,11 +95,11 @@ class StockController extends Controller
             ? max(0, min(100, (float) $value * ((float) $value <= 1 ? 100 : 1))) : null;
         $reportDonuts = [
             ['label' => 'KI-Score', 'value' => \App\Support\AiScore::toPercent($prediction?->prediction_score), 'display' => is_numeric(\App\Support\AiScore::toPercent($prediction?->prediction_score)) ? number_format((float) \App\Support\AiScore::toPercent($prediction?->prediction_score), 0, ',', '.') : '—', 'reverse' => false],
-            ['label' => 'Konf.', 'value' => $toPercent($prediction?->confidence), 'display' => $toPercent($prediction?->confidence) !== null ? number_format($toPercent($prediction?->confidence), 0, ',', '.').'%' : '—', 'reverse' => false],
-            ['label' => 'Hit-Rate', 'value' => is_numeric($walkForwardStats?->hit_rate) ? (float) $walkForwardStats->hit_rate : null, 'display' => is_numeric($walkForwardStats?->hit_rate) ? number_format((float) $walkForwardStats->hit_rate, 0, ',', '.').'%' : '—', 'reverse' => false],
+            ['label' => $english ? 'Conf.' : 'Konf.', 'value' => $toPercent($prediction?->confidence), 'display' => $toPercent($prediction?->confidence) !== null ? number_format($toPercent($prediction?->confidence), 0, ',', '.').'%' : '—', 'reverse' => false],
+            ['label' => 'Hit Rate', 'value' => is_numeric($walkForwardStats?->hit_rate) ? (float) $walkForwardStats->hit_rate : null, 'display' => is_numeric($walkForwardStats?->hit_rate) ? number_format((float) $walkForwardStats->hit_rate, 0, ',', '.').'%' : '—', 'reverse' => false],
             ['label' => 'Ø/Trade', 'value' => is_numeric($walkForwardStats?->average_profit_per_trade_percent) ? max(0, min(100, 50 + ((float) $walkForwardStats->average_profit_per_trade_percent * 25))) : null, 'display' => is_numeric($walkForwardStats?->average_profit_per_trade_percent) ? (((float) $walkForwardStats->average_profit_per_trade_percent > 0 ? '+' : '').number_format((float) $walkForwardStats->average_profit_per_trade_percent, 2, ',', '.').'%') : '—', 'reverse' => false],
-            ['label' => 'Stabilität', 'value' => $toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability), 'display' => $toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability) !== null ? number_format($toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability), 0, ',', '.').'%' : '—', 'reverse' => false],
-            ['label' => 'Risiko', 'value' => \App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown), 'display' => \App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown) !== null ? number_format(\App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown), 0, ',', '.').'%' : '—', 'reverse' => true],
+            ['label' => $english ? 'Stability' : 'Stabilität', 'value' => $toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability), 'display' => $toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability) !== null ? number_format($toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability), 0, ',', '.').'%' : '—', 'reverse' => false],
+            ['label' => $english ? 'Risk' : 'Risiko', 'value' => \App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown), 'display' => \App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown) !== null ? number_format(\App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown), 0, ',', '.').'%' : '—', 'reverse' => true],
         ];
         $reportDonuts = collect($reportDonuts)->map(function (array $donut): array {
             $donut['image'] = $this->stockReportDonut($donut);
@@ -102,7 +111,7 @@ class StockController extends Controller
         $pdf->loadHtml(view('stocks.report', compact('instrument', 'prediction', 'fundamental', 'fundamentals', 'assessment', 'trainedModel', 'patterns', 'indicators', 'horizonTargets', 'chart', 'logoData', 'reportDonuts'))->render(), 'UTF-8');
         $pdf->setPaper('a4', 'portrait');
         $pdf->render();
-        $filename = 'Aktienbericht-'.preg_replace('/[^A-Za-z0-9._-]/', '-', $instrument->symbol).'-'.now()->format('Y-m-d').'.pdf';
+        $filename = ($english ? 'Stock-report-' : 'Aktienbericht-').preg_replace('/[^A-Za-z0-9._-]/', '-', $instrument->symbol).'-'.$locale.'-'.now()->format('Y-m-d').'.pdf';
 
         return response($pdf->output(), 200, [
             'Content-Type' => 'application/pdf', 'Content-Disposition' => 'attachment; filename="'.$filename.'"',
@@ -222,6 +231,7 @@ class StockController extends Controller
                 $prediction->current_quote_time = $currentQuote->quote_time;
             }
         }
+        $this->applyEuroDisplayValues($instrument, $prediction, $yahooFinance);
         $horizonTargets = collect([5, 10, 15, 20])->mapWithKeys(function (int $days) use ($instrument, $prediction, $requestedPredictionId): array {
             $column = "predicted_price_{$days}d";
             $target = is_numeric($prediction?->{$column} ?? null) ? (float) $prediction->{$column} : null;
@@ -235,6 +245,9 @@ class StockController extends Controller
                 }
                 $target = $query->orderByDesc('prediction_time')->orderByDesc('id')->value($column);
                 $target = is_numeric($target) ? (float) $target : null;
+                if ($target !== null && is_numeric($instrument->display_price_factor ?? null)) {
+                    $target *= (float) $instrument->display_price_factor;
+                }
             }
             $current = is_numeric($prediction?->current_price ?? null) ? (float) $prediction->current_price : null;
             $return = $target !== null && $current !== null && $current !== 0.0
@@ -337,6 +350,12 @@ class StockController extends Controller
                     'quality_tier.name as tier_name',
                 ])
             : null;
+        if ($modelQuality) {
+            $modelQuality->profit_factor = ProfitFactor::cap($modelQuality->profit_factor);
+        }
+        if ($prediction) {
+            $prediction->display_score_10 = $this->predictionRankingScore($prediction, $modelQuality);
+        }
         $latestWalkForwardRunIds = DB::table('walk_forward_backtest_runs as wf_run')
             ->join('walk_forward_backtest_trades as wf_trade', 'wf_trade.run_id', '=', 'wf_run.id')
             ->where('wf_run.status', 'completed')
@@ -469,13 +488,15 @@ class StockController extends Controller
                 : null;
         $returnLabel = $returnTo && Str::startsWith($returnTo, '/screener')
             ? __('Zurück zum Screener')
+            : ($returnTo && Str::startsWith($returnTo, '/predictions/chartview-signals')
+                ? __('Zurück zu ChartView')
             : ($returnTo && Str::startsWith($returnTo, '/watchlists')
                 ? __('Zurück zur Watchlist')
                 : ($returnTo && Str::startsWith($returnTo, '/predictions')
                     ? __('Zurück zu Prognosen')
                     : ($returnTo && (Str::startsWith($returnTo, '/depots') || Str::startsWith($returnTo, '/paper-depots'))
                         ? __('Zurück zum Musterdepot')
-                        : null)));
+                        : null))));
 
         $fundamental = DB::table('instrument_fundamentals')
             ->where('instrument_id', $instrument->id)
@@ -541,7 +562,7 @@ class StockController extends Controller
                 ->whereNotNull('prediction.prediction_score')
                 ->orderByDesc('prediction.prediction_time')
                 ->orderByDesc('prediction.id')
-                ->select(['prediction.prediction_time', 'prediction.prediction_score', 'prediction.signal'])
+                ->select(['prediction.prediction_time', 'prediction.prediction_score', 'prediction.signal', 'prediction.current_price'])
                 ->selectRaw("{$signalSql} AS personalized_signal")
                 ->get()
                 ->unique(fn (object $row): string => CarbonImmutable::parse($row->prediction_time)->format('Y-m-d'))
@@ -551,6 +572,7 @@ class StockController extends Controller
                     'x' => CarbonImmutable::parse($row->prediction_time)->getTimestampMs(),
                     'y' => \App\Support\AiScore::toTen($row->prediction_score),
                     'signal' => strtoupper((string) ($row->personalized_signal ?: $row->signal ?: 'HOLD')),
+                    'price' => is_numeric($row->current_price) ? (float) $row->current_price : null,
                 ])
                 ->filter(fn (array $point): bool => is_numeric($point['y']))
                 ->values()
@@ -571,6 +593,7 @@ class StockController extends Controller
                     'from' => $previous['signal'],
                     'to' => $point['signal'],
                     'score' => $point['y'],
+                    'price' => $point['price'] ?? null,
                 ];
             })
             ->values();
@@ -630,7 +653,7 @@ class StockController extends Controller
             __('Ø Modellqualität') => $ensembleQuality['average_model_quality'] ?? null,
             __('Schwächste Modellqualität') => $ensembleQuality['weakest_model_quality'] ?? null,
             __('Ø Stabilität') => $ensembleQuality['average_stability'] ?? null,
-            __('Ø Profit-Faktor') => $ensembleQuality['average_profit_factor'] ?? null,
+            __('Ø Profit-Faktor') => ProfitFactor::cap($ensembleQuality['average_profit_factor'] ?? null),
             __('Statistische Zuverlässigkeit') => $ensembleQuality['statistical_reliability'] ?? null,
             __('Ensemble-Veto') => $prediction?->ensemble_dispersion_veto_used,
         ])->all();
@@ -666,6 +689,47 @@ class StockController extends Controller
             ->groupByRaw('LEAST(9, GREATEST(0, FLOOR(backtest_trade.ki_score)))::integer, LEAST(9, GREATEST(0, FLOOR(backtest_trade.confidence / 10)))::integer')
             ->get()
             ->keyBy(fn ($row) => $row->score_bucket.'-'.$row->confidence_bucket);
+        $stockNewsCount = DB::table('news')->where('instrument_id', $instrument->id)->count();
+        $stockNews = DB::table('news')
+            ->where('instrument_id', $instrument->id)
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get([
+                'id', 'headline', 'body', 'url', 'source', 'provider', 'published_at',
+                'ai_summary_de', 'ai_summary_en', 'sentiment_score',
+                'relevance_score', 'ai_analyzed_at',
+            ]);
+        $latestEtfSnapshots = DB::table('etf_holdings')
+            ->selectRaw('etf_fund_id, MAX(effective_date) AS effective_date')
+            ->groupBy('etf_fund_id');
+        $stockEtfs = DB::table('etf_holdings as holding')
+            ->joinSub($latestEtfSnapshots, 'latest_etf_snapshot', function ($join): void {
+                $join->on('latest_etf_snapshot.etf_fund_id', '=', 'holding.etf_fund_id')
+                    ->on('latest_etf_snapshot.effective_date', '=', 'holding.effective_date');
+            })
+            ->join('etf_funds as fund', 'fund.id', '=', 'holding.etf_fund_id')
+            ->where('holding.instrument_id', $instrument->id)
+            ->where('fund.is_active', true)
+            ->where('fund.is_german_tradeable', true)
+            ->whereNotNull('fund.german_tradeability_verified_at')
+            ->orderByDesc('holding.weight_percent')
+            ->orderBy('fund.name')
+            ->get([
+                'fund.id', 'fund.provider', 'fund.symbol', 'fund.isin', 'fund.name', 'fund.exchange',
+                'fund.currency', 'fund.mic_code', 'fund.german_listing_symbol',
+                'holding.weight_percent', 'holding.effective_date',
+            ]);
+        $linkedSecurities = DB::table('linked_securities')
+            ->where('underlying_instrument_id', $instrument->id)
+            ->where('is_active', true)
+            ->whereNotNull('german_tradeability_verified_at')
+            ->whereIn('mic_code', ['XETR', 'XFRA', 'XGAT', 'XMUN', 'XBER', 'XDUS', 'XHAM', 'XHAN', 'XSTU'])
+            ->where(fn ($query) => $query->whereNull('maturity_date')->orWhereDate('maturity_date', '>=', today()))
+            ->orderByRaw("CASE type WHEN 'discount_certificate' THEN 1 WHEN 'bonus_certificate' THEN 2 ELSE 3 END")
+            ->orderBy('maturity_date')
+            ->limit(150)
+            ->get();
         return view('stocks.show', compact(
             'instrument',
             'prediction',
@@ -708,6 +772,10 @@ class StockController extends Controller
             'indicatorCards',
             'stockHeatmap',
             'stockHeatmapSummary',
+            'stockNews',
+            'stockNewsCount',
+            'stockEtfs',
+            'linkedSecurities',
             'canViewRealtime',
             'canUseChartIndicators',
             'canViewChartPatterns',
@@ -811,6 +879,7 @@ class StockController extends Controller
             'symbol' => $instrument->symbol,
             'candles' => $series['candles']->values(),
             'source' => $series['source'],
+            'currency' => $this->usesEuroDisplay($instrument) ? 'EUR' : (string) ($instrument->currency ?: ''),
             'chart_patterns' => $this->recentChartPatterns($series['candles']),
             'watchlist_entry' => $this->watchlistEntry($instrument->id),
             'updated_at' => now()->toIso8601String(),
@@ -1109,6 +1178,28 @@ class StockController extends Controller
         ?CarbonImmutable $focusAt = null,
     ): array
     {
+        if ($this->usesEuroDisplay($instrument)) {
+            try {
+                $providerSymbol = (string) $instrument->german_listing_symbol;
+                if (filled($instrument->german_listing_exchange)) {
+                    $providerSymbol .= ':'.trim((string) $instrument->german_listing_exchange);
+                }
+                $downloaded = $yahooFinance->dailyCandles($providerSymbol, $focusAt ? 140 : 300);
+                if ($downloaded) {
+                    return [
+                        'candles' => collect($downloaded)->map(fn (array $bar): array => [
+                            'x' => CarbonImmutable::createFromTimestampUTC($bar['timestamp'])->getTimestampMs(),
+                            'y' => [(float) $bar['open'], (float) $bar['high'], (float) $bar['low'], (float) $bar['close']],
+                            'volume' => is_numeric($bar['volume'] ?? null) ? (float) $bar['volume'] : null,
+                        ]),
+                        'source' => 'twelve_data_eur_listing',
+                    ];
+                }
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
         $bars = $this->dailyBars((int) $instrument->id, $focusAt);
 
         if ($bars->count() < ($focusAt ? 50 : 252)) {
@@ -1160,6 +1251,56 @@ class StockController extends Controller
             ]),
             'source' => $bars->isEmpty() ? 'unavailable' : ($bars->every(fn ($bar) => $bar->source === 'twelve_data') ? 'twelve_data' : 'price_bars'),
         ];
+    }
+
+    private function usesEuroDisplay(object $instrument): bool
+    {
+        return strtolower((string) ($instrument->type ?? '')) !== 'index'
+            && filled($instrument->german_listing_symbol)
+            && strtoupper((string) ($instrument->german_listing_currency ?? '')) === 'EUR';
+    }
+
+    private function applyEuroDisplayValues(
+        object $instrument,
+        ?object $prediction,
+        TwelveDataService $marketData,
+    ): void {
+        $instrument->original_currency = $instrument->currency;
+        $instrument->display_price_factor = 1.0;
+
+        if (! $this->usesEuroDisplay($instrument)) {
+            return;
+        }
+
+        try {
+            $quote = $marketData->listingQuote(
+                (string) $instrument->german_listing_symbol,
+                filled($instrument->german_listing_exchange) ? (string) $instrument->german_listing_exchange : null,
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+            $quote = null;
+        }
+
+        $primaryPrice = is_numeric($prediction?->current_price ?? null) ? (float) $prediction->current_price : null;
+        $euroPrice = is_numeric($quote['price'] ?? null) ? (float) $quote['price'] : null;
+        $factor = $primaryPrice && $euroPrice ? $euroPrice / $primaryPrice : 1.0;
+        $instrument->display_price_factor = $factor;
+        $instrument->currency = 'EUR';
+
+        if (! $prediction) {
+            return;
+        }
+
+        foreach (['current_price', 'actual_price', 'predicted_price_5d', 'predicted_price_10d', 'predicted_price_15d', 'predicted_price_20d'] as $column) {
+            if (is_numeric($prediction->{$column} ?? null)) {
+                $prediction->{$column} = (float) $prediction->{$column} * $factor;
+            }
+        }
+
+        if ($euroPrice !== null && ! request()->integer('prediction')) {
+            $prediction->current_price = $euroPrice;
+        }
     }
 
     private function dailyBars(int $instrumentId, ?CarbonImmutable $focusAt = null)
@@ -1245,8 +1386,14 @@ class StockController extends Controller
             ->map(fn ($data) => $this->decodeJson($data));
 
         $definitions = [
+            'market_cap' => ['key' => 'marketCap', 'direction' => 'desc', 'positive_only' => true],
             'pe' => ['key' => 'trailingPE', 'direction' => 'asc', 'positive_only' => true],
             'dividend' => ['key' => 'dividendYield', 'direction' => 'desc', 'positive_only' => false],
+            'net_margin' => ['key' => 'profitMargins', 'direction' => 'desc', 'positive_only' => false],
+            'operating_margin' => ['key' => 'operatingMargins', 'direction' => 'desc', 'positive_only' => false],
+            'roe' => ['key' => 'returnOnEquity', 'direction' => 'desc', 'positive_only' => false],
+            'roa' => ['key' => 'returnOnAssets', 'direction' => 'desc', 'positive_only' => false],
+            'revenue_growth' => ['key' => 'revenueGrowth', 'direction' => 'desc', 'positive_only' => false],
         ];
 
         return collect($definitions)
@@ -1278,6 +1425,95 @@ class StockController extends Controller
                 ]];
             })
             ->all();
+    }
+
+    private function predictionRankingScore(object $prediction, ?object $modelQuality): float
+    {
+        $runIds = DB::table('walk_forward_backtest_runs')
+            ->where('status', 'completed')
+            ->whereIn('horizon_days', [5, 10, 15, 20])
+            ->select(['id', 'horizon_days'])
+            ->selectSub(function ($query): void {
+                $query->from('walk_forward_backtest_trades as score_run_trade')
+                    ->whereColumn('score_run_trade.run_id', 'walk_forward_backtest_runs.id')
+                    ->selectRaw('COUNT(DISTINCT score_run_trade.instrument_id)');
+            }, 'instrument_count')
+            ->orderByDesc('instrument_count')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('horizon_days')
+            ->pluck('id');
+
+        $stats = $runIds->isEmpty() ? collect() : DB::table('walk_forward_backtest_trades as score_trade')
+            ->whereIn('score_trade.run_id', $runIds)
+            ->where('score_trade.instrument_id', $prediction->instrument_id)
+            ->groupBy('score_trade.run_id')
+            ->select('score_trade.run_id')
+            ->selectRaw('COUNT(*) AS trade_count')
+            ->selectRaw('SUM(CASE WHEN net_return > 0 THEN net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN net_return < 0 THEN net_return ELSE 0 END)), 0) AS profit_factor')
+            ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
+            ->selectRaw('AVG(net_return) * 100 AS average_profit_per_trade_percent')
+            ->get()
+            ->filter(fn (object $stat): bool => (int) $stat->trade_count >= 10 && is_numeric($stat->profit_factor));
+
+        $profitFactors = $stats->map(function (object $stat): float {
+            $reliability = (int) $stat->trade_count / ((int) $stat->trade_count + 20);
+
+            return 1 + ((max(0.0, min(2.5, (float) $stat->profit_factor)) - 1) * $reliability);
+        });
+        $hitRates = $stats->filter(fn (object $stat): bool => is_numeric($stat->hit_rate))
+            ->map(function (object $stat): float {
+                $reliability = (int) $stat->trade_count / ((int) $stat->trade_count + 20);
+
+                return 50 + (((float) $stat->hit_rate - 50) * $reliability);
+            });
+        $profitsPerTrade = $stats->filter(fn (object $stat): bool => is_numeric($stat->average_profit_per_trade_percent))
+            ->pluck('average_profit_per_trade_percent')->map(fn ($value): float => (float) $value);
+        $drawdowns = $runIds->isEmpty() ? collect() : DB::table('walk_forward_backtest_year_stats')
+            ->whereIn('run_id', $runIds)
+            ->where('instrument_id', $prediction->instrument_id)
+            ->whereNotNull('maximum_drawdown')
+            ->groupBy('run_id')
+            ->selectRaw('PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY ABS(maximum_drawdown)) * 100 AS drawdown_p90')
+            ->pluck('drawdown_p90')->filter(fn ($value): bool => is_numeric($value));
+
+        $profitFactor = $profitFactors->isNotEmpty() ? (float) $profitFactors->avg() : null;
+        $hitRate = $hitRates->isNotEmpty() ? (float) $hitRates->avg() : null;
+        $profitPerTrade = $profitsPerTrade->isNotEmpty() ? (float) $profitsPerTrade->avg() : null;
+        $drawdown = $drawdowns->isNotEmpty() ? (float) $drawdowns->avg() : null;
+        $confidence = is_numeric($prediction->confidence)
+            ? max(0, min(100, (float) $prediction->confidence * ((float) $prediction->confidence <= 1 ? 100 : 1)))
+            : 0.0;
+        $currentPrice = is_numeric($prediction->current_price) ? (float) $prediction->current_price : null;
+        $predictedPrice = is_numeric($prediction->predicted_price_20d) ? (float) $prediction->predicted_price_20d : null;
+        $expectedReturn = $currentPrice && $predictedPrice !== null
+            ? (($predictedPrice - $currentPrice) / $currentPrice) * 100 - max(0.0, (float) config('aktienki.signals.round_trip_cost_percent', 0.5))
+            : 0.0;
+        $returnScore = max(0, min(100, 50 + ($expectedReturn * 5)));
+        $modelQualityScore = is_numeric($modelQuality?->quality_score)
+            ? max(0, min(100, (float) $modelQuality->quality_score * 100))
+            : null;
+        $noiseAvailable = $prediction->horizon_fusion_noise_passed !== null;
+        $stabilityAvailable = $prediction->horizon_fusion_stability_passed !== null;
+        $stabilityPassed = $prediction->horizon_fusion_stability_passed === true;
+        $stabilityScore = $stabilityPassed && is_numeric($prediction->horizon_fusion_stability_score)
+            ? max(0, min(100, (float) $prediction->horizon_fusion_stability_score * 100))
+            : 0.0;
+        $components = collect([
+            ['value' => $profitFactor !== null ? max(0, min(100, (($profitFactor - .5) / 2) * 100)) : null, 'weight' => 20],
+            ['value' => $profitPerTrade !== null ? max(0, min(100, 50 + ($profitPerTrade * 12.5))) : null, 'weight' => 10],
+            ['value' => $confidence, 'weight' => 20],
+            ['value' => $returnScore, 'weight' => 15],
+            ['value' => $drawdown !== null ? max(0, min(100, 100 - (($drawdown / 50) * 100))) : null, 'weight' => 15],
+            ['value' => $hitRate, 'weight' => 10],
+            ['value' => $modelQualityScore, 'weight' => 5],
+            ['value' => $noiseAvailable ? ($prediction->horizon_fusion_noise_passed === true ? 100 : 0) : null, 'weight' => 2.5],
+            ['value' => $stabilityAvailable ? $stabilityScore : null, 'weight' => 2.5],
+        ])->filter(fn (array $component): bool => $component['value'] !== null);
+        $weight = (float) $components->sum('weight');
+        $fallback = \App\Support\AiScore::toTen($prediction->prediction_score) ?? 0.0;
+
+        return round($weight > 0 ? (float) $components->sum(fn (array $component): float => $component['value'] * $component['weight']) / $weight / 10 : $fallback, 2);
     }
 
     private function decodeJson(mixed $value): array

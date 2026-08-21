@@ -22,13 +22,12 @@
                 </div>
             </div>
 
-            <div class="grid w-full grid-cols-5 gap-2 xl:w-auto">
+            <div class="grid w-full grid-cols-4 gap-2 xl:w-auto">
                 @foreach ([
                     [__('Prognosen'), (int) ($summary->total ?? 0), 'xl:min-w-28'],
                     [__('Aktien'), (int) ($summary->instruments ?? 0), 'xl:min-w-28'],
                     [__('Validiert'), (int) ($summary->validated ?? 0), 'xl:min-w-28'],
                     [__('Letzte Prognose'), $summary?->latest_prediction ? \Illuminate\Support\Carbon::parse($summary->latest_prediction)->timezone(config('app.timezone'))->format('d.m.Y H:i') : '—', 'xl:min-w-40'],
-                    [__('Ältestes Training'), $summary?->oldest_training ? \Illuminate\Support\Carbon::parse($summary->oldest_training)->timezone(config('app.timezone'))->format('d.m.Y') : '—', 'xl:min-w-32'],
                 ] as [$label, $value, $widthClass])
                     <div class="ak-predictions-card-surface min-w-0 rounded-lg px-2 py-1.5 sm:px-2.5 {{ $widthClass }}">
                         <p class="truncate text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)] sm:text-[9px] sm:tracking-[.12em]">{{ $label }}</p>
@@ -38,7 +37,11 @@
             </div>
         </div>
 
-        <section x-data="{ saveFilterOpen: false }" class="flex min-h-0 flex-1 flex-col gap-3">
+        <section x-data="{ saveFilterOpen: false, filtersOpen: false }" class="flex min-h-0 flex-1 flex-col gap-3">
+            <button type="button" @click="filtersOpen = ! filtersOpen" :aria-expanded="filtersOpen" class="ak-prediction-filter-toggle flex h-10 shrink-0 items-center justify-between rounded-xl border border-cyan-400/25 bg-transparent px-4 text-xs font-black text-cyan-300">
+                <span class="inline-flex items-center gap-2"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" />{{ __('Filter anzeigen') }}</span>
+                <x-heroicon-o-chevron-down class="h-4 w-4 transition" x-bind:class="filtersOpen && 'rotate-180'" />
+            </button>
             <form
                 id="prediction-filterboard"
                 onsubmit="event.preventDefault(); const l=document.getElementById('prediction-page-loading'); if(l){l.classList.remove('hidden');l.classList.add('flex');l.style.display='flex';} const f=this; setTimeout(() => HTMLFormElement.prototype.submit.call(f), 500);"
@@ -50,10 +53,10 @@
                     drawdown: Number({{ (float) request('drawdown_max', 50) }}),
                     profitFactor: Number({{ (float) request('profit_factor_min', 0) }}),
                     hitRate: Number({{ (float) request('hit_rate_min', 0) }}),
-                    volatility: Number({{ (float) request('volatility_max', 100) }}),
-                    searchTimer: null,
-                    submitSearch() { window.clearTimeout(this.searchTimer); this.searchTimer = window.setTimeout(() => this.$root.requestSubmit(), 450) }
+                    volatility: Number({{ (float) request('volatility_max', 100) }})
                 }"
+                x-show="filtersOpen"
+                x-cloak
                 class="ak-prediction-filterboard z-50 flex shrink-0 flex-col gap-1 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-2 shadow-[var(--ak-shadow)]"
             >
                 <input type="hidden" name="sort" value="{{ $sort }}">
@@ -62,33 +65,33 @@
                 <label class="relative min-w-0">
                     <span class="sr-only">{{ __('Aktie suchen') }}</span>
                     <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ak-muted)]" />
-                    <input name="q" value="{{ request('q') }}" @input="submitSearch()" placeholder="{{ __('Aktie / Symbol') }}" class="ak-input h-10 w-full pl-8 pr-2 text-xs">
+                    <input name="q" value="{{ request('q') }}" placeholder="{{ __('Aktie / Symbol') }}" class="ak-input h-10 w-full pl-8 pr-2 text-xs">
                 </label>
-                <select name="country" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 px-1.5 text-[11px]" title="{{ __('Land') }}">
+                <select name="country" class="ak-input h-10 w-full min-w-0 px-1.5 text-[11px]" title="{{ __('Land') }}">
                     <option value="">{{ __('Land') }}</option>
                     @foreach ($countries as $country)
                         <option value="{{ $country }}" @selected(strtoupper((string) request('country')) === strtoupper((string) $country))>{{ $country }}</option>
                     @endforeach
                 </select>
-                <select name="exchange" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 px-1.5 text-[11px]" title="{{ __('Exchange') }}">
+                <select name="exchange" class="ak-input h-10 w-full min-w-0 px-1.5 text-[11px]" title="{{ __('Exchange') }}">
                     <option value="">{{ __('Exchange') }}</option>
                     @foreach ($exchanges as $exchange)
                         <option value="{{ $exchange->code }}" @selected(strtoupper((string) request('exchange')) === strtoupper((string) $exchange->code))>{{ $exchange->name ?: $exchange->code }}</option>
                     @endforeach
                 </select>
-                <select name="sector" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 px-1.5 text-[11px]" title="{{ __('Sektor') }}">
+                <select name="sector" class="ak-input h-10 w-full min-w-0 px-1.5 text-[11px]" title="{{ __('Sektor') }}">
                     <option value="">{{ __('Sektor') }}</option>
                     @foreach ($sectors as $sector)
                         <option value="{{ $sector }}" @selected((string) request('sector') === (string) $sector)>{{ __($sector) }}</option>
                     @endforeach
                 </select>
-                <select name="quality_tier" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 px-1.5 text-[11px]" title="{{ __('Modellstufe mindestens') }}">
+                <select name="quality_tier" class="ak-input h-10 w-full min-w-0 px-1.5 text-[11px]" title="{{ __('Modellstufe mindestens') }}">
                     <option value="">{{ __('Modellstufe') }}</option>
                     @foreach ($qualityTiers as $qualityTier)
                         <option value="{{ $qualityTier->code }}" @selected(request('quality_tier') === $qualityTier->code)>{{ __($qualityTier->name) }}</option>
                     @endforeach
                 </select>
-                <select name="signal" @change="$root.requestSubmit()" class="ak-input h-10 w-full min-w-0 px-1.5 text-[11px]" title="{{ __('Signal') }}">
+                <select name="signal" class="ak-input h-10 w-full min-w-0 px-1.5 text-[11px]" title="{{ __('Signal') }}">
                     <option value="">{{ __('Signal') }}</option>
                     @foreach (['BUY', 'WAIT', 'WATCH', 'HOLD', 'SELL'] as $signal)
                         @continue(! $signals->contains($signal))
@@ -97,45 +100,60 @@
                 </select>
                 <div class="flex min-w-0 gap-1">
                     @if ($canUseSmartLabels)
-                        <select name="smart_label" @change="$root.requestSubmit()" class="ak-input h-10 min-w-0 flex-1 rounded-lg px-2 text-[9px] font-bold" title="{{ __('Smart Selection Label') }}">
+                        @php
+                            $smartLabelSymbols = [
+                                'sparkles' => '✨',
+                                'bolt' => '⚡',
+                                'trophy' => '🏆',
+                                'shield-check' => '🛡',
+                                'chart-bar' => '▥',
+                                'rocket-launch' => '🚀',
+                            ];
+                        @endphp
+                        <select name="smart_label" class="ak-input h-10 min-w-0 flex-1 rounded-lg px-2 text-[9px] font-bold" title="{{ __('Smart Selection Label') }}">
                             <option value="">{{ __('Label') }}</option>
                             @foreach ($smartLabels as $smartLabel)
-                                <option value="{{ $smartLabel->id }}" @selected((int) request('smart_label') === (int) $smartLabel->id)>{{ $smartLabel->name }}</option>
+                                <option value="{{ $smartLabel->id }}" @selected((int) request('smart_label') === (int) $smartLabel->id)>{{ $smartLabelSymbols[$smartLabel->icon ?: 'sparkles'] ?? '✨' }} {{ $smartLabel->name }}</option>
                             @endforeach
                         </select>
                     @else
                         <span class="ak-input inline-flex h-10 min-w-0 flex-1 items-center rounded-lg px-2 text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Label') }}</span>
                     @endif
-                    <a href="{{ route('predictions.index') }}" onclick="event.preventDefault(); const l=document.getElementById('prediction-page-loading'); if(l){l.classList.remove('hidden');l.classList.add('flex');l.style.display='flex';} const h=this.href; setTimeout(function(){window.location.href=h;},500);" class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-300/55 bg-amber-400/[.16] px-3 text-[10px] font-black text-amber-700 shadow-[0_8px_20px_rgba(245,158,11,.12)] transition hover:border-amber-200 hover:bg-amber-400/[.28] dark:text-amber-200" title="{{ __('Filter zurücksetzen') }}">
-                        <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" /><span>{{ __('Reset') }}</span>
-                    </a>
                 </div>
                 </div>
-                <div class="grid grid-cols-6 gap-1">
+                <div class="ak-prediction-range-grid grid grid-cols-6 gap-1">
                     <label class="ak-heatmap-range">
                         <span>{{ __('KI-Score') }} ≥ <b x-text="score.toFixed(1).replace('.', ',')"></b></span>
-                        <input name="score_min" type="range" min="0" max="10" step="0.5" x-model.number="score" @change="$root.requestSubmit()">
+                        <input name="score_min" type="range" min="0" max="10" step="0.5" x-model.number="score">
                     </label>
                     <label class="ak-heatmap-range">
                         <span>{{ __('Konfidenz') }} ≥ <b x-text="`${confidence}%`"></b></span>
-                        <input name="confidence_min" type="range" min="0" max="100" step="5" x-model.number="confidence" @change="$root.requestSubmit()">
+                        <input name="confidence_min" type="range" min="0" max="100" step="5" x-model.number="confidence">
                     </label>
                     <label class="ak-heatmap-range">
                         <span>{{ __('Drawdown') }} ≤ <b x-text="drawdown >= 50 ? '{{ __('Alle') }}' : `${drawdown}%`"></b></span>
-                        <input name="drawdown_max" type="range" min="0" max="50" step="5" x-model.number="drawdown" @change="$root.requestSubmit()">
+                        <input name="drawdown_max" type="range" min="0" max="50" step="5" x-model.number="drawdown">
                     </label>
                     <label class="ak-heatmap-range">
                         <span>{{ __('Profitfaktor') }} ≥ <b x-text="profitFactor <= 0 ? '{{ __('Alle') }}' : profitFactor.toFixed(1).replace('.', ',')"></b></span>
-                        <input name="profit_factor_min" type="range" min="0" max="10" step="0.1" x-model.number="profitFactor" @change="$root.requestSubmit()">
+                        <input name="profit_factor_min" type="range" min="0" max="3" step="0.1" x-model.number="profitFactor">
                     </label>
                     <label class="ak-heatmap-range">
                         <span>{{ __('Trefferquote') }} ≥ <b x-text="hitRate <= 0 ? '{{ __('Alle') }}' : `${hitRate}%`"></b></span>
-                        <input name="hit_rate_min" type="range" min="0" max="100" step="5" x-model.number="hitRate" @change="$root.requestSubmit()">
+                        <input name="hit_rate_min" type="range" min="0" max="100" step="5" x-model.number="hitRate">
                     </label>
                     <label class="ak-heatmap-range">
                         <span>{{ __('Volatilität') }} ≤ <b x-text="volatility >= 100 ? '{{ __('Alle') }}' : `${volatility}%`"></b></span>
-                        <input name="volatility_max" type="range" min="0" max="100" step="5" x-model.number="volatility" @change="$root.requestSubmit()">
+                        <input name="volatility_max" type="range" min="0" max="100" step="5" x-model.number="volatility">
                     </label>
+                </div>
+                <div class="ak-prediction-filter-actions grid grid-cols-2 gap-2">
+                    <button type="submit" class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-cyan-500 px-5 text-xs font-black text-white shadow-[0_8px_20px_rgba(6,182,212,.18)] transition hover:bg-cyan-400" style="color:#fff">
+                        <x-heroicon-o-magnifying-glass class="h-4 w-4" />{{ __('Suchen') }}
+                    </button>
+                    <a href="{{ route('predictions.index') }}" onclick="event.preventDefault(); const l=document.getElementById('prediction-page-loading'); if(l){l.classList.remove('hidden');l.classList.add('flex');l.style.display='flex';} const h=this.href; setTimeout(function(){window.location.href=h;},500);" class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-amber-300/55 bg-amber-400/[.16] px-3 text-xs font-black text-amber-700 shadow-[0_8px_20px_rgba(245,158,11,.12)] transition hover:border-amber-200 hover:bg-amber-400/[.28] dark:text-amber-200" title="{{ __('Filter zurücksetzen') }}">
+                        <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" /><span>{{ __('Reset') }}</span>
+                    </a>
                 </div>
             </form>
 
@@ -184,7 +202,7 @@
                         ? ($direction === 'asc' ? '↑' : '↓')
                         : '↕';
                 @endphp
-                <table class="ak-stocks-table w-full min-w-[1260px] table-fixed border-separate border-spacing-0 text-left text-[11px]" data-smart-labels="{{ $canUseSmartLabels ? '1' : '0' }}">
+                <table class="ak-stocks-table w-full min-w-0 table-fixed border-separate border-spacing-0 text-left text-[11px]" data-smart-labels="{{ $canUseSmartLabels ? '1' : '0' }}">
                     <colgroup>
                         <col class="ak-mobile-hidden-column" style="width:34px">
                         <col style="width:38px">
@@ -207,13 +225,13 @@
                             </th>
                             <th class="border-b border-[var(--ak-border)] px-1.5 py-3 text-left">{{ __('Label') }}</th>
                             @foreach ([
-                                ['stock', __('Aktie'), 'text-left'],
+                                ['stock', __('Name'), 'text-left'],
                                 [null, __('Land'), 'text-center'],
                                 [null, __('Börse'), 'text-left'],
                                 [null, __('Übergang'), 'text-center'],
                                 ['signal', __('Signal'), 'text-center'],
                                 ['score', __('KI-Score'), 'text-center'],
-                                [null, __('Prognosehorizonte'), 'text-center'],
+                                [null, __('Prognosen'), 'text-center'],
                                 ['price', __('Kurs'), 'text-right'],
                                 [null, __('52-Wochen-Spanne'), 'text-left'],
                                 [null, __('Chart'), 'text-center'],
@@ -228,6 +246,12 @@
                                         <span class="truncate">{{ $heading }}</span>
                                         <span class="inline-block w-3 shrink-0 text-center text-[11px] {{ $sort === $column ? 'text-teal-200' : 'text-slate-600' }}">{{ $sortIndicator($column) }}</span>
                                     </a>
+                                    @elseif ($heading === __('Prognosen'))
+                                        <span class="ak-desktop-prognosis-heading truncate">{{ $heading }}</span>
+                                        <a href="{{ $sortUrl('score') }}" class="ak-mobile-score-sort hidden items-center justify-center gap-1 transition hover:text-teal-200 {{ $sort === 'score' ? 'text-teal-200' : '' }}">
+                                            <span>{{ __('KI-Score') }}</span>
+                                            <span class="text-[11px]">{{ $sortIndicator('score') }}</span>
+                                        </a>
                                     @else<span class="truncate">{{ $heading }}</span>@endif
                                 </th>
                             @endforeach
@@ -254,6 +278,9 @@
                         @forelse ($predictions as $prediction)
                             @php
                                 $signal = strtoupper((string) ($prediction->personalized_signal ?? 'HOLD'));
+                                $isQualityGateRestrictedBuy = $signal === 'HOLD'
+                                    && strtoupper((string) ($prediction->signal ?? '')) === 'BUY'
+                                    && ! (bool) ($prediction->quality_gate_passed ?? false);
                                 $signalIcon = match ($signal) {
                                     'BUY' => 'heroicon-o-arrow-trending-up',
                                     'WAIT' => 'heroicon-o-clock',
@@ -266,21 +293,23 @@
                                 $score = is_numeric($prediction->score_10) ? max(0, min(10, (float) $prediction->score_10)) : null;
                                 $scorePercent = is_numeric($prediction->score_10) ? max(0, min(100, (float) $prediction->score_10 * 10)) : null;
                                 $scoreStatisticsTitle = implode(' · ', [
-                                    __('Profit-Faktor').': '.(is_numeric($prediction->ranking_profit_factor) ? number_format((float) $prediction->ranking_profit_factor, 2, ',', '.') : '—'),
+                                    __('Profit-Faktor').': '.(is_numeric($prediction->ranking_profit_factor) ? number_format(\App\Support\ProfitFactor::cap($prediction->ranking_profit_factor), 2, ',', '.') : '—'),
                                     __('Hit-Rate').': '.(is_numeric($prediction->ranking_hit_rate) ? number_format((float) $prediction->ranking_hit_rate, 1, ',', '.').' %' : '—'),
                                     __('Drawdown').': '.(is_numeric($prediction->ranking_drawdown) ? number_format((float) $prediction->ranking_drawdown, 1, ',', '.').' %' : '—'),
                                     __('Modellqualität').': '.number_format((float) $prediction->ranking_model_quality, 1, ',', '.').' %',
                                     __('Noise-Filter').': '.($prediction->ranking_noise_passed ? __('Bestanden') : __('Nicht bestanden')),
                                     __('Stabilitätsfilter').': '.($prediction->ranking_stability_passed ? number_format((float) $prediction->ranking_stability_percent, 1, ',', '.').' %' : __('Nicht bestanden')),
                                 ]);
-                                $scoreColor = match (true) {
-                                    $scorePercent === null => '#64748b',
-                                    $scorePercent < 40 => '#e35f72',
-                                    $scorePercent < 55 => '#f28a45',
-                                    $scorePercent < 70 => '#e5b643',
-                                    $scorePercent < 82 => '#84cc16',
-                                    default => '#22c58b',
-                                };
+                                // Continuous red -> orange -> green scale. Orange marks the
+                                // neutral score range without the previous amber/olive cast.
+                                $scoreColorDark = $scorePercent === null
+                                    ? '#64748b'
+                                    : sprintf('hsl(%.1f 78%% 40%%)', $scorePercent * 1.2);
+                                $scoreColor = $scorePercent === null
+                                    ? '#64748b'
+                                    : ($scorePercent <= 50
+                                        ? sprintf('color-mix(in srgb, #f97316 %.1f%%, #ef4444)', ($scorePercent / 50) * 100)
+                                        : sprintf('color-mix(in srgb, #10b981 %.1f%%, #f97316)', (($scorePercent - 50) / 50) * 100));
                                 $confidencePercent = is_numeric($prediction->confidence_percent) ? max(0, min(100, (float) $prediction->confidence_percent)) : null;
                                 $riskPercent = \App\Support\RiskScore::toPercent($prediction->risk_percent, $prediction->ranking_drawdown ?? null);
                                 $hitRatePercent = is_numeric($prediction->ranking_hit_rate) ? max(0, min(100, (float) $prediction->ranking_hit_rate)) : null;
@@ -295,12 +324,25 @@
                                 $hitRateColor = $hitRatePercent === null ? '#64748b' : sprintf('hsl(%.1f 72%% 43%%)', $hitRatePercent * 1.2);
                                 $profitPerTradeColor = $profitPerTradePercent === null ? '#64748b' : sprintf('hsl(%.1f 72%% 43%%)', $profitPerTradePercent * 1.2);
                                 $stabilityColor = $stabilityPercent === null ? '#64748b' : sprintf('hsl(%.1f 72%% 43%%)', $stabilityPercent * 1.2);
-                                $riskColor = match (true) {
+                                $riskColorDark = match (true) {
                                     $riskPercent === null => '#64748b',
                                     $riskPercent < 30 => '#22d3ee',
                                     $riskPercent < 50 => '#eab308',
                                     default => '#ef526b',
                                 };
+                                $riskColor = $riskPercent === null
+                                    ? '#64748b'
+                                    : ($riskPercent <= 50
+                                        ? sprintf('color-mix(in srgb, #f97316 %.1f%%, #10b981)', ($riskPercent / 50) * 100)
+                                        : sprintf('color-mix(in srgb, #ef4444 %.1f%%, #f97316)', (($riskPercent - 50) / 50) * 100));
+                                $riskTitle = implode(' · ', [
+                                    __('Risiko').': '.($riskPercent !== null ? number_format($riskPercent, 1, ',', '.').' %' : '—'),
+                                    __('Profit-Faktor').': '.(is_numeric($prediction->ranking_profit_factor) ? number_format(\App\Support\ProfitFactor::cap($prediction->ranking_profit_factor), 2, ',', '.') : '—'),
+                                    __('Drawdown').': '.(is_numeric($prediction->ranking_drawdown) ? number_format((float) $prediction->ranking_drawdown, 1, ',', '.').' %' : '—'),
+                                    __('Volatilität').': '.(is_numeric($prediction->ranking_volatility ?? null) ? number_format((float) $prediction->ranking_volatility, 1, ',', '.').' %' : '—'),
+                                    __('Hit-Rate').': '.(is_numeric($prediction->ranking_hit_rate) ? number_format((float) $prediction->ranking_hit_rate, 1, ',', '.').' %' : '—'),
+                                    __('Konfidenz').': '.($confidencePercent !== null ? number_format($confidencePercent, 1, ',', '.').' %' : '—'),
+                                ]);
                                 $forecastReturns = collect([
                                     is_numeric($prediction->expected_return_5d ?? null) ? (float) $prediction->expected_return_5d : null,
                                     is_numeric($prediction->expected_return_20d ?? null) ? (float) $prediction->expected_return_20d : null,
@@ -340,6 +382,16 @@
                                 $predictionSmartLabels = collect(is_array($prediction->smart_labels ?? null)
                                     ? $prediction->smart_labels
                                     : (json_decode((string) ($prediction->smart_labels ?? '[]'), true) ?: []));
+                                $mobileSmartLabel = $predictionSmartLabels->first();
+                                $mobileSmartLabelColor = preg_match('/^#[0-9A-Fa-f]{6}$/', (string) ($mobileSmartLabel['color'] ?? '')) ? $mobileSmartLabel['color'] : '#64748b';
+                                $mobileSmartLabelIcon = match ($mobileSmartLabel['icon'] ?? 'sparkles') {
+                                    'bolt' => 'heroicon-o-bolt',
+                                    'trophy' => 'heroicon-o-trophy',
+                                    'shield-check' => 'heroicon-o-shield-check',
+                                    'chart-bar' => 'heroicon-o-chart-bar',
+                                    'rocket-launch' => 'heroicon-o-rocket-launch',
+                                    default => 'heroicon-o-sparkles',
+                                };
                                 $week52Low = is_numeric($prediction->week_52_low) ? (float) $prediction->week_52_low : null;
                                 $week52High = is_numeric($prediction->week_52_high) ? (float) $prediction->week_52_high : null;
                                 $week52Position = $week52Low !== null && $week52High !== null && $week52High > $week52Low && is_numeric($prediction->current_price)
@@ -361,6 +413,23 @@
                                         : null;
                                     return [$days => $return];
                                 });
+                                $allHorizonsPositive = $horizonDirections->count() === 4
+                                    && $horizonDirections->every(fn ($return): bool => is_numeric($return) && (float) $return > 0);
+                                $isStrongBuy = $signal === 'BUY'
+                                    && (bool) ($prediction->quality_gate_passed ?? false)
+                                    && $allHorizonsPositive
+                                    && $score !== null && $score >= 8.0
+                                    && is_numeric($prediction->ranking_profit_factor ?? null) && (float) $prediction->ranking_profit_factor >= 1.5
+                                    && $hitRatePercent !== null && $hitRatePercent >= 60
+                                    && $confidencePercent !== null && $confidencePercent >= 75
+                                    && $riskPercent !== null && $riskPercent <= 30
+                                    && (bool) ($prediction->ranking_stability_passed ?? false)
+                                    && (int) ($prediction->ranking_trade_count ?? 0) >= 20;
+                                if ($isStrongBuy) {
+                                    $signalLabel = 'STRONG BUY';
+                                    $signalIcon = 'heroicon-s-bolt';
+                                }
+                                $mobilePriceDirection = $horizonDirections->get(20);
                                 $chartPatterns = collect($prediction->recent_chart_patterns ?? []);
                                 $chartPatternBullish = $chartPatterns->contains(fn (string $pattern): bool =>
                                     str_contains($pattern, 'Bullish') || str_contains($pattern, 'oben'));
@@ -442,13 +511,36 @@
                                         @endif
                                     </span>
                                     <div class="flex min-w-0 items-center gap-2">
-                                        <span class="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-teal-500/20 bg-gradient-to-br from-teal-500/[.10] to-cyan-500/[.04] text-[9px] font-black uppercase tracking-tight text-teal-700">
+                                        <span class="ak-mobile-flag-label-stack hidden shrink-0">
+                                            <span class="ak-mobile-row-flag" title="{{ $prediction->country ?: __('Unbekannt') }}">{{ $prediction->country ? $countryFlag($prediction->country) : '🌐' }}</span>
+                                            @if ($mobileSmartLabel)
+                                                <span class="ak-mobile-row-label" title="{{ $mobileSmartLabel['name'] ?? __('Label') }}" style="color:{{ $mobileSmartLabelColor }};border-color:{{ $mobileSmartLabelColor }}66;background:{{ $mobileSmartLabelColor }}18">
+                                                    <x-dynamic-component :component="$mobileSmartLabelIcon" class="h-2.5 w-2.5" />
+                                                </span>
+                                            @else
+                                                <span class="ak-mobile-row-label ak-mobile-row-label-empty" title="{{ __('Kein Label') }}">—</span>
+                                            @endif
+                                        </span>
+                                        <span class="ak-stock-logo relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-teal-500/20 bg-gradient-to-br from-teal-500/[.10] to-cyan-500/[.04] text-[9px] font-black uppercase tracking-tight text-teal-700">
                                             {{ strtoupper(substr((string) $prediction->symbol, 0, 2)) }}
                                             <img src="{{ route('stocks.icon', $prediction->instrument_id) }}" alt="" class="absolute inset-0 h-full w-full bg-white object-contain p-1" loading="lazy" onerror="this.remove()">
                                         </span>
                                         <div class="min-w-0">
-                                            <p class="truncate text-[11px] font-black leading-tight text-[var(--ak-text)]" title="{{ $prediction->name }}">{{ $prediction->name }}</p>
-                                            <p class="mt-0.5 truncate text-[9px] font-black uppercase tracking-[.06em] text-cyan-300" title="{{ $prediction->symbol }}">{{ $prediction->symbol }}</p>
+                                            <p class="ak-prediction-stock-name truncate text-[11px] font-black leading-tight text-[var(--ak-text)]" title="{{ $prediction->name }}">{{ $prediction->name }}</p>
+                                            <p class="ak-stock-symbol mt-0.5 truncate text-[9px] font-black uppercase tracking-[.06em] text-cyan-300" title="{{ $prediction->symbol }}">{{ $prediction->symbol }}</p>
+                                            <p class="ak-mobile-stock-price mt-1 hidden font-black tabular-nums">
+                                                <span class="ak-mobile-price-label">{{ __('Kurs') }}</span>
+                                                <span class="ak-mobile-price-value">{{ is_numeric($prediction->current_price) ? rtrim(rtrim(number_format($prediction->current_price, 2, ',', '.'), '0'), ',').($currency === 'EUR' ? ' €' : ' '.$currency) : '—' }}</span>
+                                                @if ($mobilePriceDirection !== null)
+                                                    <span class="ak-mobile-price-direction {{ $mobilePriceDirection >= 0 ? 'ak-mobile-price-up' : 'ak-mobile-price-down' }}" title="{{ __('20-Tage-Prognose') }}: {{ ($mobilePriceDirection >= 0 ? '+' : '').number_format($mobilePriceDirection, 2, ',', '.') }} %" aria-label="{{ $mobilePriceDirection >= 0 ? __('Kursprognose steigend') : __('Kursprognose fallend') }}">
+                                                        @if ($mobilePriceDirection >= 0)
+                                                            <x-heroicon-o-arrow-trending-up />
+                                                        @else
+                                                            <x-heroicon-o-arrow-trending-down />
+                                                        @endif
+                                                    </span>
+                                                @endif
+                                            </p>
                                         </div>
                                     </div>
                                 </td>
@@ -474,15 +566,19 @@
                                 </td>
                                 <td class="border-b border-[var(--ak-border)] px-1 py-2 text-center">
                                     <div class="flex flex-col items-center justify-center gap-1">
-                                        <span class="ak-prediction-signal-badge" data-signal="{{ strtolower($signal) }}" title="{{ $signalLabel }}" aria-label="{{ $signalLabel }}">
+                                        <span class="ak-prediction-signal-badge" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – BUY durch Quality Gate eingeschränkt') : $signalLabel }}">
                                             <x-dynamic-component :component="$signalIcon" class="h-3.5 w-3.5" />
+                                            <b class="ak-notebook-signal-label hidden">{{ $signalLabel }}</b>
                                         </span>
                                     </div>
                                 </td>
                                 <td class="border-b border-[var(--ak-border)] px-2 py-2">
                                     @if ($score !== null)
                                         <div class="flex h-full flex-col items-center justify-center gap-1" title="{{ $scoreStatisticsTitle }}">
-                                            <div class="ak-prediction-donut" style="--value:{{ $scorePercent }}%;--color:{{ $scoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $score }}">
+                                            <span class="ak-mobile-score" style="--score-color: {{ $scoreColorDark }}" aria-label="{{ __('KI-Score') }} {{ number_format($score, 1, ',', '.') }} von 10">
+                                                {{ number_format($score, 1, ',', '.') }}
+                                            </span>
+                                            <div class="ak-prediction-donut" style="--value:{{ $scorePercent }}%;--color:{{ $scoreColorDark }};--light-color:{{ $scoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $score }}">
                                                 <svg viewBox="0 0 44 44" aria-hidden="true">
                                                     <circle class="ak-prediction-donut-track" cx="22" cy="22" r="17" pathLength="100" />
                                                     <circle class="ak-prediction-donut-value" cx="22" cy="22" r="17" pathLength="100" stroke-dasharray="{{ $scorePercent }} 100" />
@@ -494,8 +590,17 @@
                                 </td>
                                 <td class="ak-horizon-column border-b border-[var(--ak-border)] px-2 py-2">
                                     <div class="flex w-full flex-nowrap items-center justify-center gap-2">
+                                        @if ($score !== null)
+                                            <div class="ak-prediction-donut ak-mobile-horizon-score hidden" data-label="{{ __('KI-Score') }}" style="--value:{{ $scorePercent }}%;--color:{{ $scoreColorDark }};--light-color:{{ $scoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $score }}">
+                                                <svg viewBox="0 0 44 44" aria-hidden="true"><circle class="ak-prediction-donut-track" cx="22" cy="22" r="17" pathLength="100" /><circle class="ak-prediction-donut-value" cx="22" cy="22" r="17" pathLength="100" stroke-dasharray="{{ $scorePercent }} 100" /></svg>
+                                                <span>{{ number_format($score, 1, ',', '.') }}</span>
+                                            </div>
+                                        @endif
+                                        <span class="ak-prediction-signal-badge ak-mobile-horizon-signal hidden" data-label="{{ __('Signal') }}" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – BUY durch Quality Gate eingeschränkt') : $signalLabel }}">
+                                            <b class="ak-mobile-signal-letter">{{ mb_substr($signalLabel, 0, 1) }}</b>
+                                        </span>
                                         @foreach ($horizonDirections as $days => $horizonReturn)
-                                            <span class="ak-horizon-direction" data-direction="{{ $horizonReturn === null ? 'missing' : ($horizonReturn >= 0 ? 'up' : 'down') }}" title="{{ $horizonReturn === null ? __('Keine Prognose verfügbar') : (($horizonReturn >= 0 ? '+' : '').number_format($horizonReturn, 2, ',', '.').' %') }}">
+                                            <span class="ak-horizon-direction" data-label="{{ __('Prognose') }}" data-days="{{ $days }}" data-direction="{{ $horizonReturn === null ? 'missing' : ($horizonReturn >= 0 ? 'up' : 'down') }}" title="{{ $horizonReturn === null ? __('Keine Prognose verfügbar') : (($horizonReturn >= 0 ? '+' : '').number_format($horizonReturn, 2, ',', '.').' %') }}">
                                                 <b>{{ $days }}d</b>
                                                 @if ($horizonReturn === null)
                                                     <x-heroicon-o-minus class="h-4 w-4" />
@@ -506,6 +611,9 @@
                                                 @endif
                                             </span>
                                         @endforeach
+                                        <span class="ak-prediction-donut ak-mobile-risk-logo hidden" data-label="{{ __('Risiko') }}" title="{{ $riskTitle }}" aria-label="{{ __('Risiko') }} {{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.').' Prozent' : __('nicht verfügbar') }}" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $riskPercent ?? 0 }}" style="--value:{{ $riskPercent ?? 0 }}%;--color:{{ $riskColorDark }};--light-color:{{ $riskColor }};--risk-logo-color:{{ $riskColor }}">
+                                            <span>{{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.') : '—' }}</span>
+                                        </span>
                                     </div>
                                 </td>
                                 <td class="border-b border-[var(--ak-border)] px-2 py-3 text-right tabular-nums">
@@ -550,7 +658,7 @@
                 </table>
             </div>
             @if ($predictions instanceof \Illuminate\Contracts\Pagination\Paginator && $predictions->hasPages())
-                <div class="mt-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 py-3">
+                <div class="ak-prediction-pagination mt-3 rounded-xl border border-[var(--ak-border)] bg-transparent px-4 py-3">
                     {{ $predictions->onEachSide(1)->links() }}
                 </div>
             @endif
@@ -558,10 +666,59 @@
             <style>
                 #predictions-page {
                     --ak-muted: #b8c2d4;
-                    --ak-predictions-card: color-mix(in srgb, var(--ak-card) 88%, #0e7490 12%);
-                    --ak-predictions-card-even: color-mix(in srgb, var(--ak-card) 93%, #0891b2 7%);
-                    --ak-predictions-head: #12343b;
-                    --ak-predictions-head-text: #d8efec;
+                    --ak-predictions-card: rgba(52, 65, 95, .98);
+                    --ak-predictions-card-even: rgba(47, 59, 88, .99);
+                    --ak-predictions-head: #26324d;
+                    --ak-predictions-head-text: #f8fafc;
+                }
+
+                #predictions-page .ak-prediction-pagination,
+                #predictions-page .ak-prediction-pagination nav,
+                :root:not([data-theme="light"]) #predictions-page .ak-prediction-pagination nav a,
+                :root:not([data-theme="light"]) #predictions-page .ak-prediction-pagination nav span > span {
+                    background: transparent !important;
+                    box-shadow: none !important;
+                }
+
+                #predictions-page .ak-prediction-pagination nav a,
+                #predictions-page .ak-prediction-pagination nav span > span {
+                    border-color: color-mix(in srgb, var(--ak-border) 78%, transparent) !important;
+                    color: var(--ak-muted) !important;
+                }
+
+                :root:not([data-theme="light"]) #predictions-page .ak-prediction-pagination nav a:hover {
+                    border-color: rgba(251, 146, 60, .48) !important;
+                    color: #fb923c !important;
+                }
+
+                :root:not([data-theme="light"]) #predictions-page .ak-prediction-pagination nav [aria-current="page"] > span {
+                    border-color: rgba(251, 146, 60, .72) !important;
+                    color: #fb923c !important;
+                    box-shadow: inset 0 -2px 0 rgba(251, 146, 60, .78) !important;
+                }
+
+                :root:not([data-theme="light"]) #predictions-page .ak-prediction-filter-toggle,
+                :root:not([data-theme="light"]) #predictions-page .ak-prediction-filterboard {
+                    border-color: rgba(251, 146, 60, .26) !important;
+                    background: transparent !important;
+                    box-shadow: none !important;
+                }
+
+                :root:not([data-theme="light"]) #predictions-page .ak-prediction-filter-toggle {
+                    color: #fb923c !important;
+                }
+
+                :root:not([data-theme="light"]) #predictions-page .ak-prediction-filterboard .ak-input,
+                :root:not([data-theme="light"]) #predictions-page .ak-table-filter {
+                    border-color: rgba(251, 191, 36, .20) !important;
+                    background-color: transparent !important;
+                    box-shadow: none !important;
+                }
+
+                :root:not([data-theme="light"]) #predictions-page .ak-stocks-table .ak-predictions-filter-row,
+                :root:not([data-theme="light"]) #predictions-page .ak-stocks-table .ak-predictions-filter-row th {
+                    background: transparent !important;
+                    box-shadow: none !important;
                 }
 
                 #predictions-page .ak-stocks-table {
@@ -606,10 +763,10 @@
 
                 /* Compact dashboard-card treatment: each prediction reads like a bordered transaction card. */
                 #predictions-page #predictions-table-scroll {
-                    border-color: rgba(34, 211, 238, .42) !important;
+                    border-color: rgba(251, 146, 60, .34) !important;
                     border-radius: 1.25rem !important;
-                    background: rgba(7, 24, 39, .76) !important;
-                    box-shadow: inset 4px 0 0 rgba(34, 211, 238, .72), 0 16px 36px rgba(0, 0, 0, .18) !important;
+                    background: rgba(15, 23, 42, .72) !important;
+                    box-shadow: inset 3px 0 0 rgba(251, 146, 60, .70), 0 16px 36px rgba(0, 0, 0, .22) !important;
                 }
 
                 #predictions-page .ak-stocks-table {
@@ -619,31 +776,36 @@
                 }
 
                 #predictions-page .ak-stocks-table tbody .prediction-row td {
-                    background: rgba(13, 49, 66, .92) !important;
-                    border-top: 1px solid rgba(34, 211, 238, .42) !important;
-                    border-bottom: 1px solid rgba(34, 211, 238, .42) !important;
+                    background: transparent !important;
+                    border-top: 1px solid rgba(251, 191, 36, .18) !important;
+                    border-bottom: 1px solid rgba(251, 191, 36, .18) !important;
                     padding-top: .7rem !important;
                     padding-bottom: .7rem !important;
                 }
 
+                :root:not([data-theme="light"]) #predictions-page .ak-stocks-table tbody .prediction-row:nth-child(even) td {
+                    background: transparent !important;
+                }
+
                 #predictions-page .ak-stocks-table tbody .prediction-row td:first-child {
-                    border-left: 1px solid rgba(34, 211, 238, .42) !important;
+                    border-left: 1px solid rgba(251, 146, 60, .30) !important;
                     border-radius: .8rem 0 0 .8rem;
                 }
 
                 #predictions-page .ak-stocks-table tbody .prediction-row td:last-child {
-                    border-right: 1px solid rgba(34, 211, 238, .42) !important;
+                    border-right: 1px solid rgba(251, 146, 60, .30) !important;
                     border-radius: 0 .8rem .8rem 0;
                 }
 
                 #predictions-page .ak-stocks-table tbody .prediction-row:hover td {
-                    background: rgba(20, 91, 108, .96) !important;
+                    background: rgba(66, 78, 108, .99) !important;
+                    border-color: rgba(251, 146, 60, .48) !important;
                 }
 
                 #predictions-page .ak-stocks-table tbody .prediction-row td:nth-child(3) p:first-child,
                 #predictions-page .ak-stocks-table tbody .prediction-row td:nth-child(4),
                 #predictions-page .ak-stocks-table tbody .prediction-row td:nth-child(5) {
-                    color: #67e8f9 !important;
+                    color: #fb923c !important;
                 }
 
                 #predictions-page .ak-stocks-table tbody .prediction-row td:nth-child(3) p:last-child {
@@ -657,6 +819,18 @@
                     max-width: 2rem;
                     border-radius: .65rem;
                     padding: 0;
+                }
+
+                #predictions-page .ak-prediction-signal-badge[data-signal="hold"] {
+                    border-color: rgba(234, 179, 8, .72) !important;
+                    background: rgba(250, 204, 21, .18) !important;
+                    color: #ca8a04 !important;
+                }
+
+                :root:not([data-theme="light"]) #predictions-page .ak-prediction-signal-badge[data-signal="hold"] {
+                    border-color: rgba(250, 204, 21, .78) !important;
+                    background: rgba(250, 204, 21, .20) !important;
+                    color: #fde047 !important;
                 }
 
                 #predictions-page .ak-forecast-badge {
@@ -685,16 +859,22 @@
                 }
 
                 :root[data-theme="light"] #predictions-page #predictions-table-scroll {
+                    border-color: rgba(34, 211, 238, .42) !important;
                     background: rgba(255, 255, 255, .82) !important;
+                    box-shadow: inset 4px 0 0 rgba(34, 211, 238, .72), 0 16px 36px rgba(0, 0, 0, .18) !important;
                 }
 
                 :root[data-theme="light"] #predictions-page .ak-stocks-table tbody .prediction-row td {
-                    background: rgba(229, 248, 249, .9) !important;
-                    border-color: rgba(8, 145, 178, .25) !important;
+                    background: #ffffff !important;
+                    border-color: rgba(100, 116, 139, .18) !important;
+                }
+
+                :root[data-theme="light"] #predictions-page .ak-stocks-table tbody .prediction-row:nth-child(even) td {
+                    background: #f1f3f5 !important;
                 }
 
                 :root[data-theme="light"] #predictions-page .ak-stocks-table tbody .prediction-row:hover td {
-                    background: rgba(207, 243, 245, .98) !important;
+                    background: #e8f1f2 !important;
                 }
 
                 :root[data-theme="light"] #predictions-page .ak-forecast-badge {
@@ -749,6 +929,35 @@
                     font-size: 7px;
                 }
 
+                #predictions-page .ak-mobile-score {
+                    display: none;
+                }
+
+                /* The compact score inside the horizon group belongs only to
+                   the phone layout. Keep it hidden on notebook/desktop even
+                   though the generic donut rule uses display:grid. */
+                #predictions-page .ak-mobile-horizon-score.hidden {
+                    display: none !important;
+                }
+
+                @media (min-width: 640px) and (max-width: 1535px) {
+                    #predictions-page #predictions-table-scroll .ak-prediction-signal-badge:not(.ak-mobile-horizon-signal) {
+                        width: 4.5rem !important;
+                        min-width: 4.5rem !important;
+                        max-width: 4.5rem !important;
+                        border-radius: .55rem !important;
+                    }
+                    #predictions-page #predictions-table-scroll .ak-prediction-signal-badge:not(.ak-mobile-horizon-signal) > svg {
+                        display: none !important;
+                    }
+                    #predictions-page #predictions-table-scroll .ak-notebook-signal-label {
+                        display: inline !important;
+                        font-size: .58rem;
+                        font-weight: 950;
+                        letter-spacing: .04em;
+                    }
+                }
+
                 #predictions-page .ak-stocks-table .ak-predictions-filter-row th {
                     position: sticky;
                     top: 44px;
@@ -782,7 +991,7 @@
                 }
 
                 #predictions-page select.ak-table-filter option {
-                    background: #182238;
+                    background: #26324d;
                     color: #f8fafc;
                 }
 
@@ -792,7 +1001,8 @@
                     padding: 0 13px 0 5px !important;
                     font-size: 10px !important;
                     line-height: 28px !important;
-                    background-color: #182238 !important;
+                    border-color: rgba(251, 146, 60, .22) !important;
+                    background-color: #26324d !important;
                     background-image:
                         linear-gradient(45deg, transparent 50%, #cbd5e1 50%),
                         linear-gradient(135deg, #cbd5e1 50%, transparent 50%) !important;
@@ -806,6 +1016,11 @@
                 #predictions-page .ak-table-filter::placeholder {
                     color: #f8fafc !important;
                     opacity: 1;
+                }
+
+                :root:not([data-theme="light"]) #predictions-page .ak-table-filter:focus {
+                    border-color: rgba(251, 146, 60, .62) !important;
+                    box-shadow: 0 0 0 3px rgba(251, 146, 60, .10) !important;
                 }
 
                 :root[data-theme="light"] #predictions-page .ak-table-filter {
@@ -872,6 +1087,17 @@
                     stroke-linecap: round;
                     filter: none;
                     transition: stroke-dasharray .2s ease;
+                }
+
+                :root[data-theme="light"] #predictions-page .ak-prediction-donut {
+                    background:conic-gradient(
+                        var(--light-color, var(--color)) 0 var(--value),
+                        color-mix(in srgb, var(--ak-border) 74%, var(--ak-muted) 26%) var(--value) 100%
+                    ) !important;
+                }
+
+                :root[data-theme="light"] #predictions-page .ak-prediction-donut-value {
+                    stroke:var(--light-color, var(--color)) !important;
                 }
 
                 .ak-prediction-donut span {
@@ -1019,10 +1245,49 @@
                 }
                 :root[data-theme="light"] #predictions-page .ak-horizon-direction[data-direction="down"] { color: #be4059; }
 
+                /* Kompakte Kerntabelle: nur entscheidungsrelevante Spalten. */
+                #predictions-page #predictions-table-scroll .ak-stocks-table {
+                    width:100% !important;
+                    min-width:0 !important;
+                    table-layout:fixed !important;
+                }
+                #predictions-page #predictions-table-scroll .ak-prediction-signal-badge {
+                    box-sizing:border-box !important;
+                    width:2rem !important;
+                    min-width:0 !important;
+                    max-width:100% !important;
+                    overflow:hidden !important;
+                }
+                #predictions-page .ak-stocks-table colgroup col:nth-child(4),
+                #predictions-page .ak-stocks-table colgroup col:nth-child(5),
+                #predictions-page .ak-stocks-table colgroup col:nth-child(6),
+                #predictions-page .ak-stocks-table colgroup col:nth-child(11),
+                #predictions-page .ak-stocks-table colgroup col:nth-child(12),
+                #predictions-page .ak-predictions-heading-row th:nth-child(4),
+                #predictions-page .ak-predictions-heading-row th:nth-child(5),
+                #predictions-page .ak-predictions-heading-row th:nth-child(6),
+                #predictions-page .ak-predictions-heading-row th:nth-child(11),
+                #predictions-page .ak-predictions-heading-row th:nth-child(12),
+                #predictions-page .prediction-row > td:nth-child(4),
+                #predictions-page .prediction-row > td:nth-child(5),
+                #predictions-page .prediction-row > td:nth-child(6),
+                #predictions-page .prediction-row > td:nth-child(11),
+                #predictions-page .prediction-row > td:nth-child(12) { display:none !important; }
+                #predictions-page .ak-stocks-table colgroup col:nth-child(1) { width:4% !important; }
+                #predictions-page .ak-stocks-table colgroup col:nth-child(2) { width:5% !important; }
+                #predictions-page .ak-stocks-table colgroup col:nth-child(3) { width:18% !important; }
+                #predictions-page .ak-stocks-table colgroup col:nth-child(7) { width:9% !important; }
+                #predictions-page .ak-stocks-table colgroup col:nth-child(8) { width:8% !important; }
+                #predictions-page .ak-stocks-table colgroup col:nth-child(9) { width:18% !important; }
+                #predictions-page .ak-stocks-table colgroup col:nth-child(10) { width:11% !important; }
+                #predictions-page .ak-stocks-table colgroup col:nth-child(13) { width:27% !important; }
+                #predictions-page #predictions-table-scroll { overflow-x:hidden !important; }
+
                 @media (max-width: 639px) {
                     #predictions-page #predictions-table-scroll {
-                        max-width: 100vw;
-                        overflow-x: auto !important;
+                        width: 100%;
+                        max-width: 100%;
+                        overflow-x: hidden !important;
                         overscroll-behavior-x: contain;
                         -webkit-overflow-scrolling: touch;
                         touch-action: pan-x pan-y;
@@ -1030,6 +1295,325 @@
 
                     #predictions-page .ak-mobile-hidden-column {
                         display: none !important;
+                    }
+
+                    #predictions-page .ak-stocks-table {
+                        width: 100% !important;
+                        min-width: 0 !important;
+                        table-layout: fixed !important;
+                        border-spacing: 0 6px !important;
+                        padding: 0 .3rem .5rem !important;
+                    }
+
+                    #predictions-page .ak-stocks-table colgroup col:nth-child(1),
+                    #predictions-page .ak-stocks-table colgroup col:nth-child(2),
+                    #predictions-page .ak-stocks-table colgroup col:nth-child(10),
+                    #predictions-page .ak-stocks-table colgroup col:nth-child(13),
+                    #predictions-page .ak-predictions-heading-row th:nth-child(1),
+                    #predictions-page .ak-predictions-heading-row th:nth-child(2),
+                    #predictions-page .ak-predictions-heading-row th:nth-child(10),
+                    #predictions-page .ak-predictions-heading-row th:nth-child(13),
+                    #predictions-page .prediction-row > td:nth-child(1),
+                    #predictions-page .prediction-row > td:nth-child(2),
+                    #predictions-page .prediction-row > td:nth-child(10),
+                    #predictions-page .prediction-row > td:nth-child(13) {
+                        display: none !important;
+                    }
+
+                    #predictions-page .ak-stocks-table colgroup col:nth-child(3) { width: 46% !important; }
+                    #predictions-page .ak-stocks-table colgroup col:nth-child(7),
+                    #predictions-page .ak-stocks-table colgroup col:nth-child(8),
+                    #predictions-page .ak-predictions-heading-row th:nth-child(7),
+                    #predictions-page .ak-predictions-heading-row th:nth-child(8),
+                    #predictions-page .prediction-row > td:nth-child(7),
+                    #predictions-page .prediction-row > td:nth-child(8) { display:none !important; }
+                    #predictions-page .ak-stocks-table colgroup col:nth-child(9) { width: 54% !important; }
+
+                    #predictions-page .ak-predictions-heading-row th {
+                        height: 38px;
+                        padding: .45rem .2rem !important;
+                        font-size: 8px;
+                        letter-spacing: .04em;
+                    }
+
+                    #predictions-page .ak-predictions-heading-row th:nth-child(8) a {
+                        gap: 0;
+                    }
+
+                    #predictions-page .ak-predictions-heading-row th:nth-child(8) a > span:first-child {
+                        white-space: normal;
+                        line-height: 1.05;
+                    }
+
+                    #predictions-page .prediction-row {
+                        height: 82px !important;
+                    }
+
+                    #predictions-page .prediction-row > td {
+                        min-width: 0 !important;
+                        padding: .35rem .2rem !important;
+                    }
+
+                    :root[data-theme="light"] #predictions-page .prediction-row:nth-child(odd) > td {
+                        background:#ffffff !important;
+                    }
+
+                    :root[data-theme="light"] #predictions-page .prediction-row:nth-child(even) > td {
+                        background:#f1f5f4 !important;
+                    }
+
+                    :root[data-theme="light"] #predictions-page .prediction-row:hover > td {
+                        background:#e8f5f4 !important;
+                    }
+
+                    #predictions-page .prediction-row > td:nth-child(3) {
+                        border-left: 1px solid rgba(34, 211, 238, .42) !important;
+                        border-radius: .7rem 0 0 .7rem !important;
+                        text-align: center;
+                    }
+
+                    #predictions-page .prediction-row > td:nth-child(9) {
+                        border-right: 1px solid rgba(34, 211, 238, .42) !important;
+                        border-radius: 0 .7rem .7rem 0 !important;
+                    }
+
+                    #predictions-page .ak-stock-symbol { display:none !important; }
+                    #predictions-page .ak-mobile-stock-price {
+                        display:flex !important;
+                        align-items:center;
+                        gap:.22rem;
+                        min-width:0;
+                    }
+                    #predictions-page .prediction-row > td:nth-child(3) .ak-mobile-stock-price {
+                        line-height:1.1 !important;
+                        opacity:1 !important;
+                    }
+                    #predictions-page .ak-mobile-price-label {
+                        color:var(--ak-muted);
+                        font-size:7px;
+                        font-weight:900;
+                        letter-spacing:.06em;
+                        text-transform:uppercase;
+                    }
+                    #predictions-page .ak-mobile-price-value {
+                        overflow:hidden;
+                        color:#075985;
+                        font-size:12px;
+                        font-weight:950;
+                        line-height:1;
+                        overflow:hidden;
+                        text-overflow:ellipsis;
+                        white-space:nowrap;
+                    }
+                    :root:not([data-theme="light"]) #predictions-page .ak-mobile-price-value {
+                        color:#a5f3fc;
+                    }
+                    #predictions-page .ak-mobile-price-direction {
+                        display:inline-grid;
+                        width:1rem;
+                        height:1rem;
+                        flex:0 0 1rem;
+                        place-items:center;
+                        border-radius:.3rem;
+                    }
+                    #predictions-page .ak-mobile-price-direction svg {
+                        width:.72rem;
+                        height:.72rem;
+                        stroke-width:2.2;
+                    }
+                    #predictions-page .ak-mobile-price-up {
+                        color:#059669;
+                        background:rgba(16,185,129,.12);
+                    }
+                    #predictions-page .ak-mobile-price-down {
+                        color:#e11d48;
+                        background:rgba(244,63,94,.11);
+                    }
+                    :root:not([data-theme="light"]) #predictions-page .prediction-row > td:nth-child(3) .ak-mobile-stock-price {
+                        color:#67e8f9 !important;
+                    }
+
+                    #predictions-page .prediction-row > td:nth-child(3) > div {
+                        gap: .35rem;
+                    }
+
+                    #predictions-page .prediction-row > td:nth-child(3) .ak-stock-logo {
+                        width: 1.65rem;
+                        height: 1.65rem;
+                    }
+
+                    #predictions-page .ak-mobile-flag-label-stack {
+                        display:grid !important;
+                        width:1.35rem;
+                        grid-template-rows:1rem 1rem;
+                        place-items:center;
+                        gap:.16rem;
+                    }
+
+                    #predictions-page .ak-mobile-row-flag {
+                        display:inline-flex;
+                        justify-content:center;
+                        font-size:.8rem;
+                        line-height:1;
+                    }
+
+                    #predictions-page .ak-mobile-row-label {
+                        display:inline-flex;
+                        width:1rem;
+                        height:1rem;
+                        align-items:center;
+                        justify-content:center;
+                        overflow:hidden;
+                        border:1px solid;
+                        border-radius:.3rem;
+                    }
+
+                    #predictions-page .ak-mobile-row-label-empty {
+                        border-color:rgba(100,116,139,.3);
+                        background:rgba(100,116,139,.06);
+                        color:var(--ak-muted);
+                        font-size:.48rem;
+                    }
+
+                    #predictions-page .prediction-row > td:nth-child(3) > div {
+                        gap:.28rem !important;
+                    }
+
+                    #predictions-page .prediction-row > td:nth-child(3) p:first-child {
+                        display:-webkit-box !important;
+                        overflow:hidden !important;
+                        font-size:11px !important;
+                        line-height:1.2 !important;
+                        text-overflow:ellipsis;
+                        white-space:normal !important;
+                        -webkit-box-orient:vertical;
+                        -webkit-line-clamp:2;
+                    }
+
+                    #predictions-page .prediction-row > td:nth-child(3) p:last-child {
+                        font-size: 8px !important;
+                    }
+
+                    #predictions-page #predictions-table-scroll .ak-prediction-donut {
+                        display:grid !important;
+                        width:2.25rem !important;
+                        height:2.25rem !important;
+                        flex:0 0 2.25rem !important;
+                    }
+
+                    #predictions-page .ak-mobile-score {
+                        display:none !important;
+                    }
+                    #predictions-page #predictions-table-scroll .ak-prediction-donut span { font-size:.58rem !important; }
+                    #predictions-page #predictions-table-scroll .ak-prediction-donut small { font-size:.32rem !important; }
+
+                    #predictions-page #predictions-table-scroll .ak-mobile-horizon-signal {
+                        display:inline-flex !important;
+                        width:2rem !important;
+                        min-width:2rem !important;
+                        max-width:2rem !important;
+                        height:2rem !important;
+                        padding:0 !important;
+                        border:1px solid currentColor !important;
+                        border-radius:.55rem !important;
+                        background:color-mix(in srgb,currentColor 13%,transparent) !important;
+                        box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 6px rgba(15,23,42,.1) !important;
+                    }
+                    #predictions-page .ak-mobile-horizon-signal svg {
+                        width:1.15rem !important;
+                        height:1.15rem !important;
+                        stroke-width:2.2;
+                    }
+                    #predictions-page .ak-mobile-signal-letter {
+                        font-size:.68rem;
+                        font-weight:950;
+                        line-height:1;
+                    }
+
+                    #predictions-page .ak-horizon-column > div {
+                        justify-content:flex-end !important;
+                        gap:.4rem !important;
+                        padding:.15rem .35rem .9rem 0;
+                    }
+                    #predictions-page .ak-horizon-column .ak-horizon-direction[data-days="5"],
+                    #predictions-page .ak-horizon-column .ak-horizon-direction[data-days="10"],
+                    #predictions-page .ak-horizon-column .ak-horizon-direction[data-days="15"] {
+                        display:none !important;
+                    }
+                    #predictions-page #predictions-table-scroll .ak-horizon-direction {
+                        min-width:2rem !important;
+                        width:2rem !important;
+                        max-width:2rem !important;
+                        flex:0 0 2rem !important;
+                        height:2rem !important;
+                        padding:.1rem !important;
+                        border-width:1px !important;
+                    }
+                    #predictions-page .ak-horizon-direction b { font-size:6px !important; }
+                    #predictions-page .ak-horizon-direction svg { width:.75rem !important; height:.75rem !important; }
+                    #predictions-page .ak-mobile-horizon-score {
+                        display:grid !important;
+                        position:relative !important;
+                        width:2rem !important;
+                        min-width:2rem !important;
+                        height:2rem !important;
+                        flex:0 0 2rem !important;
+                        margin-right:.25rem !important;
+                    }
+                    #predictions-page .ak-mobile-horizon-score span {
+                        position:absolute !important;
+                        inset:0 !important;
+                        display:grid !important;
+                        margin:0 !important;
+                        place-items:center !important;
+                        color:var(--ak-text) !important;
+                        font-size:.68rem !important;
+                        font-weight:950 !important;
+                        line-height:1 !important;
+                        text-align:center !important;
+                    }
+                    #predictions-page .ak-mobile-risk-logo {
+                        display:grid !important;
+                        width:2rem;
+                        min-width:2rem;
+                        height:2rem;
+                        flex:0 0 2rem !important;
+                        place-items:center;
+                        border-radius:999px;
+                    }
+                    #predictions-page .ak-mobile-score-sort { display:inline-flex !important; }
+                    #predictions-page .ak-desktop-prognosis-heading { display:none !important; }
+                    #predictions-page .ak-mobile-horizon-score::before,
+                    #predictions-page .ak-mobile-horizon-signal::after,
+                    #predictions-page .ak-horizon-direction[data-days="20"]::after,
+                    #predictions-page .ak-mobile-risk-logo::before {
+                        content:attr(data-label);
+                        position:absolute;
+                        left:50%;
+                        top:calc(100% + .22rem);
+                        transform:translateX(-50%);
+                        color:var(--ak-muted);
+                        font-size:5.5px;
+                        font-weight:900;
+                        line-height:1;
+                        letter-spacing:.01em;
+                        text-transform:uppercase;
+                        white-space:nowrap;
+                    }
+                    #predictions-page .ak-mobile-horizon-score::before,
+                    #predictions-page .ak-mobile-risk-logo::before {
+                        background:transparent;
+                    }
+                    #predictions-page .ak-mobile-horizon-signal,
+                    #predictions-page .ak-horizon-direction[data-days="20"],
+                    #predictions-page .ak-mobile-risk-logo { position:relative !important; overflow:visible !important; }
+                    #predictions-page .ak-predictions-heading-row th:nth-child(9) {
+                        white-space:normal !important;
+                        font-size:7px !important;
+                        line-height:1.05 !important;
+                    }
+                    #predictions-page .prediction-row > td:nth-child(3) {
+                        text-align:left !important;
                     }
                 }
             </style>
@@ -1319,6 +1903,79 @@
                 #prediction-filterboard .ak-prediction-filterboard-main {
                     grid-template-columns: minmax(140px, 1.35fr) repeat({{ $canUseSmartLabels ? 6 : 5 }}, minmax(105px, 1fr)) 286px !important;
                 }
+        }
+
+        @media (max-width: 639px) {
+            body:has(#predictions-page) {
+                overflow-y:auto !important;
+            }
+
+            #predictions-page {
+                height:auto !important;
+                max-height:none !important;
+                min-height:calc(100dvh - 89px) !important;
+                overflow:visible !important;
+            }
+
+            #predictions-page > section {
+                min-height:0;
+                flex:none;
+                overflow:visible;
+            }
+
+            #prediction-filterboard {
+                width:100%;
+                max-height:none;
+                overflow-x:hidden !important;
+                overflow-y:visible !important;
+                gap:.5rem;
+                padding:.75rem;
+            }
+
+            #prediction-filterboard .ak-prediction-filterboard-main,
+            #prediction-filterboard .ak-prediction-range-grid {
+                display:grid !important;
+                min-width:0 !important;
+                width:100% !important;
+                grid-template-columns:minmax(0,1fr) !important;
+                gap:.55rem !important;
+            }
+
+            #prediction-filterboard .ak-prediction-filterboard-main > *,
+            #prediction-filterboard .ak-prediction-range-grid > * {
+                width:100% !important;
+                min-width:0 !important;
+            }
+
+            #prediction-filterboard .ak-prediction-filterboard-main > div:last-child {
+                display:flex !important;
+                width:100%;
+                flex-direction:column;
+                gap:.55rem;
+            }
+
+            #prediction-filterboard .ak-prediction-filterboard-main > div:last-child > a,
+            #prediction-filterboard .ak-prediction-filterboard-main > div:last-child > select,
+            #prediction-filterboard .ak-prediction-filterboard-main > div:last-child > span {
+                width:100% !important;
+                flex:none !important;
+            }
+
+            #prediction-filterboard .ak-heatmap-range {
+                height:2.75rem;
+                grid-template-rows:1rem 1fr;
+                padding:.35rem .75rem .45rem;
+            }
+
+            #prediction-filterboard .ak-heatmap-range span {
+                font-size:.62rem;
+                text-overflow:initial;
+            }
+
+            #prediction-filterboard .ak-prediction-filter-actions {
+                width:100%;
+                margin-top:.25rem;
+            }
         }
     </style>
 

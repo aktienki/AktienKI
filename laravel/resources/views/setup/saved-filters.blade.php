@@ -17,7 +17,7 @@
         $suffixes = ['score_min' => ' / 10', 'confidence_min' => ' %', 'drawdown_max' => ' %', 'volatility_max' => ' %', 'dividend_yield_min' => ' %', 'revenue_growth_min' => ' %', 'hit_rate_min' => ' %'];
         $defaults = \App\Http\Controllers\SavedPredictionFilterController::FILTER_DEFAULTS;
     @endphp
-    <div class="flex h-[calc(100dvh-89px)] min-h-0 flex-col py-4 text-[var(--ak-text)]">
+    <div class="ak-strategy-manager flex h-[calc(100dvh-89px)] min-h-0 flex-col py-4 text-[var(--ak-text)]">
         <header class="mb-4 flex shrink-0 items-center justify-between gap-4">
             <div class="flex min-w-0 items-center gap-3">
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300"><x-heroicon-o-bookmark-square class="h-6 w-6" /></div>
@@ -92,7 +92,7 @@
                             <div class="mt-3 grid grid-cols-4 gap-2 border-t border-white/[.07] pt-3">
                                 @foreach ([
                                     [__('Performance/Jahr'), $metrics['performance_year'], '%', $metrics['performance_year'] >= 0 ? 'text-emerald-300' : 'text-rose-300'],
-                                    [__('Profitfaktor'), $metrics['profit_factor'], '', ($metrics['profit_factor'] ?? 0) >= 1 ? 'text-emerald-300' : 'text-amber-300'],
+                                    [__('Profitfaktor'), \App\Support\ProfitFactor::cap($metrics['profit_factor'] ?? null) ?? '—', '', ($metrics['profit_factor'] ?? 0) >= 1 ? 'text-emerald-300' : 'text-amber-300'],
                                     [__('Trades/Monat'), $metrics['trades_month'], '', 'text-slate-100'],
                                     [__('Drawdown'), $metrics['drawdown'], '%', 'text-rose-300'],
                                 ] as [$metricLabel, $metricValue, $metricSuffix, $metricColor])
@@ -135,6 +135,65 @@
             padding-top: 0 !important;
             padding-bottom: 0 !important;
             line-height: 34px !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management {
+            border-color: #b7cdd2 !important;
+            background: rgba(248, 252, 252, .94) !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management article {
+            border-color: #b7cdd2 !important;
+            background: #ffffff !important;
+            box-shadow: 0 5px 16px rgba(15, 73, 82, .07);
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management article#saved-filter-highlight {
+            border-color: #5eaeb8 !important;
+            background: #eef9fa !important;
+            box-shadow: 0 7px 22px rgba(8, 108, 120, .13);
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management :is(.text-white, .text-slate-100) {
+            color: #0f172a !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management :is(.text-slate-200, .text-slate-300) {
+            color: #334155 !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management :is(.text-slate-400, .text-slate-500) {
+            color: #52627a !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management :is(.text-teal-200, .text-teal-300, .text-teal-400) {
+            color: #0e6f78 !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management :is(.text-amber-200, .text-amber-300) {
+            color: #9a5b05 !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management .text-emerald-300 {
+            color: #047857 !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management .text-rose-300 {
+            color: #be123c !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management .text-orange-400 {
+            color: #c2410c !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management article [class*="border-white"] {
+            border-color: #cbd5e1 !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management article [class*="bg-slate-950"] {
+            background: #f1f5f9 !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management article [class*="bg-white"] {
+            background: #f8fafc !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management article [class*="bg-teal-400"] {
+            border-color: #8fc8ce !important;
+            background: #e6f5f6 !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management article [class*="bg-amber-300"] {
+            border-color: #e4bd69 !important;
+            background: #fff6dc !important;
+        }
+        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management article [class*="bg-orange-400"] {
+            border-color: #f0b08c !important;
+            background: #fff1e8 !important;
         }
     </style>
     @if (request()->integer('highlight') > 0)

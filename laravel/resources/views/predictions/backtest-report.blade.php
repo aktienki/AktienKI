@@ -68,10 +68,16 @@
     ];
     $formatMoney = fn ($value) => number_format((float) $value, 2, ',', '.').' €';
     $formatPercent = fn ($value) => number_format((float) $value, 2, ',', '.').' %';
-    $formatFactorUsage = fn ($usage) => collect((array) $usage)
-        ->filter(fn ($count, $factor) => (float) $factor > 1 && (int) $count > 0)
-        ->map(fn ($count, $factor) => str_replace('.', ',', (string) $factor).'×: '.number_format((int) $count, 0, ',', '.'))
-        ->implode(' · ') ?: 'Keine Aufstockung';
+    $formatFactorUsage = function ($usage, int $totalTrades): string {
+        $increasedTrades = (int) collect((array) $usage)
+            ->filter(fn ($count, $factor) => (float) $factor > 1 && (int) $count > 0)
+            ->sum();
+        $share = $totalTrades > 0 ? ($increasedTrades / $totalTrades) * 100 : 0;
+
+        return number_format($increasedTrades, 0, ',', '.').' von '
+            .number_format($totalTrades, 0, ',', '.').' Trades · '
+            .number_format($share, 2, ',', '.').' %';
+    };
     $spPerformance = (float) ($result['benchmark_performance'] ?? 0);
     $selectedExitStrategy = (string) ($filters['exit_strategy'] ?? 'fixed_20d');
     $executionHorizon = (int) ($run->horizon_days ?? 20);
@@ -132,7 +138,7 @@
                 <td>{{ number_format((int) $horizon['trades'], 0, ',', '.') }}</td>
                 <td class="{{ (float) $horizon['hit_rate'] >= 50 ? 'positive' : 'negative' }}">{{ $formatPercent($horizon['hit_rate']) }}</td>
                 <td class="{{ (float) $horizon['average_return'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($horizon['average_return']) }}</td>
-                <td>{{ $horizon['profit_factor'] === null ? '∞' : number_format((float) $horizon['profit_factor'], 2, ',', '.') }}</td>
+                <td>{{ $horizon['profit_factor'] === null ? '3,00' : number_format(\App\Support\ProfitFactor::cap($horizon['profit_factor']), 2, ',', '.') }}</td>
             </tr>
         @empty
             <tr><td colspan="8">Für die verwendeten Horizonte ist keine Walk-Forward-Gesamtstatistik verfügbar.</td></tr>
@@ -214,7 +220,7 @@
         <tr><td>Max. Portfolio-Drawdown</td><td class="negative">{{ $formatPercent($result['portfolio_max_drawdown']) }}</td>@if($showAdaptive)<td class="negative">{{ $formatPercent($result['adaptive_rotation_max_drawdown']) }}</td>@endif<td class="negative">{{ $formatPercent($result['benchmark_max_drawdown']) }}</td></tr>
         <tr><td>Ausgeführte Trades</td><td>{{ number_format($result['executed_trades'], 0, ',', '.') }}</td>@if($showAdaptive)<td>{{ number_format($result['adaptive_rotation_executed_trades'], 0, ',', '.') }}</td>@endif<td>1</td></tr>
         <tr><td>Ausgewählte Strategien</td><td class="strategy-cell">{{ $selectedStrategiesLabel }}</td>@if($showAdaptive)<td class="strategy-cell">Adaptive Rotation</td>@endif<td class="strategy-cell">Buy and Hold</td></tr>
-        <tr><td>Aufgestockte Positionen</td><td>{{ $formatFactorUsage($result['position_factor_usage'] ?? []) }}</td>@if($showAdaptive)<td>{{ $formatFactorUsage($result['adaptive_rotation_position_factor_usage'] ?? []) }}</td>@endif<td>—</td></tr>
+        <tr><td>Aufgestockte Positionen</td><td>{{ $formatFactorUsage($result['position_factor_usage'] ?? [], (int) $result['executed_trades']) }}</td>@if($showAdaptive)<td>{{ $formatFactorUsage($result['adaptive_rotation_position_factor_usage'] ?? [], (int) $result['adaptive_rotation_executed_trades']) }}</td>@endif<td>—</td></tr>
         <tr><td>Trades pro Monat</td><td>{{ number_format($result['trades_per_month'], 2, ',', '.') }}</td>@if($showAdaptive)<td>{{ number_format($result['adaptive_rotation_trades_per_month'], 2, ',', '.') }}</td>@endif<td>{{ number_format(1 / max(1, (float) $result['backtest_months']), 2, ',', '.') }}</td></tr>
         <tr><td>Übersprungene Signale</td><td>{{ number_format($result['skipped_trades'], 0, ',', '.') }}</td>@if($showAdaptive)<td>{{ number_format($result['adaptive_rotation_skipped_trades'], 0, ',', '.') }}</td>@endif<td>0</td></tr>
         <tr><td>Ø Kapitalbindung</td><td>{{ $formatPercent($result['average_capital_binding']) }}</td>@if($showAdaptive)<td>{{ $formatPercent($result['adaptive_rotation_average_capital_binding']) }}</td>@endif<td>100,00 %</td></tr>
@@ -231,7 +237,7 @@
         'Indexrotation' => ['final_capital' => data_get($result, 'index_entry_rotation_final_capital'), 'performance' => data_get($result, 'index_entry_rotation_performance'), 'max_drawdown' => data_get($result, 'index_entry_rotation_max_drawdown'), 'executed_trades' => data_get($result, 'index_entry_rotation_executed_trades', 0)],
         'Buy and Hold' => ['final_capital' => data_get($result, 'buy_and_hold_final_capital'), 'performance' => data_get($result, 'buy_and_hold_performance'), 'max_drawdown' => data_get($result, 'buy_and_hold_max_drawdown'), 'executed_trades' => data_get($result, 'buy_and_hold_executed_trades', 0)],
     ])->merge(collect($result['automatic_exit_variants'] ?? [])->mapWithKeys(fn ($variant, $key) => [match($key) {
-        'auto_exit_fixed_20d' => 'Exit 20T', 'auto_exit_dynamic_horizon' => 'Dynamischer Horizont',
+        'auto_exit_fixed_20d' => 'Direkteinstieg · Exit 20T', 'auto_exit_dynamic_horizon' => 'Direkteinstieg · dynamischer Horizont',
         'auto_exit_support_stop' => 'Support-Stop', 'auto_exit_resistance_trailing' => 'Resistance-Trailing',
         'auto_exit_signal_change' => 'Signalwechsel', 'auto_entry_wait_5d' => 'WAIT-Einstieg 5T', default => $key,
     } => $variant]))->filter(fn ($variant) => (int) ($variant['executed_trades'] ?? 0) > 0);
@@ -297,7 +303,7 @@
     <div class="header">
         <div class="brand">aktienKI.com</div>
         <h1>Statistik der verwendeten Modelle</h1>
-        <p class="subtitle">Historische Ergebnisse der im gefilterten Backtest enthaltenen Modelle</p>
+        <p class="subtitle">Horizonübergreifende Performance der im gefilterten Backtest enthaltenen Modelle – jedes Modell wird einmal ausgewiesen</p>
     </div>
 
     @php
@@ -375,7 +381,7 @@
                     <td>{{ number_format((int) $model->trades, 0, ',', '.') }}</td>
                     <td class="{{ (float) $model->hit_rate >= 50 ? 'positive' : 'negative' }}">{{ $formatPercent($model->hit_rate) }}</td>
                     <td class="{{ (float) $model->average_return >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($model->average_return) }}</td>
-                    <td>{{ $model->profit_factor === null ? '∞' : number_format((float) $model->profit_factor, 2, ',', '.') }}</td>
+                    <td>{{ $model->profit_factor === null ? '3,00' : number_format(\App\Support\ProfitFactor::cap($model->profit_factor), 2, ',', '.') }}</td>
                     <td class="negative">{{ $formatPercent($model->max_drawdown) }}</td>
                     <td>{{ date('m/y', strtotime((string) $model->first_trade)) }}–{{ date('m/y', strtotime((string) $model->last_trade)) }}</td>
                 </tr>
@@ -389,10 +395,20 @@
     <div class="section">
         <div class="section-title">Matrix Modell × Exit-Strategie</div>
         @php
-            $exitStrategies = [
+            $exitStrategyLabels = [
                 'fixed_20d' => 'Exit '.$executionHorizon.'T',
+                'adaptive_rotation_20d' => 'Adaptive Rotation',
+                'auto_exit_dynamic_horizon' => 'Dynamischer Horizont',
+                'auto_exit_support_stop' => 'Support-Stop',
+                'auto_exit_resistance_trailing' => 'Resistance-Trailing',
+                'auto_exit_signal_change' => 'Signalwechsel',
             ];
-            if ($showAdaptive) $exitStrategies['adaptive_rotation_20d'] = 'Adaptive Rotation';
+            $availableExitStrategies = $modelExitMatrix
+                ->flatten(1)
+                ->pluck('strategy')
+                ->unique();
+            $exitStrategies = collect($exitStrategyLabels)
+                ->filter(fn ($label, $strategy) => $availableExitStrategies->contains($strategy));
         @endphp
         <table class="exit-matrix">
             <thead>
@@ -417,7 +433,7 @@
                     @endforeach
                 </tr>
             @empty
-                <tr><td colspan="5">Für diesen Lauf sind keine Daten zur Exit-Matrix verfügbar.</td></tr>
+                <tr><td colspan="{{ max(2, $exitStrategies->count() + 1) }}">Für diesen Lauf sind keine Daten zur Exit-Matrix verfügbar.</td></tr>
             @endforelse
             </tbody>
         </table>

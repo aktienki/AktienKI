@@ -36,7 +36,7 @@
                 {{ __('Hitrate') }} <strong class="ml-1 text-[var(--ak-text)]">{{ is_numeric($stockHeatmapSummary?->hit_rate) ? number_format((float) $stockHeatmapSummary->hit_rate, 1, ',', '.').' %' : '—' }}</strong>
             </span>
             <span class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2 text-xs font-bold text-[var(--ak-muted)]">
-                {{ __('Profitfaktor') }} <strong class="ml-1 text-[var(--ak-text)]">{{ is_numeric($stockHeatmapSummary?->profit_factor) ? number_format((float) $stockHeatmapSummary->profit_factor, 2, ',', '.') : '—' }}</strong>
+                {{ __('Profitfaktor') }} <strong class="ml-1 text-[var(--ak-text)]">{{ is_numeric($stockHeatmapSummary?->profit_factor) ? number_format(\App\Support\ProfitFactor::cap($stockHeatmapSummary->profit_factor), 2, ',', '.') : '—' }}</strong>
             </span>
             <span class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2 text-xs font-bold text-[var(--ak-muted)]">
                 {{ __('Max. Drawdown') }} <strong class="ml-1 text-[var(--ak-text)]">{{ is_numeric($stockHeatmapSummary?->drawdown) ? number_format((float) $stockHeatmapSummary->drawdown, 1, ',', '.').' %' : '—' }}</strong>

@@ -171,7 +171,7 @@
                         <tbody class="divide-y divide-[var(--ak-border)]">
                         @forelse (($individualStats ?? collect()) as $stat)
                             @php $signal = strtoupper($stat['signal'] ?? ''); $signalTone = match ($signal) { 'BUY' => 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10', 'SELL' => 'text-rose-400 border-rose-400/30 bg-rose-400/10', default => 'text-amber-300 border-amber-300/30 bg-amber-300/10' }; @endphp
-                            <tr class="hover:bg-[var(--ak-surface-muted)]"><td class="px-2 py-2"><strong class="block text-xs font-black text-[var(--ak-text)]">{{ $stat['symbol'] }}</strong><span class="block max-w-[220px] truncate text-[9px] text-[var(--ak-muted)]">{{ $stat['name'] }}</span></td><td class="px-2 py-2"><span class="inline-flex rounded-md border px-2 py-1 text-[9px] font-black {{ $signalTone }}">{{ $signal ?: '—' }}</span></td><td class="px-2 py-2 text-right font-bold tabular-nums text-[var(--ak-text)]">{{ number_format((int) $stat['trades'], 0, ',', '.') }}</td><td class="px-2 py-2 text-right font-bold tabular-nums text-cyan-300">{{ number_format((float) $stat['hit_rate'], 1, ',', '.') }} %</td><td class="px-2 py-2 text-right font-bold tabular-nums text-amber-300">{{ $stat['profit_factor'] === null ? '∞' : number_format((float) $stat['profit_factor'], 2, ',', '.') }}</td><td class="px-2 py-2 text-right font-bold tabular-nums text-rose-300">{{ number_format((float) $stat['drawdown'], 1, ',', '.') }} %</td><td class="px-2 py-2 text-right font-bold tabular-nums {{ (float) $stat['average_return'] >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ (float) $stat['average_return'] >= 0 ? '+' : '' }}{{ number_format((float) $stat['average_return'], 2, ',', '.') }} %</td><td class="px-2 py-2 text-right font-bold tabular-nums text-[var(--ak-text)]">{{ number_format((float) $stat['score'], 1, ',', '.') }} / {{ number_format((float) $stat['confidence'], 0, ',', '.') }} %</td></tr>
+                            <tr class="hover:bg-[var(--ak-surface-muted)]"><td class="px-2 py-2"><strong class="block text-xs font-black text-[var(--ak-text)]">{{ $stat['symbol'] }}</strong><span class="block max-w-[220px] truncate text-[9px] text-[var(--ak-muted)]">{{ $stat['name'] }}</span></td><td class="px-2 py-2"><span class="inline-flex rounded-md border px-2 py-1 text-[9px] font-black {{ $signalTone }}">{{ $signal ?: '—' }}</span></td><td class="px-2 py-2 text-right font-bold tabular-nums text-[var(--ak-text)]">{{ number_format((int) $stat['trades'], 0, ',', '.') }}</td><td class="px-2 py-2 text-right font-bold tabular-nums text-cyan-300">{{ number_format((float) $stat['hit_rate'], 1, ',', '.') }} %</td><td class="px-2 py-2 text-right font-bold tabular-nums text-amber-300">{{ number_format(\App\Support\ProfitFactor::cap($stat['profit_factor']) ?? 3, 2, ',', '.') }}</td><td class="px-2 py-2 text-right font-bold tabular-nums text-rose-300">{{ number_format((float) $stat['drawdown'], 1, ',', '.') }} %</td><td class="px-2 py-2 text-right font-bold tabular-nums {{ (float) $stat['average_return'] >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ (float) $stat['average_return'] >= 0 ? '+' : '' }}{{ number_format((float) $stat['average_return'], 2, ',', '.') }} %</td><td class="px-2 py-2 text-right font-bold tabular-nums text-[var(--ak-text)]">{{ number_format((float) $stat['score'], 1, ',', '.') }} / {{ number_format((float) $stat['confidence'], 0, ',', '.') }} %</td></tr>
                         @empty
                             <tr><td colspan="8" class="px-3 py-10 text-center text-[var(--ak-muted)]">{{ __('Für die aktuelle Filterauswahl liegen keine Backtest-Trades vor.') }}</td></tr>
                         @endforelse
@@ -896,7 +896,7 @@
                         $modalExitStrategy = (string) request('exit_strategy', 'fixed_20d');
                     @endphp
                     <div x-show="capitalOpen" x-cloak class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md" @keydown.escape.window="capitalOpen = false">
-                        <form method="POST" action="{{ route('setup.filter.backtest') }}" x-data="{ submitting: false, entryStrategy: @js($modalEntryStrategy), exitStrategy: @js($modalExitStrategy) }" @submit="submitting = true" class="ak-backtest-config-dialog max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-teal-300/20 bg-[#15243a] p-5 shadow-2xl" style="background-color:#15243a !important; opacity:1 !important;" @click.outside="capitalOpen = false">
+                        <form method="POST" action="{{ route('setup.filter.backtest') }}" x-data="{ submitting: false, entryStrategy: @js($modalEntryStrategy), exitStrategy: @js($modalExitStrategy), automaticComparison: @js(request()->boolean('automatic_strategy_comparison')) }" @submit="submitting = true" class="ak-backtest-config-dialog max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-teal-300/20 bg-[#15243a] p-5 shadow-2xl" style="background-color:#15243a !important; opacity:1 !important;" @click.outside="capitalOpen = false">
                             @csrf
                             @if ($errors->any())
                                 <div class="mb-4 rounded-xl border border-rose-300/25 bg-rose-400/[.08] px-4 py-3 text-xs font-bold text-rose-200">{{ $errors->first() }}</div>
@@ -934,7 +934,7 @@
                             @endif
                             @if (! $qualitySetupMode)
                             <div class="mb-4 grid gap-4 md:grid-cols-2">
-                                <fieldset class="rounded-xl border border-cyan-300/20 bg-cyan-400/[.055] p-3">
+                                <fieldset class="rounded-xl border border-cyan-300/20 bg-cyan-400/[.055] p-3 transition" :class="automaticComparison ? 'pointer-events-none opacity-35 grayscale' : ''">
                                     <legend class="px-1 text-[10px] font-black uppercase tracking-wide text-cyan-200">{{ __('Bevorzugte Entrystrategie') }}</legend>
                                     <div class="mt-1 grid gap-1.5">
                                         @foreach ([
@@ -943,7 +943,7 @@
                                             ['forecast_score_rotation_5d', __('Forecast-Score 5T'), __('Prüft neue Einstiege alle fünf Handelstage.')],
                                         ] as [$value, $label, $description])
                                             <label class="cursor-pointer rounded-lg border px-2.5 py-2 transition" :class="entryStrategy === @js($value) ? 'border-cyan-300/45 bg-cyan-400/[.10]' : 'border-white/[.08] bg-white/[.025]'">
-                                                <span class="flex items-start gap-2"><input type="radio" name="entry_strategy" value="{{ $value }}" x-model="entryStrategy" required class="mt-0.5 h-4 w-4 border-slate-500 bg-slate-900 text-cyan-500"><span><b class="block text-[10px] text-white">{{ $label }}</b><small class="block text-[8px] leading-3 text-slate-400">{{ $description }}</small></span></span>
+                                                <span class="flex items-start gap-2"><input type="radio" name="entry_strategy" value="{{ $value }}" x-model="entryStrategy" :disabled="automaticComparison" required class="mt-0.5 h-4 w-4 border-slate-500 bg-slate-900 text-cyan-500"><span><b class="block text-[10px] text-white">{{ $label }}</b><small class="block text-[8px] leading-3 text-slate-400">{{ $description }}</small></span></span>
                                             </label>
                                         @endforeach
                                     </div>
@@ -954,13 +954,13 @@
                                             ['index_score_rotation', __('Indexrotation')],
                                         ] as [$key, $label])
                                             <label class="mt-1.5 flex cursor-pointer items-start gap-2 rounded-lg border border-white/[.08] bg-white/[.025] px-2.5 py-2">
-                                                <input type="checkbox" name="{{ $key }}" value="1" @checked(request()->boolean($key)) class="mt-0.5 h-4 w-4 rounded border-slate-500 bg-slate-900 text-cyan-500">
+                                                <input type="checkbox" name="{{ $key }}" value="1" :disabled="automaticComparison" @checked(request()->boolean($key)) class="mt-0.5 h-4 w-4 rounded border-slate-500 bg-slate-900 text-cyan-500">
                                                 <span><b class="block text-[10px] text-white">{{ $label }}</b><small class="block text-[8px] leading-3 text-slate-400">{{ __('Bevorzugt passende Aktien, solange die 20T-Prognose höchstens 2 Prozentpunkte unter der besten Aktie liegt.') }}</small></span>
                                             </label>
                                         @endforeach
                                     </div>
                                 </fieldset>
-                                <fieldset class="rounded-xl border border-amber-300/20 bg-amber-300/[.055] p-3">
+                                <fieldset class="rounded-xl border border-amber-300/20 bg-amber-300/[.055] p-3 transition" :class="automaticComparison ? 'pointer-events-none opacity-35 grayscale' : ''">
                                     <legend class="px-1 text-[10px] font-black uppercase tracking-wide text-amber-200">{{ __('Bevorzugte Exitstrategie') }}</legend>
                                     <div class="mt-1 grid gap-1.5">
                                         @foreach ([
@@ -969,7 +969,7 @@
                                             ['buy_and_hold', __('Buy and Hold'), __('Hält Aktien ohne zeitbasierten Exit.')],
                                         ] as [$value, $label, $description])
                                             <label class="cursor-pointer rounded-lg border px-2.5 py-2 transition" :class="exitStrategy === @js($value) ? 'border-amber-300/45 bg-amber-300/[.10]' : 'border-white/[.08] bg-white/[.025]'">
-                                                <span class="flex items-start gap-2"><input type="radio" name="exit_strategy" value="{{ $value }}" x-model="exitStrategy" required class="mt-0.5 h-4 w-4 border-slate-500 bg-slate-900 text-amber-500"><span><b class="block text-[10px] text-white">{{ $label }}</b><small class="block text-[8px] leading-3 text-slate-400">{{ $description }}</small></span></span>
+                                                <span class="flex items-start gap-2"><input type="radio" name="exit_strategy" value="{{ $value }}" x-model="exitStrategy" :disabled="automaticComparison" required class="mt-0.5 h-4 w-4 border-slate-500 bg-slate-900 text-amber-500"><span><b class="block text-[10px] text-white">{{ $label }}</b><small class="block text-[8px] leading-3 text-slate-400">{{ $description }}</small></span></span>
                                             </label>
                                         @endforeach
                                     </div>
@@ -991,7 +991,7 @@
                                 <p class="mt-2 text-[8px] leading-3 text-slate-400">{{ __('Die Pfeile zeigen die Sortierung: niedriger Drawdown sowie höhere Hit-Rate und höherer Profitfaktor werden bevorzugt.') }}</p>
                             </fieldset>
                             <label class="mb-4 flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-300/25 bg-emerald-400/[.07] px-4 py-3">
-                                <input type="checkbox" name="automatic_strategy_comparison" value="1" @checked(request()->boolean('automatic_strategy_comparison')) class="mt-0.5 h-4 w-4 rounded border-slate-500 bg-slate-900 text-emerald-500">
+                                <input type="checkbox" name="automatic_strategy_comparison" value="1" x-model="automaticComparison" @checked(request()->boolean('automatic_strategy_comparison')) class="mt-0.5 h-4 w-4 rounded border-slate-500 bg-slate-900 text-emerald-500">
                                 <span><b class="block text-[11px] font-black uppercase tracking-wide text-emerald-200">{{ __('Automatik') }}</b><small class="mt-1 block text-[9px] leading-4 text-slate-300">{{ __('Berechnet alle verfügbaren Entry- und Exitstrategien und stellt sie im Bericht gegenüber. Das fest gewählte Auswahlprofil bleibt für alle Varianten unverändert.') }}</small></span>
                             </label>
                             @endif
@@ -1118,7 +1118,7 @@
                 ],
                 'profit_factor' => [
                     'label' => __('Ø Profitfaktor'),
-                    'display' => number_format((float) ($heatmapSummary?->profit_factor ?? 0), 2, ',', '.'),
+                    'display' => number_format(\App\Support\ProfitFactor::cap($heatmapSummary?->profit_factor) ?? 0, 2, ',', '.'),
                     'width' => max(0, min(100, ((float) ($heatmapSummary?->profit_factor ?? 0) / 2.5) * 100)),
                     'color' => 'bg-teal-400',
                     'colors' => ['bg-rose-500', 'bg-rose-500', 'bg-rose-400', 'bg-rose-400', 'bg-yellow-300', 'bg-yellow-300', 'bg-lime-300', 'bg-lime-400', 'bg-green-400', 'bg-emerald-500'],
@@ -1490,7 +1490,7 @@
                                         <td class="px-3 py-2 font-black {{ $loop->first ? 'text-emerald-300' : '' }}">{{ $loop->iteration }}</td>
                                         <td class="px-3 py-2 font-bold">{{ $activeRules ?: __('Basis') }}</td>
                                         <td class="px-3 py-2">{{ number_format((float) data_get($variant, 'validation.average_return', 0), 2, ',', '.') }} %/Trade</td>
-                                        <td class="px-3 py-2">{{ number_format((float) data_get($variant, 'validation.profit_factor', 0), 2, ',', '.') }}</td>
+                                        <td class="px-3 py-2">{{ number_format(\App\Support\ProfitFactor::cap(data_get($variant, 'validation.profit_factor', 0)) ?? 0, 2, ',', '.') }}</td>
                                         <td class="px-3 py-2">{{ number_format((float) data_get($variant, 'validation.hit_rate', 0), 1, ',', '.') }} %</td>
                                         <td class="px-3 py-2">{{ number_format((float) data_get($variant, 'validation.max_drawdown', 0), 1, ',', '.') }} %</td>
                                         <td class="px-3 py-2">{{ (int) data_get($variant, 'validation.trades', 0) }}</td>

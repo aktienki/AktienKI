@@ -191,8 +191,8 @@ class DashboardController extends Controller
         $topStockToday = $topStockQuery()
             ->whereRaw("UPPER({$personalizedSignalSql}) = ?", ['BUY'])
             ->first(['prediction.id as prediction_id', 'prediction.ai_score', 'prediction.prediction_score', 'prediction.horizon_fusion_consensus_return', 'prediction.market_return_20d', 'instrument.symbol', 'instrument.name']);
-        $topWaitStock = $topStockQuery()
-            ->whereRaw("UPPER({$personalizedSignalSql}) = ?", ['WAIT'])
+        $topWatchStock = $topStockQuery()
+            ->whereRaw("UPPER({$personalizedSignalSql}) = ?", ['WATCH'])
             ->first(['prediction.id as prediction_id', 'prediction.ai_score', 'prediction.prediction_score', 'prediction.horizon_fusion_consensus_return', 'prediction.market_return_20d', 'instrument.symbol', 'instrument.name']);
         $messageReminders = collect()
             ->merge(
@@ -277,7 +277,7 @@ class DashboardController extends Controller
             'canUsePlus',
             'canUsePro',
             'topStockToday',
-            'topWaitStock',
+            'topWatchStock',
         ));
     }
 
@@ -489,7 +489,7 @@ class DashboardController extends Controller
         $riskService = app(StockRiskClassificationService::class);
         $level = $riskService->userLevel($user);
 
-        return Cache::remember("dashboard.profile-universe.{$level}.v1", now()->addMinutes(5), function () use ($user, $riskService, $level): array {
+        return Cache::remember("dashboard.profile-universe.{$level}.v2", now()->addMinutes(5), function () use ($user, $riskService, $level): array {
             $latestPredictionIds = DB::table('predictions')
                 ->selectRaw('instrument_id, MAX(id) AS prediction_id')
                 ->groupBy('instrument_id');
@@ -499,7 +499,9 @@ class DashboardController extends Controller
                 ->where('instrument.type', 'stock')
                 ->where('instrument.is_active', true)
                 ->whereNull('instrument.deleted_at')
-                ->where(fn ($nested) => $nested->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'));
+                ->when($level !== 'risk', fn ($builder) => $builder->where(
+                    fn ($nested) => $nested->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep')
+                ));
             $totalActiveCount = (clone $query)->count();
             $riskService->applyVisibility($query, $user, 'instrument.risk_status');
             $personalizedSignalSql = app(PersonalizedSignalService::class)->sql('prediction', $user);

@@ -58,7 +58,7 @@ final class AkiChatController extends Controller
                 'properties' => [
                     'score_min' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 10],
                     'confidence_min' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 100],
-                    'profit_factor_min' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 10],
+                    'profit_factor_min' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 3],
                     'volatility_max' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 100],
                     'country' => ['type' => ['string', 'null']],
                     'exchange' => ['type' => ['string', 'null']],
@@ -79,7 +79,7 @@ final class AkiChatController extends Controller
                     'score_min' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 10],
                     'confidence_min' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 100],
                     'drawdown_max' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 50],
-                    'profit_factor_min' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 10],
+                    'profit_factor_min' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 3],
                     'hit_rate_min' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 100],
                     'volatility_max' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => 100],
                     'predicted_return_min' => ['type' => ['number', 'null'], 'minimum' => -50, 'maximum' => 100],
@@ -207,7 +207,7 @@ final class AkiChatController extends Controller
     {
         $numeric = [
             'score_min' => [0, 10], 'confidence_min' => [0, 100], 'drawdown_max' => [0, 50],
-            'profit_factor_min' => [0, 10], 'hit_rate_min' => [0, 100], 'volatility_max' => [0, 100],
+            'profit_factor_min' => [0, 3], 'hit_rate_min' => [0, 100], 'volatility_max' => [0, 100],
             'predicted_return_min' => [-50, 100],
         ];
         $result = [];

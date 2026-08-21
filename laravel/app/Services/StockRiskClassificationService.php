@@ -3,20 +3,20 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\ProfitFactor;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 final class StockRiskClassificationService
 {
-    public const SLEEP_PROFIT_FACTOR = 1.05;
-
-    public function classify(?float $profitFactor, ?float $confidence, ?float $drawdown): ?string
+    public function classify(?float $profitFactor, ?float $profitPerTrade, ?float $confidence, ?float $drawdown): ?string
     {
-        if ($profitFactor === null || $confidence === null || $drawdown === null) {
+        $profitFactor = ProfitFactor::cap($profitFactor);
+        if ($profitFactor === null || $profitPerTrade === null || $confidence === null || $drawdown === null) {
             return null;
         }
 
-        if ($profitFactor < self::SLEEP_PROFIT_FACTOR) {
+        if ($profitPerTrade < 0) {
             return 'sleep';
         }
 
@@ -28,7 +28,7 @@ final class StockRiskClassificationService
             return 'balanced';
         }
 
-        if ($profitFactor >= self::SLEEP_PROFIT_FACTOR && $confidence >= 42 && $drawdown <= 45) {
+        if ($profitFactor >= 1.05 && $confidence >= 42 && $drawdown <= 45) {
             return 'opportunity';
         }
 
@@ -64,38 +64,53 @@ final class StockRiskClassificationService
 
     public function refresh(?int $instrumentId = null): array
     {
-        $filter = $instrumentId ? 'AND model.instrument_id = ?' : '';
+        $modelFilter = $instrumentId ? 'AND model.instrument_id = ?' : '';
+        $tradeFilter = $instrumentId ? 'AND trade.instrument_id = ?' : '';
         $targetFilter = $instrumentId ? 'AND instrument.id = ?' : '';
-        $bindings = $instrumentId ? [$instrumentId, $instrumentId] : [];
+        $bindings = $instrumentId ? [$instrumentId, $instrumentId, $instrumentId] : [];
 
         DB::update(<<<SQL
-WITH metric AS (
+WITH model_metric AS (
     SELECT model.instrument_id,
-        MIN(LEAST(9.99, GREATEST(0, (model.metrics->>'profit_factor')::numeric))) AS profit_factor,
+        MIN(LEAST(3.0, GREATEST(0, (model.metrics->>'profit_factor')::numeric))) AS profit_factor,
         MAX(ABS((model.metrics->>'max_drawdown')::numeric) * 100) AS max_drawdown
     FROM trained_models model
     WHERE model.status='active' AND model.instrument_id IS NOT NULL
         AND (model.metadata->>'prediction_horizon')::int IN (5,10,15,20)
-        AND jsonb_exists(model.metrics, 'profit_factor') AND jsonb_exists(model.metrics, 'max_drawdown') {$filter}
+        AND jsonb_exists(model.metrics, 'profit_factor') AND jsonb_exists(model.metrics, 'max_drawdown') {$modelFilter}
     GROUP BY model.instrument_id
     HAVING COUNT(DISTINCT (model.metadata->>'prediction_horizon')::int)=4
+), latest_walk_forward AS (
+    SELECT trade.instrument_id, run.horizon_days, MAX(run.id) AS run_id
+    FROM walk_forward_backtest_runs run
+    JOIN walk_forward_backtest_trades trade ON trade.run_id=run.id
+    WHERE run.status='completed' AND run.horizon_days IN (5,10,15,20) {$tradeFilter}
+    GROUP BY trade.instrument_id, run.horizon_days
+), trade_metric AS (
+    SELECT latest_walk_forward.instrument_id, AVG(trade.net_return) * 100 AS profit_per_trade
+    FROM latest_walk_forward
+    JOIN walk_forward_backtest_trades trade ON trade.run_id=latest_walk_forward.run_id
+        AND trade.instrument_id=latest_walk_forward.instrument_id
+    GROUP BY latest_walk_forward.instrument_id
+    HAVING COUNT(DISTINCT latest_walk_forward.horizon_days)=4
 ), prediction AS (
     SELECT DISTINCT ON (instrument_id) instrument_id,
         LEAST(100, GREATEST(0, confidence * CASE WHEN confidence <= 1 THEN 100 ELSE 1 END)) AS confidence
     FROM predictions WHERE confidence IS NOT NULL ORDER BY instrument_id, prediction_time DESC, id DESC
 ), classified AS (
-    SELECT instrument.id, metric.profit_factor, prediction.confidence, metric.max_drawdown,
-        CASE WHEN metric.profit_factor IS NULL OR prediction.confidence IS NULL OR metric.max_drawdown IS NULL THEN NULL
-             WHEN metric.profit_factor < 1.05 THEN 'sleep'
-             WHEN metric.profit_factor >= 1.35 AND prediction.confidence >= 70 AND metric.max_drawdown <= 18 THEN 'defensive'
-             WHEN metric.profit_factor >= 1.20 AND prediction.confidence >= 58 AND metric.max_drawdown <= 28 THEN 'balanced'
-             WHEN metric.profit_factor >= 1.05 AND prediction.confidence >= 42 AND metric.max_drawdown <= 45 THEN 'opportunity'
+    SELECT instrument.id, model_metric.profit_factor, trade_metric.profit_per_trade, prediction.confidence, model_metric.max_drawdown,
+        CASE WHEN model_metric.profit_factor IS NULL OR trade_metric.profit_per_trade IS NULL OR prediction.confidence IS NULL OR model_metric.max_drawdown IS NULL THEN NULL
+             WHEN trade_metric.profit_per_trade < 0 THEN 'sleep'
+             WHEN model_metric.profit_factor >= 1.35 AND prediction.confidence >= 70 AND model_metric.max_drawdown <= 18 THEN 'defensive'
+             WHEN model_metric.profit_factor >= 1.20 AND prediction.confidence >= 58 AND model_metric.max_drawdown <= 28 THEN 'balanced'
+             WHEN model_metric.profit_factor >= 1.05 AND prediction.confidence >= 42 AND model_metric.max_drawdown <= 45 THEN 'opportunity'
              ELSE 'risk' END AS status
-    FROM instruments instrument LEFT JOIN metric ON metric.instrument_id=instrument.id
+    FROM instruments instrument LEFT JOIN model_metric ON model_metric.instrument_id=instrument.id
+    LEFT JOIN trade_metric ON trade_metric.instrument_id=instrument.id
     LEFT JOIN prediction ON prediction.instrument_id=instrument.id
     WHERE instrument.type='stock' {$targetFilter}
 )
-UPDATE instruments SET risk_status=classified.status, risk_profit_factor=classified.profit_factor,
+UPDATE instruments SET risk_status=classified.status, risk_profit_factor=classified.profit_per_trade,
     risk_confidence=classified.confidence, risk_max_drawdown=classified.max_drawdown, risk_status_updated_at=NOW()
 FROM classified WHERE instruments.id=classified.id
 SQL, $bindings);
