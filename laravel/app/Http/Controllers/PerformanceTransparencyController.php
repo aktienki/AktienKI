@@ -73,7 +73,8 @@ final class PerformanceTransparencyController extends Controller
                 ?? ($row->validation_passed ? 'solid' : 'observation');
             $row->before_metrics = $before;
             $row->after_metrics = $after;
-            $row->reason = $this->reason($row, $after);
+            $row->reason = data_get($result, 'model_tracking.comment_de')
+                ?? $this->reason($row, $after);
 
             return $row;
         });

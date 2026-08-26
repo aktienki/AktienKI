@@ -93,6 +93,26 @@ final class EvaluateStockContextFilters extends Command
         $qualityClass = $postFilterReleased ? $postFilterQualityClass : $rawQualityClass;
         $status = $released ? $qualityClass.'_active' : $qualityClass.'_documented';
 
+        $instrumentMeta = is_string($instrument->meta) ? (json_decode($instrument->meta, true) ?: []) : (array) $instrument->meta;
+        $activeVariant = (string) data_get($instrumentMeta, 'arima_validation.selected_variant', 'baseline');
+        $activeFilters = (array) ($selected['filters'] ?? []);
+        $rejectedFilters = array_values(array_diff(array_keys($filters), $activeFilters));
+        $tracking = [
+            'production_status' => $released ? 'productive' : 'documented',
+            'quality_class' => $qualityClass,
+            'evidence_level' => $postFilterEvidence,
+            'active_variant' => $activeVariant,
+            'active_filters' => $activeFilters,
+            'rejected_filters' => $rejectedFilters,
+            'trade_count_after_filters' => (int) ($selected['oos']['trades'] ?? 0),
+            'low_trade_count_is_evidence_only' => true,
+            'comment_de' => $this->trackingComment(
+                $released, $qualityClass, $postFilterEvidence, $activeVariant,
+                $activeFilters, $rejectedFilters, (array) ($selected['oos'] ?? [])
+            ),
+            'updated_at' => now()->toIso8601String(),
+        ];
+
         $evaluation = [
             'version' => 'post-filter-no-harm-v1', 'split' => $split,
             'baseline' => $baseline, 'selected' => $selected,
@@ -116,8 +136,9 @@ final class EvaluateStockContextFilters extends Command
         ];
         $payload['post_filter_evaluation'] = $evaluation;
         $payload['final_quality_class'] = $qualityClass;
+        $payload['model_tracking'] = $tracking;
         if (!$this->option('dry-run')) {
-            DB::transaction(function () use ($threshold, $instrument, $payload, $status, $released, $qualityClass): void {
+            DB::transaction(function () use ($threshold, $instrument, $payload, $status, $released, $qualityClass, $tracking): void {
                 DB::table('stock_individual_thresholds')->where('id', $threshold->id)->update([
                     'status' => $status, 'validation_passed' => $released,
                     'activated_at' => $released ? now() : null,
@@ -127,6 +148,7 @@ final class EvaluateStockContextFilters extends Command
                 $meta['model_quality_class'] = $qualityClass;
                 $meta['model_quality_policy'] = 'post-filter-no-harm-v1';
                 $meta['model_quality_updated_at'] = now()->toIso8601String();
+                $meta['model_tracking'] = $tracking;
                 if ($released) unset($meta['deactivated_reason'], $meta['deactivated_at']);
                 DB::table('instruments')->where('id', $instrument->id)->update([
                     'is_active' => $released, 'meta' => json_encode($meta, JSON_THROW_ON_ERROR), 'updated_at' => now(),
@@ -196,5 +218,29 @@ final class EvaluateStockContextFilters extends Command
         if ($trades >= 10) return 'medium';
         if ($trades >= 1) return 'low';
         return 'none';
+    }
+
+    private function trackingComment(
+        bool $released,
+        string $qualityClass,
+        string $evidence,
+        string $variant,
+        array $activeFilters,
+        array $rejectedFilters,
+        array $metrics,
+    ): string {
+        $status = $released ? 'Produktiv freigegeben' : 'Dokumentiert, derzeit nicht produktiv';
+        $filters = $activeFilters === [] ? 'keine zusätzlichen Postfilter' : implode(', ', $activeFilters);
+        $rejected = $rejectedFilters === []
+            ? 'Keine geprüften Filter wurden verworfen.'
+            : 'Nicht verbessernde Filter verworfen: '.implode(', ', $rejectedFilters).'.';
+        $trades = (int) ($metrics['trades'] ?? 0);
+        $hitRate = is_numeric($metrics['hit_rate'] ?? null) ? number_format((float) $metrics['hit_rate'], 1, ',', '.').' %' : '–';
+        $profitFactor = is_numeric($metrics['profit_factor'] ?? null) ? number_format((float) $metrics['profit_factor'], 2, ',', '.') : '–';
+        $average = is_numeric($metrics['average_return_percent'] ?? null) ? number_format((float) $metrics['average_return_percent'], 2, ',', '.').' %' : '–';
+
+        return "{$status} als ".ucfirst($qualityClass).". Variante {$variant}; aktive Filter: {$filters}. "
+            ."OOS nach Filtern: {$trades} Trades, Trefferquote {$hitRate}, Profitfaktor {$profitFactor}, Ø/Trade {$average}. "
+            ."Evidenzstufe: {$evidence}; eine geringe Tradezahl ist nur ein Evidenzhinweis und kein Ausschlussgrund. {$rejected}";
     }
 }
