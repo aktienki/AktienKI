@@ -7,6 +7,8 @@ use App\Services\YahooIndexService;
 use App\Services\HistoricalDynamicExitService;
 use App\Services\HistoricalForecastScoreRotationService;
 use App\Services\HistoricalAreaEntryRotationService;
+use App\Services\HistoricalIndicatorMatrixService;
+use App\Services\HistoricalIndicatorProbabilityService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Query\Builder;
@@ -23,7 +25,13 @@ final class RunFilteredBacktest implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 1200;
+    /**
+     * A full three-year strategy test can take considerably longer than an
+     * ordinary web/notification job. The dedicated backtests worker uses the
+     * same limit, so Laravel and the process supervisor agree about when a job
+     * is actually stale.
+     */
+    public int $timeout = 7200;
 
     public bool $failOnTimeout = true;
 
@@ -33,9 +41,11 @@ final class RunFilteredBacktest implements ShouldQueue
         public readonly int $runId,
         public readonly int $sourceRunId,
         public readonly array $filters,
-    ) {}
+    ) {
+        $this->onQueue('backtests');
+    }
 
-    public function handle(TwelveDataService $marketData, YahooIndexService $fallbackMarketData, HistoricalDynamicExitService $dynamicExits, HistoricalForecastScoreRotationService $scoreRotation, HistoricalAreaEntryRotationService $areaRotations): void
+    public function handle(TwelveDataService $marketData, YahooIndexService $fallbackMarketData, HistoricalDynamicExitService $dynamicExits, HistoricalForecastScoreRotationService $scoreRotation, HistoricalAreaEntryRotationService $areaRotations, HistoricalIndicatorMatrixService $indicatorMatrix, HistoricalIndicatorProbabilityService $indicatorProbability): void
     {
         if ($this->isCancelled()) {
             $this->clearCancellationMarker();
@@ -94,6 +104,10 @@ final class RunFilteredBacktest implements ShouldQueue
             ->whereBetween('trade.gross_return', [-1.0, 3.0])
             ->where('instrument.is_active', true)
             ->where('instrument.is_german_tradeable', true)
+            // A German listing flag is not sufficient for a historical EUR
+            // execution: without a complete listing-price history, using the
+            // native quote (USD, ZAc, GBP, ...) as EUR corrupts position sizes.
+            ->whereRaw("UPPER(COALESCE(instrument.currency, '')) = 'EUR'")
             ->whereNull('instrument.deleted_at');
 
         $drawdownMaximum = is_numeric($this->filters['drawdown_max'] ?? null)
@@ -136,12 +150,47 @@ final class RunFilteredBacktest implements ShouldQueue
 
         $this->applyFilters($query, $fundamentalNumber);
 
-        $candidates = $query->select('trade.*', 'instrument.sector as rotation_sector')
+        $candidates = $query->select(
+            'trade.*',
+            'instrument.sector as rotation_sector',
+            'instrument.currency as source_currency',
+            'instrument.german_listing_symbol as eur_listing_symbol',
+            'instrument.german_listing_exchange as eur_listing_exchange',
+        )
             ->orderBy('trade.entry_date')
             ->orderByDesc('trade.ki_score')
             ->orderByDesc('trade.confidence')
             ->orderBy('trade.id')
             ->get();
+        $sectorScoreMinimum = is_numeric($this->filters['sector_score_min'] ?? null)
+            ? max(-1.0, min(10.0, (float) $this->filters['sector_score_min'])) : -1.0;
+        if ($sectorScoreMinimum >= 0) {
+            $sectorScores = DB::table('backtest_trades as sector_trade')
+                ->join('instruments as sector_instrument', 'sector_instrument.id', '=', 'sector_trade.instrument_id')
+                ->where('sector_trade.backtest_run_id', $this->sourceRunId)
+                ->whereNotNull('sector_instrument.sector')
+                ->groupBy('sector_trade.entry_date', 'sector_instrument.sector')
+                ->get(['sector_trade.entry_date', 'sector_instrument.sector', DB::raw('AVG(sector_trade.ki_score) AS average_score')])
+                ->mapWithKeys(fn (object $row): array => [(string) $row->entry_date.'|'.(string) $row->sector => (float) $row->average_score]);
+            $candidates = $candidates->filter(fn (object $trade): bool => filled($trade->rotation_sector)
+                && (float) $sectorScores->get((string) $trade->entry_date.'|'.(string) $trade->rotation_sector, 0) > $sectorScoreMinimum)->values();
+        }
+        $candidates = $indicatorMatrix->filterEntries($candidates, $this->filters);
+        $candidates = $indicatorProbability->filter(
+            $candidates,
+            max(0.0, min(100.0, (float) ($this->filters['indicator_probability_min'] ?? 0))),
+        );
+        $minimumNoiseScore = max(0.0, min(100.0, (float) ($this->filters['noise_score_min'] ?? 0)));
+        if ($minimumNoiseScore > 0 && $candidates->isNotEmpty()) {
+            $noiseScores = DB::table('historical_noise_scores')
+                ->whereIn('instrument_id', $candidates->pluck('instrument_id')->unique())
+                ->where('calculation_version', 'noise-score-tanh-v1')
+                ->get(['instrument_id', 'signal_date', 'score'])
+                ->mapWithKeys(fn (object $row): array => [(int) $row->instrument_id.'|'.(string) $row->signal_date => (float) $row->score]);
+            $candidates = $candidates->filter(fn (object $trade): bool =>
+                (float) $noiseScores->get((int) $trade->instrument_id.'|'.(string) $trade->entry_date, -1) >= $minimumNoiseScore
+            )->values();
+        }
         $riskStyle = in_array($this->filters['entry_risk_style'] ?? null, ['conservative', 'balanced', 'chance'], true)
             ? $this->filters['entry_risk_style'] : 'balanced';
         $metrics = $candidates->groupBy('instrument_id')->map(function ($rows): array {
@@ -178,6 +227,14 @@ final class RunFilteredBacktest implements ShouldQueue
                 $row = (array) $trade;
                 unset($row['id']);
                 unset($row['rotation_sector'], $row['selection_drawdown'], $row['selection_hit_rate'], $row['selection_profit_factor']);
+                $indicatorProbability = is_numeric($row['indicator_probability'] ?? null)
+                    ? (float) $row['indicator_probability']
+                    : null;
+                unset($row['indicator_probability']);
+                $sourceCurrency = strtoupper((string) ($row['source_currency'] ?? 'EUR'));
+                $eurListingSymbol = $row['eur_listing_symbol'] ?? null;
+                $eurListingExchange = $row['eur_listing_exchange'] ?? null;
+                unset($row['source_currency'], $row['eur_listing_symbol'], $row['eur_listing_exchange']);
                 $row['backtest_run_id'] = $this->runId;
                 $row['transaction_cost'] = $positionCapital > 0 ? $tradeCost / $positionCapital : 0;
                 $row['net_return'] = (float) $trade->gross_return - (float) $row['transaction_cost'];
@@ -187,8 +244,19 @@ final class RunFilteredBacktest implements ShouldQueue
                 $row['metadata'] = json_encode([
                     ...$metadata,
                     'allocated_capital' => $positionCapital,
+                    'allocated_capital_eur' => $positionCapital,
                     'trade_cost_eur' => $tradeCost,
+                    'entry_value_eur' => $positionCapital,
+                    'exit_value_eur' => $positionCapital * (1 + (float) $row['net_return']),
+                    'execution_currency' => 'EUR',
+                    'source_quote_currency' => $sourceCurrency,
+                    'eur_listing_symbol' => $eurListingSymbol,
+                    'eur_listing_exchange' => $eurListingExchange,
+                    'execution_basis' => $sourceCurrency === 'EUR'
+                        ? 'native_eur_quote'
+                        : 'verified_german_eur_listing_return_proxy',
                     'capital_constrained' => true,
+                    'indicator_probability_20d' => $indicatorProbability,
                 ], JSON_THROW_ON_ERROR);
                 $row['created_at'] = now();
                 $row['updated_at'] = now();
@@ -197,6 +265,7 @@ final class RunFilteredBacktest implements ShouldQueue
             })->all());
         }
 
+        $indicatorMatrixSummary = $indicatorMatrix->applyExits($this->runId, $this->filters);
         if (! $this->calculateExitStrategies()) {
             $this->clearCancellationMarker();
             return;
@@ -210,6 +279,7 @@ final class RunFilteredBacktest implements ShouldQueue
             'resistance_trailing_stop' => filter_var($this->filters['resistance_trailing_stop_enabled'] ?? false, FILTER_VALIDATE_BOOL),
             'entry_wait_5d' => filter_var($this->filters['entry_wait_5d_enabled'] ?? false, FILTER_VALIDATE_BOOL),
             'signal_change_exit' => ($this->filters['exit_strategy'] ?? 'fixed_20d') === 'signal_change',
+            'forecast_below_price_exit' => ($this->filters['exit_strategy'] ?? 'fixed_20d') === 'forecast_below_price',
         ]);
         if (isset($dynamicExitSummary['rules'])) {
             $run = DB::table('backtest_runs')->where('id', $this->runId)->first(['settings']);
@@ -221,6 +291,7 @@ final class RunFilteredBacktest implements ShouldQueue
                 'resistance_trailing_stop_enabled' => 'resistance_trailing_stop',
                 'entry_wait_5d_enabled' => 'entry_wait_5d',
                 'signal_change_exit_enabled' => 'signal_change_exit',
+                'forecast_below_price_exit_enabled' => 'forecast_below_price_exit',
             ] as $filterKey => $ruleKey) data_set($settings, 'selection_filters.'.$filterKey, ! empty($dynamicExitSummary['rules'][$ruleKey]) ? 1 : 0);
             data_set($settings, 'optimization.dynamic_exit', $dynamicExitSummary);
             DB::table('backtest_runs')->where('id', $this->runId)->update(['settings' => json_encode($settings, JSON_THROW_ON_ERROR), 'updated_at' => now()]);
@@ -269,13 +340,23 @@ final class RunFilteredBacktest implements ShouldQueue
                 'max_parallel_positions' => $this->maxPositions(),
                 'trade_cost_eur' => $tradeCost,
                 'total_costs' => round($rows->count() * $tradeCost, 2),
-                'exit_strategies' => ['fixed_20d', 'adaptive_rotation_20d'],
+                'exit_strategies' => $automaticComparison
+                    ? [
+                        'fixed_20d',
+                        'adaptive_rotation_20d',
+                        ...array_values(array_filter(
+                            array_keys(HistoricalDynamicExitService::AUTOMATIC_VARIANTS),
+                            fn (string $strategy): bool => str_starts_with($strategy, 'auto_exit_'),
+                        )),
+                    ]
+                    : ['fixed_20d', 'adaptive_rotation_20d'],
                 'entry_selection_profile' => $riskStyle,
                 'automatic_strategy_comparison' => $automaticComparison,
                 'automatic_exit_comparison_summary' => $automaticExitSummary,
                 'dynamic_exit_summary' => $dynamicExitSummary,
                 'forecast_score_rotation_summary' => $scoreRotationSummary,
                 'area_entry_rotation_summary' => $areaRotationSummary,
+                'indicator_matrix_summary' => $indicatorMatrixSummary,
             ], JSON_THROW_ON_ERROR),
             'updated_at' => now(),
         ]);
@@ -360,8 +441,19 @@ final class RunFilteredBacktest implements ShouldQueue
         elseif ((bool) $filter('positive_prediction_required', false)) $query->where('trade.predicted_return', '>', 0);
         if (is_numeric($filter('volatility_max')) && (float) $filter('volatility_max') < 100) $query->where('technical.volatility_20', '<=', max(0, (float) $filter('volatility_max')) / 100);
         if (is_numeric($filter('pe_max')) && (float) $filter('pe_max') < 100) $query->whereRaw($fundamentalNumber('trailingPE').' <= ?', [(float) $filter('pe_max')]);
-        if (is_numeric($filter('dividend_yield_min')) && (float) $filter('dividend_yield_min') > 0) $query->whereRaw($fundamentalNumber('dividendYield').' >= ?', [(float) $filter('dividend_yield_min') / 100]);
+        if (is_numeric($filter('dividend_yield_min')) && ($filter('dividend_yield_operator', 'gte') === 'lte' || (float) $filter('dividend_yield_min') > 0)) {
+            $operator = $filter('dividend_yield_operator', 'gte') === 'lte' ? '<=' : '>=';
+            $query->whereRaw($fundamentalNumber('dividendYield').' '.$operator.' ?', [(float) $filter('dividend_yield_min') / 100]);
+        }
         if (is_numeric($filter('market_cap_min')) && (float) $filter('market_cap_min') > 0) $query->whereRaw($fundamentalNumber('marketCap').' >= ?', [(float) $filter('market_cap_min') * 1_000_000_000]);
+        if (in_array($filter('market_cap_group'), ['small', 'mid', 'large'], true)) {
+            $value = $fundamentalNumber('marketCap');
+            match ($filter('market_cap_group')) {
+                'small' => $query->whereRaw($value.' < ?', [2_000_000_000]),
+                'mid' => $query->whereRaw($value.' >= ? AND '.$value.' < ?', [2_000_000_000, 10_000_000_000]),
+                'large' => $query->whereRaw($value.' >= ?', [10_000_000_000]),
+            };
+        }
         if (is_numeric($filter('revenue_growth_min')) && (float) $filter('revenue_growth_min') > -50) $query->whereRaw($fundamentalNumber('revenueGrowth').' >= ?', [(float) $filter('revenue_growth_min') / 100]);
     }
 

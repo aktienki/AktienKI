@@ -2,9 +2,11 @@
 
 namespace App\Notifications;
 
+use App\Services\PredictionReminderChart;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 
 class PredictionPurchaseReminderNotification extends Notification
 {
@@ -21,20 +23,42 @@ class PredictionPurchaseReminderNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $return = (($this->currentPrice - (float) $this->reminder->purchase_price) / (float) $this->reminder->purchase_price) * 100;
-        $interested = ($this->reminder->intent ?? 'purchased') === 'interested';
-        $mail = (new MailMessage)
-            ->subject(__($interested ? 'Kauferinnerung: :symbol · :days Tage' : 'Prognose-Auswertung: :symbol · :days Tage', ['symbol' => $this->instrument->symbol, 'days' => $this->reminder->horizon_days]))
-            ->greeting(__('Hallo :name,', ['name' => $notifiable->name]))
-            ->line($interested
-                ? __('Du wolltest :name nach :days Tagen erneut als möglichen Kauf prüfen.', ['name' => $this->instrument->name, 'days' => $this->reminder->horizon_days])
-                : __('Du hast den Kauf von :name für die :days-Tage-Prognose bestätigt.', ['name' => $this->instrument->name, 'days' => $this->reminder->horizon_days]))
-            ->line(__($interested ? 'Beobachtungskurs: :price :currency' : 'Kaufkurs: :price :currency', ['price' => number_format((float) $this->reminder->purchase_price, 2, ',', '.'), 'currency' => $this->instrument->currency]))
-            ->line(__('Aktueller Kurs: :price :currency', ['price' => number_format($this->currentPrice, 2, ',', '.'), 'currency' => $this->instrument->currency]))
-            ->line(__('Entwicklung seitdem: :return %', ['return' => ($return > 0 ? '+' : '').number_format($return, 2, ',', '.')]))
-            ->line(__('Aktuelles Signal: :signal', ['signal' => $this->currentSignal]));
+        $prediction = DB::table('predictions')->where('instrument_id', $this->instrument->id)
+            ->orderByDesc('prediction_time')->orderByDesc('id')->first();
+        $history = DB::table('price_bars')->where('instrument_id', $this->instrument->id)->where('interval', '1d')
+            ->whereNotNull('close')->orderByDesc('bar_time')->limit(30)->pluck('close')->reverse()
+            ->map(fn ($value): float => (float) $value)->values()->all();
+        $forecasts = collect([5, 10, 15, 20])->mapWithKeys(function (int $days) use ($prediction): array {
+            $column = "predicted_price_{$days}d";
+            $target = is_numeric(data_get($prediction, $column)) ? (float) data_get($prediction, $column) : null;
+            if ($target === null) {
+                $target = DB::table('predictions')
+                    ->where('instrument_id', $this->instrument->id)
+                    ->where('prediction_horizon_minutes', $days * 1440)
+                    ->whereNotNull($column)
+                    ->orderByDesc('prediction_time')->orderByDesc('id')
+                    ->value($column);
+                $target = is_numeric($target) ? (float) $target : null;
+            }
 
-        return $mail->action($interested ? __('Kauf jetzt prüfen') : __('Aktie ansehen'), route('stocks.show', $this->instrument->symbol))
-            ->line(__('Dies ist eine persönliche Erinnerung und keine Anlageberatung.'));
+            return [$days => $target];
+        })->all();
+        $basePrice = max(.0001, (float) $this->reminder->purchase_price);
+        $performance = (($this->currentPrice - $basePrice) / $basePrice) * 100;
+        $logo = file_get_contents(public_path('brand/generated/bull-logo-light-clean.png'));
+        $chart = app(PredictionReminderChart::class)->render($history, $forecasts);
+
+        return (new MailMessage)
+            ->subject(__('Kauferinnerung: :symbol · aktuelle Prognosen', ['symbol' => $this->instrument->symbol]))
+            ->view('mail.prediction-purchase-reminder', [
+                'user' => $notifiable, 'reminder' => $this->reminder, 'instrument' => $this->instrument,
+                'currentPrice' => $this->currentPrice, 'currentSignal' => $this->currentSignal,
+                'performance' => $performance, 'prediction' => $prediction, 'forecasts' => $forecasts,
+                'stockUrl' => route('stocks.show', $this->instrument->symbol),
+            ])
+            ->withSymfonyMessage(function (\Symfony\Component\Mime\Email $email) use ($logo, $chart): void {
+                $email->embed($logo, 'aktienki-logo.png', 'image/png');
+                $email->embed($chart, 'prediction-chart.png', 'image/png');
+            });
     }
 }

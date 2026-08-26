@@ -3,16 +3,16 @@
 namespace App\Services;
 
 use App\Models\Prediction;
-use App\Support\ProfitFactor;
 use Illuminate\Support\Facades\DB;
 
 class ActionScoreService
 {
-    public const VERSION = 'action-v5-market-phase';
+    public const VERSION = 'action-v7-confirm4-60t-filter';
 
-    public function __construct(private readonly MacdStochasticMarketPhaseService $marketPhaseService)
-    {
-    }
+    public function __construct(
+        private readonly MacdStochasticMarketPhaseService $marketPhaseService,
+        private readonly ActionScoreFormula $formula,
+    ) {}
 
     /** @return array{score: float, signal: string, blocked: bool, components: array<string, mixed>}|null */
     public function calculate(Prediction $prediction): ?array
@@ -57,7 +57,7 @@ class ActionScoreService
             $drawdown = (float) $instrumentRisk->risk_max_drawdown;
         }
 
-        $profitFactor = ProfitFactor::cap($trade?->profit_factor);
+        $profitFactor = is_numeric($trade?->profit_factor) ? (float) $trade->profit_factor : null;
         $averageTrade = is_numeric($trade?->average_return_percent) ? (float) $trade->average_return_percent : null;
         $hitRate = is_numeric($trade?->hit_rate) ? (float) $trade->hit_rate : null;
         $tradeCount = (int) ($trade?->trades ?? 0);
@@ -81,45 +81,72 @@ class ActionScoreService
             $stability = ($yearReturns->filter(fn (float $value): bool => $value > 0)->count() / $yearReturns->count()) * 100;
         }
 
-        $values = [
-            'profit_factor' => $profitFactor !== null ? max(0, min(100, (($profitFactor - .5) / 2) * 100)) : 0,
-            'average_profit_per_trade' => $averageTrade !== null ? max(0, min(100, 50 + ($averageTrade * 12.5))) : 0,
-            'confidence' => $confidence,
-            'expected_return_20d' => max(0, min(100, 50 + ($expectedReturn * 5))),
-            'drawdown' => $drawdownPercent !== null ? max(0, min(100, 100 - ($drawdownPercent * 2))) : 0,
-            'hit_rate' => $hitRate !== null ? max(0, min(100, $hitRate)) : 0,
-            'stability' => $stability !== null ? max(0, min(100, $stability)) : 0,
-            'quality_gate' => $prediction->quality_gate_passed === true ? 100 : 0,
-        ];
-        $weights = ['profit_factor' => 20, 'average_profit_per_trade' => 10, 'confidence' => 20, 'expected_return_20d' => 15, 'drawdown' => 15, 'hit_rate' => 10, 'stability' => 5, 'quality_gate' => 5];
-        $score = round(collect($values)->sum(fn (float $value, string $key): float => $value * $weights[$key]) / 100, 2);
         $marketPhase = $this->marketPhaseService->forPrediction($prediction);
-        if ($marketPhase !== null) {
-            $score = round(max(0, min(100, $score + $marketPhase['score_adjustment'])), 2);
-        }
-
         $blockers = is_array($prediction->quality_gate_blockers)
             ? $prediction->quality_gate_blockers
             : (json_decode((string) ($prediction->quality_gate_blockers ?? '[]'), true) ?: []);
         $hardBlockers = array_values(array_filter($blockers, fn ($blocker): bool => (string) $blocker !== 'volatility'));
-        $blocked = $tradeCount < 10
-            || $averageTrade === null
-            || $averageTrade < 0
-            || $prediction->quality_gate_passed !== true
-            || $hardBlockers !== [];
-        if ($blocked) {
-            $score = min(64.0, $score);
-        }
-        if (($marketPhase['buy_veto'] ?? false) === true) {
-            $score = min(64.0, $score);
-        }
+        $result = $this->formula->calculate([
+            'profit_factor' => $profitFactor,
+            'average_trade' => $averageTrade,
+            'confidence' => $confidence,
+            'expected_return' => $expectedReturn,
+            'drawdown' => $drawdownPercent,
+            'hit_rate' => $hitRate,
+            'stability' => $stability,
+            'trade_count' => $tradeCount,
+            'quality_gate_passed' => $prediction->quality_gate_passed === true,
+            'hard_blockers' => $hardBlockers,
+        ], $marketPhase);
+        ['score' => $score, 'signal' => $signal, 'blocked' => $blocked, 'values' => $values, 'weights' => $weights] = $result;
 
-        $signal = match (true) {
-            $score >= 65 => 'BUY',
-            $score >= 55 => 'WATCH',
-            $score >= 40 => 'HOLD',
-            default => 'SELL',
-        };
+        $fusionDetails = is_array($prediction->horizon_fusion_details)
+            ? $prediction->horizon_fusion_details
+            : (json_decode((string) ($prediction->horizon_fusion_details ?? '{}'), true) ?: []);
+        $pointReturns = (array) data_get($fusionDetails, 'points_return', []);
+        $fourHorizonReturns = collect([5, 10, 15, 20])->mapWithKeys(function (int $days) use ($pointReturns): array {
+            $value = $pointReturns[$days] ?? $pointReturns[(string) $days] ?? null;
+            return [$days => is_numeric($value) ? (float) $value : null];
+        });
+        $availableConfirmations = $fourHorizonReturns->filter(fn ($value): bool => $value !== null);
+        $allFourPositive = $availableConfirmations->count() === 4
+            && $availableConfirmations->every(fn (float $value): bool => $value > 0);
+        $positiveShortConfirmations = collect([5, 10, 15])->filter(
+            fn (int $days): bool => is_numeric($fourHorizonReturns->get($days)) && (float) $fourHorizonReturns->get($days) > 0
+        )->count();
+        $primary20Positive = is_numeric($fourHorizonReturns->get(20))
+            && (float) $fourHorizonReturns->get(20) > 0;
+        // 1+ is reserved for complete positive confirmation across all four
+        // production horizons. The underlying raw score remains documented.
+        $scoreBeforeConfirmationCap = $score;
+        if ($score >= 90.0 && ! $allFourPositive) $score = 89.99;
+
+        $longHorizonContext = data_get($fusionDetails, 'long_horizon_context');
+        $longHorizonVeto = $signal === 'BUY'
+            && is_array($longHorizonContext)
+            && filter_var($longHorizonContext['decisive'] ?? false, FILTER_VALIDATE_BOOL)
+            && array_key_exists('aligned_with_primary_20d', $longHorizonContext)
+            && ! filter_var($longHorizonContext['aligned_with_primary_20d'], FILTER_VALIDATE_BOOL);
+        if ($longHorizonVeto) $signal = 'WATCH';
+
+        $primaryDirectionVeto = $signal === 'BUY' && ! $primary20Positive;
+        if ($primaryDirectionVeto) $signal = 'WATCH';
+
+        $individualThreshold = DB::table('stock_individual_thresholds')
+            ->where('instrument_id', $prediction->instrument_id)
+            ->where('horizon_days', 20)
+            ->where('algorithm_version', 'historical-action-v5-per-stock-before-context-filters')
+            ->whereNotNull('minimum_ai_score')
+            ->orderByDesc('calculated_at')
+            ->orderByDesc('id')
+            ->first(['id', 'horizon_days', 'algorithm_version', 'status', 'minimum_ai_score']);
+        $signalBeforeIndividualThreshold = $signal;
+        $individualThresholdApplied = false;
+        $individualThresholdMissing = $signal === 'BUY' && $individualThreshold === null;
+        if ($individualThresholdMissing || ($signal === 'BUY' && ($score / 10) < (float) $individualThreshold->minimum_ai_score)) {
+            $signal = 'WATCH';
+            $individualThresholdApplied = true;
+        }
 
         return [
             'score' => $score,
@@ -129,7 +156,34 @@ class ActionScoreService
                 'version' => self::VERSION, 'values' => $values, 'weights' => $weights,
                 'metrics' => compact('profitFactor', 'averageTrade', 'hitRate', 'tradeCount', 'expectedReturn', 'drawdownPercent', 'stability'),
                 'market_phase' => $marketPhase,
+                'horizon_confirmation' => [
+                    'policy' => '20d_primary_other_horizons_confirmation_only',
+                    'returns' => $fourHorizonReturns->all(),
+                    'positive_short_confirmation_count' => $positiveShortConfirmations,
+                    'all_four_positive' => $allFourPositive,
+                    'primary_20d_positive' => $primary20Positive,
+                    'primary_direction_veto_applied' => $primaryDirectionVeto,
+                    'score_before_confirmation_cap' => $scoreBeforeConfirmationCap,
+                    'score_capped_for_missing_full_confirmation' => $scoreBeforeConfirmationCap !== $score,
+                ],
+                'long_horizon_60d_filter' => [
+                    'context' => $longHorizonContext,
+                    'veto_applied' => $longHorizonVeto,
+                    'filter_only' => true,
+                ],
                 'hard_blockers' => $hardBlockers, 'blocked' => $blocked, 'walk_forward_run_ids' => $runIds->values()->all(),
+                'individual_buy_threshold' => $individualThreshold === null ? null : [
+                    'id' => (int) $individualThreshold->id,
+                    'algorithm_version' => $individualThreshold->algorithm_version,
+                    'status' => $individualThreshold->status,
+                    'calibration_horizon_days' => (int) $individualThreshold->horizon_days,
+                    'minimum_ai_score' => (float) $individualThreshold->minimum_ai_score,
+                    'applied' => $individualThresholdApplied,
+                    'decision' => $individualThresholdApplied
+                        ? 'BUY_TO_WATCH'
+                        : ($signalBeforeIndividualThreshold === 'BUY' ? 'PASSED' : 'NOT_BUY'),
+                ],
+                'individual_buy_threshold_missing_veto' => $individualThresholdMissing,
             ],
         ];
     }

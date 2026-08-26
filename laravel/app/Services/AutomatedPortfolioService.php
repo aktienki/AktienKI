@@ -246,10 +246,20 @@ final class AutomatedPortfolioService
                 $query->whereRaw('technical.volatility_20 * 100 <= ?', [(float) $filters['volatility_max']]))
             ->when((float) ($filters['pe_max'] ?? 100) < 100, fn ($query) =>
                 $query->whereRaw($fundamentalNumber('trailingPE').' <= ?', [(float) $filters['pe_max']]))
-            ->when((float) ($filters['dividend_yield_min'] ?? 0) > 0, fn ($query) =>
-                $query->whereRaw($fundamentalNumber('dividendYield').' >= ?', [(float) $filters['dividend_yield_min'] / 100]))
+            ->when(($filters['dividend_yield_operator'] ?? 'gte') === 'lte' || (float) ($filters['dividend_yield_min'] ?? 0) > 0, function ($query) use ($filters, $fundamentalNumber) {
+                $operator = ($filters['dividend_yield_operator'] ?? 'gte') === 'lte' ? '<=' : '>=';
+                return $query->whereRaw($fundamentalNumber('dividendYield').' '.$operator.' ?', [(float) ($filters['dividend_yield_min'] ?? 0) / 100]);
+            })
             ->when((float) ($filters['market_cap_min'] ?? 0) > 0, fn ($query) =>
                 $query->whereRaw($fundamentalNumber('marketCap').' >= ?', [(float) $filters['market_cap_min'] * 1_000_000_000]))
+            ->when(in_array($filters['market_cap_group'] ?? 'all', ['small', 'mid', 'large'], true), function ($query) use ($filters, $fundamentalNumber) {
+                $value = $fundamentalNumber('marketCap');
+                return match ($filters['market_cap_group']) {
+                    'small' => $query->whereRaw($value.' < ?', [2_000_000_000]),
+                    'mid' => $query->whereRaw($value.' >= ? AND '.$value.' < ?', [2_000_000_000, 10_000_000_000]),
+                    'large' => $query->whereRaw($value.' >= ?', [10_000_000_000]),
+                };
+            })
             ->when((float) ($filters['revenue_growth_min'] ?? -50) > -50, fn ($query) =>
                 $query->whereRaw($fundamentalNumber('revenueGrowth').' >= ?', [(float) $filters['revenue_growth_min'] / 100]))
             ->select([
@@ -436,11 +446,13 @@ final class AutomatedPortfolioService
         $dynamicHorizonExit = (bool) data_get($strategy->filters, 'dynamic_horizon_exit_enabled', false);
         $supportStop = (bool) data_get($strategy->filters, 'support_stop_enabled', false);
         $resistanceExit = (bool) data_get($strategy->filters, 'resistance_trailing_stop_enabled', false);
-        if (! $fixed20dExit && ! $dynamicHorizonExit && ! $supportStop && ! $resistanceExit) return;
+        $forecastBelowPriceExit = (string) data_get($strategy->filters, 'exit_strategy', '') === 'forecast_below_price'
+            || (bool) data_get($strategy->filters, 'forecast_below_price_exit_enabled', false);
+        if (! $fixed20dExit && ! $dynamicHorizonExit && ! $supportStop && ! $resistanceExit && ! $forecastBelowPriceExit) return;
 
         PortfolioPosition::query()->where('portfolio_id', $portfolio->id)->get()
             ->filter(fn (PortfolioPosition $position): bool => (int) data_get($position->meta, 'automation.strategy_id', 0) === (int) $strategy->id)
-            ->each(function (PortfolioPosition $position) use ($strategy, $portfolio, $fixed20dExit, $dynamicHorizonExit, $supportStop, $resistanceExit): void {
+            ->each(function (PortfolioPosition $position) use ($strategy, $portfolio, $fixed20dExit, $dynamicHorizonExit, $supportStop, $resistanceExit, $forecastBelowPriceExit): void {
                 $quote = DB::table('current_stock_quotes')->where('instrument_id', $position->instrument_id)
                     ->whereIn('status', ['ok', 'current'])->orderByDesc('quote_time')->orderByDesc('id')->value('price');
                 $price = is_numeric($quote) ? (float) $quote : (float) $position->current_price;
@@ -455,6 +467,12 @@ final class AutomatedPortfolioService
                 $dynamicExitDays = max(1, (int) data_get($position->meta, 'automation.exit_holding_days', 20));
                 $dynamicExitTrigger = $dynamicHorizonExit && $tradingDaysHeld >= $dynamicExitDays;
                 $supportTrigger = $supportStop && is_numeric($levels['support']) && $price < (float) $levels['support'] * .99;
+                $latestForecast = $forecastBelowPriceExit
+                    ? DB::table('predictions')->where('instrument_id', $position->instrument_id)
+                        ->orderByDesc('prediction_time')->orderByDesc('id')->value('predicted_price_20d')
+                    : null;
+                $forecastBelowPriceTrigger = $forecastBelowPriceExit && is_numeric($latestForecast)
+                    && (float) $latestForecast > 0 && (float) $latestForecast < $price;
                 $positionMeta = (array) $position->meta;
                 $trailingStop = data_get($positionMeta, 'automation.resistance_trailing_stop');
                 $profitable = $price > (float) $position->average_buy_price;
@@ -468,11 +486,12 @@ final class AutomatedPortfolioService
                     }
                 }
                 $trailingTrigger = is_numeric($trailingStop) && $price < (float) $trailingStop;
-                if (! $fixedExitTrigger && ! $dynamicExitTrigger && ! $supportTrigger && ! $trailingTrigger) return;
+                if (! $fixedExitTrigger && ! $dynamicExitTrigger && ! $supportTrigger && ! $trailingTrigger && ! $forecastBelowPriceTrigger) return;
 
                 $reason = $fixedExitTrigger ? 'fixed_20_trading_days'
                     : ($dynamicExitTrigger ? 'dynamic_prediction_horizon'
-                    : ($supportTrigger ? 'support_stop_1_percent' : 'resistance_trailing_stop'));
+                    : ($supportTrigger ? 'support_stop_1_percent'
+                    : ($trailingTrigger ? 'resistance_trailing_stop' : 'forecast_below_current_price')));
                 DB::transaction(function () use ($strategy, $position, $portfolio, $price, $levels, $reason): void {
                     $locked = PortfolioPosition::query()->lockForUpdate()->find($position->id);
                     if (! $locked) return;

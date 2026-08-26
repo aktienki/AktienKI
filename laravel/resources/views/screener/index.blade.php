@@ -6,7 +6,7 @@
         </header>
 
         @if($isFreeRegional)
-            <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[.06] px-4 py-3"><div><p class="text-[9px] font-black uppercase tracking-[.15em] text-amber-400">{{ __('Free · Regionales Top-100-Universum') }}</p><p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Der Aktienscreener zeigt ausschließlich die 100 wichtigsten Aktien deiner Region (:country).', ['country' => $regionalCountry]) }}</p></div><a href="{{ route('pricing') }}" class="text-[9px] font-black text-amber-300">{{ __('Alle Aktien ab Plus') }} →</a></div>
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[.06] px-4 py-3"><div><p class="text-[9px] font-black uppercase tracking-[.15em] text-amber-400">{{ __('Free · Regionales Top-100-Portfolio') }}</p><p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Der Aktienscreener zeigt ausschließlich die 100 wichtigsten Aktien deiner Region (:country).', ['country' => $regionalCountry]) }}</p></div><a href="{{ route('pricing') }}" class="text-[9px] font-black text-amber-300">{{ __('Alle Aktien ab Plus') }} →</a></div>
         @endif
 
         @if (session('status'))
@@ -215,6 +215,33 @@
                         $value = $stock->{"expected_return_{$days}d"} ?? null;
                         return [$days => is_numeric($value) ? (float) $value : null];
                     });
+                    $calibratedSignalQuality = data_get($stock->stock_signal_calibration, 'quality_percent');
+                    $buySignalRating = \App\Support\DirectionalSignalRating::calculate(
+                        $mobileForecasts->all(),
+                        is_numeric($calibratedSignalQuality) ? (float) $calibratedSignalQuality : $rankingScorePercent,
+                    );
+                    $buySignalScorePercent = (float) $buySignalRating['percent'];
+                    $buySignalScoreLabel = (string) $buySignalRating['label'];
+                    $buySignalScoreColor = $qualityDonutColor($buySignalScorePercent);
+                    $modelQualityBadge = match ((string) ($stock->model_quality_tier_code ?? '')) {
+                        'top' => 'Top Quality',
+                        'strong' => 'Quality',
+                        'solid' => 'Solid',
+                        'test' => 'Basic',
+                        default => ($stock->model_quality_tier_name ?? __('Validiert')),
+                    };
+                    $riskClassBadge = match (true) {
+                        $rankingRiskPercent === null => __('Nicht bewertet'),
+                        $rankingRiskPercent <= 25 => __('Defensiv'),
+                        $rankingRiskPercent <= 50 => __('Ausgewogen'),
+                        $rankingRiskPercent <= 75 => __('Dynamisch'),
+                        default => __('Spekulativ'),
+                    };
+                    $buySignalSectorStart = max(0, $buySignalScorePercent - 5);
+                    $buySignalSectorEnd = max(1, $buySignalScorePercent);
+                    $riskSectorStart = max(0, (float) ($rankingRiskPercent ?? 0) - 5);
+                    $riskSectorEnd = max(1, (float) ($rankingRiskPercent ?? 0));
+                    $signalStrength = \App\Support\SignalStrength::label($mobileForecasts[20]);
                     $priceChange = is_numeric($stock->price_change_percent ?? null) ? (float) $stock->price_change_percent : null;
                 @endphp
                 <article
@@ -229,7 +256,7 @@
                                     <b class="screener-mobile-rank">{{ $ranking > 0 ? '#'.$ranking : '—' }}</b>
                                     <span class="screener-mobile-flag" aria-label="{{ $stock->country ?: __('Land') }}">{{ $countryFlag }}</span>
                                     <span class="screener-mobile-name" title="{{ $stock->name ?: $stock->symbol }}">{{ $stock->name ?: $stock->symbol }}</span>
-                                    <x-stock-risk-status :status="$stock->risk_status ?? null" compact />
+                                    <x-stock-risk-status :status="$stock->risk_status ?? null" compact :interactive="false" />
                                 </span>
                                 <span class="screener-mobile-header-meta">
                                     <span title="{{ $stock->sector ?: __('Sektor nicht hinterlegt') }}"><x-sector-icon :sector="$stock->sector" class="h-3 w-3 shrink-0" /><small>{{ $stock->sector ?: '—' }}</small></span>
@@ -248,13 +275,13 @@
                         </span>
                         <span class="screener-mobile-summary-middle">
                             <span class="screener-mobile-score-group">
-                                <span class="screener-mobile-donut" style="--mobile-donut-value:{{ number_format($rankingScorePercent, 2, '.', '') }}%;--mobile-donut-color:{{ $rankingScoreColor }}"><span><b>{{ number_format($rankingScorePercent, 0, ',', '.') }}</b><small>{{ __('Score') }}</small></span></span>
-                                <span class="screener-mobile-donut" style="--mobile-donut-value:{{ number_format($rankingRiskPercent ?? 0, 2, '.', '') }}%;--mobile-donut-color:{{ $riskDonutColor }}"><span><b>{{ $rankingRiskPercent !== null ? number_format($rankingRiskPercent, 0, ',', '.').'%' : '—' }}</b><small>{{ __('Risiko') }}</small></span></span>
+                                <span class="screener-mobile-donut" title="{{ __('Rohwert') }}: {{ number_format($rankingScorePercent, 0, ',', '.') }}/100" style="--mobile-donut-value:{{ number_format($rankingScorePercent, 2, '.', '') }}%;--mobile-donut-color:{{ $rankingScoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($rankingScorePercent, 1, '.', '') }}"><span><b>{{ \App\Support\QualityGrade::fromPercent($rankingScorePercent) ?? '—' }}</b><small>{{ __('Score') }}</small></span></span>
+                                <span class="screener-mobile-donut screener-risk-donut" title="{{ __('Rohwert') }}: {{ $rankingRiskPercent !== null ? number_format($rankingRiskPercent, 0, ',', '.').' %' : '—' }}" style="--mobile-donut-value:{{ number_format($rankingRiskPercent ?? 0, 2, '.', '') }}%;--mobile-donut-color:{{ $riskDonutColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($rankingRiskPercent ?? 0, 1, '.', '') }}"><span><b>{{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</b><small>{{ __('Risiko') }}</small></span></span>
                             </span>
                             <span class="screener-mobile-signal-group">
                                 <span class="screener-mobile-summary-metric">
                                     <span class="screener-mobile-signal" data-signal="{{ strtolower($signal) }}">{{ $signalLabel }}</span>
-                                    <small>{{ __('Signal') }}</small>
+                                    <small>{{ __('Stärke') }} {{ $signalStrength }}</small>
                                 </span>
                                 <span class="screener-mobile-summary-metric">
                                     <span class="screener-mobile-return" data-tone="{{ $mobileForecasts[20] === null ? 'neutral' : ($mobileForecasts[20] > 0 ? 'positive' : ($mobileForecasts[20] < 0 ? 'negative' : 'neutral')) }}" title="{{ __('Mögliche Rendite in 20 Tagen') }}">
@@ -273,7 +300,7 @@
                     </button>
                     <div class="screener-mobile-details grid h-full min-h-0 gap-2 md:grid-cols-2 xl:grid-cols-6" x-bind:class="mobileExpanded && 'is-mobile-open'">
                         <div class="screener-chart-panel relative h-full min-h-0 rounded-xl border border-transparent p-3 pt-5 xl:col-span-2">
-                            <div class="grid gap-3 md:grid-cols-[.85fr_1fr]">
+                            <div class="grid gap-3 md:grid-cols-[.7fr_1.3fr]">
                                 <div class="screener-expanded-identity">
                                     <p class="screener-border-title text-amber-300">{{ __('Globales Ranking') }} @if($stock->screening_rank)<strong>#{{ $stock->screening_rank }}</strong>@endif</p>
                                     <div class="mt-1 flex items-center gap-2">
@@ -291,7 +318,6 @@
                                         <button type="button" @click.prevent.stop="signalInfoOpen = true" class="screener-signal-info-button inline-grid h-7 w-7 place-items-center rounded-lg border border-cyan-300/35 bg-cyan-400/[.08] text-cyan-300 transition hover:bg-cyan-400/[.16]" aria-label="{{ __('Signalbegründung anzeigen') }}">
                                             <x-heroicon-o-information-circle class="h-4 w-4" />
                                         </button>
-                                        <x-stock-risk-status :status="$stock->risk_status ?? null" />
                                     </span>
                                     <p class="mt-1 text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ __('Persönliches Profil') }}: {{ $stock->personal_risk_profile }}</p>
                                     <template x-teleport="body">
@@ -348,8 +374,24 @@
                                         </p>
                                     @endif
                                 </div>
-                                <p class="mt-3 text-[9px] font-black uppercase text-[var(--ak-muted)]">{{ __('Mögliche Rendite · 20 Tage') }}</p>
-                                <p class="mt-1 text-lg font-black {{ $returnClass }}">{{ $return !== null ? sprintf('%+.2f %%', $return) : '—' }}</p>
+                                <p class="mt-3 text-[9px] font-black uppercase text-[var(--ak-muted)]">{{ __('Performance · Prognosehorizonte') }}</p>
+                                <div class="screener-performance-horizons mt-1.5 grid grid-cols-2 gap-1 sm:grid-cols-4">
+                                    @foreach($mobileForecasts as $days => $forecast)
+                                        @php
+                                            $forecastBadgeTone = $forecast === null
+                                                ? 'border-slate-400/20 bg-slate-400/[.06] text-[var(--ak-muted)]'
+                                                : ($forecast > 0
+                                                    ? 'border-emerald-400/35 bg-emerald-400/[.10] text-emerald-400'
+                                                    : ($forecast < 0
+                                                        ? 'border-rose-400/35 bg-rose-400/[.10] text-rose-400'
+                                                        : 'border-amber-400/35 bg-amber-400/[.10] text-amber-400'));
+                                        @endphp
+                                        <span class="flex min-w-0 flex-col items-center justify-center rounded-md border px-1 py-1 {{ $forecastBadgeTone }}" title="{{ __('Mögliche Rendite in :days Tagen', ['days' => $days]) }}">
+                                            <small class="text-[7px] font-black uppercase tracking-wide opacity-75">{{ $days }}T</small>
+                                            <b class="max-w-full truncate text-[9px] font-black tabular-nums">{{ $forecast === null ? '—' : sprintf('%+.1f%%', $forecast) }}</b>
+                                        </span>
+                                    @endforeach
+                                </div>
                                 </div>
                             <div class="screener-expanded-chart md:col-span-2">
                                 <div class="mb-3 md:hidden">
@@ -418,43 +460,168 @@
                             </div>
                             </div>
                         </div>
-                        <div class="grid h-full min-h-0 gap-2 sm:grid-cols-2 xl:col-span-2 xl:grid-rows-[auto_auto_1fr]">
+                        <div class="screener-desktop-analysis grid h-full min-h-0 gap-2 sm:grid-cols-2 xl:col-span-2">
                             <div class="screener-transparent-panel relative rounded-xl border p-3 sm:col-span-2">
-                            <div class="screener-ranking-donuts">
-                                <div class="screener-metric-wrap screener-metric-wrap-primary"><div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingScorePercent, 2, '.', '') }}%; --donut-color: {{ $rankingScoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($rankingScorePercent, 1, '.', '') }}"><span>{{ number_format($rankingScorePercent, 0, ',', '.') }}</span></div><small>{{ __('KI-Score') }} (/100)</small></div>
-                                <div class="screener-metric-wrap"><div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingConfidencePercent, 2, '.', '') }}%; --donut-color: {{ $rankingConfidenceColor }}" role="meter" aria-label="{{ __('Konfidenz') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($rankingConfidencePercent, 1, '.', '') }}"><span>{{ number_format($rankingConfidencePercent, 0, ',', '.') }}</span></div><small>{{ __('Konf.') }} (%)</small></div>
-                                <div class="screener-metric-wrap"><div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingHitRatePercent, 2, '.', '') }}%; --donut-color: {{ $rankingHitRateColor }}" role="meter" aria-label="{{ __('Hit-Rate') }}" aria-valuemin="0" aria-valuemax="100" @if($rankingHitRateAvailable) aria-valuenow="{{ number_format($rankingHitRatePercent, 1, '.', '') }}" @endif><span>{{ $rankingHitRateAvailable ? number_format($rankingHitRatePercent, 0, ',', '.') : '—' }}</span></div><small>{{ __('Hit-Rate') }} (%)</small></div>
-                                <div class="screener-metric-wrap"><div class="screener-metric-donut ak-profit-factor-donut" style="--donut-value: {{ number_format($rankingProfitFactorPercent, 2, '.', '') }}%; --donut-color: {{ $rankingProfitFactorColor }}" role="meter" aria-label="{{ __('Profitfaktor im dreijährigen Walk-Forward-Test') }}" aria-valuemin="0" aria-valuemax="3" @if($rankingProfitFactorAvailable) data-profit-factor="{{ number_format($rankingProfitFactor, 4, '.', '') }}" aria-valuenow="{{ number_format($rankingProfitFactor, 4, '.', '') }}" @endif><span class="screener-metric-value-long">{{ $rankingProfitFactorAvailable ? number_format($rankingProfitFactor, 2, ',', '.') : '—' }}</span></div><small>{{ __('Profitfaktor') }} (0–3)</small></div>
-                                <div class="screener-metric-wrap"><div class="screener-metric-donut" style="--donut-value: {{ number_format($rankingStabilityPercent, 2, '.', '') }}%; --donut-color: {{ $rankingStabilityColor }}" role="meter" aria-label="{{ __('Stabilitätsfilter') }}" aria-valuemin="0" aria-valuemax="100" @if($rankingStabilityAvailable) aria-valuenow="{{ number_format($rankingStabilityPercent, 1, '.', '') }}" @endif><span>{{ $rankingStabilityAvailable ? number_format($rankingStabilityPercent, 0, ',', '.') : '—' }}</span></div><small>{{ __('Stabilität') }} (%)</small></div>
+                            <div class="screener-ranking-donuts screener-stock-primary-donuts">
+                                <div class="screener-model-badges" aria-label="{{ __('Modell- und Risikoeinstufung') }}">
+                                    <span class="screener-classification-badge screener-classification-badge-quality"><small>{{ __('Modell') }}</small><strong>{{ $modelQualityBadge }}</strong></span>
+                                    <span class="screener-classification-badge screener-classification-badge-risk"><small>{{ __('Risikoklasse') }}</small><strong>{{ $riskClassBadge }}</strong></span>
+                                </div>
+                                <div class="screener-metric-wrap screener-metric-wrap-primary" title="{{ __('Gewichtete Prognose') }}: {{ number_format((float) $buySignalRating['weighted_return'], 2, ',', '.') }} % · {{ __('Modellqualität') }}: {{ number_format((float) $buySignalRating['quality'], 0, ',', '.') }}/100">
+                                    @php
+                                        $buySignalSectorCenter = max(0, min(100, (float) $buySignalScorePercent));
+                                        $buySignalSectorStart = max(0, $buySignalSectorCenter - 3.5);
+                                        $buySignalSectorEnd = min(100, $buySignalSectorCenter + 3.5);
+                                    @endphp
+                                    <div class="screener-metric-donut screener-buy-signal-donut" style="--donut-value: {{ number_format($buySignalScorePercent, 2, '.', '') }}%; --donut-color: {{ $buySignalScoreColor }}; --active-sector-start: {{ $buySignalSectorStart }}%; --active-sector-end: {{ $buySignalSectorEnd }}%; --active-sector-color: {{ $buySignalScoreColor }}" role="meter" aria-label="{{ __('KI-Qualität') }} {{ $buySignalScoreLabel }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($buySignalScorePercent, 1, '.', '') }}"><span>{{ $buySignalScoreLabel }}</span></div>
+                                    <small>{{ __('KI-Qualität') }}</small>
+                                </div>
+                                <div class="screener-metric-wrap" title="{{ __('Rohwert') }}: {{ $rankingRiskPercent !== null ? number_format($rankingRiskPercent, 0, ',', '.').' %' : '—' }}">
+                                    <div class="screener-metric-donut screener-risk-donut" style="--donut-value: {{ number_format($rankingRiskPercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $riskDonutColor }}; --active-sector-start: {{ $riskSectorStart }}%; --active-sector-end: {{ $riskSectorEnd }}%; --active-sector-color: {{ $riskDonutColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" @if($rankingRiskPercent !== null) aria-valuenow="{{ number_format($rankingRiskPercent, 1, '.', '') }}" @endif><span>{{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</span></div>
+                                    <small>{{ __('Risiko') }}</small>
+                                </div>
                             </div>
                             <div class="screener-donut-spacer"></div>
                             </div>
-                            <div class="screener-transparent-panel grid grid-cols-3 gap-2 rounded-xl border px-3 py-2 sm:col-span-2">
-                                <div>
-                                    <p class="text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ __('Dividende') }}</p>
-                                    <p class="mt-0.5 text-xs font-black text-amber-200">{{ $dividendYield !== null ? number_format($dividendYield, 2, ',', '.').'%' : '—' }}</p>
+                            <div class="screener-fundamental-strip screener-transparent-panel grid grid-cols-3 overflow-hidden rounded-xl border sm:col-span-2">
+                                <div class="px-3 py-2">
+                                    <small>{{ __('Dividende') }}</small>
+                                    <b>{{ $dividendYield !== null ? number_format($dividendYield, 2, ',', '.').' %' : '—' }}</b>
                                 </div>
-                                <div class="border-l border-amber-400/15 pl-2">
-                                    <p class="text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ __('KGV') }}</p>
-                                    <p class="mt-0.5 text-xs font-black text-amber-200">{{ $priceEarningsRatio !== null ? number_format($priceEarningsRatio, 1, ',', '.') : '—' }}</p>
+                                <div class="border-x border-cyan-300/15 px-3 py-2">
+                                    <small>{{ __('KGV') }}</small>
+                                    <b>{{ $priceEarningsRatio !== null ? number_format($priceEarningsRatio, 1, ',', '.') : '—' }}</b>
                                 </div>
-                                <div class="border-l border-amber-400/15 pl-2">
-                                    <p class="text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ __('Sektorplatz') }}</p>
-                                    <p class="mt-0.5 text-xs font-black text-amber-200">{{ $stock->sector_rank ? '#'.$stock->sector_rank : '—' }}</p>
+                                <div class="px-3 py-2">
+                                    <small>{{ __('Sektorplatz') }}</small>
+                                    <b>{{ is_numeric($stock->sector_rank ?? null) ? '#'.number_format((float) $stock->sector_rank, 0, ',', '.') : '—' }}</b>
                                 </div>
                             </div>
-                            <details class="screener-transparent-panel company-description-card screener-company-card relative z-20 flex h-full min-h-0 flex-col rounded-xl border p-3 sm:col-span-2">
-                                <summary class="flex cursor-pointer list-none items-center justify-between gap-2">
-                                    <div class="min-w-0 flex-1">
-                                        <p class="text-[9px] font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Unternehmen') }}</p>
-                                        <p class="company-preview mt-2 text-xs leading-5 text-[var(--ak-muted)]">{{ $businessSummary ?: __('Unternehmensbeschreibung wird noch erstellt.') }}</p>
+                            @php
+                                $percentiles = $stock->global_percentiles ?? [];
+                                $indexPercentiles = $stock->index_percentiles ?? [];
+                                $sectorPercentiles = $stock->sector_percentiles ?? [];
+                                $percentileRows = [
+                                    [__('KI-Score'), $rankingScorePercent, 'score', '/100'],
+                                    [__('Prognose 20T'), $return, 'return_20d', '%'],
+                                    [__('Konfidenz'), $rankingConfidencePercent, 'confidence', '%'],
+                                    [__('Profitfaktor'), $rankingProfitFactorAvailable ? $rankingProfitFactor : null, 'profit_factor', ''],
+                                    [__('Hit-Rate'), $rankingHitRateAvailable ? $rankingHitRatePercent : null, 'hit_rate', '%'],
+                                    [__('Risiko'), $rankingRiskPercent, 'risk', '%'],
+                                    [__('Volatilität'), is_numeric($stock->annualized_volatility) ? (float) $stock->annualized_volatility * 100 : null, 'volatility', '%'],
+                                    [__('Indikatoren'), $stock->indicator_strength_percent, 'indicators', '%'],
+                                    [__('KGV'), $priceEarningsRatio, 'pe_ratio', ''],
+                                    [__('Dividendenrendite'), $dividendYield, 'dividend_yield', '%'],
+                                ];
+                            @endphp
+                            <div class="screener-percentile-profile screener-transparent-panel h-full min-h-0 overflow-hidden rounded-xl border sm:col-span-2">
+                                <div class="screener-company-slider hidden h-full xl:block" x-data="{ companySlide: 0, slideCount: 3 }">
+                                    <div class="flex items-center justify-between border-b border-cyan-300/15 px-3 py-2">
+                                        <div>
+                                            <p class="text-[9px] font-black uppercase tracking-[.12em] text-cyan-300" x-text="companySlide === 0 ? @js(__('Unternehmen')) : (companySlide === 2 ? @js(__('Fundamentaldaten')) : @js(__('Qualitätsprofil')))"></p>
+                                            <p class="mt-0.5 text-[8px] font-bold text-[var(--ak-muted)]" x-show="companySlide === 1">{{ __('Aktuelle Modell- und Risikobewertung') }}</p>
+                                            <p class="mt-0.5 text-[8px] font-bold text-[var(--ak-muted)]" x-show="companySlide === 2">{{ __('Die wichtigsten Unternehmenskennzahlen') }}</p>
+                                        </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <button type="button" @click="companySlide = (companySlide - 1 + slideCount) % slideCount" class="grid h-7 w-7 place-items-center rounded-lg border border-cyan-300/20 text-cyan-300 transition hover:bg-cyan-400/10" aria-label="{{ __('Vorherige Ansicht') }}"><x-heroicon-o-chevron-left class="h-3.5 w-3.5" /></button>
+                                            <template x-for="dot in slideCount" :key="dot"><button type="button" @click="companySlide = dot - 1" class="h-1.5 w-1.5 rounded-full transition" :class="companySlide === dot - 1 ? 'bg-cyan-300 scale-125' : 'bg-slate-600'" :aria-label="`Slide ${dot}`"></button></template>
+                                            <button type="button" @click="companySlide = (companySlide + 1) % slideCount" class="grid h-7 w-7 place-items-center rounded-lg border border-cyan-300/20 text-cyan-300 transition hover:bg-cyan-400/10" aria-label="{{ __('Nächste Ansicht') }}"><x-heroicon-o-chevron-right class="h-3.5 w-3.5" /></button>
+                                        </div>
                                     </div>
-                                    @if ($businessSummary)
-                                        <span aria-label="{{ __('Vollständige Unternehmensbeschreibung anzeigen') }}" class="ml-2 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cyan-300/50 bg-cyan-400/10 text-xs font-black text-cyan-200">i</span>
-                                    @endif
-                                </summary>
-                                <p class="company-description mt-2 flex-1 text-xs leading-5 text-[var(--ak-muted)]">{{ $businessSummary ?: __('Unternehmensbeschreibung wird noch erstellt.') }}</p>
-                            </details>
+                                    <div class="h-[calc(100%-3rem)] p-3">
+                                        <div x-show="companySlide === 0" x-transition.opacity class="h-full">
+                                            <p class="line-clamp-[9] text-[11px] leading-[1.65] text-[var(--ak-muted)]">{{ $businessSummary ?: __('Für dieses Unternehmen ist noch keine Beschreibung verfügbar.') }}</p>
+                                        </div>
+                                        <div x-cloak x-show="companySlide === 2" x-transition.opacity class="screener-fundamentals-slide grid h-full grid-cols-2 content-center gap-2.5">
+                                            @foreach ([
+                                                [__('KGV'), $priceEarningsRatio !== null ? number_format($priceEarningsRatio, 1, ',', '.') : '—'],
+                                                [__('Dividendenrendite'), $dividendYield !== null ? number_format($dividendYield, 2, ',', '.').' %' : '—'],
+                                                [__('Sektorplatz'), is_numeric($stock->sector_rank ?? null) ? '#'.number_format((float) $stock->sector_rank, 0, ',', '.') : '—'],
+                                                [__('Prognose 20T'), $return !== null ? (($return > 0 ? '+' : '').number_format($return, 1, ',', '.').' %') : '—'],
+                                            ] as [$fundamentalLabel, $fundamentalValue])
+                                                <div>
+                                                    <small>{{ $fundamentalLabel }}</small>
+                                                    <b>{{ $fundamentalValue }}</b>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                        <div x-cloak x-show="companySlide === 1" x-transition.opacity class="grid h-full grid-cols-3 content-center gap-x-3 gap-y-4">
+                                            @foreach ([
+                                                [__('KI-Qualität'), $rankingScorePercent, $rankingScoreColor, \App\Support\QualityGrade::fromPercent($rankingScorePercent) ?? '—', false],
+                                                [__('Konf.'), $rankingConfidencePercent, $rankingConfidenceColor, \App\Support\QualityGrade::fromPercent($rankingConfidencePercent) ?? '—', false],
+                                                [__('Hit-Rate'), $rankingHitRatePercent, $rankingHitRateColor, $rankingHitRateAvailable ? \App\Support\QualityGrade::fromPercent($rankingHitRatePercent) : '—', false],
+                                                [__('Profitfaktor'), $rankingProfitFactorPercent, $rankingProfitFactorColor, $rankingProfitFactorAvailable ? \App\Support\QualityGrade::fromPercent($rankingProfitFactorPercent) : '—', false],
+                                                [__('Stabilität'), $rankingStabilityPercent, $rankingStabilityColor, $rankingStabilityAvailable ? \App\Support\QualityGrade::fromPercent($rankingStabilityPercent) : '—', false],
+                                                [__('Risiko'), $rankingRiskPercent ?? 0, $riskDonutColor, \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—', true],
+                                            ] as [$sliderMetricLabel, $sliderMetricValue, $sliderMetricColor, $sliderMetricGrade, $sliderMetricRisk])
+                                                <div class="screener-slider-quality-metric">
+                                                    <div class="screener-metric-donut {{ $sliderMetricRisk ? 'screener-risk-donut' : '' }}" style="--donut-value: {{ number_format((float) $sliderMetricValue, 2, '.', '') }}%; --donut-color: {{ $sliderMetricColor }}"><span>{{ $sliderMetricGrade }}</span></div>
+                                                    <small>{{ $sliderMetricLabel }}</small>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between border-b border-cyan-300/15 px-3 py-2">
+                                    <p class="text-[9px] font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Perzentilprofil') }}</p>
+                                    <span class="text-[8px] font-bold uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('Vergleichsgruppen') }}</span>
+                                </div>
+                                <table class="w-full table-fixed text-left text-[10px]">
+                                    <thead class="text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">
+                                        <tr><th class="w-[31%] px-3 py-1.5">{{ __('Kennzahl') }}</th><th class="px-1 py-1.5 text-right">{{ __('Wert') }}</th><th class="px-1 py-1.5 text-right">{{ __('Global') }}</th><th class="px-1 py-1.5 text-right">{{ __('Index') }}</th><th class="px-3 py-1.5 text-right">{{ __('Sektor') }}</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($percentileRows as [$percentileLabel, $percentileValue, $percentileKey, $percentileSuffix])
+                                            <tr class="border-t border-cyan-300/10 odd:bg-slate-500/[.025]">
+                                                <td class="truncate px-3 py-1.5 font-bold text-[var(--ak-text)]">{{ $percentileLabel }}</td>
+                                                <td class="px-1 py-1.5 text-right font-black text-[var(--ak-text)]">{{ is_numeric($percentileValue) ? number_format((float) $percentileValue, $percentileSuffix === '' ? 2 : 1, ',', '.').$percentileSuffix : '—' }}</td>
+                                                @foreach([$percentiles[$percentileKey] ?? null, $indexPercentiles[$percentileKey] ?? null, $sectorPercentiles[$percentileKey] ?? null] as $comparisonPercentile)
+                                                    @php
+                                                        $percentileColorValue = $comparisonPercentile;
+                                                        $percentileTone = ! is_numeric($comparisonPercentile)
+                                                            ? 'border-slate-400/20 bg-slate-400/[.05] text-[var(--ak-muted)]'
+                                                            : match (true) {
+                                                                (float) $percentileColorValue >= 80 => 'border-emerald-400/55 bg-emerald-400/[.24] text-emerald-300 shadow-[0_0_10px_rgba(52,211,153,.12)]',
+                                                                (float) $percentileColorValue >= 60 => 'border-lime-400/45 bg-lime-400/[.17] text-lime-300',
+                                                                (float) $percentileColorValue >= 40 => 'border-amber-400/45 bg-amber-400/[.16] text-amber-300',
+                                                                (float) $percentileColorValue >= 20 => 'border-orange-400/45 bg-orange-400/[.17] text-orange-300',
+                                                                default => 'border-rose-400/55 bg-rose-400/[.22] text-rose-300',
+                                                            };
+                                                        $percentileBand = ! is_numeric($comparisonPercentile) ? 'neutral' : match (true) {
+                                                            (float) $percentileColorValue >= 75 => 'green',
+                                                            (float) $percentileColorValue >= 50 => 'yellow',
+                                                            (float) $percentileColorValue >= 25 => 'orange',
+                                                            default => 'red',
+                                                        };
+                                                    @endphp
+                                                    <td class="px-1 py-1.5 text-right last:pr-3"><span data-band="{{ $percentileBand }}" class="screener-percentile-badge inline-flex min-w-9 justify-center rounded-md border px-1 py-0.5 font-black {{ $percentileTone }}">{{ is_numeric($comparisonPercentile) ? 'P'.number_format((float) $comparisonPercentile, 0, ',', '.') : '—' }}</span></td>
+                                                @endforeach
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                                <div class="border-t border-cyan-300/15 px-3 py-2.5">
+                                    <div class="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start">
+                                        <details class="group min-w-0">
+                                            <summary class="cursor-pointer list-none">
+                                                <span class="flex items-center justify-between gap-2"><span class="text-[8px] font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Unternehmen') }}</span>@if($businessSummary)<span class="text-[8px] font-black text-cyan-300/70 group-open:hidden">{{ __('Mehr') }} ↓</span>@endif</span>
+                                                <span class="mt-1 block max-h-16 overflow-hidden text-[10px] leading-4 text-[var(--ak-muted)] group-open:hidden">{{ $businessSummary ?: __('Für dieses Unternehmen ist noch keine Beschreibung verfügbar.') }}</span>
+                                            </summary>
+                                            @if($businessSummary)<p class="mt-1 text-[10px] leading-4 text-[var(--ak-muted)]">{{ $businessSummary }}</p><span class="mt-1 inline-block text-[8px] font-black text-cyan-300/70">{{ __('Weniger') }} ↑</span>@endif
+                                        </details>
+                                        <div class="grid grid-cols-2 gap-1.5">
+                                            <div class="rounded-lg border border-cyan-300/15 bg-cyan-400/[.045] px-2 py-1.5 text-center">
+                                                <small class="block text-[7px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('KGV') }}</small>
+                                                <b class="mt-0.5 block text-[10px] font-black tabular-nums text-[var(--ak-text)]">{{ $priceEarningsRatio !== null ? number_format($priceEarningsRatio, 2, ',', '.') : '—' }}</b>
+                                            </div>
+                                            <div class="rounded-lg border border-emerald-400/15 bg-emerald-400/[.045] px-2 py-1.5 text-center">
+                                                <small class="block text-[7px] font-black uppercase tracking-[.06em] text-[var(--ak-muted)]">{{ __('Div.-Rendite') }}</small>
+                                                <b class="mt-0.5 block text-[10px] font-black tabular-nums {{ $dividendYield !== null && $dividendYield > 0 ? 'text-emerald-300' : 'text-[var(--ak-text)]' }}">{{ $dividendYield !== null ? number_format($dividendYield, 2, ',', '.').' %' : '—' }}</b>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="grid h-full min-h-0 gap-3 md:col-span-2 xl:col-span-2">
                         @if ($stock->assessment_is_detailed_buy)

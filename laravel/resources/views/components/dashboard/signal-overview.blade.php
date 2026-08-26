@@ -8,14 +8,10 @@
     $positiveShare = ($positive / $directionTotal) * 100;
     $biasPosition = max(0, min(100, (($average + 1) / 2) * 100));
     $biasColor = $average < -.05 ? '#e87989' : ($average > .05 ? '#4fbf91' : '#d6ad45');
-    $signals = ['SELL', 'HOLD', 'WATCH', 'BUY'];
+    $signals = ['SELL', 'WAIT', 'HOLD', 'WATCH', 'BUY'];
     $distribution = $stats['distribution'] ?? [];
+    $distributionChanges = app(\App\Services\SignalDistributionDeltaService::class)->changes();
     $distributionTotal = max(1, (int) ($stats['distribution_total'] ?? 0));
-    $distributionMax = max(1, (int) ($stats['distribution_max'] ?? 0));
-    $colors = [
-        'SELL' => '244,63,94', 'HOLD' => '100,116,139',
-        'WATCH' => '245,158,11', 'BUY' => '16,185,129',
-    ];
 @endphp
 
 <x-dashboard.card class="ak-standard-card ak-signal-overview-card ak-card-static ak-dashboard-card flex min-h-[240px] w-full flex-col p-4 lg:min-h-[255px]">
@@ -26,21 +22,22 @@
         <div>
             <p class="text-[10px] font-black uppercase tracking-[.18em] text-orange-400">{{ __('Signale') }}</p>
             <h3 class="mt-0.5 text-sm font-black text-[var(--ak-text)]">{{ __('Signal Bias & aktuelle Verteilung') }}</h3>
-            <p class="mt-0.5 text-[9px] text-[var(--ak-muted)]">{{ __('Richtungswechsel der letzten 5 Tage und neuestes Signal je Aktie') }}</p>
+            <p class="mt-0.5 text-[9px] text-[var(--ak-muted)]">{{ __('Richtungswechsel der letzten 5 Tage und KI-Score-Verteilung des aktiven Portfolios') }}</p>
         </div>
     </div>
 
     <div class="my-auto min-h-0 pt-1.5">
-        <section class="grid grid-cols-4 gap-1.5">
+        <section class="ak-signal-distribution-grid grid gap-1.5">
             @foreach ($signals as $signal)
                 @php
                     $count = (int) ($distribution[$signal] ?? 0);
                     $share = ($count / $distributionTotal) * 100;
-                    $intensity = $count > 0 ? .12 + (.58 * ($count / $distributionMax)) : .035;
+                    $change = (int) ($distributionChanges[$signal] ?? 0);
                 @endphp
-                <div class="ak-signal-distribution-cell" data-signal="{{ strtolower($signal) }}" style="background-color:rgba({{ $colors[$signal] }},{{ number_format($intensity, 2, '.', '') }});">
+                <div class="ak-signal-distribution-cell" data-signal="{{ strtolower($signal) }}" style="--signal-share:{{ number_format($share, 2, '.', '') }};">
                     <span>{{ $signal }}</span>
                     <strong>{{ number_format($count, 0, ',', '.') }}</strong>
+                    <em class="absolute right-2 top-1.5 text-[8px] font-black not-italic tabular-nums text-cyan-500" title="{{ __('Änderung zur vorherigen Auswertung') }}">{{ $change > 0 ? '+' : ($change < 0 ? '−' : '±') }}{{ abs($change) }}</em>
                     <small>{{ number_format($share, 0, ',', '.') }} %</small>
                 </div>
             @endforeach

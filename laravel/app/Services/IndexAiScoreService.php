@@ -10,20 +10,28 @@ class IndexAiScoreService
 {
     public function countryScores(): array
     {
-        return Cache::remember('dashboard_country_index_scores_v2', now()->addMinutes(2), function (): array {
+        return Cache::remember('dashboard_country_index_scores_v3', now()->addMinutes(2), function (): array {
             $rankedBars = DB::table('price_bars as bar')
-                ->where('bar.interval', '1d')
-                ->selectRaw('bar.instrument_id, bar.close, bar.bar_time, bar.updated_at AS observed_at, ROW_NUMBER() OVER (PARTITION BY bar.instrument_id ORDER BY bar.bar_time DESC, bar.id DESC) AS row_number');
+                ->whereIn('bar.interval', ['1m', '1d'])
+                ->selectRaw('bar.instrument_id, bar.close, bar.bar_time, bar.updated_at AS observed_at, bar.interval, ROW_NUMBER() OVER (PARTITION BY bar.instrument_id ORDER BY bar.bar_time DESC, bar.id DESC) AS row_number');
 
             $latestMoves = DB::query()
                 ->fromSub($rankedBars, 'ranked_bar')
+                ->where('row_number', 1)
+                ->select(['instrument_id', 'close as latest_close', 'bar_time as market_date', 'observed_at', 'interval as latest_interval']);
+
+            $rankedDailyBars = DB::table('price_bars as bar')
+                ->where('bar.interval', '1d')
+                ->selectRaw('bar.instrument_id, bar.close, bar.bar_time, ROW_NUMBER() OVER (PARTITION BY bar.instrument_id ORDER BY bar.bar_time DESC, bar.id DESC) AS row_number');
+
+            $dailyCloses = DB::query()
+                ->fromSub($rankedDailyBars, 'ranked_daily_bar')
                 ->where('row_number', '<=', 2)
                 ->groupBy('instrument_id')
                 ->selectRaw('instrument_id')
-                ->selectRaw('MAX(close) FILTER (WHERE row_number = 1) AS latest_close')
-                ->selectRaw('MAX(close) FILTER (WHERE row_number = 2) AS previous_close')
-                ->selectRaw('MAX(bar_time) FILTER (WHERE row_number = 1) AS market_date')
-                ->selectRaw('MAX(observed_at) FILTER (WHERE row_number = 1) AS observed_at');
+                ->selectRaw('MAX(close) FILTER (WHERE row_number = 1) AS latest_daily_close')
+                ->selectRaw('MAX(bar_time) FILTER (WHERE row_number = 1) AS latest_daily_date')
+                ->selectRaw('MAX(close) FILTER (WHERE row_number = 2) AS previous_daily_close');
 
             $indices = DB::table('market_indices as market_index')
                 ->join('instruments as instrument', function ($join): void {
@@ -32,14 +40,15 @@ class IndexAiScoreService
                 })
                 ->joinSub($latestMoves, 'latest_move', fn ($join) =>
                     $join->on('latest_move.instrument_id', '=', 'instrument.id'))
+                ->joinSub($dailyCloses, 'daily_close', fn ($join) =>
+                    $join->on('daily_close.instrument_id', '=', 'instrument.id'))
                 ->where('market_index.is_active', true)
                 ->where('instrument.is_active', true)
                 ->whereNull('instrument.deleted_at')
                 ->whereNotNull('market_index.country')
                 ->where('market_index.country', '<>', '')
                 ->whereNotNull('latest_move.latest_close')
-                ->whereNotNull('latest_move.previous_close')
-                ->where('latest_move.previous_close', '>', 0)
+                ->whereNotNull('daily_close.latest_daily_close')
                 ->orderBy('market_index.global_rank')
                 ->get([
                     'market_index.country',
@@ -48,9 +57,12 @@ class IndexAiScoreService
                     'market_index.global_rank',
                     'instrument.currency',
                     'latest_move.latest_close',
-                    'latest_move.previous_close',
                     'latest_move.market_date',
                     'latest_move.observed_at',
+                    'latest_move.latest_interval',
+                    'daily_close.latest_daily_close',
+                    'daily_close.latest_daily_date',
+                    'daily_close.previous_daily_close',
                 ]);
 
             return $indices
@@ -58,11 +70,20 @@ class IndexAiScoreService
                 ->reject(fn ($countryIndices, string $country): bool => $country === 'EU')
                 ->map(function ($countryIndices): array {
                     $representative = $countryIndices->first();
-                    $changes = $countryIndices->map(fn ($index): float =>
-                        (((float) $index->latest_close - (float) $index->previous_close) / (float) $index->previous_close) * 100);
+                    $changes = $countryIndices->map(function ($index): ?float {
+                        $latestDate = \Carbon\Carbon::parse($index->market_date)->toDateString();
+                        $dailyDate = \Carbon\Carbon::parse($index->latest_daily_date)->toDateString();
+                        $previousClose = $latestDate > $dailyDate
+                            ? (float) $index->latest_daily_close
+                            : (float) ($index->previous_daily_close ?? 0);
+
+                        return $previousClose > 0
+                            ? (((float) $index->latest_close - $previousClose) / $previousClose) * 100
+                            : null;
+                    })->filter(fn ($change) => $change !== null);
 
                     return [
-                        'change' => round((float) $changes->avg(), 2),
+                        'change' => $changes->isNotEmpty() ? round((float) $changes->avg(), 2) : null,
                         'indices' => $countryIndices->count(),
                         'index_name' => (string) $representative->name,
                         'index_symbol' => (string) $representative->symbol,

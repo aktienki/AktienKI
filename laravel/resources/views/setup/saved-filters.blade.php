@@ -80,7 +80,7 @@
                                     $displayValue = $key === 'model' && is_array($value)
                                         ? collect($value)->map(fn ($id) => $modelAliases[(int) $id] ?? '#'.$id)->implode(', ')
                                         : ($key === 'exit_strategy'
-                                            ? (['fixed_20d' => __('20 Tage'), 'winner_runner' => __('Winner Runner'), 'prediction_target' => __('Prognoseziel'), 'buy_and_hold' => __('Buy and Hold')][$value] ?? $value)
+                                            ? (['fixed_20d' => __('20 Tage'), 'signal_change' => __('Signal- oder Marktphasenwechsel'), 'forecast_below_price' => __('Prognose unter Kurs'), 'winner_runner' => __('Winner Runner'), 'prediction_target' => __('Prognoseziel'), 'buy_and_hold' => __('Buy and Hold')][$value] ?? $value)
                                         : (in_array($key, ['sector_score_rotation', 'index_score_rotation'], true)
                                             ? ((int) $value === 1 ? __('Aktiv') : __('Inaktiv'))
                                             : (is_array($value) ? implode(', ', $value) : $value)));

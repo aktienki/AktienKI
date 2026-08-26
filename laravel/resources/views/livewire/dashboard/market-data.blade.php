@@ -2,6 +2,19 @@
 
 @php
     $score = $overallAssessment['score'] ?? collect($dailyAiScores)->last()['y'] ?? null;
+    $scoreHistory = collect($dailyAiScores)
+        ->pluck('y')
+        ->filter(fn ($value) => is_numeric($value))
+        ->map(fn ($value) => (float) $value)
+        ->values();
+    $previousScore = $scoreHistory->count() >= 2 ? $scoreHistory->get($scoreHistory->count() - 2) : null;
+    $scoreChange = $score !== null && $previousScore !== null ? (float) $score - $previousScore : null;
+    $scoreChangePercent = $scoreChange !== null && abs($previousScore) > 0.00001
+        ? ($scoreChange / $previousScore) * 100
+        : null;
+    $scoreChangeTone = $scoreChange === null || abs($scoreChange) < 0.00001
+        ? 'neutral'
+        : ($scoreChange > 0 ? 'positive' : 'negative');
     $positiveMarkets = (int) ($overallAssessment['positiveMarkets'] ?? 0);
     $marketCount = max(1, (int) ($overallAssessment['marketCount'] ?? count($markets)));
     $breadth = ($positiveMarkets / $marketCount) * 100;
@@ -23,6 +36,24 @@
     };
 @endphp
 
+<style>
+    .ak-market-command .ak-market-hero-stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: .65rem;
+    }
+    @media (min-width: 768px) {
+        .ak-market-command .ak-market-hero-stats {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        }
+    }
+    @media (min-width: 1024px) {
+        .ak-market-command .ak-market-command-hero > .relative.grid {
+            grid-template-columns: minmax(0, .9fr) minmax(560px, 1.1fr) !important;
+        }
+    }
+</style>
+
 <section class="ak-container ak-market-command py-5 lg:py-7">
     <header class="ak-market-command-hero ak-detail-hero">
         <div class="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(330px,.8fr)] lg:items-end">
@@ -39,11 +70,25 @@
                 </p>
             </div>
 
-            <div class="grid grid-cols-3 gap-2 sm:gap-3">
+            <div class="ak-market-hero-stats">
                 <div class="ak-market-hero-stat">
                     <span>{{ __('KI-Score') }}</span>
                     <strong>{{ $score !== null ? number_format($score, 1, ',', '.') : '—' }}</strong>
                     <small>/ 10</small>
+                </div>
+                <div class="ak-market-hero-stat ak-market-score-change" data-change="{{ $scoreChangeTone }}">
+                    <span>{{ __('Zu gestern') }}</span>
+                    <strong>
+                        @if ($scoreChange !== null)
+                            <i aria-hidden="true">{{ $scoreChangeTone === 'positive' ? '↗' : ($scoreChangeTone === 'negative' ? '↘' : '→') }}</i>
+                            {{ $scoreChange >= 0 ? '+' : '' }}{{ number_format($scoreChange, 1, ',', '.') }}
+                        @else
+                            —
+                        @endif
+                    </strong>
+                    <small>
+                        {{ $scoreChangePercent !== null ? (($scoreChangePercent >= 0 ? '+' : '').number_format($scoreChangePercent, 1, ',', '.').' %') : '—' }}
+                    </small>
                 </div>
                 <div class="ak-market-hero-stat">
                     <span>{{ __('Marktbreite') }}</span>
@@ -59,7 +104,7 @@
         </div>
     </header>
 
-    <div class="ak-market-tape ak-detail-panel ak-standard-card mt-4 grid gap-px overflow-hidden sm:grid-cols-2 lg:grid-cols-5">
+    <div class="ak-market-tape ak-detail-panel ak-standard-card mt-4 grid gap-px overflow-hidden">
         @foreach ($markets as $market)
             @php $change = $market['change'] ?? null; @endphp
             <div class="ak-market-tape-item">
@@ -91,15 +136,15 @@
 
     <x-dashboard.macro-indicator-cards :cards="$macroCards" />
 
-    <article class="ak-market-briefing ak-detail-panel ak-standard-card mt-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="ak-market-eyebrow">{{ $isExternalAiReport ? __('Externer Marktbericht') : __('Regelbasierter Marktbericht') }}</p>
-            <span class="rounded-lg border border-cyan-400/20 bg-cyan-400/[.06] px-2.5 py-1 text-[9px] font-black uppercase tracking-[.1em] text-cyan-400">{{ $isExternalAiReport ? __('Aktuelle Web-Recherche') : __('Datenbasierte Auswertung') }}</span>
+    <article x-data="{ marketReportOpen: window.innerWidth >= 768 }" class="ak-market-briefing ak-detail-panel ak-standard-card mt-4">
+        <div class="flex items-center justify-between gap-3">
+            <button type="button" @click="marketReportOpen = ! marketReportOpen" :aria-expanded="marketReportOpen.toString()" class="min-w-0 flex-1 text-left"><p class="ak-market-eyebrow">{{ $isExternalAiReport ? __('Externer Marktbericht') : __('Regelbasierter Marktbericht') }}</p><h2 class="mt-1 truncate text-xl font-black tracking-[-.025em] text-[var(--ak-text)] sm:text-2xl">{{ $analysisHeadline }}</h2></button>
+            <span class="flex shrink-0 items-center gap-2"><span class="hidden rounded-lg border border-cyan-400/20 bg-cyan-400/[.06] px-2.5 py-1 text-[9px] font-black uppercase tracking-[.1em] text-cyan-400 sm:inline-flex">{{ $isExternalAiReport ? __('Aktuelle Web-Recherche') : __('Datenbasierte Auswertung') }}</span><button type="button" @click="marketReportOpen = ! marketReportOpen" class="grid h-9 w-9 place-items-center rounded-lg border border-cyan-400/25 text-cyan-500" aria-label="{{ __('Marktbericht aufklappen') }}"><x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="marketReportOpen && 'rotate-180'" /></button></span>
         </div>
-        <h2 class="mt-3 text-2xl font-black tracking-[-.025em] text-[var(--ak-text)]">{{ $analysisHeadline }}</h2>
+        <div x-show="marketReportOpen" x-cloak x-transition.opacity>
         <p class="mt-3 max-w-5xl text-sm leading-6 text-[var(--ak-muted)]">{{ $analysisSummary }}</p>
         @if ($analysisMetrics->isNotEmpty())
-            <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="ak-market-analysis-metrics mt-4 grid gap-2">
                 @foreach ($analysisMetrics as $metric)
                     <div class="rounded-xl border border-cyan-400/15 bg-cyan-400/[.04] px-3 py-2.5">
                         <p class="text-[8px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ $metric['label'] }}</p>
@@ -119,22 +164,23 @@
             <span>{{ $isExternalAiReport ? __('Markteinschätzung mit aktuellen externen Quellen · keine Anlageberatung') : __('Regelbasierte Auswertung aktueller Marktdaten · keine Anlageberatung') }}</span>
             @if (!empty($marketAnalysis['date']))<span>{{ __('Analyse vom') }} {{ \Illuminate\Support\Carbon::parse($marketAnalysis['date'])->format('d.m.Y') }}</span>@endif
         </footer>
+        </div>
     </article>
 
-    <section class="mt-4" aria-labelledby="market-opportunities-risks-title">
-        <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
-            <div>
+    <section x-data="{ opportunitiesRisksOpen: window.innerWidth >= 768 }" class="mt-4" aria-labelledby="market-opportunities-risks-title">
+        <div class="flex items-center justify-between gap-3" :class="opportunitiesRisksOpen ? 'mb-3' : ''">
+            <button type="button" @click="opportunitiesRisksOpen = ! opportunitiesRisksOpen" :aria-expanded="opportunitiesRisksOpen.toString()" class="min-w-0 flex-1 text-left">
                 <p class="ak-market-eyebrow">{{ __('Bericht') }}</p>
-                <h2 id="market-opportunities-risks-title" class="mt-1 text-xl font-black text-[var(--ak-text)]">{{ __('Chancen & Risiken') }}</h2>
-            </div>
-            @if (!empty($marketAnalysis['date']))
-                <span class="text-[9px] font-bold uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ __('Analyse vom') }} {{ \Illuminate\Support\Carbon::parse($marketAnalysis['date'])->format('d.m.Y') }}</span>
-            @endif
+                <h2 id="market-opportunities-risks-title" class="mt-1 truncate text-xl font-black text-[var(--ak-text)]">{{ __('Chancen & Risiken') }}</h2>
+                <span class="mt-1 block text-[9px] font-bold uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ $opportunities->count() }} {{ __('Chancen') }} · {{ $risks->count() }} {{ __('Risiken') }}</span>
+            </button>
+            <span class="flex shrink-0 items-center gap-2">@if (!empty($marketAnalysis['date']))<span class="hidden text-[9px] font-bold uppercase tracking-[.1em] text-[var(--ak-muted)] sm:inline">{{ __('Analyse vom') }} {{ \Illuminate\Support\Carbon::parse($marketAnalysis['date'])->format('d.m.Y') }}</span>@endif<button type="button" @click="opportunitiesRisksOpen = ! opportunitiesRisksOpen" class="grid h-9 w-9 place-items-center rounded-lg border border-cyan-400/25 text-cyan-500" aria-label="{{ __('Chancen und Risiken aufklappen') }}"><x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="opportunitiesRisksOpen && 'rotate-180'" /></button></span>
         </div>
+        <div x-show="opportunitiesRisksOpen" x-cloak x-transition.opacity>
         @if($isRegionalFreeView)
             <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[.06] px-4 py-3">
                 <div>
-                    <p class="text-[9px] font-black uppercase tracking-[.15em] text-amber-400">{{ __('Free · Regionales Aktienuniversum') }}</p>
+                    <p class="text-[9px] font-black uppercase tracking-[.15em] text-amber-400">{{ __('Free · Regionales Portfolio') }}</p>
                     <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Chancen und Risiken basieren auf den 100 wichtigsten Aktien deiner Region (:country).', ['country' => $regionalCountry]) }}</p>
                 </div>
                 <a href="{{ route('pricing') }}" class="inline-flex h-9 items-center rounded-lg border border-amber-400/30 bg-amber-400/[.08] px-3 text-[9px] font-black text-amber-300 transition hover:bg-amber-400/[.15]">{{ __('Internationale Auswahl ab Plus') }} →</a>
@@ -172,6 +218,7 @@
                     </ul>
                 </article>
             @endforeach
+        </div>
         </div>
     </section>
 

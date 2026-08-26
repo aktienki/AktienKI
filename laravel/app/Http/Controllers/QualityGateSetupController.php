@@ -73,7 +73,7 @@ final class QualityGateSetupController extends Controller
             'score_min' => ['required', 'numeric', 'between:0,10'],
             'confidence_min' => ['required', 'numeric', 'between:0,100'],
             'risk_max' => ['required', 'numeric', 'between:0,100'],
-            'predicted_return_min' => ['required', 'numeric', 'between:-50,100'],
+            'predicted_return_min' => ['required', 'numeric', 'between:0.5,10'],
             'drawdown_max' => ['required', 'numeric', 'between:0,100'],
             'profit_factor_min' => ['required', 'numeric', 'between:0,3'],
             'hit_rate_min' => ['required', 'numeric', 'between:0,100'],

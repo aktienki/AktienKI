@@ -1,0 +1,15 @@
+[Unit]
+Description=Download and atomically replace the Deutsche Boerse certificates archive
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aktienki
+Group=aktienki
+ExecStart=/home/aktienki/AktienKI/scripts/sync-deutsche-boerse-certificates.sh
+ExecStartPost=/home/aktienki/AktienKI/python-engine-v2/.venv/bin/python /home/aktienki/AktienKI/scripts/import-deutsche-boerse-certificates.py
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

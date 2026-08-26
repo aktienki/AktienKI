@@ -124,7 +124,277 @@
             }
         }
 
+        #stock-detail-page .stock-mobile-indicators {
+            display: block;
+            flex: 0 0 100%;
+            width: 100%;
+            margin-top: .25rem;
+        }
+
+        #stock-detail-page .stock-mobile-indicators > summary {
+            min-height: 2.25rem;
+            padding: .45rem .65rem;
+        }
+
         @media (max-width: 767px) {
+            #stock-detail-page #indicator-statistics .stock-indicator-chart-shell {
+                display: none !important;
+            }
+
+            #stock-detail-page #indicator-statistics > .grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: .5rem !important;
+            }
+
+            #stock-detail-page #indicator-statistics article {
+                height: auto !important;
+                min-height: 5rem;
+                padding: .6rem !important;
+            }
+
+            #stock-detail-page #indicator-statistics .stock-indicator-card-head {
+                height: 100%;
+                align-items: center !important;
+                padding-bottom: 0 !important;
+                border-bottom: 0 !important;
+            }
+
+            #stock-detail-page {
+                padding-top: .5rem !important;
+                padding-bottom: .5rem !important;
+            }
+
+            #stock-detail-page .stock-detail-header {
+                margin-bottom: .65rem !important;
+                gap: .65rem !important;
+                padding-bottom: .65rem !important;
+            }
+
+            #stock-detail-page .stock-company-summary {
+                align-items: flex-start !important;
+                gap: .65rem !important;
+            }
+
+            #stock-detail-page .stock-company-mark {
+                width: 2.75rem !important;
+                height: 2.75rem !important;
+                border-radius: .8rem !important;
+                font-size: 1rem !important;
+            }
+
+            #stock-detail-page .stock-company-heading {
+                align-items: center;
+                gap: .4rem !important;
+            }
+
+            #stock-detail-page .stock-company-title {
+                display: -webkit-box !important;
+                overflow: hidden !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+                font-size: 1.12rem !important;
+                line-height: 1.25 !important;
+                white-space: normal !important;
+                -webkit-box-orient: vertical;
+                -webkit-line-clamp: 2;
+            }
+
+            #stock-detail-page .stock-company-symbol {
+                padding: .22rem .5rem !important;
+                font-size: .66rem !important;
+            }
+
+            #stock-detail-page .stock-company-meta {
+                margin-top: .3rem !important;
+                align-items: flex-start !important;
+                font-size: .68rem !important;
+                line-height: 1rem !important;
+            }
+
+            #stock-detail-page .stock-header-actions {
+                width: 100%;
+                gap: .4rem !important;
+            }
+
+            #stock-detail-page .stock-header-actions :is(button, a) {
+                height: 2.25rem !important;
+            }
+
+            #stock-detail-page .stock-header-report {
+                padding-inline: .65rem !important;
+            }
+
+            #stock-detail-page .stock-header-back {
+                width: auto !important;
+                min-width: 0;
+                flex: 1 1 auto;
+                padding-inline: .65rem !important;
+            }
+
+            #stock-detail-page .stock-signal-transition {
+                width: 100% !important;
+                height: 2.65rem !important;
+                min-height: 2.65rem !important;
+                flex: 1 0 100% !important;
+                justify-content: center;
+                gap: .4rem !important;
+                padding: .4rem .55rem !important;
+                font-size: .64rem !important;
+                line-height: .85rem;
+            }
+
+            #stock-detail-page .stock-chart-mobile-action {
+                width: 100% !important;
+                min-height: 1.9rem !important;
+                flex: none !important;
+                justify-content: center !important;
+                margin: 0 !important;
+                padding: .3rem .45rem !important;
+                font-size: .56rem !important;
+                line-height: .8rem !important;
+                text-align: center;
+            }
+
+            #stock-detail-page .stock-chart-toolbar {
+                display: grid !important;
+                width: 100%;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                align-items: stretch !important;
+                gap: .3rem !important;
+                overflow: hidden;
+            }
+
+            #stock-detail-page .stock-chart-live-stack {
+                position: absolute;
+                top: .4rem;
+                right: 1.4rem;
+                display: flex !important;
+                width: 8.25rem;
+                flex-direction: column;
+                align-items: stretch;
+                gap: .3rem;
+            }
+
+            #stock-detail-page .stock-chart-live-stack > * {
+                width: 100%;
+                min-width: 0 !important;
+                max-width: 100%;
+                overflow: hidden;
+            }
+
+            #stock-detail-page #stock-chart-card .stock-detail-card-head {
+                position: relative;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: .5rem !important;
+                min-height: 0;
+            }
+
+            #stock-detail-page #stock-chart-card .stock-detail-card-head > div:first-of-type {
+                width: 100%;
+                min-width: 0;
+            }
+
+            #stock-detail-page #stock-chart-card .stock-detail-card-head > div:first-of-type > :is(p, h2) {
+                max-width: calc(100% - 9.25rem);
+            }
+
+            #stock-detail-page #stock-chart-period-buttons {
+                display: grid !important;
+                width: 100%;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: .25rem !important;
+                margin-top: 1.1rem !important;
+            }
+
+            #stock-detail-page #stock-chart-period-buttons button {
+                min-width: 0;
+                padding: .32rem .15rem !important;
+                font-size: .52rem !important;
+            }
+
+            #stock-detail-page .stock-chart-live-stack > [data-stock-live-card],
+            #stock-detail-page .stock-chart-live-stack > [data-stock-live-change] {
+                min-height: 2.4rem;
+                padding: .35rem .5rem !important;
+            }
+
+            #stock-detail-page .stock-chart-mobile-action svg {
+                width: .9rem !important;
+                height: .9rem !important;
+            }
+
+            #stock-detail-page #stock-chart-fullscreen {
+                width: 100%;
+                height: 2.65rem !important;
+                min-height: 2.65rem !important;
+                justify-self: stretch;
+            }
+
+            #stock-detail-page .stock-mobile-indicators {
+                display: block;
+                width: calc(100% - .65rem);
+                max-width: calc(100% - .65rem);
+                flex: 0 0 auto !important;
+                align-self: flex-start;
+                grid-column: 1 / -1;
+                margin-top: 0 !important;
+                overflow: hidden;
+            }
+
+            #stock-detail-page .stock-mobile-indicators > summary {
+                min-height: 1.95rem;
+                padding: .35rem .55rem !important;
+            }
+
+            #stock-detail-page .stock-signal-transition-date {
+                width: 100%;
+                margin-left: 0 !important;
+                font-size: .52rem;
+                text-align: center;
+            }
+
+            #stock-detail-page .stock-signal-transition {
+                flex-wrap: wrap;
+                row-gap: .2rem !important;
+            }
+
+            #stock-detail-page .stock-signal-transition-date {
+                margin-left: auto;
+                opacity: .9 !important;
+                white-space: nowrap;
+            }
+
+            @media (max-width: 390px) {
+                #stock-detail-page .stock-chart-live-stack {
+                    right: 1rem;
+                    width: 7.6rem;
+                }
+
+                #stock-detail-page #stock-chart-card .stock-detail-card-head > div:first-of-type > :is(p, h2),
+                #stock-detail-page #stock-chart-period-buttons {
+                    width: calc(100% - 8.2rem);
+                    max-width: calc(100% - 8.2rem);
+                }
+
+                #stock-detail-page #stock-chart-period-buttons {
+                    display: grid;
+                    grid-template-columns: repeat(5, minmax(0, 1fr));
+                }
+
+                #stock-detail-page #stock-chart-period-buttons button {
+                    min-width: 0;
+                }
+            }
+
+            :root[data-theme="light"] #stock-detail-page .stock-signal-transition {
+                border-color: rgba(217, 119, 6, .48) !important;
+                background: rgba(254, 243, 199, .82) !important;
+                color: #a65306 !important;
+                box-shadow: 0 4px 12px rgba(180, 83, 9, .10);
+            }
+
             #stock-detail-page .stock-analysis-donuts {
                 display: grid !important;
                 grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -172,6 +442,47 @@
             align-items: center;
             justify-content: center;
             gap: .3rem;
+        }
+
+        /* The composite KI score is the primary assessment and therefore gets
+           a clearly larger chart than its supporting quality metrics. */
+        #stock-detail-page .stock-analysis-donuts .screener-metric-donut {
+            width: 3.65rem;
+            height: 3.65rem;
+            min-width: 3.65rem;
+            min-height: 3.65rem;
+            flex: 0 0 3.65rem;
+        }
+
+        #stock-detail-page .stock-analysis-donuts .screener-metric-donut-score {
+            width: 4.75rem;
+            height: 4.75rem;
+            min-width: 4.75rem;
+            min-height: 4.75rem;
+            flex: 0 0 4.75rem;
+            box-shadow: 0 0 24px color-mix(in srgb, var(--donut-color) 30%, transparent);
+        }
+
+        #stock-detail-page .stock-analysis-donuts .screener-metric-donut-score span {
+            font-size: 1.05rem;
+        }
+
+        @media (max-width: 767px) {
+            #stock-detail-page .stock-analysis-donuts .screener-metric-donut {
+                width: 2.7rem;
+                height: 2.7rem;
+                min-width: 2.7rem;
+                min-height: 2.7rem;
+                flex-basis: 2.7rem;
+            }
+
+            #stock-detail-page .stock-analysis-donuts .screener-metric-donut-score {
+                width: 3.35rem;
+                height: 3.35rem;
+                min-width: 3.35rem;
+                min-height: 3.35rem;
+                flex-basis: 3.35rem;
+            }
         }
 
         #stock-detail-page .stock-analysis-donut-label {
@@ -496,9 +807,13 @@
         $riskPercent = \App\Support\RiskScore::toPercent(
             $prediction?->risk_score,
             $prediction?->drawdown_risk_factor,
-            $modelQuality?->maximum_drawdown,
+            data_get($modelQuality, 'maximum_drawdown'),
+            data_get($detailWalkForwardStats, 'return_volatility_percent'),
         );
         $signal = strtoupper((string) ($prediction?->personalized_signal ?? 'HOLD'));
+        $signalStrength = \App\Support\SignalStrength::label(
+            is_numeric(data_get($horizonTargets, '20.return')) ? (float) data_get($horizonTargets, '20.return') : null
+        );
         $isQualityGateRestrictedBuy = $signal === 'HOLD'
             && strtoupper((string) ($prediction?->signal ?? '')) === 'BUY'
             && ! (bool) ($prediction?->quality_gate_passed ?? false);
@@ -510,8 +825,8 @@
             && (bool) ($prediction?->quality_gate_passed ?? false)
             && $allHorizonsPositive
             && $scorePercent !== null && $scorePercent >= 80
-            && is_numeric($modelQuality?->profit_factor) && (float) $modelQuality->profit_factor >= 1.5
-            && is_numeric($detailWalkForwardStats?->hit_rate) && (float) $detailWalkForwardStats->hit_rate >= 60
+            && is_numeric(data_get($modelQuality, 'profit_factor')) && (float) data_get($modelQuality, 'profit_factor') >= 1.5
+            && is_numeric(data_get($detailWalkForwardStats, 'hit_rate')) && (float) data_get($detailWalkForwardStats, 'hit_rate') >= 60
             && $confidencePercent !== null && $confidencePercent >= 75
             && $riskPercent !== null && $riskPercent <= 30
             && (bool) ($prediction?->horizon_fusion_stability_passed ?? false)
@@ -559,6 +874,17 @@
             default => '#a78bfa',
         };
         $isInAnyWatchlist = $instrumentWatchlistIds->isNotEmpty();
+        $headerIndicatorProbability = $indicatorCards
+            ->pluck('currentProbability')
+            ->filter(fn ($value) => is_numeric($value))
+            ->avg();
+        $headerIndicatorDirection = $headerIndicatorProbability === null
+            ? '→'
+            : ((float) $headerIndicatorProbability >= 55 ? '↗' : ((float) $headerIndicatorProbability < 45 ? '↘' : '→'));
+        $headerIndicatorCards = $indicatorCards
+            ->filter(fn (array $card): bool => is_numeric($card['currentProbability'] ?? null))
+            ->take(5)
+            ->values();
         $outlook20dPercent = is_numeric($prediction?->predicted_price_20d)
             && is_numeric($prediction?->current_price)
             && (float) $prediction->current_price !== 0.0
@@ -618,20 +944,25 @@
         id="stock-detail-page"
         class="mx-auto flex h-[calc(100vh-73px)] min-h-0 w-full max-w-screen-2xl flex-col py-4 supports-[height:100dvh]:h-[calc(100dvh-73px)]"
     >
-        <header class="mb-4 flex shrink-0 flex-col justify-between gap-4 border-b border-[var(--ak-border)] pb-3 sm:flex-row sm:items-end">
-            <div class="flex min-w-0 items-center gap-4">
+        <header class="stock-detail-header mb-4 flex shrink-0 flex-col justify-between gap-4 border-b border-[var(--ak-border)] pb-3 sm:flex-row sm:items-end">
+            <div class="stock-company-summary flex min-w-0 items-center gap-4">
                 <span class="stock-company-mark flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border text-xl font-black">
                     {{ strtoupper(substr($instrument->symbol, 0, 2)) }}
                 </span>
-                <div class="min-w-0">
+                <div class="stock-company-copy min-w-0">
                     <div class="flex flex-wrap items-center gap-2.5">
-                        <div class="flex flex-wrap items-center gap-2">
+                        <div class="stock-company-heading flex min-w-0 flex-wrap items-center gap-2">
                             <h1 class="stock-company-title inline-flex max-w-full truncate rounded-xl border px-3.5 py-1.5 text-2xl font-black text-[var(--ak-text)] shadow-[0_10px_28px_rgba(0,0,0,.12)]">{{ $instrument->name }}</h1>
-                            <x-stock-risk-status :status="$instrument->risk_status" />
+                            <x-stock-risk-status
+                                :status="$instrument->risk_status"
+                                :profit-per-trade="$instrument->risk_profit_factor"
+                                :confidence="$instrument->risk_confidence"
+                                :drawdown="$instrument->risk_max_drawdown"
+                            />
                         </div>
                         <span class="stock-company-symbol rounded-lg px-2.5 py-1 text-xs font-black">{{ $instrument->symbol }}</span>
                     </div>
-                    <p class="mt-1 flex items-center gap-1.5 text-sm text-[var(--ak-muted)]">
+                    <p class="stock-company-meta mt-1 flex items-center gap-1.5 text-sm text-[var(--ak-muted)]">
                         <x-sector-icon :sector="$instrument->sector" class="h-4 w-4 shrink-0 text-teal-500" />
                         <span>{{ __($instrument->sector ?: 'Keine Branche') }}
                         @if ($instrument->industry) · {{ $instrument->industry }} @endif
@@ -640,7 +971,7 @@
                     </p>
                 </div>
             </div>
-            <div class="flex shrink-0 items-center gap-2 self-start sm:self-auto">
+            <div class="stock-header-actions flex shrink-0 items-center gap-2 self-start sm:self-auto">
                 @if ($userWatchlists->count() === 1)
                     @php
                         $singleWatchlist = $userWatchlists->first();
@@ -691,16 +1022,51 @@
 
                 <x-paper-depot-buy :portfolios="$paperPortfolios" :instrument-id="$instrument->id" :instrument-name="$instrument->name" :currency="$instrument->currency" :price="$prediction?->current_price" :score="\App\Support\AiScore::toPercent($prediction?->display_score_10 ?? $prediction?->prediction_score)" />
 
-                <a href="{{ route('stocks.report', ['symbol' => $instrument->symbol, 'prediction' => $prediction?->id, 'v' => now()->timestamp]) }}" title="{{ __('Ausführlichen PDF-Bericht für :stock herunterladen', ['stock' => $instrument->name]) }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 text-[10px] font-black uppercase tracking-wide text-cyan-400 transition hover:border-cyan-400/50 hover:bg-cyan-400/15">
+                <a data-stock-report-link href="{{ route('stocks.report', ['symbol' => $instrument->symbol, 'prediction' => $prediction?->id, 'v' => now()->timestamp]) }}" title="{{ __('Ausführlichen PDF-Bericht für :stock herunterladen', ['stock' => $instrument->name]) }}" class="stock-header-report inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 text-[10px] font-black uppercase tracking-wide text-cyan-400 transition hover:border-cyan-400/50 hover:bg-cyan-400/15">
                     <x-heroicon-o-document-arrow-down class="h-4 w-4" />
                     <span>{{ __('Bericht') }}</span>
                 </a>
 
-                <a href="{{ $returnTo ?: ($requestedPredictionId > 0 ? route('predictions.index') : route('stocks.index')) }}" class="inline-flex h-10 w-44 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 text-xs font-bold text-[var(--ak-muted)] transition hover:border-violet-400/30 hover:text-[var(--ak-text)]">
+                <dialog id="stock-report-delivery-dialog" class="m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-cyan-400/30 bg-[var(--ak-card)] p-0 text-[var(--ak-text)] shadow-2xl backdrop:bg-slate-950/70">
+                    <div class="p-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <div><p class="text-[9px] font-black uppercase tracking-[.15em] text-cyan-400">{{ __('Aktienbericht') }}</p><h2 class="mt-1 text-lg font-black">{{ __('Bericht erhalten') }}</h2></div>
+                            <button type="button" data-stock-report-close class="grid h-9 w-9 place-items-center rounded-xl border border-[var(--ak-border)] text-[var(--ak-muted)]" aria-label="{{ __('Schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
+                        </div>
+                        <p class="mt-3 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Möchten Sie den aktuellen Bericht per E-Mail erhalten oder direkt als PDF herunterladen?') }}</p>
+                        <div class="mt-5 grid gap-2">
+                            <form method="POST" action="{{ route('stocks.report.email', ['symbol' => $instrument->symbol, 'prediction' => $prediction?->id]) }}">@csrf
+                                <button type="submit" class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-400/15 text-xs font-black text-cyan-400"><x-heroicon-o-envelope class="h-4 w-4" />{{ __('Per E-Mail senden') }}</button>
+                            </form>
+                            <a data-stock-report-download href="{{ route('stocks.report', ['symbol' => $instrument->symbol, 'prediction' => $prediction?->id, 'v' => now()->timestamp]) }}" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 text-xs font-black text-amber-400"><x-heroicon-o-document-arrow-down class="h-4 w-4" />{{ __('PDF herunterladen') }}</a>
+                        </div>
+                    </div>
+                </dialog>
+
+                <a href="{{ $returnTo ?: ($requestedPredictionId > 0 ? route('predictions.index') : route('stocks.index')) }}" class="stock-header-back inline-flex h-10 w-44 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 text-xs font-bold text-[var(--ak-muted)] transition hover:border-violet-400/30 hover:text-[var(--ak-text)]">
                     <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" /><span class="truncate">{{ $returnLabel ?: ($requestedPredictionId > 0 ? __('Zurück zu Prognosen') : __('Zur Aktienliste')) }}</span>
                 </a>
             </div>
         </header>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const reportLink = document.querySelector('[data-stock-report-link]');
+                const reportDialog = document.querySelector('#stock-report-delivery-dialog');
+                const closeButton = reportDialog?.querySelector('[data-stock-report-close]');
+                if (!reportLink || !reportDialog) return;
+
+                reportLink.addEventListener('click', event => {
+                    if (!window.matchMedia('(max-width: 767px)').matches) return;
+                    event.preventDefault();
+                    reportDialog.showModal();
+                });
+                closeButton?.addEventListener('click', () => reportDialog.close());
+                reportDialog.addEventListener('click', event => {
+                    if (event.target === reportDialog) reportDialog.close();
+                });
+            });
+        </script>
 
         <div
             class="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 pb-3"
@@ -719,66 +1085,21 @@
                     <x-heroicon-o-arrows-pointing-in class="h-4 w-4" />
                     {{ __('Vollbild beenden') }}
                 </button>
-                <div class="stock-detail-card-head flex shrink-0 items-start justify-between gap-3">
+                <div class="stock-detail-card-head flex shrink-0 flex-wrap items-start justify-between gap-3">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Kurschart') }}</p>
                         <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Kursentwicklung') }}</h2>
                         <p class="mt-1 text-xs text-[var(--ak-muted)]">
-                            {{ __('Tageskerzen · Zeitraum und Indikatoren frei wählbar') }}
+                            {{ __('Tageskerzen · Zeitraum frei wählbar') }}
                         </p>
                         <div id="stock-chart-period-buttons" class="mt-2 flex flex-wrap items-center gap-1 sm:flex-nowrap">
                             @foreach ([22 => '1M', 66 => '3M', 132 => '6M', 252 => '1J', 0 => 'Max'] as $periodDays => $periodLabel)
                                 <button type="button" data-chart-period="{{ $periodDays }}" aria-pressed="{{ $periodDays === 22 ? 'true' : 'false' }}" class="min-w-0 rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-wide transition {{ $periodDays === 22 ? 'border-cyan-400/35 bg-cyan-400/15 text-cyan-400' : 'border-[var(--ak-border)] bg-[var(--ak-surface-muted)] text-[var(--ak-muted)] hover:border-cyan-400/25 hover:text-[var(--ak-text)]' }}">{{ $periodLabel }}</button>
                             @endforeach
                         </div>
-                        <details class="group mt-1.5 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] {{ $canUseChartIndicators ? '' : 'opacity-55 grayscale' }}">
-                            <summary aria-disabled="{{ $canUseChartIndicators ? 'false' : 'true' }}" class="flex list-none items-center justify-between gap-3 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)] transition [&::-webkit-details-marker]:hidden {{ $canUseChartIndicators ? 'cursor-pointer hover:text-cyan-400' : 'pointer-events-none cursor-not-allowed' }}">
-                                <span class="inline-flex items-center gap-2">
-                                    <x-heroicon-o-adjustments-horizontal class="h-4 w-4 text-cyan-400" />
-                                    {{ __('Indikatoren') }}
-                                    @unless ($canUseChartIndicators)
-                                        <span class="ak-plan-badge ak-plan-badge--plus">PLUS</span>
-                                    @endunless
-                                </span>
-                                <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform group-open:rotate-180" />
-                            </summary>
-                            <div id="stock-indicator-buttons" class="flex flex-wrap items-center gap-1.5 border-t border-[var(--ak-border)] px-2.5 py-2.5">
-                            <span id="stock-chart-pattern-badge" class="{{ empty($chartPatterns) ? 'hidden ' : '' }}mb-1 inline-flex w-full items-start gap-2 rounded-lg border border-cyan-400/25 bg-cyan-400/[.07] px-2.5 py-2 text-[9px] font-black uppercase leading-relaxed tracking-wide text-cyan-300">
-                                <x-heroicon-o-chart-bar class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                <span data-pattern-label>{{ collect($chartPatterns)->pluck('name')->join(' · ') }}</span>
-                            </span>
-                            @foreach ([
-                                'rsi' => 'RSI 14', 'sma20' => 'SMA 20', 'sma50' => 'SMA 50', 'sma200' => 'SMA 200',
-                                'ema20' => 'EMA 20', 'ema50' => 'EMA 50', 'bollinger' => 'Bollinger', 'sar' => 'SAR',
-                                'macd' => 'MACD', 'adx' => 'ADX 14', 'atr' => 'ATR 14', 'stochastic' => 'Stochastik',
-                                'cci' => 'CCI 20', 'mfi' => 'MFI 14', 'vwap' => 'VWAP', 'obv' => 'OBV',
-                                'williams' => 'Williams %R', 'roc' => 'ROC 12', 'volatility' => 'Volatilität', 'momentum' => 'Momentum 10',
-                                'support' => 'Unterstützung', 'resistance' => 'Widerstand', 'patterns' => 'Chartmuster',
-                            ] as $indicator => $indicatorLabel)
-                                <button
-                                    type="button"
-                                    data-indicator="{{ $indicator }}"
-                                    @disabled(! $canUseChartIndicators)
-                                    aria-pressed="false"
-                                    class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)] transition hover:border-violet-400/25 hover:text-[var(--ak-text)]"
-                                >
-                                    {{ $indicatorLabel }}
-                                </button>
-                            @endforeach
-                            <button
-                                type="button"
-                                data-chart-reset
-                                @disabled(! $canUseChartIndicators)
-                                title="{{ __('Chart zurücksetzen') }}"
-                                aria-label="{{ __('Chart zurücksetzen') }}"
-                                class="inline-flex items-center gap-1 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)] transition hover:border-violet-400/25 hover:text-[var(--ak-text)]"
-                            >
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />Reset
-                            </button>
-                            </div>
-                        </details>
                     </div>
-                    <div class="flex flex-wrap items-center justify-end gap-2">
+                    <div class="stock-chart-toolbar flex flex-wrap items-center justify-end gap-2">
+                        <div class="stock-chart-live-stack contents">
                         <div data-stock-live-card class="rounded-xl border border-cyan-500/25 bg-cyan-500/[.09] px-3 py-1.5 text-right transition-colors duration-300">
                             <p
                                 data-live-symbol="{{ $instrument->symbol }}"
@@ -799,10 +1120,8 @@
                             <strong data-stock-live-change-value class="text-[11px] font-black tabular-nums">—</strong>
                             <small class="mt-0.5 text-[7px] font-black uppercase tracking-wide opacity-75">{{ __('Tagesperformance') }}</small>
                         </span>
-                        <span class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-2 text-[10px] font-bold text-[var(--ak-muted)]">
-                            {{ $chartCandles->count() }} {{ __('Tage') }}
-                        </span>
-                        <span class="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/20 bg-amber-400/[.08] px-2.5 py-2 text-[9px] font-black uppercase tracking-wide text-amber-500">
+                        </div>
+                        <span class="stock-chart-mobile-action inline-flex items-center gap-1.5 rounded-xl border border-amber-400/20 bg-amber-400/[.08] px-2.5 py-2 text-[9px] font-black uppercase tracking-wide text-amber-500">
                             <i class="h-0.5 w-5 rounded-full bg-amber-500"></i>{{ __('Historischer KI-Score') }}
                         </span>
                         <button
@@ -810,10 +1129,10 @@
                             onclick="document.getElementById('stock-horizon-stability-modal')?.showModal()"
                             title="{{ __('Stabilitätswerte der Prognosehorizonte') }}"
                             aria-label="{{ __('Stabilitätswerte anzeigen') }}"
-                            class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-cyan-400/40 bg-cyan-400/15 px-2.5 text-[9px] font-black uppercase tracking-wide text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,.12)] transition hover:border-cyan-300/70 hover:bg-cyan-400/20"
+                            class="stock-chart-mobile-action inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-cyan-400/40 bg-cyan-400/15 px-2.5 text-[9px] font-black uppercase tracking-wide text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,.12)] transition hover:border-cyan-300/70 hover:bg-cyan-400/20"
                         >
                             <x-heroicon-o-adjustments-horizontal class="h-4 w-4" />
-                            <span>{{ __('Filterwerte') }}</span>
+                            <span>{{ __('Performance seit Signal') }}</span>
                         </button>
                         @if ($latestSignalTransition)
                             @php
@@ -826,14 +1145,14 @@
                                 };
                             @endphp
                             <span
-                                class="inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[9px] font-black uppercase tracking-wide {{ $transitionClasses }}"
+                                class="stock-chart-mobile-action stock-signal-transition inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[9px] font-black uppercase tracking-wide {{ $transitionClasses }}"
                                 title="{{ __('Letzter Signalwechsel') }}"
                             >
                                 <i class="h-4 border-l border-dashed border-current opacity-70"></i>
                                 {{ strtoupper((string) ($latestSignalTransition['from'] ?? '—')) }}
                                 <x-heroicon-o-arrow-right class="h-3 w-3" />
                                 {{ $transitionTarget }}
-                                <span class="opacity-70">· {{ \Carbon\CarbonImmutable::createFromTimestampMs((int) $latestSignalTransition['x'])->format('d.m.Y') }}</span>
+                                <span class="stock-signal-transition-date opacity-70">{{ \Carbon\CarbonImmutable::createFromTimestampMs((int) $latestSignalTransition['x'])->format('d.m.Y') }}</span>
                             </span>
                         @endif
                         <button
@@ -850,6 +1169,65 @@
                             @unless ($canUseChartZoom)<span class="ak-plan-badge ak-plan-badge--pro">PRO</span>@endunless
                         </button>
                     </div>
+                    @if ($canUseChartIndicators && $headerIndicatorCards->isNotEmpty())
+                        <div class="grid w-full grid-cols-5 gap-1 md:hidden" aria-label="{{ __('Steigwahrscheinlichkeit je Indikator') }}">
+                            @foreach ($headerIndicatorCards as $headerIndicatorCard)
+                                @php
+                                    $headerProbability = (float) $headerIndicatorCard['currentProbability'];
+                                    $headerIndicatorTone = $headerProbability >= 65
+                                        ? 'border-emerald-400/55 bg-emerald-400/15 text-emerald-400'
+                                        : ($headerProbability >= 55
+                                            ? 'border-lime-400/50 bg-lime-400/12 text-lime-400'
+                                            : ($headerProbability >= 45
+                                                ? 'border-amber-400/50 bg-amber-400/12 text-amber-400'
+                                                : 'border-rose-400/50 bg-rose-400/12 text-rose-400'));
+                                    $headerIndicatorShortLabel = match ($headerIndicatorCard['field'] ?? '') {
+                                        'stochK' => 'STOCH',
+                                        'volatility' => 'VOLA',
+                                        default => strtoupper(str_replace([' 14', ' 20T'], '', (string) ($headerIndicatorCard['label'] ?? 'IND'))),
+                                    };
+                                @endphp
+                                <span class="flex min-w-0 flex-col items-center justify-center rounded-lg border px-1 py-1 {{ $headerIndicatorTone }}">
+                                    <small class="max-w-full truncate text-[6px] font-black uppercase tracking-wide">{{ $headerIndicatorShortLabel }}</small>
+                                    <strong class="text-[9px] font-black tabular-nums">{{ number_format($headerProbability, 0, ',', '.') }} %</strong>
+                                </span>
+                            @endforeach
+                        </div>
+                    @endif
+                    <details class="stock-mobile-indicators group rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] {{ $canUseChartIndicators ? '' : 'opacity-55 grayscale' }}">
+                        <summary aria-disabled="{{ $canUseChartIndicators ? 'false' : 'true' }}" class="flex list-none items-center justify-between gap-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)] [&::-webkit-details-marker]:hidden {{ $canUseChartIndicators ? 'cursor-pointer' : 'pointer-events-none cursor-not-allowed' }}">
+                            <span class="inline-flex items-center gap-2">
+                                <x-heroicon-o-adjustments-horizontal class="h-4 w-4 text-cyan-500" />
+                                {{ __('Indikatoren') }}
+                                @unless ($canUseChartIndicators)<span class="ak-plan-badge ak-plan-badge--plus">PLUS</span>@endunless
+                            </span>
+                            <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform group-open:rotate-180" />
+                        </summary>
+                        <div id="stock-indicator-buttons" class="flex max-h-36 flex-wrap items-center gap-1.5 overflow-y-auto border-t border-[var(--ak-border)] p-2">
+                            <span id="stock-chart-pattern-badge" class="{{ empty($chartPatterns) ? 'hidden ' : '' }}mb-1 inline-flex w-full items-start gap-2 rounded-lg border border-cyan-400/25 bg-cyan-400/[.07] px-2 py-1.5 text-[8px] font-black uppercase leading-relaxed text-cyan-400">
+                                <x-heroicon-o-chart-bar class="h-3.5 w-3.5 shrink-0" />
+                                <span data-pattern-label>{{ collect($chartPatterns)->pluck('name')->join(' · ') }}</span>
+                            </span>
+                            @foreach ([
+                                'rsi' => 'RSI 14', 'sma20' => 'SMA 20', 'sma50' => 'SMA 50', 'sma200' => 'SMA 200',
+                                'ema20' => 'EMA 20', 'ema50' => 'EMA 50', 'bollinger' => 'Bollinger', 'sar' => 'SAR',
+                                'macd' => 'MACD', 'adx' => 'ADX 14', 'atr' => 'ATR 14', 'stochastic' => 'Stochastik',
+                                'cci' => 'CCI 20', 'mfi' => 'MFI 14', 'vwap' => 'VWAP', 'obv' => 'OBV',
+                                'williams' => 'Williams %R', 'roc' => 'ROC 12', 'volatility' => 'Volatilität', 'momentum' => 'Momentum 10',
+                                'support' => 'Unterstützung', 'resistance' => 'Widerstand', 'patterns' => 'Chartmuster',
+                            ] as $indicator => $indicatorLabel)
+                                <button type="button" data-indicator="{{ $indicator }}" @disabled(! $canUseChartIndicators) aria-pressed="false" class="rounded-md border border-[var(--ak-border)] bg-[var(--ak-card)] px-2 py-1 text-[8px] font-black uppercase text-[var(--ak-muted)]">
+                                    {{ $indicatorLabel }}
+                                </button>
+                            @endforeach
+                            <button type="button" data-chart-reset @disabled(! $canUseChartIndicators) class="inline-flex items-center gap-1 rounded-md border border-[var(--ak-border)] bg-[var(--ak-card)] px-2 py-1 text-[8px] font-black uppercase text-[var(--ak-muted)]">
+                                <x-heroicon-o-arrow-path class="h-3 w-3" />Reset
+                            </button>
+                        </div>
+                        @if ($canUseChartIndicators)
+                            <div id="stock-indicator-statistics-slot" class="hidden border-t border-[var(--ak-border)] p-3"></div>
+                        @endif
+                    </details>
                 </div>
                 @if ($chartCandles->isNotEmpty())
                     <div class="relative min-h-[160px] min-w-0 flex-1 overflow-hidden lg:min-h-0">
@@ -879,61 +1257,75 @@
                     </div>
                 @endif
             </article>
-            <dialog id="stock-horizon-stability-modal" class="m-auto w-[min(94vw,920px)] rounded-2xl border border-cyan-400/30 bg-[var(--ak-card)] p-0 text-[var(--ak-text)] shadow-2xl backdrop:bg-slate-950/75">
+            @php
+                $performanceBuyTransition = $historicalSignalTransitions
+                    ->reverse()
+                    ->first(fn (array $transition): bool => strtoupper((string) ($transition['to'] ?? '')) === 'BUY');
+                $performanceBuyAt = $performanceBuyTransition
+                    ? (int) ($performanceBuyTransition['x'] ?? 0)
+                    : null;
+                $performanceCandles = $performanceBuyAt
+                    ? $chartCandles->filter(fn (array $candle): bool => (int) ($candle['x'] ?? 0) >= $performanceBuyAt)->values()
+                    : collect();
+                $performanceBuyPrice = is_numeric($performanceBuyTransition['price'] ?? null)
+                    ? (float) $performanceBuyTransition['price']
+                    : (is_numeric(data_get($performanceCandles->first(), 'y.3')) ? (float) data_get($performanceCandles->first(), 'y.3') : null);
+                $performanceCurrentPrice = is_numeric(data_get($performanceCandles->last(), 'y.3'))
+                    ? (float) data_get($performanceCandles->last(), 'y.3')
+                    : null;
+                $performanceCurrentReturn = $performanceBuyPrice && $performanceCurrentPrice !== null
+                    ? (($performanceCurrentPrice / $performanceBuyPrice) - 1) * 100
+                    : null;
+                $performanceElapsedDays = max(0, $performanceCandles->count() - 1);
+            @endphp
+            <dialog id="stock-horizon-stability-modal" class="m-auto w-[min(94vw,720px)] rounded-2xl border border-cyan-400/30 bg-[var(--ak-card)] p-0 text-[var(--ak-text)] shadow-2xl backdrop:bg-slate-950/75">
                 <div class="border-b border-[var(--ak-border)] px-5 py-4">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-400">{{ __('Prognosestabilität') }}</p>
-                            <h2 class="mt-1 text-lg font-black">{{ __('Werte je Horizont') }}</h2>
-                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Noise- und Stabilitätswerte der Prognosen für 5, 10, 15 und 20 Handelstage.') }}</p>
+                            <p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-400">{{ __('Performance seit Signal') }}</p>
+                            <h2 class="mt-1 text-lg font-black">{{ __('Entwicklung seit dem letzten BUY') }}</h2>
+                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Ausschließlich realisierte Kurse nach dem letzten Signalwechsel auf BUY.') }}</p>
                         </div>
                         <button type="button" onclick="this.closest('dialog').close()" aria-label="{{ __('Schließen') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)] hover:text-cyan-400">
                             <x-heroicon-o-x-mark class="h-5 w-5" />
                         </button>
                     </div>
                 </div>
-                <div class="overflow-x-auto p-5">
-                    <table class="w-full min-w-[760px] text-left text-xs">
+                <div class="p-5">
+                    @if ($performanceBuyTransition && $performanceBuyPrice !== null)
+                        <div class="mb-4 grid grid-cols-3 gap-2">
+                            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('BUY-Signal') }}</small><strong class="mt-1 block text-xs">{{ \Carbon\CarbonImmutable::createFromTimestampMs($performanceBuyAt)->format('d.m.Y') }}</strong></div>
+                            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Signalkurs') }}</small><strong class="mt-1 block text-xs">{{ number_format($performanceBuyPrice, 2, ',', '.') }} {{ $currency }}</strong></div>
+                            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Bis heute') }}</small><strong class="mt-1 block text-xs {{ $performanceCurrentReturn >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $performanceCurrentReturn !== null ? (($performanceCurrentReturn > 0 ? '+' : '').number_format($performanceCurrentReturn, 2, ',', '.').' %') : '—' }}</strong></div>
+                        </div>
+                    @endif
+                    <table class="w-full table-fixed text-left text-xs">
                         <thead class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                             <tr class="border-b border-[var(--ak-border)]">
                                 <th class="px-2 py-2">{{ __('Horizont') }}</th>
-                                <th class="px-2 py-2">{{ __('Kursziel') }}</th>
-                                <th class="px-2 py-2">{{ __('Rendite') }}</th>
-                                <th class="px-2 py-2">{{ __('Stabilität') }}</th>
-                                <th class="px-2 py-2">{{ __('Richtungskonsistenz') }}</th>
-                                <th class="px-2 py-2">{{ __('Streuung') }}</th>
-                                <th class="px-2 py-2">{{ __('Noise') }}</th>
-                                <th class="px-2 py-2">{{ __('Stabilitätsfilter') }}</th>
+                                <th class="px-2 py-2">{{ __('Realer Kurs') }}</th>
+                                <th class="px-2 py-2">{{ __('Reale Rendite') }}</th>
+                                <th class="px-2 py-2">{{ __('Status') }}</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ([5, 10, 15, 20] as $days)
                                 @php
-                                    $stability = $horizonStability[$days] ?? [];
+                                    $realizedCandle = $performanceCandles->get($days);
+                                    $realizedPrice = is_numeric(data_get($realizedCandle, 'y.3')) ? (float) data_get($realizedCandle, 'y.3') : null;
+                                    $realizedReturn = $performanceBuyPrice && $realizedPrice !== null ? (($realizedPrice / $performanceBuyPrice) - 1) * 100 : null;
                                 @endphp
                                 <tr class="border-b border-[var(--ak-border)]/70 last:border-0">
                                     <td class="px-2 py-3 font-black text-cyan-400">{{ $days }}T</td>
-                                    <td class="px-2 py-3 font-bold">{{ is_numeric($stability['price'] ?? null) ? number_format((float) $stability['price'], 2, ',', '.').' '.$currency : '—' }}</td>
-                                    <td class="px-2 py-3 font-black {{ !is_numeric($stability['return'] ?? null) ? 'text-[var(--ak-muted)]' : ((float) $stability['return'] >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ is_numeric($stability['return'] ?? null) ? (((float) $stability['return'] > 0 ? '+' : '').number_format((float) $stability['return'], 2, ',', '.').' %') : '—' }}</td>
-                                    <td class="px-2 py-3">{{ is_numeric($stability['stability_score'] ?? null) ? number_format((float) $stability['stability_score'] * 100, 1, ',', '.').' %' : __('Keine Daten') }}</td>
-                                    <td class="px-2 py-3">{{ is_numeric($stability['direction_consistency'] ?? null) ? number_format((float) $stability['direction_consistency'] * 100, 1, ',', '.').' %' : __('Keine Daten') }}</td>
-                                    <td class="px-2 py-3">{{ is_numeric($stability['dispersion'] ?? null) ? number_format((float) $stability['dispersion'] * 100, 2, ',', '.').' %' : __('Keine Daten') }}</td>
-                                    @foreach (['noise_passed', 'stability_passed'] as $gate)
-                                        <td class="px-2 py-3">
-                                            @if (($stability[$gate] ?? null) === null)
-                                                <span class="text-[var(--ak-muted)]">{{ __('Keine Daten') }}</span>
-                                            @elseif ($stability[$gate])
-                                                <span class="font-black text-emerald-400">{{ __('Bestanden') }}</span>
-                                            @else
-                                                <span class="font-black text-rose-400">{{ __('Nicht bestanden') }}</span>
-                                            @endif
-                                        </td>
-                                    @endforeach
+                                    <td class="px-2 py-3 font-bold">{{ $realizedPrice !== null ? number_format($realizedPrice, 2, ',', '.').' '.$currency : '—' }}</td>
+                                    <td class="px-2 py-3 font-black {{ $realizedReturn === null ? 'text-[var(--ak-muted)]' : ($realizedReturn >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ $realizedReturn !== null ? (($realizedReturn > 0 ? '+' : '').number_format($realizedReturn, 2, ',', '.').' %') : '—' }}</td>
+                                    <td class="px-2 py-3">@if($realizedPrice !== null)<span class="font-black text-emerald-400">{{ __('Realisiert') }}</span>@else<span class="text-amber-400">{{ __('Offen') }} · {{ $performanceElapsedDays }}/{{ $days }}T</span>@endif</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                    <p class="mt-4 text-[10px] leading-5 text-[var(--ak-muted)]">{{ __('Hinweis: Noise-Filter und Horizontfusion bewerten die gemeinsame Form der Prognosekurve. Identische Fusionswerte in mehreren Zeilen sind daher möglich.') }}</p>
+                    @unless ($performanceBuyTransition && $performanceBuyPrice !== null)<p class="py-6 text-center text-sm text-[var(--ak-muted)]">{{ __('Kein auswertbares BUY-Signal im verfügbaren Kurszeitraum.') }}</p>@endunless
+                    <p class="mt-4 text-[10px] leading-5 text-[var(--ak-muted)]">{{ __('Berechnung auf Basis der tatsächlichen Tages-Schlusskurse. Der Signalhandelstag zählt als Ausgangspunkt; Gebühren sind nicht berücksichtigt.') }}</p>
                 </div>
             </dialog>
 
@@ -943,14 +1335,111 @@
                         <p class="text-[10px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Aktuelle KI-Analyse') }}</p>
                         <h2 class="mt-1 font-black text-[var(--ak-text)]">{{ __('Persönliche Einordnung') }}</h2>
                     </div>
+                    <div class="flex flex-wrap items-center justify-end gap-2">
                     @if ($signal === 'WAIT' && $canViewRealtime)
                         <button type="button" onclick="document.getElementById('entry-signal-alert-modal')?.showModal()" class="inline-flex h-8 min-w-24 items-center justify-center gap-1.5 rounded-lg border border-emerald-300/70 bg-emerald-400/25 px-3 text-xs font-black text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,.22)] transition hover:bg-emerald-400/35">
                             <x-heroicon-o-clock class="h-4 w-4" />{{ $signalLabel }}
                         </button>
                     @else
-                        <span data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isStrongBuy ? __('Alle Qualitätskriterien und Prognosehorizonte sind positiv') : ($isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel) }}" class="ak-signal-badge inline-flex h-8 min-w-20 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-black {{ $signalClass }}"><span>{{ $isStrongBuy ? 'STRONG BUY' : $signalLabel }}</span>@if($isQualityGateRestrictedBuy)<small class="ak-restricted-buy-label">BUY*</small>@endif</span>
+                        <span data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isStrongBuy ? __('Alle Qualitätskriterien und Prognosehorizonte sind positiv') : ($isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel) }}" class="ak-signal-badge inline-flex h-8 min-w-20 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-black {{ $signalClass }}"><span>{{ $isStrongBuy ? 'STRONG BUY' : $signalLabel }} · {{ $signalStrength }}</span>@if($isQualityGateRestrictedBuy)<small class="ak-restricted-buy-label">BUY*</small>@endif</span>
                     @endif
+                    <button type="button" onclick="document.getElementById('stock-product-finder-modal')?.showModal()" class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-cyan-400/35 bg-cyan-400/10 px-3 text-xs font-black text-cyan-400 transition hover:bg-cyan-400/15">
+                        <x-heroicon-o-magnifying-glass class="h-4 w-4" />{{ __('Produkte recherchieren') }}
+                    </button>
+                    </div>
                 </div>
+
+                <dialog id="stock-product-finder-modal" x-data="{ step: 1, product: 'certificate', horizon: 20, objective: 'buffer', loading: true, items: [], message: null, async loadProducts() { if (!this.loading || this.items.length) return; try { const response = await fetch(@js(route('stocks.certificates', ['symbol' => $instrument->symbol])), { headers: { Accept: 'application/json' } }); const payload = await response.json(); if (!response.ok) throw new Error(payload.message || 'HTTP '+response.status); this.items = payload.data || []; this.message = payload.message || null; } catch (error) { this.message = @js(__('Die Zertifikatesuche ist derzeit nicht verfügbar.')); } finally { this.loading = false; } } }" x-init="loadProducts()" @close="step=1" class="m-auto w-[calc(100%-2rem)] max-w-2xl overflow-hidden rounded-2xl border border-cyan-400/30 bg-[var(--ak-card)] p-0 text-[var(--ak-text)] shadow-2xl backdrop:bg-slate-950/75">
+                        <div class="border-b border-[var(--ak-border)] bg-cyan-400/[.05] p-5">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-500">{{ __('Neutrale Produktsuche · Beispiel') }}</p>
+                                    <h2 class="mt-1 text-xl font-black">🇩🇪 {{ $instrument->name }}</h2>
+                                    <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ $instrument->symbol }} · {{ __('Aktueller Kurs') }} {{ is_numeric($prediction?->current_price) ? number_format((float) $prediction->current_price, 2, ',', '.').' '.$currency : '—' }}</p>
+                                </div>
+                                <button type="button" onclick="document.getElementById('stock-product-finder-modal')?.close()" class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--ak-border)] text-[var(--ak-muted)]" aria-label="{{ __('Schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
+                            </div>
+                            <div class="mt-4 grid grid-cols-4 gap-2" aria-label="{{ __('Fortschritt') }}">
+                                <template x-for="number in [1,2,3,4]" :key="number"><span class="h-1.5 rounded-full" :class="step >= number ? 'bg-cyan-400' : 'bg-slate-400/20'"></span></template>
+                            </div>
+                        </div>
+
+                        <div class="p-5">
+                            <p class="mb-4 rounded-xl border border-amber-400/25 bg-amber-400/[.07] p-3 text-[10px] font-bold leading-5 text-[var(--ak-muted)]"><strong class="text-amber-500">{{ __('Keine Anlageberatung:') }}</strong> {{ __('Die Suche zeigt Instrumentarten anhand deiner selbst gewählten Sachfilter. Es erfolgt keine persönliche Empfehlung, Geeignetheitsprüfung, Rangfolge oder Aufforderung zum Kauf.') }}</p>
+                            <section x-show="step===1">
+                                <h3 class="text-lg font-black">{{ __('Welche Instrumentart möchtest du recherchieren?') }}</h3>
+                                <div class="mt-4 grid gap-2 sm:grid-cols-3">
+                                    @php
+                                        $productResearchOptions = [['stock', __('Aktie'), __('Direkte Beteiligung ohne feste Laufzeit.')], ['certificate', __('Anlagezertifikate'), __('Discount- und Bonusstrukturen durchsuchen.')]];
+                                        if ((string) data_get(auth()->user()?->meta, 'risk_profile.level', 'normal') === 'risk') {
+                                            $productResearchOptions[] = ['chance', __('Hebel / Termingeschäfte'), __('Optionsscheine, Knock-outs und weitere gehebelte Strukturen analysieren.')];
+                                        }
+                                    @endphp
+                                    @foreach ($productResearchOptions as [$value, $title, $copy])
+                                        @if ($value === 'chance' && app()->environment('local'))
+                                            <a href="{{ route('stocks.leveraged-risk', ['symbol' => $instrument->symbol]) }}" class="rounded-xl border border-amber-400/35 bg-amber-400/[.07] p-4 text-left transition hover:bg-amber-400/[.12]"><strong class="block text-sm text-amber-500">{{ $title }} <span aria-hidden="true">→</span></strong><small class="mt-2 block leading-5 text-[var(--ak-muted)]">{{ $copy }}</small></a>
+                                        @else
+                                            <button type="button" @click="product='{{ $value }}'" :class="product==='{{ $value }}' ? 'border-cyan-400 bg-cyan-400/10' : 'border-[var(--ak-border)]'" class="rounded-xl border p-4 text-left"><strong class="block text-sm">{{ $title }}</strong><small class="mt-2 block leading-5 text-[var(--ak-muted)]">{{ $copy }}</small></button>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </section>
+
+                            <section x-cloak x-show="step===2">
+                                <h3 class="text-lg font-black">{{ __('Wie lange möchtest du halten?') }}</h3>
+                                <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                                    <template x-for="days in [5,10,15,20]" :key="days"><button type="button" @click="horizon=days" :class="horizon===days ? 'border-cyan-400 bg-cyan-400/10 text-cyan-500' : 'border-[var(--ak-border)]'" class="h-14 rounded-xl border text-sm font-black"><span x-text="days"></span>T</button></template>
+                                    <button type="button" @click="horizon='exit'" :class="horizon==='exit' ? 'border-cyan-400 bg-cyan-400/10 text-cyan-500' : 'border-[var(--ak-border)]'" class="h-14 rounded-xl border text-xs font-black">{{ __('Bis Exit') }}</button>
+                                </div>
+                                <p class="mt-3 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Eine Zertifikatslaufzeit muss deutlich über dem gewählten Prognosefenster liegen.') }}</p>
+                            </section>
+
+                            <section x-cloak x-show="step===3">
+                                <h3 class="text-lg font-black">{{ __('Welchen Sachfilter möchtest du anwenden?') }}</h3>
+                                <div class="mt-4 grid gap-2 sm:grid-cols-3">
+                                    @foreach ([['buffer', __('Puffer ≥ 15 %'), __('Nur Produkte mit ausgewiesenem Sicherheitspuffer.')], ['no_knockout', __('Ohne Knock-out'), __('Produkte mit Knock-out-Barriere ausschließen.')], ['all', __('Alle Strukturen'), __('Keine Einschränkung nach der Produktstruktur.')]] as [$value, $title, $copy])
+                                        <button type="button" @click="objective='{{ $value }}'" :class="objective==='{{ $value }}' ? 'border-cyan-400 bg-cyan-400/10' : 'border-[var(--ak-border)]'" class="rounded-xl border p-4 text-left"><strong class="block text-sm">{{ $title }}</strong><small class="mt-2 block leading-5 text-[var(--ak-muted)]">{{ $copy }}</small></button>
+                                    @endforeach
+                                </div>
+                            </section>
+
+                            <section x-cloak x-show="step===4">
+                                <div class="flex items-end justify-between gap-3"><div><p class="text-[9px] font-black uppercase tracking-[.15em] text-amber-500">{{ __('Illustrative Darstellung') }}</p><h3 class="mt-1 text-lg font-black">{{ __('Treffer gemäß Sachfilter') }}</h3></div><span class="rounded-lg border border-amber-400/25 bg-amber-400/10 px-2 py-1 text-[9px] font-black text-amber-500">{{ __('Keine Echtprodukte') }}</span></div>
+                                <div x-show="loading" class="mt-4 rounded-xl border border-[var(--ak-border)] p-6 text-center text-xs font-bold text-[var(--ak-muted)]">{{ __('Twelve Data wird durchsucht …') }}</div>
+                                <div x-cloak x-show="!loading && items.length" class="mt-4 max-h-72 overflow-auto rounded-xl border border-[var(--ak-border)]">
+                                    <table class="w-full min-w-[620px] text-left text-xs">
+                                        <thead class="sticky top-0 bg-[var(--ak-surface-muted)] text-[9px] uppercase text-[var(--ak-muted)]"><tr><th class="p-3">{{ __('Symbol') }}</th><th class="p-3">{{ __('Instrument') }}</th><th class="p-3">{{ __('Typ') }}</th><th class="p-3">{{ __('Börse') }}</th><th class="p-3">{{ __('Währung') }}</th><th class="p-3">{{ __('Zugang') }}</th></tr></thead>
+                                        <tbody>
+                                            <template x-for="item in items" :key="item.symbol+'|'+item.exchange">
+                                                <tr class="border-t border-[var(--ak-border)]"><td class="p-3 font-black text-cyan-500" x-text="item.symbol"></td><td class="max-w-52 truncate p-3" x-text="item.name || '—'"></td><td class="p-3" x-text="item.instrument_type || '—'"></td><td class="p-3" x-text="item.exchange || item.mic_code || '—'"></td><td class="p-3" x-text="item.currency || '—'"></td><td class="p-3" x-text="item.access || '—'"></td></tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div x-cloak x-show="!loading && !items.length" class="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/[.06] p-4"><strong class="block text-sm text-amber-500">{{ __('Keine Treffer') }}</strong><p class="mt-2 text-xs leading-5 text-[var(--ak-muted)]" x-text="message"></p></div>
+                                <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                                    @if (app()->environment('local') && (string) data_get(auth()->user()?->meta, 'risk_profile.level', 'normal') === 'risk')
+                                        <a x-cloak x-show="product==='chance'" href="{{ route('stocks.leveraged-risk', ['symbol' => $instrument->symbol]) }}" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-400/35 bg-amber-400/10 px-4 text-xs font-black text-amber-500 transition hover:bg-amber-400/15 sm:col-span-2">
+                                            <x-heroicon-o-shield-exclamation class="h-4 w-4" />{{ __('20T-Verlustrisiko analysieren') }}
+                                        </a>
+                                    @endif
+                                    <a href="{{ route('certificates.index', ['q' => $instrument->name]) }}" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-400/10 px-4 text-xs font-black text-cyan-500 transition hover:bg-cyan-400/15">
+                                        <x-heroicon-o-list-bullet class="h-4 w-4" />{{ __('Offiziellen Katalog durchsuchen') }}
+                                    </a>
+                                    <a href="{{ route('certificates.index') }}" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-cyan-400/35 hover:text-cyan-500">
+                                        {{ __('Alle Zertifikate anzeigen') }} <span aria-hidden="true">→</span>
+                                    </a>
+                                </div>
+                                <p class="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.06] p-3 text-[10px] leading-5 text-[var(--ak-muted)]">{{ __('Quelle: Twelve Data. Die Treffer sind reine Referenzdaten und keine Empfehlung. Barriere, Cap, Bezugsverhältnis, Spread, Emittentenrisiko und Basiswertzuordnung müssen vor einer Verwendung anhand der offiziellen Produktunterlagen geprüft werden.') }}</p>
+                            </section>
+
+                            <div class="mt-5 flex items-center justify-between border-t border-[var(--ak-border)] pt-4">
+                                <button type="button" x-show="step>1" @click="step--" class="h-10 rounded-xl border border-[var(--ak-border)] px-4 text-xs font-black">{{ __('Zurück') }}</button><span x-show="step===1"></span>
+                                <button type="button" x-show="step<4" @click="step++" class="h-10 rounded-xl bg-cyan-500 px-5 text-xs font-black text-slate-950">{{ __('Weiter') }}</button>
+                                <button type="button" x-show="step===4" onclick="document.getElementById('stock-product-finder-modal')?.close()" class="h-10 rounded-xl border border-cyan-400/35 bg-cyan-400/10 px-5 text-xs font-black text-cyan-500">{{ __('Fertig') }}</button>
+                            </div>
+                        </div>
+                    </dialog>
 
                 @if ($prediction)
                     @php
@@ -978,10 +1467,10 @@
                                 ? (float) $modelChallenger->quality_score * 100
                                 : (float) $modelChallenger->quality_score))
                             : null;
-                        $analysisModelQualityPercent = is_numeric($modelQuality?->quality_score)
-                            ? max(0, min(100, (float) $modelQuality->quality_score <= 1
-                                ? (float) $modelQuality->quality_score * 100
-                                : (float) $modelQuality->quality_score))
+                        $analysisModelQualityPercent = is_numeric(data_get($modelQuality, 'quality_score'))
+                            ? max(0, min(100, (float) data_get($modelQuality, 'quality_score') <= 1
+                                ? (float) data_get($modelQuality, 'quality_score') * 100
+                                : (float) data_get($modelQuality, 'quality_score')))
                             : null;
                         $analysisQualityDonutColor = static function (?float $percent): string {
                             if ($percent === null) return '#64748b';
@@ -996,14 +1485,14 @@
                         $analysisScoreColor = $analysisQualityDonutColor($scorePercent);
                         $analysisModelQualityColor = $analysisQualityDonutColor($analysisModelQualityPercent);
                         $analysisRiskColor = $analysisQualityDonutColor($riskPercent !== null ? 100 - $riskPercent : null);
-                        $analysisHitRatePercent = is_numeric($detailWalkForwardStats?->hit_rate)
-                            ? max(0, min(100, (float) $detailWalkForwardStats->hit_rate)) : null;
-                        $analysisProfitPerTrade = is_numeric($detailWalkForwardStats?->average_profit_per_trade_percent)
-                            ? (float) $detailWalkForwardStats->average_profit_per_trade_percent : null;
+                        $analysisHitRatePercent = is_numeric(data_get($detailWalkForwardStats, 'hit_rate'))
+                            ? max(0, min(100, (float) data_get($detailWalkForwardStats, 'hit_rate'))) : null;
+                        $analysisProfitPerTrade = is_numeric(data_get($detailWalkForwardStats, 'average_profit_per_trade_percent'))
+                            ? (float) data_get($detailWalkForwardStats, 'average_profit_per_trade_percent') : null;
                         $analysisProfitPerTradeScale = $analysisProfitPerTrade !== null
                             ? max(0, min(100, 50 + ($analysisProfitPerTrade * 25))) : null;
                         $analysisStabilityValue = $prediction->horizon_fusion_stability_score
-                            ?? $modelQuality?->model_stability;
+                            ?? data_get($modelQuality, 'model_stability');
                         $analysisStabilityPercent = is_numeric($analysisStabilityValue)
                             ? max(0, min(100, (float) $analysisStabilityValue * ((float) $analysisStabilityValue <= 1 ? 100 : 1)))
                             : null;
@@ -1011,17 +1500,19 @@
                         $analysisHitRateColor = $analysisQualityDonutColor($analysisHitRatePercent);
                         $analysisProfitPerTradeColor = $analysisQualityDonutColor($analysisProfitPerTradeScale);
                         $analysisStabilityColor = $analysisQualityDonutColor($analysisStabilityPercent);
+                        $qualityGrade = static fn (?float $quality): string => \App\Support\QualityGrade::fromPercent($quality) ?? '—';
+                        $riskGrade = \App\Support\QualityGrade::riskLevel($riskPercent) ?? '—';
                     @endphp
                     <div class="mt-3 space-y-3">
                         <div class="rounded-xl border border-[var(--ak-border)] bg-transparent p-3">
                             <p class="mb-2 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Bewertung') }}</p>
                             <div class="stock-analysis-donuts flex min-h-[76px] w-full flex-nowrap items-center justify-between gap-1.5 overflow-visible">
-                                <div class="stock-analysis-donut-item"><div class="screener-metric-donut screener-metric-donut-score" style="--donut-value: {{ number_format($scorePercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisScoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ round($scorePercent ?? 0) }}"><span>{{ $scorePercent !== null ? number_format($scorePercent, 0, ',', '.') : '—' }}</span></div><small class="stock-analysis-donut-label">{{ __('KI-Score') }} (/100)</small></div>
-                                <div class="stock-analysis-donut-item"><div class="screener-metric-donut" style="--donut-value: {{ number_format($confidencePercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisConfidenceColor }}" role="meter" aria-label="{{ __('Konfidenz') }}" aria-valuemin="0" aria-valuemax="100" @if($confidencePercent !== null) aria-valuenow="{{ round($confidencePercent) }}" @endif><span>{{ $confidencePercent !== null ? number_format($confidencePercent, 0, ',', '.') : '—' }}</span></div><small class="stock-analysis-donut-label">{{ __('Konf.') }} (%)</small></div>
-                                <div class="stock-analysis-donut-item"><div class="screener-metric-donut" style="--donut-value: {{ number_format($analysisHitRatePercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisHitRateColor }}" role="meter" aria-label="{{ __('Hit-Rate') }}" aria-valuemin="0" aria-valuemax="100" @if($analysisHitRatePercent !== null) aria-valuenow="{{ round($analysisHitRatePercent) }}" @endif><span>{{ $analysisHitRatePercent !== null ? number_format($analysisHitRatePercent, 0, ',', '.') : '—' }}</span></div><small class="stock-analysis-donut-label">{{ __('Hit-Rate') }} (%)</small></div>
-                                <div class="stock-analysis-donut-item"><div class="screener-metric-donut" style="--donut-value: {{ number_format($analysisProfitPerTradeScale ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisProfitPerTradeColor }}" role="meter" aria-label="{{ __('Durchschnittlicher Netto-Profit je Trade') }}" @if($analysisProfitPerTrade !== null) aria-valuenow="{{ $analysisProfitPerTrade }}" @endif><span class="screener-metric-value-long">{{ $analysisProfitPerTrade !== null ? (($analysisProfitPerTrade > 0 ? '+' : '').number_format($analysisProfitPerTrade, 2, ',', '.')) : '—' }}</span></div><small class="stock-analysis-donut-label">{{ __('Ø/Trade') }} (%)</small></div>
-                                <div class="stock-analysis-donut-item"><div class="screener-metric-donut" style="--donut-value: {{ number_format($analysisStabilityPercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisStabilityColor }}" role="meter" aria-label="{{ __('Stabilität') }}" aria-valuemin="0" aria-valuemax="100" @if($analysisStabilityPercent !== null) aria-valuenow="{{ round($analysisStabilityPercent) }}" @endif><span>{{ $analysisStabilityPercent !== null ? number_format($analysisStabilityPercent, 0, ',', '.') : '—' }}</span></div><small class="stock-analysis-donut-label">{{ __('Stabilität') }} (%)</small></div>
-                                <div class="stock-analysis-donut-item"><div class="screener-metric-donut screener-risk-donut" style="--donut-value: {{ number_format($riskPercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisRiskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" @if($riskPercent !== null) aria-valuenow="{{ round($riskPercent) }}" @endif><span>{{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.') : '—' }}</span></div><small class="stock-analysis-donut-label">{{ __('Risiko') }} (%)</small></div>
+                                <div class="stock-analysis-donut-item" title="{{ __('Modellqualität') }}: {{ $scorePercent !== null ? number_format($scorePercent, 0, ',', '.').'/100' : '—' }}"><div class="screener-metric-donut screener-metric-donut-score" style="--donut-value: {{ number_format($scorePercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisScoreColor }}"><span>{{ $qualityGrade($scorePercent) }}</span></div><small class="stock-analysis-donut-label">{{ __('KI-Qualität') }}</small></div>
+                                <div class="stock-analysis-donut-item" title="{{ __('Rohwert') }}: {{ $confidencePercent !== null ? number_format($confidencePercent, 0, ',', '.').' %' : '—' }}"><div class="screener-metric-donut" style="--donut-value: {{ number_format($confidencePercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisConfidenceColor }}"><span>{{ $qualityGrade($confidencePercent) }}</span></div><small class="stock-analysis-donut-label">{{ __('Konf.') }}</small></div>
+                                <div class="stock-analysis-donut-item" title="{{ __('Rohwert') }}: {{ $analysisHitRatePercent !== null ? number_format($analysisHitRatePercent, 0, ',', '.').' %' : '—' }}"><div class="screener-metric-donut" style="--donut-value: {{ number_format($analysisHitRatePercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisHitRateColor }}"><span>{{ $qualityGrade($analysisHitRatePercent) }}</span></div><small class="stock-analysis-donut-label">{{ __('Hit-Rate') }}</small></div>
+                                <div class="stock-analysis-donut-item" title="{{ __('Durchschnittliche Rendite je abgeschlossenem Signalwechsel-Trade') }}: {{ $analysisProfitPerTrade !== null ? (($analysisProfitPerTrade > 0 ? '+' : '').number_format($analysisProfitPerTrade, 2, ',', '.').' %') : '—' }}"><div class="screener-metric-donut" style="--donut-value: {{ number_format($analysisProfitPerTradeScale ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisProfitPerTradeColor }}"><span>{{ $qualityGrade($analysisProfitPerTradeScale) }}</span></div><small class="stock-analysis-donut-label">{{ __('Ø/Trade') }}</small></div>
+                                <div class="stock-analysis-donut-item" title="{{ __('Rohwert') }}: {{ $analysisStabilityPercent !== null ? number_format($analysisStabilityPercent, 0, ',', '.').' %' : '—' }}"><div class="screener-metric-donut" style="--donut-value: {{ number_format($analysisStabilityPercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisStabilityColor }}"><span>{{ $qualityGrade($analysisStabilityPercent) }}</span></div><small class="stock-analysis-donut-label">{{ __('Stabilität') }}</small></div>
+                                <div class="stock-analysis-donut-item" title="{{ __('Rohwert') }}: {{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.').' %' : '—' }}"><div class="screener-metric-donut screener-risk-donut" style="--donut-value: {{ number_format($riskPercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $analysisRiskColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($riskPercent ?? 0, 1, '.', '') }}"><span>{{ $riskGrade }}</span></div><small class="stock-analysis-donut-label">{{ __('Risiko') }}</small></div>
                             </div>
                         </div>
                         <div class="rounded-xl border border-[var(--ak-border)] bg-transparent p-2">
@@ -1036,13 +1527,13 @@
                                 </p>
                             @endif
                         </div>
-                        <div x-data="{ reminderOpen: false, reminderDays: 5, reminderTarget: null, reminderReturn: null, reminderIntent: 'interested' }" class="stock-horizon-cards grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <div x-data="{ reminderOpen: false, reminderDays: 5, reminderTarget: null, reminderReturn: null, reminderIntent: 'interested', reminderDate: '', dateForDays(days) { const date = new Date(); date.setDate(date.getDate() + Number(days)); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); return date.toISOString().slice(0, 10); } }" class="stock-horizon-cards grid grid-cols-2 gap-2 sm:grid-cols-4">
                             @foreach ([5, 10, 15, 20] as $horizonDays)
                                 @php
                                     $horizonTarget = $horizonTargets[$horizonDays] ?? ['price' => null, 'return' => null];
                                     $horizonReturn = $horizonTarget['return'];
                                 @endphp
-                                <button type="button" @if($canViewRealtime) @click="reminderDays={{ $horizonDays }}; reminderTarget=@js($horizonTarget['price']); reminderReturn=@js($horizonReturn); reminderIntent='interested'; reminderOpen=true" @endif title="{{ $canViewRealtime ? __('Kauferinnerung einrichten') : __('Ab Pro verfügbar') }}" class="relative min-w-0 rounded-xl border border-[var(--ak-border)] bg-transparent p-2 text-left transition {{ $canViewRealtime ? 'hover:border-cyan-400/45 hover:bg-cyan-400/[.05]' : 'cursor-default opacity-75' }}">
+                                <button type="button" @if($canViewRealtime) @click="reminderDays={{ $horizonDays }}; reminderTarget=@js($horizonTarget['price']); reminderReturn=@js($horizonReturn); reminderIntent='interested'; reminderDate=dateForDays({{ $horizonDays }}); reminderOpen=true" @endif title="{{ $canViewRealtime ? __('Kauferinnerung einrichten') : __('Ab Pro verfügbar') }}" class="relative min-w-0 rounded-xl border border-[var(--ak-border)] bg-transparent p-2 text-left transition {{ $canViewRealtime ? 'hover:border-cyan-400/45 hover:bg-cyan-400/[.05]' : 'cursor-default opacity-75' }}">
                                     @unless($canViewRealtime)<span class="ak-plan-badge ak-plan-badge--pro absolute right-1.5 top-1.5">PRO</span>@endunless
                                     <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $horizonDays }} {{ __('Tage') }}</p>
                                     <p class="mt-1 truncate text-sm font-black text-cyan-400">{{ is_numeric($horizonTarget['price']) ? number_format((float) $horizonTarget['price'], 2, ',', '.').' '.$currency : '—' }}</p>
@@ -1052,8 +1543,8 @@
                                 </button>
                             @endforeach
                             <template x-teleport="body">
-                                <div x-cloak x-show="reminderOpen" class="fixed inset-0 z-[160] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" @click.self="reminderOpen=false" @keydown.escape.window="reminderOpen=false">
-                                    <form method="POST" action="{{ route('stocks.purchase-reminder.store', $instrument->id) }}" class="w-full max-w-lg rounded-2xl border border-cyan-400/30 bg-[#0d1b2d] p-5 shadow-2xl">
+                                <div x-cloak x-show="reminderOpen" class="ak-modal-overlay fixed inset-0 z-[160] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" @click.self="reminderOpen=false" @keydown.escape.window="reminderOpen=false">
+                                    <form method="POST" action="{{ route('stocks.purchase-reminder.store', $instrument->id) }}" class="ak-modal-panel w-full max-w-lg rounded-2xl border border-cyan-400/30 bg-[#0d1b2d] p-5 shadow-2xl">
                                         @csrf
                                         <input type="hidden" name="prediction_id" value="{{ $prediction->id }}">
                                         <input type="hidden" name="horizon_days" :value="reminderDays">
@@ -1065,7 +1556,10 @@
                                         </div>
                                         <div class="mt-4 grid grid-cols-2 gap-2">
                                             <div class="rounded-xl border border-cyan-400/20 bg-cyan-400/[.05] p-3"><small class="text-slate-400">{{ __('Kursziel') }}</small><strong class="mt-1 block text-cyan-300" x-text="reminderTarget == null ? '—' : new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(reminderTarget)+' {{ $currency }}'"></strong></div>
-                                            <div class="rounded-xl border border-amber-300/20 bg-amber-300/[.05] p-3"><small class="text-slate-400">{{ __('E-Mail am') }}</small><strong class="mt-1 block text-amber-300" x-text="new Intl.DateTimeFormat('de-DE').format(new Date(Date.now()+reminderDays*86400000))"></strong></div>
+                                            <label class="block cursor-pointer rounded-xl border border-amber-300/30 bg-amber-300/[.05] p-3 transition hover:border-amber-400/60">
+                                                <small class="text-slate-400">{{ __('E-Mail am') }}</small>
+                                                <input type="date" name="remind_on" x-model="reminderDate" min="{{ now()->toDateString() }}" required @click="$event.target.showPicker?.()" class="mt-1 block w-full cursor-pointer border-0 bg-transparent p-0 text-base font-black text-amber-500 outline-none focus:ring-0" aria-label="{{ __('Datum der Erinnerung') }}">
+                                            </label>
                                         </div>
                                         @if($signal === 'WAIT')<p class="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] p-3 text-xs font-bold text-emerald-300">{{ __('WAIT: Eine spätere Kaufprüfung ist hier besonders sinnvoll. Die E-Mail zeigt auch, ob das Signal inzwischen auf BUY gewechselt ist.') }}</p>@endif
                                         <fieldset class="mt-4">
@@ -1090,7 +1584,7 @@
                                                 <label class="flex items-start gap-2 text-[10px] text-slate-300"><input type="checkbox" name="resistance_trailing_stop_enabled" value="1" class="mt-0.5 h-4 w-4 rounded bg-slate-900 text-cyan-400"><span><b class="block text-white">{{ __('Widerstands-Trailing-Stop') }}</b>{{ __('Nach Ausbruch Stop 1 % unter den ehemaligen Widerstand nachziehen.') }}</span></label>
                                             </div>
                                         </div>
-                                        <button type="submit" class="mt-4 h-11 w-full rounded-xl bg-cyan-400 text-sm font-black text-slate-950 transition hover:bg-cyan-300">{{ __('Erinnerung speichern') }}</button>
+                                        <button type="submit" class="ak-modal-primary-action mt-4 h-11 w-full rounded-xl bg-cyan-400 text-sm font-black text-slate-950 transition hover:bg-cyan-300">{{ __('Erinnerung speichern') }}</button>
                                         <button type="button" @click="reminderOpen=false" class="mt-2 h-9 w-full rounded-lg border border-white/10 text-xs font-black text-slate-400">{{ __('Abbrechen') }}</button>
                                     </form>
                                 </div>
@@ -1171,7 +1665,7 @@
                 ->filter(fn ($value) => is_numeric($value))
                 ->avg();
         @endphp
-        <section data-stock-collapsible="indicators" data-stock-collapsible-title="{{ __('Indikatoren Statistik') }}" class="space-y-4">
+        <section id="indicator-statistics" data-stock-collapsible="indicators" data-stock-collapsible-title="{{ __('Indikatoren Statistik') }}" class="scroll-mt-20 space-y-4">
             <div class="flex flex-wrap items-end justify-between gap-3 px-1">
                     <div class="min-w-0">
                         <h2 class="text-xs font-black uppercase tracking-[.14em] text-cyan-400">{{ __('Historische Indikatoranalyse') }}</h2>
@@ -1244,10 +1738,10 @@
         </section>
 
         @if ($canViewChartPatterns)
-        <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartformationen') }}">
+        <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartmuster') }}">
             <article class="stock-detail-panel stock-chart-pattern-panel overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
                 <div class="grid gap-2 xl:grid-cols-2">
-                    @foreach ($chartPatternStats as $patternStat)
+                    @forelse ($chartPatternStats as $patternStat)
                         @php
                             $patternBullish = $patternStat['direction'] === 'bullish';
                             $patternTone = $patternBullish ? 'text-emerald-400' : 'text-rose-400';
@@ -1311,16 +1805,18 @@
                                 </div>
                             </div>
                         </div>
-                    @endforeach
+                    @empty
+                        <p class="col-span-full rounded-xl border border-dashed border-cyan-400/20 px-4 py-6 text-center text-xs text-[var(--ak-muted)]">{{ __('In den letzten 5 Tagen wurde kein Chartmuster erkannt.') }}</p>
+                    @endforelse
                 </div>
                 <p class="mt-3 text-[9px] leading-4 text-[var(--ak-muted)]">{{ __('Bei bearischen Mustern wird die Performance richtungsbereinigt: Ein fallender Kurs zählt dort als positiver Treffer. Vergangene Muster sind keine Garantie für zukünftige Ergebnisse.') }}</p>
             </article>
         </section>
         @else
-        <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartformationen') }}" data-stock-pro-locked>
+        <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartmuster') }}" data-stock-pro-locked>
             <div class="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-cyan-400/[.025] px-5 py-8 text-center">
                 <span class="ak-plan-badge ak-plan-badge--pro">PRO</span>
-                <p class="mt-3 text-sm font-black text-[var(--ak-text)]">{{ __('Chartformationen sind im Pro-Tarif verfügbar.') }}</p>
+                <p class="mt-3 text-sm font-black text-[var(--ak-text)]">{{ __('Chartmuster sind im Pro-Tarif verfügbar.') }}</p>
                 <p class="mt-1 max-w-xl text-xs leading-5 text-[var(--ak-muted)]">{{ __('Enthält erkannte Muster, Beispielcharts und deren historische Performance.') }}</p>
             </div>
         </section>
@@ -1522,10 +2018,10 @@
             </div>
         </section>
 
-        <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartformationen') }}" data-stock-pro-locked>
+        <section data-stock-collapsible="chart-patterns" data-stock-collapsible-title="{{ __('Chartmuster') }}" data-stock-pro-locked>
             <div class="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-cyan-400/[.025] px-5 py-8 text-center">
                 <span class="ak-plan-badge ak-plan-badge--pro">PRO</span>
-                <p class="mt-3 text-sm font-black text-[var(--ak-text)]">{{ __('Chartformationen sind im Pro-Tarif verfügbar.') }}</p>
+                <p class="mt-3 text-sm font-black text-[var(--ak-text)]">{{ __('Chartmuster sind im Pro-Tarif verfügbar.') }}</p>
                 <p class="mt-1 max-w-xl text-xs leading-5 text-[var(--ak-muted)]">{{ __('Enthält erkannte Muster, Beispielcharts und deren historische Performance.') }}</p>
             </div>
         </section>
@@ -1788,7 +2284,7 @@
                             'subtitle' => __('Größe und aktuelle Bewertung'),
                             'icon' => 'heroicon-o-scale',
                             'values' => [
-                                ['label' => __('Marktkapitalisierung'), 'value' => $fundamentalData['marketCap'] ?? $instrument->market_cap],
+                                ['label' => __('Marktkapitalisierung'), 'value' => $fundamentalData['marketCap'] ?? $instrument->market_cap, 'ranking' => $sectorRankings['market_cap'] ?? null],
                                 [
                                     'label' => __('KGV'),
                                     'value' => is_numeric($fundamentalData['trailingPE'] ?? null)
@@ -1823,10 +2319,10 @@
                             'subtitle' => __('Margen und Kapitalrenditen'),
                             'icon' => 'heroicon-o-arrow-trending-up',
                             'values' => [
-                                ['label' => __('Nettomarge'), 'value' => $fundamentalPercent($fundamentalData['profitMargins'] ?? null)],
-                                ['label' => __('Operative Marge'), 'value' => $fundamentalPercent($fundamentalData['operatingMargins'] ?? null)],
-                                ['label' => __('Eigenkapitalrendite'), 'value' => $fundamentalPercent($fundamentalData['returnOnEquity'] ?? null)],
-                                ['label' => __('Gesamtkapitalrendite'), 'value' => $fundamentalPercent($fundamentalData['returnOnAssets'] ?? null)],
+                                ['label' => __('Nettomarge'), 'value' => $fundamentalPercent($fundamentalData['profitMargins'] ?? null), 'ranking' => $sectorRankings['net_margin'] ?? null],
+                                ['label' => __('Operative Marge'), 'value' => $fundamentalPercent($fundamentalData['operatingMargins'] ?? null), 'ranking' => $sectorRankings['operating_margin'] ?? null],
+                                ['label' => __('Eigenkapitalrendite'), 'value' => $fundamentalPercent($fundamentalData['returnOnEquity'] ?? null), 'ranking' => $sectorRankings['roe'] ?? null],
+                                ['label' => __('Gesamtkapitalrendite'), 'value' => $fundamentalPercent($fundamentalData['returnOnAssets'] ?? null), 'ranking' => $sectorRankings['roa'] ?? null],
                             ],
                         ],
                         [
@@ -1834,8 +2330,13 @@
                             'subtitle' => __('Umsatz, Ergebnis und Dynamik'),
                             'icon' => 'heroicon-o-chart-bar-square',
                             'values' => [
-                                ['label' => __('Umsatz'), 'value' => $fundamentalData['totalRevenue'] ?? null],
-                                ['label' => __('Umsatzwachstum'), 'value' => $fundamentalPercent($fundamentalData['revenueGrowth'] ?? null)],
+                                [
+                                    'label' => __('Umsatz'),
+                                    'value' => $fundamentalData['totalRevenue'] ?? null,
+                                    'growth' => $fundamentalPercent($fundamentalData['revenueGrowth'] ?? null),
+                                    'growth_raw' => is_numeric($fundamentalData['revenueGrowth'] ?? null) ? (float) $fundamentalData['revenueGrowth'] : null,
+                                    'ranking' => $sectorRankings['revenue_growth'] ?? null,
+                                ],
                                 ['label' => __('Bruttogewinn'), 'value' => $fundamentalData['grossProfits'] ?? null],
                                 ['label' => 'EBITDA', 'value' => $fundamentalData['ebitda'] ?? null],
                             ],
@@ -1872,7 +2373,45 @@
                     </div>
                 </div>
 
-                <div class="grid gap-4 xl:grid-cols-2">
+                <div class="grid gap-3 md:hidden">
+                    @foreach ($fundamentalGroups as $group)
+                        <section class="overflow-hidden rounded-xl border border-cyan-400/15 bg-[var(--ak-card)]">
+                            <header class="flex items-start gap-2.5 border-b border-cyan-400/15 bg-cyan-400/[.035] px-3 py-2.5">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-400/10 text-amber-400">
+                                    <x-dynamic-component :component="$group['icon']" class="h-4 w-4" />
+                                </span>
+                                <span class="min-w-0">
+                                    <strong class="block text-sm font-black text-[var(--ak-text)]">{{ $group['title'] }}</strong>
+                                    <small class="mt-0.5 block text-[10px] leading-4 text-[var(--ak-muted)]">{{ $group['subtitle'] }}</small>
+                                </span>
+                            </header>
+                            <dl class="divide-y divide-cyan-400/10 px-3">
+                                @foreach ($group['values'] as $item)
+                                    <div class="grid grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)] items-start gap-3 py-2.5">
+                                        <dt class="min-w-0 text-[10px] font-bold leading-4 text-[var(--ak-muted)]">
+                                            <span class="block">{{ $item['label'] }}</span>
+                                            @if ($item['growth'] ?? null)
+                                                <span class="mt-1 block w-fit rounded-md px-1.5 py-0.5 text-[8px] font-black {{ ($item['growth_raw'] ?? 0) >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500' }}">
+                                                    {{ __('Wachstum') }} {{ $item['growth'] }}
+                                                </span>
+                                            @endif
+                                            @if ($item['ranking'] ?? null)
+                                                <span class="mt-1 block w-fit rounded-md border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[8px] font-bold text-cyan-500">
+                                                    {{ __('Sektorrang') }} {{ $item['ranking']['rank'] }}/{{ $item['ranking']['total'] }}
+                                                </span>
+                                            @endif
+                                        </dt>
+                                        <dd class="min-w-0 break-words text-right text-[12px] font-black leading-4 tabular-nums text-[var(--ak-text)]">
+                                            <span>{{ $item['value'] === null || $item['value'] === '' ? '—' : $formatValue((string) $item['label'], $item['value']) }}</span>
+                                        </dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+                        </section>
+                    @endforeach
+                </div>
+
+                <div class="hidden gap-4 md:grid xl:grid-cols-2">
                     @foreach (array_chunk($fundamentalGroups, 4) as $fundamentalColumnGroups)
                     <div class="ak-table-wrap w-full !rounded-xl !border-cyan-400/10 overflow-x-auto">
                     <table class="ak-table w-full min-w-[34rem] table-fixed text-left [&_td]:!px-2.5 [&_td]:!py-1.5 [&_th]:!px-2.5 [&_th]:!py-2">
@@ -2021,13 +2560,26 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const chartIndicatorDetails = document.querySelector('.stock-mobile-indicators');
+            const indicatorStatisticsSlot = document.querySelector('#stock-indicator-statistics-slot');
+            const standaloneIndicatorSection = document.querySelector('#indicator-statistics');
+            if (chartIndicatorDetails && indicatorStatisticsSlot && standaloneIndicatorSection) {
+                standaloneIndicatorSection.removeAttribute('data-stock-collapsible');
+                standaloneIndicatorSection.removeAttribute('data-stock-collapsible-title');
+                standaloneIndicatorSection.classList.remove('scroll-mt-20');
+                standaloneIndicatorSection.classList.add('stock-embedded-indicator-card');
+                indicatorStatisticsSlot.appendChild(standaloneIndicatorSection);
+                indicatorStatisticsSlot.classList.remove('hidden');
+            }
+
             const analysisSection = document.querySelector('[data-stock-collapsible="analysis"]');
             const stockDisclaimer = document.querySelector('#stock-disclaimer');
             if (analysisSection && stockDisclaimer) {
                 stockDisclaimer.parentNode.insertBefore(analysisSection, stockDisclaimer);
             }
 
-            const indicatorSection = document.querySelector('[data-stock-collapsible="indicators"]');
+            const indicatorSection = document.querySelector('#indicator-statistics')
+                ?? document.querySelector('[data-stock-collapsible="indicators"]');
             const matrixSection = document.querySelector('[data-stock-collapsible="indicator-matrix"]');
             if (indicatorSection && matrixSection) {
                 const heading = document.createElement('div');
@@ -2132,8 +2684,10 @@
     </script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        const initializeStockIndicatorStatistics = () => {
             if (!window.ApexCharts) return;
+            if (document.documentElement.dataset.stockIndicatorStatisticsInitialized === 'true') return;
+            document.documentElement.dataset.stockIndicatorStatisticsInitialized = 'true';
             const cards = @json($indicatorCards);
             let rendered = false;
 
@@ -2226,7 +2780,19 @@
             window.addEventListener('stock-detail-section-opened', event => {
                 if (event.detail?.section === 'indicators') renderIndicatorCards();
             });
-        });
+            const indicatorRenderSection = document.querySelector('#indicator-statistics')
+                ?? document.querySelector('[data-stock-collapsible="indicators"]');
+            const indicatorContent = indicatorRenderSection?.querySelector(':scope > .stock-collapsible-content');
+            if (chartIndicatorDetails) {
+                chartIndicatorDetails.addEventListener('toggle', () => {
+                    if (chartIndicatorDetails.open) requestAnimationFrame(renderIndicatorCards);
+                });
+            }
+            if (indicatorRenderSection && (!chartIndicatorDetails || chartIndicatorDetails.open) && !indicatorContent?.hidden) renderIndicatorCards();
+        };
+        document.addEventListener('DOMContentLoaded', initializeStockIndicatorStatistics, { once: true });
+        window.addEventListener('aktienki:charts-ready', initializeStockIndicatorStatistics, { once: true });
+        if (document.readyState !== 'loading') initializeStockIndicatorStatistics();
     </script>
 
     @php
@@ -2238,9 +2804,11 @@
     @endphp
     @if ($chartCandles->isNotEmpty())
         <script>
-            document.addEventListener('DOMContentLoaded', () => {
+            const initializeStockDetailChart = () => {
                 const element = document.querySelector('#stock-detail-chart');
                 if (!element || !window.ApexCharts) return;
+                if (element.dataset.chartInitialized === 'true') return;
+                element.dataset.chartInitialized = 'true';
 
                 const initialCandles = @json($chartCandles->values());
                 const historicalAiScores = @json($historicalAiScores->values());
@@ -2296,6 +2864,25 @@
                 let zoomDragStart = null;
                 let zoomInteractionActive = false;
                 const activeIndicators = new Set();
+
+                const latestSignalTransition = historicalSignalTransitions.at(-1) ?? null;
+                const signalColors = {
+                    BUY: '#22c55e', WATCH: '#84cc16', HOLD: '#facc15', WAIT: '#22d3ee', SELL: '#fb7185',
+                };
+
+                const latestSignalAnchor = () => {
+                    const timestamp = new Date(latestSignalTransition?.x).getTime();
+                    if (!Number.isFinite(timestamp)) return null;
+                    const candle = [...currentCandles]
+                        .reverse()
+                        .find(item => new Date(item.x).getTime() <= timestamp);
+                    const price = Number(candle?.y?.[3]);
+                    const signal = String(latestSignalTransition?.to || 'HOLD').toUpperCase();
+
+                    return candle && Number.isFinite(price)
+                        ? { timestamp, price, signal, color: signalColors[signal] || '#facc15' }
+                        : null;
+                };
 
                 const addTradingDays = (timestamp, tradingDays) => {
                     const target = new Date(timestamp);
@@ -2523,11 +3110,28 @@
                 };
 
                 const chartSeries = () => {
-                    return [{
+                    const series = [{
                         name: @json($instrument->symbol),
                         type: 'candlestick',
                         data: currentCandles,
                     }];
+                    const signalAnchor = latestSignalAnchor();
+                    if (signalAnchor) {
+                        const range = chartTimeRange();
+                        const end = Number.isFinite(range.max)
+                            ? range.max
+                            : new Date(currentCandles.at(-1)?.x).getTime();
+                        series.push({
+                            name: @json(__('Kurs beim letzten Signalwechsel')),
+                            type: 'line',
+                            data: [
+                                { x: signalAnchor.timestamp, y: signalAnchor.price },
+                                { x: end, y: signalAnchor.price },
+                            ],
+                        });
+                    }
+
+                    return series;
                 };
 
                 const rsiData = (period = 14) => {
@@ -2617,6 +3221,8 @@
                         .map(Number)
                         .filter(Number.isFinite)
                         .forEach(value => values.push(value));
+                    const signalAnchor = latestSignalAnchor();
+                    if (Number.isFinite(Number(signalAnchor?.price))) values.push(Number(signalAnchor.price));
                     if (watchlistEntry?.price && Number.isFinite(Number(watchlistEntry.price))) values.push(Number(watchlistEntry.price));
                     if (values.length === 0) return {};
 
@@ -2650,17 +3256,6 @@
                         x: chartFocusAt,
                         borderColor: '#f59e0b',
                         strokeDashArray: 5,
-                        label: {
-                            orientation: 'horizontal',
-                            borderColor: '#f59e0b',
-                            text: predictionBadgeText || @json(__('Prognosezeitpunkt')),
-                            style: {
-                                background: '#f59e0b',
-                                color: '#111827',
-                                fontSize: '10px',
-                                fontWeight: 800,
-                            },
-                        },
                     }] : [];
 
                     const chartOptions = {
@@ -2677,7 +3272,10 @@
                             pan: { enabled: false },
                             animations: { enabled: true, speed: 350 },
                         },
-                        stroke: { width: 1 },
+                        colors: [sectorColor, '#f59e0b'],
+                        stroke: { width: [1, 1.35], dashArray: [0, 5], curve: 'straight' },
+                        markers: { size: 0 },
+                        legend: { show: false },
                         fill: { opacity: 1 },
                         plotOptions: {
                             bar: {
@@ -3423,6 +4021,40 @@
                             svg.appendChild(label);
                         });
 
+                    const signalAnchor = latestSignalAnchor();
+                    if (signalAnchor && signalAnchor.timestamp <= timeRange.max) {
+                        const signalY = toY(signalAnchor.price);
+                        const signalX = toX(Math.max(timeRange.min, signalAnchor.timestamp));
+                        svg.appendChild(svgNode('line', {
+                            x1: signalX,
+                            x2: left + plotWidth,
+                            y1: signalY,
+                            y2: signalY,
+                            stroke: signalAnchor.color,
+                            'stroke-width': '1.4',
+                            'stroke-dasharray': '6 4',
+                            'stroke-opacity': '.9',
+                            'vector-effect': 'non-scaling-stroke',
+                        }));
+                        const signalPriceLabel = svgNode('text', {
+                            x: left + plotWidth - 3,
+                            y: Math.max(top + 9, signalY - 4),
+                            fill: signalAnchor.color,
+                            'font-size': '8',
+                            'font-weight': '800',
+                            'text-anchor': 'end',
+                            'font-family': 'inherit',
+                        });
+                        const signalDate = new Date(signalAnchor.timestamp).toLocaleDateString(document.documentElement.lang || 'de-DE', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                        });
+                        signalPriceLabel.textContent = `${signalAnchor.signal} · ${new Intl.NumberFormat(document.documentElement.lang || 'de-DE', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        }).format(signalAnchor.price)} ${currency} · ${signalDate}`;
+                        svg.appendChild(signalPriceLabel);
+                    }
+
                     if (watchlistEntry?.price && Number.isFinite(Number(watchlistEntry.price))) {
                         const entryY = toY(Number(watchlistEntry.price));
                         svg.appendChild(svgNode('line', {
@@ -3439,23 +4071,6 @@
                             stroke: '#f59e0b', 'stroke-width': '1',
                             'stroke-dasharray': '5 6', 'stroke-opacity': '.65',
                         }));
-                        if (predictionBadgeText) {
-                            const badgeWidth = Math.max(116, predictionBadgeText.length * 6.1 + 18);
-                            const badgeX = Math.max(left + 4, Math.min(left + plotWidth - badgeWidth - 4, focusX - badgeWidth / 2));
-                            const badgeY = top + 6;
-                            svg.appendChild(svgNode('rect', {
-                                x: badgeX, y: badgeY, width: badgeWidth, height: 22, rx: '6',
-                                fill: '#f59e0b', 'fill-opacity': '.16',
-                                stroke: '#f59e0b', 'stroke-opacity': '.82',
-                            }));
-                            const badgeLabel = svgNode('text', {
-                                x: badgeX + badgeWidth / 2, y: badgeY + 14.5,
-                                fill: '#fbbf24', 'font-size': '10', 'font-weight': '800',
-                                'text-anchor': 'middle', 'font-family': 'inherit',
-                            });
-                            badgeLabel.textContent = predictionBadgeText;
-                            svg.appendChild(badgeLabel);
-                        }
                     }
 
                     const tickCount = 7;
@@ -3852,7 +4467,10 @@
                     });
                 }
                 window.addEventListener('beforeunload', () => window.clearInterval(liveTimer));
-            });
+            };
+            document.addEventListener('DOMContentLoaded', initializeStockDetailChart, { once: true });
+            window.addEventListener('aktienki:charts-ready', initializeStockDetailChart, { once: true });
+            if (document.readyState !== 'loading') initializeStockDetailChart();
         </script>
     @endif
 @endsection

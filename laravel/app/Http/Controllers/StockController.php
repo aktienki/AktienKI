@@ -6,7 +6,9 @@ use App\Enums\PlanLevel;
 use App\Services\PlanAccessService;
 use App\Services\MarketDataEntitlementService;
 use App\Services\PersonalizedSignalService;
+use App\Services\LeveragedProductRiskService;
 use App\Services\TwelveDataService;
+use App\Services\TechnicalPriceLevelService;
 use App\Support\ProfitFactor;
 use Carbon\CarbonImmutable;
 use Dompdf\Dompdf;
@@ -16,12 +18,148 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Throwable;
 
 class StockController extends Controller
 {
+    public function certificates(Request $request, string $symbol, TwelveDataService $marketData, LeveragedProductRiskService $leveragedRisk): JsonResponse
+    {
+        $instrument = $this->instrument($symbol);
+        $items = $marketData->structuredProducts(
+            (string) $instrument->symbol,
+            (string) $instrument->name,
+            $instrument->isin ? (string) $instrument->isin : null,
+        );
+        $canViewLeveragedProducts = (string) data_get($request->user()?->meta, 'risk_profile.level', 'normal') === 'risk';
+        if (! $canViewLeveragedProducts) {
+            $items = array_values(array_filter($items, static function (array $item): bool {
+                $type = mb_strtolower((string) ($item['instrument_type'] ?? ''));
+
+                return ! str_contains($type, 'warrant')
+                    && ! str_contains($type, 'option')
+                    && ! str_contains($type, 'knock');
+            }));
+        }
+
+        return response()->json([
+            'data' => $items,
+            'count' => count($items),
+            'provider' => 'Twelve Data',
+            'reference_only' => true,
+            'risk_analysis' => $canViewLeveragedProducts
+                ? $leveragedRisk->currentProfile((int) $instrument->id, 20)
+                : null,
+            'message' => $items === []
+                ? __('Twelve Data liefert für diesen Basiswert derzeit keine zuordenbaren Zertifikate oder Warrants.')
+                : null,
+        ]);
+    }
+
+    public function leveragedRisk(Request $request, string $symbol, LeveragedProductRiskService $leveragedRisk, TechnicalPriceLevelService $priceLevels): View
+    {
+        abort_unless(app()->environment('local'), 404);
+        abort_unless((string) data_get($request->user()?->meta, 'risk_profile.level', 'normal') === 'risk', 403);
+
+        $instrument = $this->instrument($symbol);
+        $profile = $leveragedRisk->currentProfile((int) $instrument->id, 20);
+        abort_unless($profile, 404, __('Für diese Aktie liegt noch keine 20T-Risikomatrix vor.'));
+
+        $underlyingCodes = ['DBK.DE' => 514000];
+        $underlyingCode = $underlyingCodes[mb_strtoupper((string) $instrument->symbol)] ?? null;
+        $productCounts = $underlyingCode
+            ? DB::table('deutsche_boerse_certificates')->where('underlying_code', $underlyingCode)
+                ->whereIn('warrant_type', ['CALL', 'PUT', 'RANGE', 'OTHER'])
+                ->selectRaw('warrant_type, count(*) AS total')->groupBy('warrant_type')->pluck('total', 'warrant_type')
+            : collect();
+
+        $historyBars = DB::table('price_bars')->where('instrument_id', $instrument->id)
+            ->where('interval', '1d')->orderByDesc('bar_time')->limit(756)
+            ->get(['bar_time', 'open', 'high', 'low', 'close'])->reverse()->values()->map(fn ($bar) => [
+                'date' => CarbonImmutable::parse($bar->bar_time)->toDateString(),
+                'open' => (float) $bar->open,
+                'high' => (float) $bar->high,
+                'low' => (float) $bar->low,
+                'close' => (float) $bar->close,
+            ]);
+        $chartBars = $historyBars->take(-120)->values();
+        $technicalLevels = $priceLevels->levels((int) $instrument->id, 180);
+        $forecastTargetDistance = abs((float) $profile['predicted_return_percent']);
+        $monteCarlo = Cache::remember(
+            "leveraged-risk:monte-carlo:v4:{$instrument->id}:20:10000:".number_format($forecastTargetDistance, 2, '.', ''),
+            now()->addHours(6),
+            fn () => $leveragedRisk->simulateHistoricalPaths($historyBars->pluck('close')->all(), 20, 10000, 20260825, $forecastTargetDistance),
+        );
+
+        return view('stocks.leveraged-risk', compact('instrument', 'profile', 'productCounts', 'chartBars', 'monteCarlo', 'technicalLevels'));
+    }
+
+    public function leveragedRiskCertificates(Request $request, string $symbol): JsonResponse
+    {
+        abort_unless(app()->environment('local'), 404);
+        abort_unless((string) data_get($request->user()?->meta, 'risk_profile.level', 'normal') === 'risk', 403);
+
+        $validated = $request->validate([
+            'side' => ['required', 'in:long,short'],
+            'leverage' => ['required', 'integer', 'in:2,5,10,15,20'],
+            'loss_threshold' => ['required', 'integer', 'min:10', 'max:100', 'multiple_of:10'],
+        ]);
+        $instrument = $this->instrument($symbol);
+        $underlyingCode = ['DBK.DE' => 514000][mb_strtoupper((string) $instrument->symbol)] ?? null;
+        if (! $underlyingCode) {
+            return response()->json(['data' => [], 'count' => 0, 'message' => __('Für diesen Basiswert ist noch kein Produktkatalog zugeordnet.')]);
+        }
+
+        $warrantType = $validated['side'] === 'long' ? 'CALL' : 'PUT';
+        $base = DB::table('deutsche_boerse_certificates')
+            ->where('underlying_code', $underlyingCode)
+            ->where('warrant_type', $warrantType)
+            ->where(fn ($query) => $query->whereNull('last_trading_date')->orWhereDate('last_trading_date', '>=', today()))
+            ->where(fn ($query) => $query->whereNull('maturity_date')->orWhereDate('maturity_date', '>=', today()));
+        $count = (clone $base)->count();
+        $items = $base->orderByRaw('maturity_date IS NULL')->orderBy('maturity_date')->orderBy('instrument_name')->limit(60)
+            ->get(['instrument_name', 'isin', 'wkn', 'warrant_type', 'currency', 'maturity_date', 'mic_code', 'specialist'])
+            ->map(fn ($item): array => [
+                'name' => (string) $item->instrument_name,
+                'isin' => (string) $item->isin,
+                'wkn' => (string) ($item->wkn ?? ''),
+                'type' => (string) $item->warrant_type,
+                'currency' => (string) ($item->currency ?? 'EUR'),
+                'maturity' => $item->maturity_date ? CarbonImmutable::parse($item->maturity_date)->format('d.m.Y') : null,
+                'exchange' => (string) ($item->mic_code ?? 'XFRA'),
+                'issuer' => (string) ($item->specialist ?? ''),
+                'url' => 'https://www.boerse-frankfurt.de/suche?search_terms='.rawurlencode((string) $item->isin),
+            ])->values();
+
+        return response()->json([
+            'data' => $items,
+            'count' => $count,
+            'shown' => $items->count(),
+            'selection' => $validated,
+            'reference_only' => true,
+            'message' => __('Vorauswahl nach Produktrichtung. Der exakte Produkthebel kann erst nach Ergänzung von Produktkurs, Bezugsverhältnis und Finanzierungsschwelle verifiziert werden.'),
+        ]);
+    }
+
+    public function emailReport(Request $request, string $symbol)
+    {
+        abort_unless($request->user()?->email, 422, __('Keine E-Mail-Adresse im Profil hinterlegt.'));
+
+        $pdfResponse = $this->report($request, $symbol);
+        $filename = 'Aktienbericht-'.preg_replace('/[^A-Za-z0-9._-]/', '-', $symbol).'-'.now()->format('Y-m-d').'.pdf';
+        $recipient = (string) $request->user()->email;
+
+        Mail::raw(__('Im Anhang finden Sie den aktuellen Aktienbericht für :symbol.', ['symbol' => $symbol]), function ($message) use ($recipient, $filename, $pdfResponse, $symbol): void {
+            $message->to($recipient)
+                ->subject(__('Aktienbericht :symbol', ['symbol' => $symbol]))
+                ->attachData((string) $pdfResponse->getContent(), $filename, ['mime' => 'application/pdf']);
+        });
+
+        return back()->with('status', __('Der Aktienbericht wurde an :email gesendet.', ['email' => $recipient]));
+    }
+
     public function report(Request $request, string $symbol): Response
     {
         $locale = in_array($request->query('locale'), ['de', 'en'], true)
@@ -48,6 +186,10 @@ class StockController extends Controller
         $assessment = DB::table('stock_ai_assessments')->where('instrument_id', $instrument->id)
             ->when($prediction, fn ($query) => $query->where('prediction_id', $prediction->id))
             ->orderByDesc('assessment_date')->orderByDesc('id')->first();
+        if (! $assessment) {
+            $assessment = DB::table('stock_ai_assessments')->where('instrument_id', $instrument->id)
+                ->orderByDesc('assessment_date')->orderByDesc('id')->first();
+        }
         $trainedModel = $prediction?->trained_model_id
             ? DB::table('trained_models as tm')->leftJoin('model_quality_rankings as mq', 'mq.trained_model_id', '=', 'tm.id')
                 ->leftJoin('model_definitions as md', 'md.id', '=', 'tm.model_definition_id')
@@ -74,8 +216,15 @@ class StockController extends Controller
             ->where('instrument_id', $instrument->id)->whereIn('run_id', $latestWalkForwardRunIds)
             ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
             ->selectRaw('AVG(net_return) * 100 AS average_profit_per_trade_percent')->first();
-        $patterns = $this->chartPatternStatistics((int) $instrument->id);
+        $patterns = collect($this->chartPatternStatistics((int) $instrument->id))
+            ->filter(fn (array $pattern): bool => filled($pattern['latest_at'] ?? null)
+                && CarbonImmutable::parse($pattern['latest_at'])->gte(now()->subDays(5)->startOfDay()))
+            ->map(function (array $pattern): array {
+                $pattern['chart'] = $this->stockReportPatternChart($pattern['example'] ?? []);
+                return $pattern;
+            })->values()->all();
         $indicators = $this->indicatorCards($instrument);
+        $indicatorMatrices = $this->stockReportIndicatorMatrices($indicators);
         $horizonTargets = collect([5, 10, 15, 20])->mapWithKeys(function (int $days) use ($instrument, $prediction): array {
             $column = "predicted_price_{$days}d";
             $value = is_numeric($prediction?->{$column} ?? null) ? (float) $prediction->{$column} : null;
@@ -87,10 +236,35 @@ class StockController extends Controller
             }
             return [$days => is_numeric($value) ? (float) $value : null];
         })->all();
-        $chartBars = $this->dailyBars((int) $instrument->id)->take(-120)->values();
-        $chart = $this->stockReportChart($chartBars, $horizonTargets);
-        $logoPath = public_path('brand/generated/bull-logo-light-clean.png');
-        $logoData = is_file($logoPath) ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath)) : null;
+        $chartBars = $this->dailyBars((int) $instrument->id)
+            ->when($prediction?->prediction_time, function ($bars) use ($prediction) {
+                $predictionDate = CarbonImmutable::parse($prediction->prediction_time)->endOfDay();
+
+                return $bars->filter(fn ($bar) => CarbonImmutable::parse($bar->bar_time)->lte($predictionDate));
+            })
+            ->take(-120)->values();
+        $signalHistory = DB::table('predictions')->where('instrument_id', $instrument->id)
+            ->when($prediction?->prediction_time, fn ($query) => $query->where('prediction_time', '<=', $prediction->prediction_time))
+            ->whereNotNull('signal')->orderBy('prediction_time')->orderBy('id')
+            ->get(['prediction_time', 'signal', 'current_price']);
+        $signalTransition = null;
+        $previousSignal = null;
+        foreach ($signalHistory as $signalPoint) {
+            $pointSignal = strtoupper((string) $signalPoint->signal);
+            if ($previousSignal !== null && $pointSignal !== $previousSignal) $signalTransition = $signalPoint;
+            $previousSignal = $pointSignal;
+        }
+        $signalPrice = is_numeric($signalTransition?->current_price) ? (float) $signalTransition->current_price : null;
+        $signalAt = $signalTransition?->prediction_time ? CarbonImmutable::parse($signalTransition->prediction_time) : null;
+        $chart = $this->stockReportChart(
+            $chartBars,
+            $horizonTargets,
+            is_numeric($prediction?->current_price) ? (float) $prediction->current_price : null,
+            $signalPrice,
+            $signalAt,
+        );
+        $logoPath = public_path('brand/generated/bull-logo-dark-padded.jpg');
+        $logoData = is_file($logoPath) ? 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($logoPath)) : null;
         $toPercent = static fn ($value): ?float => is_numeric($value)
             ? max(0, min(100, (float) $value * ((float) $value <= 1 ? 100 : 1))) : null;
         $reportDonuts = [
@@ -108,7 +282,7 @@ class StockController extends Controller
         $options = new Options();
         $options->set('isRemoteEnabled', false);
         $pdf = new Dompdf($options);
-        $pdf->loadHtml(view('stocks.report', compact('instrument', 'prediction', 'fundamental', 'fundamentals', 'assessment', 'trainedModel', 'patterns', 'indicators', 'horizonTargets', 'chart', 'logoData', 'reportDonuts'))->render(), 'UTF-8');
+        $pdf->loadHtml(view('stocks.report', compact('instrument', 'prediction', 'fundamental', 'fundamentals', 'assessment', 'trainedModel', 'patterns', 'indicators', 'indicatorMatrices', 'horizonTargets', 'chart', 'logoData', 'reportDonuts', 'signalPrice', 'signalAt'))->render(), 'UTF-8');
         $pdf->setPaper('a4', 'portrait');
         $pdf->render();
         $filename = ($english ? 'Stock-report-' : 'Aktienbericht-').preg_replace('/[^A-Za-z0-9._-]/', '-', $instrument->symbol).'-'.$locale.'-'.now()->format('Y-m-d').'.pdf';
@@ -121,21 +295,29 @@ class StockController extends Controller
         ]);
     }
 
-    private function stockReportChart($bars, array $targets): ?string
+    private function stockReportChart($bars, array $targets, ?float $forecastBase = null, ?float $signalPrice = null, ?CarbonImmutable $signalAt = null): ?string
     {
         $closes = collect($bars)->map(fn ($bar) => (float) $bar->close)->filter(fn ($value) => $value > 0)->values();
         if ($closes->count() < 2) return null;
         $forecast = collect([5, 10, 15, 20])->map(fn ($day) => $targets[$day] ?? null)->filter(fn ($value) => is_numeric($value));
-        $all = $closes->concat($forecast)->values(); $min = (float) $all->min(); $max = (float) $all->max();
+        $forecastBase = $forecastBase !== null && $forecastBase > 0 ? $forecastBase : (float) $closes->last();
+        $all = $closes->concat($forecast)->push($forecastBase)->when($signalPrice !== null, fn ($values) => $values->push($signalPrice))->values(); $min = (float) $all->min(); $max = (float) $all->max();
         $pad = max(($max - $min) * .12, $max * .015); $min -= $pad; $max += $pad; $range = max(.00001, $max - $min);
         $w = 720; $h = 190; $left = 38; $right = 18; $top = 16; $bottom = 28; $plotW = $w-$left-$right; $plotH = $h-$top-$bottom;
         $hx = fn ($i) => $left + ($i / max(1, $closes->count()-1)) * ($plotW * .78);
         $fy = fn ($value) => $top + (($max-(float)$value)/$range)*$plotH;
         $history = $closes->map(fn ($value,$i) => number_format($hx($i),1,'.','').','.number_format($fy($value),1,'.',''))->implode(' ');
-        $lastX = $hx($closes->count()-1); $last = (float) $closes->last(); $forecastPoints = [number_format($lastX,1,'.','').','.number_format($fy($last),1,'.','')];
+        $lastX = $hx($closes->count()-1); $forecastPoints = [number_format($lastX,1,'.','').','.number_format($fy($forecastBase),1,'.','')];
         $labels = ''; foreach ([5,10,15,20] as $i => $day) { if (!is_numeric($targets[$day] ?? null)) continue; $x=$lastX+(($i+1)/4)*($plotW*.22); $y=$fy($targets[$day]); $forecastPoints[]=number_format($x,1,'.','').','.number_format($y,1,'.',''); $labels.='<circle cx="'.$x.'" cy="'.$y.'" r="3" fill="#22d3ee"/><text x="'.$x.'" y="'.($y-7).'" text-anchor="middle" font-size="8" fill="#0e7490" font-weight="bold">'.$day.'T</text>'; }
         $grid=''; for($i=0;$i<4;$i++){ $y=$top+($i/3)*$plotH; $value=$max-($i/3)*$range; $grid.='<line x1="'.$left.'" y1="'.$y.'" x2="'.($w-$right).'" y2="'.$y.'" stroke="#cbd5e1" stroke-width=".6"/><text x="'.($left-5).'" y="'.($y+3).'" text-anchor="end" font-size="7" fill="#64748b">'.number_format($value,0,',','.').'</text>'; }
-        $svg='<svg xmlns="http://www.w3.org/2000/svg" width="'.$w.'" height="'.$h.'" viewBox="0 0 '.$w.' '.$h.'"><rect width="100%" height="100%" rx="8" fill="#f8fafc"/>'.$grid.'<polyline points="'.$history.'" fill="none" stroke="#0891b2" stroke-width="2"/><line x1="'.$lastX.'" y1="'.$top.'" x2="'.$lastX.'" y2="'.($h-$bottom).'" stroke="#f59e0b" stroke-dasharray="4 3"/><polyline points="'.implode(' ',$forecastPoints).'" fill="none" stroke="#22c55e" stroke-width="2.2"/>'.$labels.'<text x="'.$left.'" y="'.($h-8).'" font-size="8" fill="#64748b">Historischer Kurs</text><text x="'.($w-$right).'" y="'.($h-8).'" text-anchor="end" font-size="8" fill="#16a34a">Prognose 5/10/15/20T</text></svg>';
+        $signalLine = '';
+        if ($signalPrice !== null) {
+            $signalIndex = 0;
+            if ($signalAt) foreach (collect($bars)->values() as $index => $bar) { if (CarbonImmutable::parse($bar->bar_time)->gte($signalAt)) { $signalIndex = $index; break; } }
+            $signalX = $hx(min($signalIndex, max(0, $closes->count() - 1))); $signalY = $fy($signalPrice);
+            $signalLine = '<line x1="'.$signalX.'" y1="'.$signalY.'" x2="'.($w-$right).'" y2="'.$signalY.'" stroke="#f59e0b" stroke-width="1.4" stroke-dasharray="5 3"/><text x="'.($w-$right).'" y="'.($signalY-4).'" text-anchor="end" font-size="8" fill="#b45309" font-weight="bold">Signalkurs '.number_format($signalPrice, 2, ',', '.').'</text>';
+        }
+        $svg='<svg xmlns="http://www.w3.org/2000/svg" width="'.$w.'" height="'.$h.'" viewBox="0 0 '.$w.' '.$h.'"><rect width="100%" height="100%" rx="8" fill="#f8fafc"/>'.$grid.'<polyline points="'.$history.'" fill="none" stroke="#0891b2" stroke-width="2"/>'.$signalLine.'<line x1="'.$lastX.'" y1="'.$top.'" x2="'.$lastX.'" y2="'.($h-$bottom).'" stroke="#f59e0b" stroke-dasharray="4 3"/><polyline points="'.implode(' ',$forecastPoints).'" fill="none" stroke="#22c55e" stroke-width="2.2"/>'.$labels.'<text x="'.$left.'" y="'.($h-8).'" font-size="8" fill="#64748b">Historischer Kurs</text><text x="'.($w-$right).'" y="'.($h-8).'" text-anchor="end" font-size="8" fill="#16a34a">Prognose 5/10/15/20T</text></svg>';
         return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 
@@ -148,27 +330,50 @@ class StockController extends Controller
             ! $available => '#64748b', $quality >= 85 => '#22c55e', $quality >= 70 => '#84cc16',
             $quality >= 55 => '#d9e021', $quality >= 40 => '#facc15', $quality >= 25 => '#fb923c', default => '#fb7185',
         };
-        $size = 160; $image = imagecreatetruecolor($size, $size);
-        imagesavealpha($image, true); imagefill($image, 0, 0, imagecolorallocatealpha($image, 0, 0, 0, 127));
-        $hex = fn (string $hex): array => sscanf(ltrim($hex, '#'), '%02x%02x%02x');
-        [$r, $g, $b] = $hex($color); $activeColor = imagecolorallocate($image, $r, $g, $b);
-        $track = imagecolorallocate($image, 51, 65, 85); $fill = imagecolorallocate($image, 30, 41, 59);
-        imagefilledellipse($image, 80, 80, 126, 126, $track); imagefilledellipse($image, 80, 80, 96, 96, $fill);
-        if ($available) {
-            imagesetthickness($image, 15); imagearc($image, 80, 80, 111, 111, -90, -90 + (int) round(360 * $value / 100), $activeColor);
-        }
-        $font = base_path('vendor/dompdf/dompdf/lib/fonts/DejaVuSans.ttf');
-        $bold = base_path('vendor/dompdf/dompdf/lib/fonts/DejaVuSans-Bold.ttf');
-        $text = (string) ($donut['display'] ?? '—'); $label = (string) ($donut['label'] ?? '');
-        $center = static function ($image, string $font, float $size, int $y, string $text, int $color): void {
-            $box = imagettfbbox($size, 0, $font, $text); $width = $box[2] - $box[0];
-            imagettftext($image, $size, 0, (int) ((160 - $width) / 2), $y, $color, $font, $text);
-        };
-        $center($image, $bold, 19, 78, $text, $activeColor);
-        $center($image, $font, 10, 103, $label, imagecolorallocate($image, 189, 202, 219));
-        ob_start(); imagepng($image); $png = ob_get_clean(); imagedestroy($image);
+        $radius = 52;
+        $circumference = 2 * M_PI * $radius;
+        $dash = $available ? $circumference * ($value / 100) : 0;
+        $gap = max(0, $circumference - $dash);
+        $text = htmlspecialchars((string) ($donut['display'] ?? '—'), ENT_QUOTES | ENT_XML1, 'UTF-8');
+        $label = htmlspecialchars((string) ($donut['label'] ?? ''), ENT_QUOTES | ENT_XML1, 'UTF-8');
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">'
+            .'<circle cx="80" cy="80" r="52" fill="#ffffff" stroke="#e2e8f0" stroke-width="15"/>'
+            .($available ? '<circle cx="80" cy="80" r="52" fill="none" stroke="'.$color.'" stroke-width="15" stroke-linecap="round" stroke-dasharray="'.number_format($dash, 2, '.', '').' '.number_format($gap, 2, '.', '').'" transform="rotate(-90 80 80)"/>' : '')
+            .'<text x="80" y="78" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="19" font-weight="700" fill="'.$color.'">'.$text.'</text>'
+            .'<text x="80" y="103" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#475569">'.$label.'</text>'
+            .'</svg>';
 
-        return 'data:image/png;base64,'.base64_encode((string) $png);
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
+    }
+
+    private function stockReportPatternChart(array $bars): ?string
+    {
+        $bars = collect($bars)->values();
+        if ($bars->isEmpty()) return null;
+        $low = (float) $bars->min('low'); $high = (float) $bars->max('high'); $range = max(.000001, $high - $low);
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="62" viewBox="0 0 180 62"><rect width="180" height="62" rx="6" fill="#f8fafc"/>';
+        foreach ($bars as $index => $bar) {
+            $x = 16 + $index * (148 / max(1, $bars->count() - 1));
+            $y = fn ($value) => 54 - (((float) $value - $low) / $range) * 46;
+            $open = $y($bar['open']); $close = $y($bar['close']); $color = (float) $bar['close'] >= (float) $bar['open'] ? '#10b981' : '#ef4444';
+            $svg .= '<line x1="'.$x.'" y1="'.$y($bar['high']).'" x2="'.$x.'" y2="'.$y($bar['low']).'" stroke="'.$color.'"/><rect x="'.($x-4).'" y="'.min($open,$close).'" width="8" height="'.max(2,abs($close-$open)).'" rx="1" fill="'.$color.'"/>';
+        }
+        return 'data:image/svg+xml;base64,'.base64_encode($svg.'</svg>');
+    }
+
+    private function stockReportIndicatorMatrices($indicators): array
+    {
+        $cards = collect($indicators)->keyBy('label');
+        return collect([[__('Momentum 10T'),'Stochastik %K'],['ADX 14','Stochastik %K'],['MACD Histogramm','Stochastik %K']])->map(function ($pair) use ($cards) {
+            $a=$cards->get($pair[0]); $b=$cards->get($pair[1]); if(!$a||!$b)return null;
+            $ap=collect($a['points'])->keyBy('date'); $points=collect($b['points'])->map(fn($p)=>isset($ap[$p['date']])?['x'=>(float)$ap[$p['date']]['x'],'y'=>(float)$p['x'],'up'=>(bool)$p['up']]:null)->filter()->values();
+            if($points->isEmpty())return null;
+            $limits=fn($v)=>collect($v)->sort()->values()->pipe(fn($s)=>collect([.2,.4,.6,.8])->map(fn($q)=>(float)$s[(int)floor(($s->count()-1)*$q)])->all());
+            $xl=$limits($points->pluck('x')); $yl=$limits($points->pluck('y')); $bin=fn($v,$ls)=>collect($ls)->search(fn($l)=>$v<=$l)===false?4:(int)collect($ls)->search(fn($l)=>$v<=$l);
+            $cells=array_fill(0,5,array_fill(0,5,['n'=>0,'up'=>0])); foreach($points as $p){$x=$bin($p['x'],$xl);$y=$bin($p['y'],$yl);$cells[$y][$x]['n']++;if($p['up'])$cells[$y][$x]['up']++;}
+            foreach($cells as $y=>$row)foreach($row as $x=>$c)$cells[$y][$x]['p']=$c['n']?($c['up']/$c['n'])*100:null;
+            return ['x'=>$a['label'],'y'=>$b['label'],'cells'=>$cells,'samples'=>$points->count()];
+        })->filter()->values()->all();
     }
 
     public function chartAnalysis(string $symbol): View
@@ -372,6 +577,7 @@ class StockController extends Controller
                 ->selectRaw('COUNT(*) AS trade_count')
                 ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
                 ->selectRaw('AVG(net_return) * 100 AS average_profit_per_trade_percent')
+                ->selectRaw('STDDEV_POP(net_return) * 100 AS return_volatility_percent')
                 ->first();
         $qualityGateTier = DB::table('model_quality_tiers')
             ->where('code', 'test')
@@ -547,7 +753,11 @@ class StockController extends Controller
             : ['candles' => collect(), 'source' => 'license_restricted'];
         $chartPatterns = $this->recentChartPatterns($chartCandles);
         $chartPatternStats = $historicalChartAllowed
-            ? $this->chartPatternStatistics((int) $instrument->id)
+            ? collect($this->chartPatternStatistics((int) $instrument->id))
+                ->filter(fn (array $pattern): bool => filled($pattern['latest_at'] ?? null)
+                    && CarbonImmutable::parse($pattern['latest_at'])->gte(now()->subDays(5)->startOfDay()))
+                ->values()
+                ->all()
             : [];
         $chartStartAt = $chartCandles->isNotEmpty()
             ? CarbonImmutable::createFromTimestampMs((int) $chartCandles->first()['x'])->startOfDay()
@@ -1429,20 +1639,29 @@ class StockController extends Controller
 
     private function predictionRankingScore(object $prediction, ?object $modelQuality): float
     {
-        $runIds = DB::table('walk_forward_backtest_runs')
-            ->where('status', 'completed')
-            ->whereIn('horizon_days', [5, 10, 15, 20])
-            ->select(['id', 'horizon_days'])
-            ->selectSub(function ($query): void {
-                $query->from('walk_forward_backtest_trades as score_run_trade')
-                    ->whereColumn('score_run_trade.run_id', 'walk_forward_backtest_runs.id')
-                    ->selectRaw('COUNT(DISTINCT score_run_trade.instrument_id)');
-            }, 'instrument_count')
-            ->orderByDesc('instrument_count')
-            ->orderByDesc('id')
-            ->get()
-            ->unique('horizon_days')
-            ->pluck('id');
+        // KI score describes model quality only. A bearish high-confidence
+        // forecast can therefore have excellent quality; its direction is
+        // represented independently by the signal strength.
+        if (is_numeric($modelQuality?->quality_score)) {
+            return round(max(0.0, min(10.0, (float) $modelQuality->quality_score * 10.0)), 2);
+        }
+
+        // Every stock page used to count distinct instruments across the full
+        // 1M+ row trade table for every historical run. The runner already
+        // persists that coverage in summary.instruments, so choose the same
+        // four reference runs from the compact run table and cache the result.
+        $runIds = Cache::remember('stocks.ranking-score-reference-runs.v2', now()->addHour(), fn () =>
+            DB::table('walk_forward_backtest_runs')
+                ->where('status', 'completed')
+                ->whereIn('horizon_days', [5, 10, 15, 20])
+                ->select(['id', 'horizon_days'])
+                ->selectRaw("COALESCE((summary->>'instruments')::integer, 0) AS instrument_count")
+                ->orderByDesc('instrument_count')
+                ->orderByDesc('id')
+                ->get()
+                ->unique('horizon_days')
+                ->pluck('id')
+        );
 
         $stats = $runIds->isEmpty() ? collect() : DB::table('walk_forward_backtest_trades as score_trade')
             ->whereIn('score_trade.run_id', $runIds)

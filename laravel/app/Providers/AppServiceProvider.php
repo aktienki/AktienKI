@@ -32,7 +32,7 @@ class AppServiceProvider extends ServiceProvider
             $alreadyEmbedded = collect($event->message->getAttachments())
                 ->contains(fn ($part): bool => method_exists($part, 'getContentId') && $part->getContentId() === 'aktienki-logo@aktienki.com');
             if (! $alreadyEmbedded) {
-                $logo = (new DataPart(new File(public_path('brand/generated/bull-logo-light-clean.png')), 'aktienki-logo.png', 'image/png'))->asInline();
+                $logo = (new DataPart(new File(public_path('brand/generated/bull-icon.png')), 'aktienki-logo.png', 'image/png'))->asInline();
                 $logo->setContentId('aktienki-logo@aktienki.com');
                 $event->message->addPart($logo);
             }

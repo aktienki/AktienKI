@@ -7,10 +7,18 @@
         mobileNavigation: @js(data_get(auth()->user()?->preferences ?? [], 'mobile_navigation', ['order' => [], 'hidden' => []])),
         applyMobileNavigation() {
             const items = [...this.$refs.navigation.querySelectorAll('[data-nav-key]')];
-            const defaults = ['welcome','features','roadmap','dashboard','screener','predictions','depots','accounts','setup','news','pricing','contact','community'];
+            const defaults = ['welcome','features','roadmap','dashboard','screener','predictions','depots','accounts','setup','news','pricing','contact','help','community'];
             const order = [...(this.mobileNavigation.order || []), ...defaults].filter((key, index, all) => all.indexOf(key) === index);
             const hidden = new Set(this.mobileNavigation.hidden || []);
             const mobile = window.innerWidth < 768;
+            if (mobile) {
+                const screenerIndex = order.indexOf('screener');
+                if (screenerIndex >= 0) order.splice(screenerIndex, 1);
+                const dashboardIndex = order.indexOf('dashboard');
+                order.splice(Math.max(0, dashboardIndex + 1), 0, 'screener');
+                hidden.delete('dashboard');
+                hidden.delete('screener');
+            }
             items.forEach((item) => {
                 item.style.order = mobile ? String(order.indexOf(item.dataset.navKey) + 1) : '';
                 item.style.display = mobile && hidden.has(item.dataset.navKey) ? 'none' : '';
@@ -70,7 +78,7 @@
                 <x-heroicon-o-squares-2x2 /><span>Dashboard</span>
             </a>
             <div x-data="{open:false,left:0,top:0,toggle(){const b=this.$refs.trigger.getBoundingClientRect();this.left=b.left;this.top=b.bottom+8;this.open=!this.open}}" @click.outside="open=false" data-nav-key="screener" class="relative shrink-0">
-                <button x-ref="trigger" type="button" @click="toggle()" class="{{ request()->routeIs('screener.*', 'indices.*', 'sectors.*', 'markets.situation', 'daily-market-analysis') ? 'ak-top-link-active' : 'ak-top-link' }}" :aria-expanded="open">
+                <button x-ref="trigger" type="button" @click="toggle()" class="{{ request()->routeIs('screener.*', 'news.*', 'indices.*', 'sectors.*', 'securities.*', 'markets.situation', 'daily-market-analysis') ? 'ak-top-link-active' : 'ak-top-link' }}" :aria-expanded="open">
                     <x-heroicon-o-funnel /><span>{{ __('Screener') }}</span><x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition" x-bind:class="{'rotate-180':open}" />
                 </button>
                 <template x-teleport="body">
@@ -79,7 +87,11 @@
                         <a href="{{ route('screener.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-chart-bar-square class="h-5 w-5 text-cyan-500" />{{ __('Aktien') }}</a>
                         <a href="{{ route('indices.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-globe-alt class="h-5 w-5 text-cyan-500" />{{ __('Indizes') }}</a>
                         <a href="{{ route('sectors.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-building-office-2 class="h-5 w-5 text-cyan-500" />{{ __('Sektoren') }}</a>
+                        @if (Route::has('securities.index'))
+                            <a href="{{ route('securities.index', ['tab' => 'etfs']) }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-rectangle-stack class="h-5 w-5 text-violet-400" />{{ __('ETFs') }}</a>
+                        @endif
                         <a href="{{ route('daily-market-analysis') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-scale class="h-5 w-5 text-amber-500" />{{ __('Chancen & Risiken') }}</a>
+                        <a href="{{ route('news.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-newspaper class="h-5 w-5 text-cyan-500" />{{ __('News') }}</a>
                     </div>
                 </template>
             </div>
@@ -125,6 +137,18 @@
                         <a href="{{ route('predictions.signal-history') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
                             <x-heroicon-o-arrow-path class="h-5 w-5 text-amber-500" />
                             {{ __('Signalwechsel-Historie') }}
+                        </a>
+                        <a href="{{ route('predictions.chartview-signals') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                            <x-heroicon-o-signal class="h-5 w-5 text-emerald-500" />
+                            {{ __('ChartView-Signale') }} <span class="ml-auto ak-plan-badge ak-plan-badge--pro">PRO</span>
+                        </a>
+                        <a href="{{ route('opportunities.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-amber-500/10 hover:text-amber-500">
+                            <x-heroicon-o-sparkles class="h-5 w-5 text-amber-500" />
+                            {{ __('Handelschancen') }} <span class="ml-auto ak-plan-badge ak-plan-badge--pro">PRO</span>
+                        </a>
+                        <a href="{{ route('predictions.performance-transparency') }}" class="flex items-center gap-3 rounded-xl border-t border-[var(--ak-border)] px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500">
+                            <x-heroicon-o-table-cells class="h-5 w-5 text-cyan-500" />
+                            {{ __('Performance & Einordnung') }} <span class="ml-auto ak-plan-badge ak-plan-badge--pro">PRO</span>
                         </a>
                     </div>
                 </template>
@@ -291,6 +315,9 @@
             @endguest
             <a data-nav-key="contact" href="{{ route('contact') }}" class="{{ request()->routeIs('contact') ? 'ak-top-link-active' : 'ak-top-link' }}"><x-heroicon-o-envelope /><span>{{ __('Kontakt') }}</span></a>
             @auth
+                <a data-nav-key="help" data-tour-help href="{{ route('tutorial.index') }}" class="{{ request()->routeIs('tutorial.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
+                    <x-heroicon-o-question-mark-circle /><span>{{ __('Hilfe') }}</span>
+                </a>
                 <a data-nav-key="community" href="{{ route('community.index') }}" class="{{ request()->routeIs('community.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
                     <x-heroicon-o-user-group /><span>{{ __('Community') }}</span>
                 </a>
@@ -327,8 +354,6 @@
                             <span class="block text-[8px] text-amber-200/80">{{ __('kostenfrei bis') }} {{ $topbarUser->tariff_ends_at->format('d.m.Y') }}</span>
                         @elseif ($topbarBetaAccess)
                             <span class="block text-[8px] text-amber-200/80">{{ __('kostenfrei während Beta') }}</span>
-                        @else
-                            <span class="block text-[8px] text-[var(--ak-muted)]">{{ __('Mein Abo') }}</span>
                         @endif
                     </span>
                 </a>
@@ -348,6 +373,8 @@
                                 <a href="{{ route('profile.edit', ['return_to' => request()->fullUrl()]) }}" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-violet-500/15 hover:text-white"><x-heroicon-o-user class="h-5 w-5 text-violet-300" />Profil</a>
                             @endif
                             <a href="{{ route('profile.edit', ['return_to' => request()->fullUrl()]) }}#darstellung" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-violet-500/15 hover:text-white"><x-heroicon-o-cog-6-tooth class="h-5 w-5 text-violet-300" />{{ __('Einstellungen') }}</a>
+                            <a href="{{ route('profile.mobile-view') }}" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-cyan-500/15 hover:text-white"><x-heroicon-o-device-phone-mobile class="h-5 w-5 text-cyan-300" />{{ __('Mobile Ansicht') }}</a>
+                            <a href="{{ route('tutorial.index') }}" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-cyan-500/15 hover:text-white"><x-heroicon-o-question-mark-circle class="h-5 w-5 text-cyan-300" />{{ __('Hilfe & Tutorial') }}</a>
                             <a href="{{ route('integrations.index') }}" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-300 transition hover:bg-teal-500/15 hover:text-white"><x-heroicon-o-link class="h-5 w-5 text-teal-400" />{{ __('Broker & WhatsApp') }}</a>
                             @if (auth()->user()->is_admin)
                                 <a href="{{ route('admin.infrastructure') }}" @click="open=false" class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-cyan-200 transition hover:bg-cyan-500/15 hover:text-white"><x-heroicon-o-server-stack class="h-5 w-5 text-cyan-300" />{{ __('Systembetrieb') }}</a>

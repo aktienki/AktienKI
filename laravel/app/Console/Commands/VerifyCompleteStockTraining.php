@@ -26,25 +26,28 @@ class VerifyCompleteStockTraining extends Command
             }
 
             foreach (self::HORIZONS as $days => $minutes) {
-                $prediction = DB::table('predictions as prediction')
-                    ->join('trained_models as model', 'model.id', '=', 'prediction.trained_model_id')
-                    ->where('prediction.instrument_id', $instrumentId)
-                    ->where('prediction.prediction_horizon_minutes', $minutes)
-                    ->where('model.feature_set_version', (string) $this->option('feature-version'))
-                    ->orderByDesc('prediction.prediction_time')->orderByDesc('prediction.id')
-                    ->first(['prediction.horizon_fusion_noise_passed', 'prediction.horizon_fusion_stability_passed']);
-                if (! $prediction) {
-                    $errors[] = "{$symbol}: {$days}d-Prediction fehlt";
-                } elseif ($prediction->horizon_fusion_noise_passed === null || $prediction->horizon_fusion_stability_passed === null) {
-                    $errors[] = "{$symbol}: {$days}d-Filterprüfung fehlt";
-                }
+                $modelExists = DB::table('trained_models')->where('instrument_id', $instrumentId)
+                    ->where('prediction_horizon_minutes', $minutes)->whereNull('deleted_at')
+                    ->where('feature_set_version', (string) $this->option('feature-version'))->exists();
+                if (! $modelExists) $errors[] = "{$symbol}: {$days}d-Modell fehlt";
 
-                $runId = DB::table('walk_forward_backtest_runs')->where('status', 'completed')
-                    ->where('horizon_days', $days)->orderByDesc('id')->value('id');
-                if (! $runId || ! DB::table('walk_forward_backtest_scores')->where('run_id', $runId)
-                    ->where('instrument_id', $instrumentId)->exists()) {
+                $runId = DB::table('walk_forward_backtest_runs as run')
+                    ->join('walk_forward_backtest_trades as trade', 'trade.run_id', '=', 'run.id')
+                    ->where('run.status', 'completed')->where('run.horizon_days', $days)
+                    ->where('trade.instrument_id', $instrumentId)
+                    ->orderByDesc('run.finished_at')->orderByDesc('run.id')->value('run.id');
+                if (! $runId) {
                     $errors[] = "{$symbol}: {$days}d-Walk-Forward fehlt";
                 }
+            }
+
+            $phaseFilter = DB::table('market_context_predictions')
+                ->where('scope_type', 'stock_phase20')
+                ->where('scope_key', (string) $instrumentId)
+                ->whereRaw("meta->>'source' = ?", ['pytorch_stock_three_phase_gru_20t'])
+                ->orderByDesc('prediction_date')->first();
+            if (! $phaseFilter) {
+                $errors[] = "{$symbol}: PyTorch-Phasenfilter fehlt";
             }
         }
 

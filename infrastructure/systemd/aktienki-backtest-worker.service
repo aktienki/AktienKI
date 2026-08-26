@@ -1,0 +1,17 @@
+[Unit]
+Description=AktienKI dedicated strategy backtest worker
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=aktienki
+Group=aktienki
+WorkingDirectory=/home/aktienki/AktienKI/laravel
+ExecStart=/usr/bin/php artisan queue:work database --queue=backtests --sleep=2 --tries=1 --timeout=7200 --max-time=21600
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

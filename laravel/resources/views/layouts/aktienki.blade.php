@@ -35,6 +35,10 @@
     @endauth
 
     @livewireScripts
+    @auth
+        <x-tutorial-tour />
+    @endauth
+    <x-confirmation-modal />
     <x-cookie-consent />
 </body>
 </html>

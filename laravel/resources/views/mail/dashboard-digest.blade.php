@@ -51,6 +51,38 @@
 </div>
 @endif
 
+@if(!empty($signalCockpit))
+<div style="font-size:20px;font-weight:800;color:#17283e;margin-top:22px">{{ __('Signal-Cockpit') }}</div>
+<div style="color:#687c91;font-size:11px;margin:4px 0 12px">{{ __('Signal-, Indikator- und Musterbewegungen der letzten drei Handelstage') }}</div>
+
+<div style="background:#122034;border:1px solid #29445a;border-radius:14px;padding:15px;color:#e7edf5">
+<div style="color:#42c6d5;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px">{{ __('Signalwechsel') }}</div>
+<table role="presentation" width="100%" cellpadding="7" cellspacing="0" style="margin-top:7px;color:#dce6ef;font-size:11px">
+@forelse(collect($signalCockpit['signalChanges'] ?? [])->take(5) as $change)
+<tr><td style="border-top:1px solid #263d52;font-weight:800">{{ $change['symbol'] }}</td><td style="border-top:1px solid #263d52;color:#9eb1c3">{{ $change['from'] }} → <strong style="color:#42c6d5">{{ $change['to'] }}</strong></td><td align="right" style="border-top:1px solid #263d52;color:#9eb1c3">{{ \Illuminate\Support\Carbon::parse($change['at'])->format('d.m.') }}</td></tr>
+@empty<tr><td style="color:#9eb1c3">{{ __('Keine Signalwechsel in den letzten drei Handelstagen.') }}</td></tr>@endforelse
+</table>
+</div>
+
+<div style="background:#122034;border:1px solid #514b32;border-radius:14px;padding:15px;color:#e7edf5;margin-top:12px">
+<div style="color:#d9a84e;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px">{{ __('Top 5 nach KI-Score') }}</div>
+<table role="presentation" width="100%" cellpadding="7" cellspacing="0" style="margin-top:7px;color:#dce6ef;font-size:11px">
+@foreach(collect($signalCockpit['topScores'] ?? [])->take(5) as $stock)
+<tr><td style="border-top:1px solid #3d3b30;font-weight:800">{{ $stock['symbol'] }}</td><td style="border-top:1px solid #3d3b30;color:#9eb1c3">{{ $stock['signal'] }}</td><td align="right" style="border-top:1px solid #3d3b30;color:#d9a84e;font-weight:800">{{ $stock['score'] !== null ? number_format($stock['score'], 1, ',', '.').' /10' : '–' }}</td></tr>
+@endforeach
+</table>
+</div>
+
+<div style="background:#122034;border:1px solid #285248;border-radius:14px;padding:15px;color:#e7edf5;margin-top:12px">
+<div style="color:#42d6b8;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px">ChartView · {{ __('Indikatoren & Chartmuster') }}</div>
+<table role="presentation" width="100%" cellpadding="7" cellspacing="0" style="margin-top:7px;color:#dce6ef;font-size:11px">
+@forelse(collect($signalCockpit['indicatorSignals'] ?? [])->take(5) as $event)
+<tr><td style="border-top:1px solid #263d52;font-weight:800">{{ $event['symbol'] }}</td><td style="border-top:1px solid #263d52;color:{{ $event['tone'] === 'positive' ? '#42d6b8' : '#d77987' }}">{{ __($event['label']) }}</td><td align="right" style="border-top:1px solid #263d52;color:#42c6d5;font-weight:800">{{ is_numeric($event['rise_probability']) ? number_format($event['rise_probability'], 0, ',', '.').' % ↑' : '–' }}</td></tr>
+@empty<tr><td style="color:#9eb1c3">{{ __('Keine wichtigen Indikatorwechsel in den letzten drei Handelstagen.') }}</td></tr>@endforelse
+</table>
+</div>
+@endif
+
 <div style="text-align:center;margin-top:18px"><a href="{{ $dashboardUrl }}" style="display:inline-block;background:#276f69;color:#ffffff;text-decoration:none;border-radius:7px;padding:11px 20px;font-size:12px;font-weight:800">{{ __('Dashboard öffnen') }}</a></div>
 
 <div style="margin-top:20px;padding:14px;border-radius:9px;background:#f2f4f7;color:#5b6571;font-size:11px;line-height:1.55">{{ __('Die Inhalte dienen ausschließlich Informations- und Analysezwecken. Sie stellen keine Anlageberatung oder Aufforderung zum Handel dar.') }}</div>

@@ -37,6 +37,21 @@ Schedule::command('stocks:classify-risk')
     ->onOneServer()
     ->runInBackground();
 
+// A completed walk-forward run changes the evidence behind the user-facing
+// score. Recalculate only affected latest predictions; the raw model score is
+// retained in model_prediction_score for auditing.
+Schedule::command('scores:recalculate')
+    ->everyMinute()
+    ->withoutOverlapping(10)
+    ->onOneServer()
+    ->runInBackground();
+
+// Score exits use the latest finalized daily prediction. A weak rating must
+// persist for two sessions; model retraining alone never triggers an exit.
+Schedule::command('exits:evaluate-normalized-scores')
+    ->weekdays()->dailyAt('07:15')->timezone('Europe/Berlin')
+    ->withoutOverlapping(30)->onOneServer()->runInBackground();
+
 // Persist both language variants after the daily prediction batch. The report
 // command skips a prediction/locale pair that has already been generated.
 Schedule::command('reports:signal-change --locale=de')
@@ -53,6 +68,12 @@ Schedule::command('market-factors:calculate --days=14')
     ->weekdays()->dailyAt('06:25')->timezone('Europe/Berlin')
     ->withoutOverlapping(60)->onOneServer()->runInBackground();
 
+// Refresh the persisted daily series used by the DAX, VDAX and bond macro
+// cards after the European and US cash sessions have closed.
+Schedule::command('markets:refresh-macro-history --range=3y')
+    ->weekdays()->dailyAt('23:15')->timezone('Europe/Berlin')
+    ->withoutOverlapping(90)->onOneServer()->runInBackground();
+
 // Keep the broad German stock universe current as market caps and the
 // available instrument catalogue grow. It is intentionally not labelled DAX.
 Schedule::command('indices:sync-germany-top500')
@@ -60,8 +81,9 @@ Schedule::command('indices:sync-germany-top500')
     ->withoutOverlapping(10)->onOneServer()->runInBackground();
 
 Schedule::command('markets:generate-index-infos')
-    ->dailyAt('06:35')
+    ->dailyAt('06:35')->timezone('Europe/Berlin')
     ->withoutOverlapping(20)
+    ->onOneServer()
     ->runInBackground();
 
 if (config('aktienki.portfolio_automation.enabled', false)) {
@@ -115,12 +137,36 @@ Schedule::command('news:sync-press-releases --limit=2500 --analyze --analysis-li
 if (config('aktienki.python_engine.server_predictions_enabled', false)) {
     $limit = max(1, (int) config('aktienki.python_engine.prediction_limit', 5000));
 
-    // One consistent prediction snapshot for every market. The digest is
-    // dispatched by the command immediately after a successful batch, giving
-    // users the longest possible time to react during the trading day.
-    Schedule::command("predictions:run-server all --limit={$limit} --send-digest")
+    // Regional batches refresh prices and calculate the four production
+    // horizons plus the stock phase filter after each cash session. They do
+    // not publish a partially refreshed global snapshot.
+    Schedule::command("predictions:run-server asia --limit={$limit} --defer-finalization")
         ->weekdays()
-        ->dailyAt('08:00')
+        ->dailyAt('10:00')
+        ->timezone('Europe/Berlin')
+        ->withoutOverlapping(180)
+        ->onOneServer()
+        ->runInBackground();
+    Schedule::command("predictions:run-server europe --limit={$limit} --defer-finalization")
+        ->weekdays()
+        ->dailyAt('18:30')
+        ->timezone('Europe/Berlin')
+        ->withoutOverlapping(240)
+        ->onOneServer()
+        ->runInBackground();
+    Schedule::command("predictions:run-server americas --limit={$limit} --defer-finalization")
+        ->weekdays()
+        ->dailyAt('23:30')
+        ->timezone('Europe/Berlin')
+        ->withoutOverlapping(240)
+        ->onOneServer()
+        ->runInBackground();
+
+    // The morning job only publishes after the completeness gate. It updates
+    // indicator, sector and index filters before the 5T-20T fusion and digest.
+    Schedule::command("predictions:run-server all --limit={$limit} --finalize-only --send-digest")
+        ->weekdays()
+        ->dailyAt('06:45')
         ->timezone('Europe/Berlin')
         ->withoutOverlapping(180)
         ->onOneServer()

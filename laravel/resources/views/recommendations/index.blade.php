@@ -631,6 +631,14 @@
                     if (Number.isFinite(transitionTimestamp) && transitionTimestamp >= xMin && transitionTimestamp <= xMax) {
                         const transitionX = toX(transitionTimestamp);
                         const transitionColor = '#f59e0b';
+                        const transitionCandle = candles.reduce((closest, candle) => {
+                            if (!closest) return candle;
+
+                            return Math.abs(candle.x - transitionTimestamp) < Math.abs(closest.x - transitionTimestamp)
+                                ? candle
+                                : closest;
+                        }, null);
+                        const transitionPrice = Number(transitionCandle?.y?.[3]);
                         const transitionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                         transitionLine.setAttribute('x1', transitionX);
                         transitionLine.setAttribute('x2', transitionX);
@@ -641,6 +649,33 @@
                         transitionLine.setAttribute('stroke-dasharray', '3 4');
                         transitionLine.setAttribute('stroke-opacity', '.72');
                         svg.appendChild(transitionLine);
+
+                        if (Number.isFinite(transitionPrice) && transitionPrice >= yMin && transitionPrice <= yMax) {
+                            const transitionY = toY(transitionPrice);
+                            const priceLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                            priceLine.setAttribute('x1', transitionX);
+                            priceLine.setAttribute('x2', left + plotWidth);
+                            priceLine.setAttribute('y1', transitionY);
+                            priceLine.setAttribute('y2', transitionY);
+                            priceLine.setAttribute('stroke', transitionColor);
+                            priceLine.setAttribute('stroke-width', '1.15');
+                            priceLine.setAttribute('stroke-opacity', '.68');
+                            priceLine.setAttribute('vector-effect', 'non-scaling-stroke');
+                            svg.appendChild(priceLine);
+
+                            const priceLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                            priceLabel.setAttribute('x', left + plotWidth - 2);
+                            priceLabel.setAttribute('y', Math.max(top + 8, transitionY - 3));
+                            priceLabel.setAttribute('fill', transitionColor);
+                            priceLabel.setAttribute('font-size', '7');
+                            priceLabel.setAttribute('font-weight', '800');
+                            priceLabel.setAttribute('text-anchor', 'end');
+                            priceLabel.textContent = `${transitionPrice.toLocaleString(document.documentElement.lang, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                            })} ${stock.currency || 'EUR'}`;
+                            svg.appendChild(priceLabel);
+                        }
 
                         const transitionText = `${transition.from} → ${transition.to}`;
                         const badgeWidth = Math.max(48, transitionText.length * 4.8 + 10);

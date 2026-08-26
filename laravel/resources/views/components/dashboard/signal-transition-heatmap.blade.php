@@ -1,7 +1,7 @@
 @props(['stats' => []])
 
 @php
-    $signals = ['SELL', 'HOLD', 'WATCH', 'BUY'];
+    $signals = ['BUY', 'WATCH', 'HOLD', 'SELL'];
     $matrix = $stats['matrix'] ?? [];
     $maxCount = max(1, (int) ($stats['max_count'] ?? 0));
 @endphp

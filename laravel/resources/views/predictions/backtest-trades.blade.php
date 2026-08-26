@@ -8,7 +8,7 @@
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-[.16em] text-teal-400">{{ __('Backtest-Trades') }}</p>
                     <h1 class="text-2xl font-black">
-                        {{ __('KI-Score :from–:to · Konfidenz :confidenceFrom–:confidenceTo %', [
+                        {{ __('Modellscore :from–:to · Konfidenz :confidenceFrom–:confidenceTo %', [
                             'from' => $scoreBucket,
                             'to' => $scoreBucket + 1,
                             'confidenceFrom' => $confidenceBucket * 10,
@@ -81,7 +81,7 @@
                         ['exit_price', __('Exit-Kurs'), 'text-right'],
                         ['return', __('Rendite'), 'text-right'],
                         ['drawdown', __('Drawdown'), 'text-center'],
-                        ['score', __('KI-Score'), 'text-center'],
+                        ['score', __('Modellscore'), 'text-center'],
                         ['confidence', __('Konfidenz'), 'text-center'],
                         ['model', __('Modell'), 'text-left'],
                     ];

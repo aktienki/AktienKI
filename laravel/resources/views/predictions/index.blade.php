@@ -147,11 +147,11 @@
                         <input name="volatility_max" type="range" min="0" max="100" step="5" x-model.number="volatility">
                     </label>
                 </div>
-                <div class="ak-prediction-filter-actions grid grid-cols-2 gap-2">
-                    <button type="submit" class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-cyan-500 px-5 text-xs font-black text-white shadow-[0_8px_20px_rgba(6,182,212,.18)] transition hover:bg-cyan-400" style="color:#fff">
+                <div class="ak-prediction-filter-actions flex justify-end gap-2">
+                    <button type="submit" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-cyan-500 px-4 text-xs font-black text-white shadow-[0_8px_20px_rgba(6,182,212,.18)] transition hover:bg-cyan-400" style="color:#fff">
                         <x-heroicon-o-magnifying-glass class="h-4 w-4" />{{ __('Suchen') }}
                     </button>
-                    <a href="{{ route('predictions.index') }}" onclick="event.preventDefault(); const l=document.getElementById('prediction-page-loading'); if(l){l.classList.remove('hidden');l.classList.add('flex');l.style.display='flex';} const h=this.href; setTimeout(function(){window.location.href=h;},500);" class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-amber-300/55 bg-amber-400/[.16] px-3 text-xs font-black text-amber-700 shadow-[0_8px_20px_rgba(245,158,11,.12)] transition hover:border-amber-200 hover:bg-amber-400/[.28] dark:text-amber-200" title="{{ __('Filter zurücksetzen') }}">
+                    <a href="{{ route('predictions.index') }}" onclick="event.preventDefault(); const l=document.getElementById('prediction-page-loading'); if(l){l.classList.remove('hidden');l.classList.add('flex');l.style.display='flex';} const h=this.href; setTimeout(function(){window.location.href=h;},500);" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-amber-300/55 bg-amber-400/[.16] px-4 text-xs font-black text-amber-700 shadow-[0_8px_20px_rgba(245,158,11,.12)] transition hover:border-amber-200 hover:bg-amber-400/[.28] dark:text-amber-200" title="{{ __('Filter zurücksetzen') }}">
                         <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" /><span>{{ __('Reset') }}</span>
                     </a>
                 </div>
@@ -292,6 +292,8 @@
                                 $currency = $prediction->currency ?: 'EUR';
                                 $score = is_numeric($prediction->score_10) ? max(0, min(10, (float) $prediction->score_10)) : null;
                                 $scorePercent = is_numeric($prediction->score_10) ? max(0, min(100, (float) $prediction->score_10 * 10)) : null;
+                                $scoreGrade = \App\Support\QualityGrade::fromPercent($scorePercent);
+                                $signalStrength = \App\Support\SignalStrength::label(is_numeric($prediction->expected_return_20d ?? null) ? (float) $prediction->expected_return_20d : null);
                                 $scoreStatisticsTitle = implode(' · ', [
                                     __('Profit-Faktor').': '.(is_numeric($prediction->ranking_profit_factor) ? number_format(\App\Support\ProfitFactor::cap($prediction->ranking_profit_factor), 2, ',', '.') : '—'),
                                     __('Hit-Rate').': '.(is_numeric($prediction->ranking_hit_rate) ? number_format((float) $prediction->ranking_hit_rate, 1, ',', '.').' %' : '—'),
@@ -312,6 +314,7 @@
                                         : sprintf('color-mix(in srgb, #10b981 %.1f%%, #f97316)', (($scorePercent - 50) / 50) * 100));
                                 $confidencePercent = is_numeric($prediction->confidence_percent) ? max(0, min(100, (float) $prediction->confidence_percent)) : null;
                                 $riskPercent = \App\Support\RiskScore::toPercent($prediction->risk_percent, $prediction->ranking_drawdown ?? null);
+                                $riskGrade = \App\Support\QualityGrade::riskLevel($riskPercent);
                                 $hitRatePercent = is_numeric($prediction->ranking_hit_rate) ? max(0, min(100, (float) $prediction->ranking_hit_rate)) : null;
                                 $profitPerTrade = is_numeric($prediction->ranking_profit_per_trade) ? (float) $prediction->ranking_profit_per_trade : null;
                                 $profitPerTradePercent = $profitPerTrade === null ? null : max(0, min(100, 50 + ($profitPerTrade * 12.5)));
@@ -526,7 +529,7 @@
                                             <img src="{{ route('stocks.icon', $prediction->instrument_id) }}" alt="" class="absolute inset-0 h-full w-full bg-white object-contain p-1" loading="lazy" onerror="this.remove()">
                                         </span>
                                         <div class="min-w-0">
-                                            <p class="ak-prediction-stock-name truncate text-[11px] font-black leading-tight text-[var(--ak-text)]" title="{{ $prediction->name }}">{{ $prediction->name }}</p>
+                                            <p class="ak-prediction-stock-name truncate text-[11px] font-black leading-tight text-[var(--ak-text)] dark:text-cyan-300" title="{{ $prediction->name }}">{{ $prediction->name }}</p>
                                             <p class="ak-stock-symbol mt-0.5 truncate text-[9px] font-black uppercase tracking-[.06em] text-cyan-300" title="{{ $prediction->symbol }}">{{ $prediction->symbol }}</p>
                                             <p class="ak-mobile-stock-price mt-1 hidden font-black tabular-nums">
                                                 <span class="ak-mobile-price-label">{{ __('Kurs') }}</span>
@@ -570,20 +573,21 @@
                                             <x-dynamic-component :component="$signalIcon" class="h-3.5 w-3.5" />
                                             <b class="ak-notebook-signal-label hidden">{{ $signalLabel }}</b>
                                         </span>
+                                        <small class="text-[8px] font-black text-[var(--ak-muted)]">{{ __('Stärke') }} {{ $signalStrength }}</small>
                                     </div>
                                 </td>
                                 <td class="border-b border-[var(--ak-border)] px-2 py-2">
                                     @if ($score !== null)
-                                        <div class="flex h-full flex-col items-center justify-center gap-1" title="{{ $scoreStatisticsTitle }}">
+                                        <div class="flex h-full flex-col items-center justify-center gap-1" title="{{ __('Rohwert') }}: {{ number_format($score, 1, ',', '.') }}/10 · {{ $scoreStatisticsTitle }}">
                                             <span class="ak-mobile-score" style="--score-color: {{ $scoreColorDark }}" aria-label="{{ __('KI-Score') }} {{ number_format($score, 1, ',', '.') }} von 10">
-                                                {{ number_format($score, 1, ',', '.') }}
+                                                {{ $scoreGrade ?? '—' }}
                                             </span>
                                             <div class="ak-prediction-donut" style="--value:{{ $scorePercent }}%;--color:{{ $scoreColorDark }};--light-color:{{ $scoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $score }}">
                                                 <svg viewBox="0 0 44 44" aria-hidden="true">
                                                     <circle class="ak-prediction-donut-track" cx="22" cy="22" r="17" pathLength="100" />
                                                     <circle class="ak-prediction-donut-value" cx="22" cy="22" r="17" pathLength="100" stroke-dasharray="{{ $scorePercent }} 100" />
                                                 </svg>
-                                                <span>{{ number_format($score, 1, ',', '.') }}</span><small>{{ __('KI') }}/10</small>
+                                                <span>{{ $scoreGrade ?? '—' }}</span><small>{{ __('KI-Qualität') }}</small>
                                             </div>
                                         </div>
                                     @else<span class="block text-center text-[var(--ak-muted)]">—</span>@endif
@@ -593,7 +597,7 @@
                                         @if ($score !== null)
                                             <div class="ak-prediction-donut ak-mobile-horizon-score hidden" data-label="{{ __('KI-Score') }}" style="--value:{{ $scorePercent }}%;--color:{{ $scoreColorDark }};--light-color:{{ $scoreColor }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $score }}">
                                                 <svg viewBox="0 0 44 44" aria-hidden="true"><circle class="ak-prediction-donut-track" cx="22" cy="22" r="17" pathLength="100" /><circle class="ak-prediction-donut-value" cx="22" cy="22" r="17" pathLength="100" stroke-dasharray="{{ $scorePercent }} 100" /></svg>
-                                                <span>{{ number_format($score, 1, ',', '.') }}</span>
+                                                <span>{{ $scoreGrade ?? '—' }}</span>
                                             </div>
                                         @endif
                                         <span class="ak-prediction-signal-badge ak-mobile-horizon-signal hidden" data-label="{{ __('Signal') }}" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – BUY durch Quality Gate eingeschränkt') : $signalLabel }}">
@@ -611,8 +615,8 @@
                                                 @endif
                                             </span>
                                         @endforeach
-                                        <span class="ak-prediction-donut ak-mobile-risk-logo hidden" data-label="{{ __('Risiko') }}" title="{{ $riskTitle }}" aria-label="{{ __('Risiko') }} {{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.').' Prozent' : __('nicht verfügbar') }}" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $riskPercent ?? 0 }}" style="--value:{{ $riskPercent ?? 0 }}%;--color:{{ $riskColorDark }};--light-color:{{ $riskColor }};--risk-logo-color:{{ $riskColor }}">
-                                            <span>{{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.') : '—' }}</span>
+                                        <span class="ak-prediction-donut ak-mobile-risk-logo hidden" data-label="{{ __('Risiko') }}" title="{{ $riskTitle }}" aria-label="{{ __('Risiko') }} {{ $riskGrade ?? __('nicht verfügbar') }}" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $riskPercent ?? 0 }}" style="--value:{{ $riskPercent ?? 0 }}%;--color:{{ $riskColorDark }};--light-color:{{ $riskColor }};--risk-logo-color:{{ $riskColor }}">
+                                            <span>{{ $riskGrade ?? '—' }}</span><small>{{ __('Risiko') }}</small>
                                         </span>
                                     </div>
                                 </td>
@@ -658,8 +662,35 @@
                 </table>
             </div>
             @if ($predictions instanceof \Illuminate\Contracts\Pagination\Paginator && $predictions->hasPages())
-                <div class="ak-prediction-pagination mt-3 rounded-xl border border-[var(--ak-border)] bg-transparent px-4 py-3">
-                    {{ $predictions->onEachSide(1)->links() }}
+                @php
+                    $paginationStart = max(1, $predictions->currentPage() - 2);
+                    $paginationEnd = min($predictions->lastPage(), $predictions->currentPage() + 2);
+                @endphp
+                <div class="ak-prediction-pagination" role="navigation" aria-label="{{ __('Seitennavigation') }}">
+                    <span class="ak-pagination-summary">
+                        {{ number_format($predictions->firstItem(), 0, ',', '.') }}–{{ number_format($predictions->lastItem(), 0, ',', '.') }}
+                        <span aria-hidden="true">/</span>
+                        {{ number_format($predictions->total(), 0, ',', '.') }}
+                    </span>
+                    <div class="ak-pagination-pages">
+                        @if ($predictions->onFirstPage())
+                            <span class="ak-pagination-button is-disabled" aria-disabled="true">‹</span>
+                        @else
+                            <a class="ak-pagination-button" href="{{ $predictions->previousPageUrl() }}" rel="prev" aria-label="{{ __('Vorherige Seite') }}">‹</a>
+                        @endif
+
+                        @for ($page = $paginationStart; $page <= $paginationEnd; $page++)
+                            <a class="ak-pagination-button {{ $page === $predictions->currentPage() ? 'is-current' : '' }}"
+                               href="{{ $predictions->url($page) }}"
+                               @if ($page === $predictions->currentPage()) aria-current="page" @endif>{{ $page }}</a>
+                        @endfor
+
+                        @if ($predictions->hasMorePages())
+                            <a class="ak-pagination-button" href="{{ $predictions->nextPageUrl() }}" rel="next" aria-label="{{ __('Nächste Seite') }}">›</a>
+                        @else
+                            <span class="ak-pagination-button is-disabled" aria-disabled="true">›</span>
+                        @endif
+                    </div>
                 </div>
             @endif
 
@@ -672,29 +703,63 @@
                     --ak-predictions-head-text: #f8fafc;
                 }
 
-                #predictions-page .ak-prediction-pagination,
-                #predictions-page .ak-prediction-pagination nav,
-                :root:not([data-theme="light"]) #predictions-page .ak-prediction-pagination nav a,
-                :root:not([data-theme="light"]) #predictions-page .ak-prediction-pagination nav span > span {
-                    background: transparent !important;
-                    box-shadow: none !important;
+                #predictions-page .ak-prediction-pagination {
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    gap: .75rem;
+                    width: max-content;
+                    max-width: 100%;
+                    margin: .65rem 0 0 auto;
+                    color: var(--ak-muted);
+                    font-size: .75rem;
+                    font-weight: 700;
                 }
 
-                #predictions-page .ak-prediction-pagination nav a,
-                #predictions-page .ak-prediction-pagination nav span > span {
-                    border-color: color-mix(in srgb, var(--ak-border) 78%, transparent) !important;
-                    color: var(--ak-muted) !important;
+                #predictions-page .ak-pagination-summary {
+                    white-space: nowrap;
+                    opacity: .82;
                 }
 
-                :root:not([data-theme="light"]) #predictions-page .ak-prediction-pagination nav a:hover {
-                    border-color: rgba(251, 146, 60, .48) !important;
-                    color: #fb923c !important;
+                #predictions-page .ak-pagination-pages {
+                    display: flex;
+                    align-items: center;
+                    gap: .25rem;
                 }
 
-                :root:not([data-theme="light"]) #predictions-page .ak-prediction-pagination nav [aria-current="page"] > span {
-                    border-color: rgba(251, 146, 60, .72) !important;
-                    color: #fb923c !important;
-                    box-shadow: inset 0 -2px 0 rgba(251, 146, 60, .78) !important;
+                #predictions-page .ak-pagination-button {
+                    display: inline-grid;
+                    width: 2rem;
+                    height: 2rem;
+                    place-items: center;
+                    border: 1px solid transparent;
+                    border-radius: .45rem;
+                    background: transparent;
+                    color: var(--ak-muted);
+                    line-height: 1;
+                    transition: border-color .16s ease, color .16s ease, background-color .16s ease;
+                }
+
+                #predictions-page .ak-pagination-button:hover {
+                    border-color: color-mix(in srgb, var(--ak-accent) 45%, transparent);
+                    color: var(--ak-accent);
+                }
+
+                #predictions-page .ak-pagination-button.is-current {
+                    border-color: color-mix(in srgb, var(--ak-accent) 58%, transparent);
+                    background: color-mix(in srgb, var(--ak-accent) 10%, transparent);
+                    color: var(--ak-accent);
+                }
+
+                #predictions-page .ak-pagination-button.is-disabled {
+                    opacity: .28;
+                }
+
+                @media (max-width: 640px) {
+                    #predictions-page .ak-prediction-pagination {
+                        justify-content: space-between;
+                        width: 100%;
+                    }
                 }
 
                 :root:not([data-theme="light"]) #predictions-page .ak-prediction-filter-toggle,
@@ -1111,7 +1176,8 @@
 
                 .ak-prediction-donut small {
                     position: absolute;
-                    bottom: 7px;
+                    top: calc(100% + 3px);
+                    bottom: auto;
                     z-index: 2;
                     width: 100%;
                     margin: 0;
@@ -1123,9 +1189,13 @@
                 }
 
                 #predictions-page .ak-prediction-donut span {
-                    margin-top: -7px;
+                    margin-top: 0;
                     color: var(--color);
                     font-size: 9px;
+                }
+
+                #predictions-page .ak-prediction-donut {
+                    overflow: visible;
                 }
 
                 #predictions-page .ak-stocks-table tbody .prediction-row {
@@ -1604,6 +1674,7 @@
                     #predictions-page .ak-mobile-risk-logo::before {
                         background:transparent;
                     }
+                    #predictions-page .ak-mobile-risk-logo::before { content:none; }
                     #predictions-page .ak-mobile-horizon-signal,
                     #predictions-page .ak-horizon-direction[data-days="20"],
                     #predictions-page .ak-mobile-risk-logo { position:relative !important; overflow:visible !important; }
@@ -1812,6 +1883,11 @@
 
         #prediction-filterboard .ak-prediction-filterboard-main > div:last-child > a {
             height: 2.4rem;
+        }
+
+        #prediction-filterboard .ak-prediction-filter-actions > * {
+            width: 8.5rem;
+            max-width: calc(50% - .25rem);
         }
 
         #prediction-filterboard .ak-input::placeholder {

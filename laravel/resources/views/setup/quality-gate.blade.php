@@ -22,7 +22,7 @@
                 <div class="mt-3 grid min-h-0 flex-1 grid-cols-2 gap-3 lg:grid-cols-3">
                     @php($fields = [
                         ['score_min', __('KI-Score mindestens'), 0, 10, .1, '/10'], ['confidence_min', __('Model Qualität mindestens'), 0, 100, 1, '%'], ['risk_max', __('Risiko maximal'), 0, 100, 1, '%'],
-                        ['predicted_return_min', __('Prognose 20 Tage mindestens'), -50, 100, .5, '%'], ['drawdown_max', __('Drawdown maximal'), 0, 100, 1, '%'], ['profit_factor_min', __('Profitfaktor mindestens'), 0, 10, .05, ''],
+                        ['predicted_return_min', __('Prognose 20 Tage mindestens'), .5, 10, .5, '%'], ['drawdown_max', __('Drawdown maximal'), 0, 100, 1, '%'], ['profit_factor_min', __('Profitfaktor mindestens'), 0, 10, .05, ''],
                         ['hit_rate_min', __('Hitrate mindestens'), 0, 100, 1, '%'], ['minimum_trades', __('Backtest-Trades mindestens'), 1, 10000, 1, ''],
                     ])
                     @foreach($fields as [$key,$label,$min,$max,$step,$unit])

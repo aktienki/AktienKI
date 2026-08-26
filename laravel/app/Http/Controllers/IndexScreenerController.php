@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PlanLevel;
+use App\Livewire\Dashboard\MarketData;
 use App\Services\FreeRegionalStockUniverseService;
 use App\Services\PersonalizedSignalService;
 use App\Services\PlanAccessService;
@@ -17,6 +18,11 @@ class IndexScreenerController extends Controller
 {
     public function __invoke(Request $request, PersonalizedSignalService $personalizedSignals, PlanAccessService $planAccess): View
     {
+        $mainIndexSymbols = [
+            '^GSPC', '^IXIC', '^DJI', '^RUT', '^GSPTSE', '^BVSP',
+            '^FTSE', '^GDAXI', '^FCHI', '^STOXX50E', '^STOXX',
+            '^N225', '^HSI', '000001.SS', '^KS11', '^NSEI', '^AXJO',
+        ];
         $isFreeRegional = $planAccess->level($request->user()) === PlanLevel::Free;
         $regionalUniverse = app(FreeRegionalStockUniverseService::class);
         $allowedInstrumentIds = $isFreeRegional ? $regionalUniverse->instrumentIds($request->user())->all() : [];
@@ -55,6 +61,7 @@ class IndexScreenerController extends Controller
             ->join('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
             ->leftJoinSub($walkForwardStats, 'walk_forward', fn ($join) => $join->on('walk_forward.instrument_id', '=', 'membership.instrument_id'))
             ->where('market_index.is_active', true)
+            ->whereIn('market_index.symbol', $mainIndexSymbols)
             ->whereNotNull('prediction.prediction_score')
             ->when($isFreeRegional, fn ($query) => $query->whereIn('membership.instrument_id', $allowedInstrumentIds))
             ->when($request->filled('q'), function ($query) use ($request) {
@@ -73,9 +80,12 @@ class IndexScreenerController extends Controller
             ->selectRaw('AVG(prediction.horizon_fusion_stability_score) AS average_stability')
             ->selectRaw('AVG(prediction.risk_score) AS average_risk')
             ->selectRaw('SUM(COALESCE(walk_forward.historical_trades, 0)) AS historical_trades')
+            ->selectRaw('AVG(((prediction.predicted_price_5d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return_5d')
+            ->selectRaw('AVG(((prediction.predicted_price_10d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return_10d')
+            ->selectRaw('AVG(((prediction.predicted_price_15d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return_15d')
             ->selectRaw('AVG(((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return');
 
-        $aggregateCacheKey = 'index_screener_aggregate_v5_'.sha1(json_encode([
+        $aggregateCacheKey = 'index_screener_aggregate_v6_'.sha1(json_encode([
             'q' => trim((string) $request->query('q')),
             'region' => trim((string) $request->query('region')),
             'universe' => $isFreeRegional ? $allowedInstrumentIds : 'all',
@@ -86,6 +96,32 @@ class IndexScreenerController extends Controller
                     ? AiScore::toTen($index->calculated_rating)
                     : (is_numeric($index->rating) ? (float) $index->rating : null);
             }));
+        $index60Date = Schema::hasTable('market_context_predictions')
+            ? DB::table('market_context_predictions')->where('scope_type', 'index60')->max('prediction_date')
+            : null;
+        $index60Contexts = $index60Date
+            ? DB::table('market_context_predictions')->where('scope_type', 'index60')
+                ->where('prediction_date', $index60Date)->get()->keyBy('scope_key')
+            : collect();
+        $indices->each(function ($index) use ($index60Contexts): void {
+            $context = $index60Contexts->get((string) $index->id);
+            $index->pytorch_60t_probability = $context ? max(0.0, min(1.0, ((float) $context->score) / 10.0)) : null;
+            $index->pytorch_60t_signal = $context?->signal;
+            $index->pytorch_60t_confidence = $context ? (float) $context->confidence : null;
+            $index->pytorch_60t_member_count = $context ? (int) $context->member_count : 0;
+            $index->pytorch_60t_alignment = null;
+            $index->pytorch_60t_stability_adjustment = 0.0;
+            if ($index->pytorch_60t_probability !== null && is_numeric($index->expected_return)) {
+                $decisive = abs($index->pytorch_60t_probability - 0.5) >= 0.05;
+                $aligned = ($index->pytorch_60t_probability >= 0.5) === ((float) $index->expected_return >= 0.0);
+                $index->pytorch_60t_alignment = $decisive ? $aligned : null;
+                $index->pytorch_60t_stability_adjustment = ! $decisive ? 0.0 : ($aligned ? 0.05 : -0.10);
+            }
+            $baseStability = is_numeric($index->average_stability) ? (float) $index->average_stability : null;
+            $index->context_adjusted_stability = $baseStability === null
+                ? null
+                : max(0.0, min(1.0, $baseStability + $index->pytorch_60t_stability_adjustment));
+        });
 
         $latestQuotes = DB::table('current_stock_quotes')
             ->where('status', 'current')
@@ -187,14 +223,23 @@ class IndexScreenerController extends Controller
             : collect();
         $indices->each(fn ($index) => $index->daily_market_info = $dailyMarketInfos->get($index->id));
         $visibleIndexIds = $indices->pluck('id')->all();
+        $marketData = app(MarketData::class);
+        $indexAnalysisCards = method_exists($marketData, 'loadVisibleIndexComparisonCards')
+            ? $marketData->loadVisibleIndexComparisonCards($indices, $isFreeRegional ? $allowedInstrumentIds : [])
+            : [];
+        $indices->each(fn ($index) => $index->analysis_card = $indexAnalysisCards[(int) $index->id] ?? null);
         $regionsCacheKey = 'index_screener_regions_v4_'.sha1(implode(',', $visibleIndexIds));
         $regions = Cache::remember($regionsCacheKey, now()->addHour(), fn () => DB::table('market_indices as market_index')
             ->where('market_index.is_active', true)
             ->whereNotNull('market_index.region')
             ->whereIn('market_index.id', $visibleIndexIds)
             ->distinct()->orderBy('market_index.region')->pluck('market_index.region'));
+        $macroCards = method_exists($marketData, 'loadIndexComparisonCards')
+            ? $marketData->loadIndexComparisonCards()
+            : [];
+        $view = $request->routeIs('indices.redesign') ? 'indices.redesign' : 'indices.index';
 
-        return view('indices.index', compact('indices', 'regions', 'realtimeQuotes', 'isFreeRegional', 'regionalCountry'));
+        return view($view, compact('indices', 'regions', 'realtimeQuotes', 'isFreeRegional', 'regionalCountry', 'macroCards'));
     }
 
     private function chartPointsWithoutIsolatedOutliers($bars)

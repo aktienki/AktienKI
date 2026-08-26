@@ -73,7 +73,9 @@ final class StockRiskClassificationService
 WITH model_metric AS (
     SELECT model.instrument_id,
         MIN(LEAST(3.0, GREATEST(0, (model.metrics->>'profit_factor')::numeric))) AS profit_factor,
-        MAX(ABS((model.metrics->>'max_drawdown')::numeric) * 100) AS max_drawdown
+        MAX(CASE WHEN ABS((model.metrics->>'max_drawdown')::numeric) <= 1
+            THEN ABS((model.metrics->>'max_drawdown')::numeric) * 100
+            ELSE ABS((model.metrics->>'max_drawdown')::numeric) END) AS max_drawdown
     FROM trained_models model
     WHERE model.status='active' AND model.instrument_id IS NOT NULL
         AND (model.metadata->>'prediction_horizon')::int IN (5,10,15,20)
@@ -87,30 +89,46 @@ WITH model_metric AS (
     WHERE run.status='completed' AND run.horizon_days IN (5,10,15,20) {$tradeFilter}
     GROUP BY trade.instrument_id, run.horizon_days
 ), trade_metric AS (
-    SELECT latest_walk_forward.instrument_id, AVG(trade.net_return) * 100 AS profit_per_trade
+    SELECT latest_walk_forward.instrument_id,
+        LEAST(3.0, GREATEST(0, COALESCE(SUM(CASE WHEN trade.net_return > 0 THEN trade.net_return ELSE 0 END)
+            / NULLIF(ABS(SUM(CASE WHEN trade.net_return < 0 THEN trade.net_return ELSE 0 END)), 0), 3.0))) AS profit_factor,
+        AVG(trade.net_return) * 100 AS profit_per_trade
     FROM latest_walk_forward
     JOIN walk_forward_backtest_trades trade ON trade.run_id=latest_walk_forward.run_id
         AND trade.instrument_id=latest_walk_forward.instrument_id
     GROUP BY latest_walk_forward.instrument_id
     HAVING COUNT(DISTINCT latest_walk_forward.horizon_days)=4
+), drawdown_metric AS (
+    SELECT latest_walk_forward.instrument_id,
+        MAX(CASE WHEN ABS(year_stats.maximum_drawdown) <= 1
+            THEN ABS(year_stats.maximum_drawdown) * 100 ELSE ABS(year_stats.maximum_drawdown) END) AS max_drawdown
+    FROM latest_walk_forward
+    JOIN walk_forward_backtest_year_stats year_stats ON year_stats.run_id=latest_walk_forward.run_id
+        AND year_stats.instrument_id=latest_walk_forward.instrument_id
+    GROUP BY latest_walk_forward.instrument_id
 ), prediction AS (
     SELECT DISTINCT ON (instrument_id) instrument_id,
         LEAST(100, GREATEST(0, confidence * CASE WHEN confidence <= 1 THEN 100 ELSE 1 END)) AS confidence
     FROM predictions WHERE confidence IS NOT NULL ORDER BY instrument_id, prediction_time DESC, id DESC
 ), classified AS (
-    SELECT instrument.id, model_metric.profit_factor, trade_metric.profit_per_trade, prediction.confidence, model_metric.max_drawdown,
-        CASE WHEN model_metric.profit_factor IS NULL OR trade_metric.profit_per_trade IS NULL OR prediction.confidence IS NULL OR model_metric.max_drawdown IS NULL THEN NULL
+    SELECT instrument.id, COALESCE(trade_metric.profit_factor, model_metric.profit_factor) AS profit_factor,
+        trade_metric.profit_per_trade, prediction.confidence,
+        COALESCE(drawdown_metric.max_drawdown, model_metric.max_drawdown) AS max_drawdown,
+        CASE WHEN COALESCE(trade_metric.profit_factor, model_metric.profit_factor) IS NULL OR trade_metric.profit_per_trade IS NULL
+                  OR prediction.confidence IS NULL OR COALESCE(drawdown_metric.max_drawdown, model_metric.max_drawdown) IS NULL THEN NULL
              WHEN trade_metric.profit_per_trade < 0 THEN 'sleep'
-             WHEN model_metric.profit_factor >= 1.35 AND prediction.confidence >= 70 AND model_metric.max_drawdown <= 18 THEN 'defensive'
-             WHEN model_metric.profit_factor >= 1.20 AND prediction.confidence >= 58 AND model_metric.max_drawdown <= 28 THEN 'balanced'
-             WHEN model_metric.profit_factor >= 1.05 AND prediction.confidence >= 42 AND model_metric.max_drawdown <= 45 THEN 'opportunity'
+             WHEN COALESCE(trade_metric.profit_factor, model_metric.profit_factor) >= 1.35 AND prediction.confidence >= 70 AND COALESCE(drawdown_metric.max_drawdown, model_metric.max_drawdown) <= 18 THEN 'defensive'
+             WHEN COALESCE(trade_metric.profit_factor, model_metric.profit_factor) >= 1.20 AND prediction.confidence >= 58 AND COALESCE(drawdown_metric.max_drawdown, model_metric.max_drawdown) <= 28 THEN 'balanced'
+             WHEN COALESCE(trade_metric.profit_factor, model_metric.profit_factor) >= 1.05 AND prediction.confidence >= 42 AND COALESCE(drawdown_metric.max_drawdown, model_metric.max_drawdown) <= 45 THEN 'opportunity'
              ELSE 'risk' END AS status
     FROM instruments instrument LEFT JOIN model_metric ON model_metric.instrument_id=instrument.id
     LEFT JOIN trade_metric ON trade_metric.instrument_id=instrument.id
+    LEFT JOIN drawdown_metric ON drawdown_metric.instrument_id=instrument.id
     LEFT JOIN prediction ON prediction.instrument_id=instrument.id
     WHERE instrument.type='stock' {$targetFilter}
 )
-UPDATE instruments SET risk_status=classified.status, risk_profit_factor=classified.profit_per_trade,
+UPDATE instruments SET risk_status=classified.status, risk_profit_factor=classified.profit_factor,
+    risk_profit_per_trade=classified.profit_per_trade,
     risk_confidence=classified.confidence, risk_max_drawdown=classified.max_drawdown, risk_status_updated_at=NOW()
 FROM classified WHERE instruments.id=classified.id
 SQL, $bindings);

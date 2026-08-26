@@ -34,6 +34,8 @@ class MarketData extends Component
 
     public array $macroCards = [];
 
+    public array $monthlyBacktestAiScores = [];
+
     public bool $isRegionalFreeView = false;
 
     public string $regionalCountry = '';
@@ -134,6 +136,7 @@ class MarketData extends Component
         $this->sentiment = $marketService->sentiment($this->markets);
         $this->signalTransitionStats = $this->loadSignalTransitionStats();
         $this->macroCards = $this->loadMacroCards();
+        $this->monthlyBacktestAiScores = $this->loadMonthlyBacktestAiScores();
     }
 
     public function render()
@@ -150,30 +153,77 @@ class MarketData extends Component
                 'marketAnalysis' => $this->marketAnalysis,
                 'signalTransitionStats' => $this->signalTransitionStats,
                 'macroCards' => $this->macroCards,
+                'monthlyBacktestAiScores' => $this->monthlyBacktestAiScores,
                 'isRegionalFreeView' => $this->isRegionalFreeView,
                 'regionalCountry' => $this->regionalCountry,
             ]
         );
     }
 
+    public function loadMonthlyBacktestAiScores(): array
+    {
+        return Cache::remember('dashboard.monthly-backtest-ai-scores.v3', now()->addMinutes(30), function (): array {
+            // Three complete calendar years: the current year plus the two
+            // preceding years. Future months of the current year remain empty
+            // slots in the grouped boxplot.
+            $firstMonth = now()->startOfYear()->subYears(2);
+            $lastDay = now()->endOfYear();
+
+            // One observation per instrument and signal date prevents repeated
+            // completed backtest runs from giving the same stock extra weight.
+            $instrumentDays = DB::table('backtest_trades as trade')
+                ->join('backtest_runs as run', 'run.id', '=', 'trade.backtest_run_id')
+                ->whereIn('run.status', ['completed', 'completed_with_errors'])
+                ->whereBetween('trade.entry_date', [$firstMonth->toDateString(), $lastDay->toDateString()])
+                ->whereNotNull('trade.ki_score')
+                ->whereBetween('trade.ki_score', [0, 10])
+                ->groupBy('trade.instrument_id', 'trade.entry_date')
+                ->selectRaw('trade.instrument_id, trade.entry_date, AVG(trade.ki_score) AS score');
+
+            $monthly = DB::query()
+                ->fromSub($instrumentDays, 'instrument_day')
+                ->selectRaw("DATE_TRUNC('month', instrument_day.entry_date) AS month")
+                ->selectRaw('AVG(instrument_day.score) AS score')
+                ->selectRaw('PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY instrument_day.score) AS q25')
+                ->selectRaw('PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY instrument_day.score) AS median')
+                ->selectRaw('PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY instrument_day.score) AS q75')
+                ->selectRaw('MIN(instrument_day.score) AS minimum')
+                ->selectRaw('MAX(instrument_day.score) AS maximum')
+                ->selectRaw('COUNT(*) AS observations')
+                ->groupByRaw("DATE_TRUNC('month', instrument_day.entry_date)")
+                ->orderBy('month')
+                ->get()
+                ->keyBy(fn (object $row): string => Carbon::parse($row->month)->format('Y-m'));
+
+            return collect(range(0, 35))->map(function (int $offset) use ($firstMonth, $monthly): array {
+                $month = $firstMonth->copy()->addMonths($offset);
+                $row = $monthly->get($month->format('Y-m'));
+
+                return [
+                    'month' => $month->format('Y-m'),
+                    'label' => $month->locale(app()->getLocale())->translatedFormat('M y'),
+                    'value' => $row !== null ? round((float) $row->score, 2) : null,
+                    'q25' => $row !== null ? round((float) $row->q25, 2) : null,
+                    'median' => $row !== null ? round((float) $row->median, 2) : null,
+                    'q75' => $row !== null ? round((float) $row->q75, 2) : null,
+                    'minimum' => $row !== null ? round((float) $row->minimum, 2) : null,
+                    'maximum' => $row !== null ? round((float) $row->maximum, 2) : null,
+                    'observations' => $row !== null ? (int) $row->observations : 0,
+                ];
+            })->all();
+        });
+    }
+
     private function loadMacroCards(): array
     {
-        $bars = DB::table('instruments as instrument')
-            ->join('price_bars as bar', 'bar.instrument_id', '=', 'instrument.id')
-            ->where('instrument.symbol', 'AGG')
-            ->whereIn('bar.interval', ['1d', '1h'])
-            ->where('bar.bar_time', '>=', now()->subYears(3))
-            ->orderByDesc('bar.bar_time')->orderByDesc('bar.id')->limit(3000)
-            ->get(['instrument.symbol', 'bar.close', 'bar.bar_time'])
-            ->groupBy('symbol')->map(fn ($rows) => $rows->sortBy('bar_time')->values());
         $series = static fn ($rows): array => collect($rows ?? [])->map(fn (object $row): array => [
             'label' => Carbon::parse($row->bar_time)->format('d.m.'),
             'value' => is_numeric($row->close) ? (float) $row->close : null,
         ])->filter(fn (array $point): bool => $point['value'] !== null)->values()->all();
-        $agg = $series($bars->get('AGG', collect()));
         $daxLevels = DB::table('instruments as instrument')
             ->join('price_bars as bar', 'bar.instrument_id', '=', 'instrument.id')
-            ->where('instrument.symbol', '^GDAXI')->where('bar.interval', '1d')
+            ->where('instrument.symbol', 'EXS1:XETR')->where('bar.interval', '1d')
+            ->where('bar.source', 'twelve_data')
             ->where('bar.bar_time', '>=', now()->subYear())
             ->orderBy('bar.bar_time')->get(['bar.close', 'bar.bar_time']);
         $daxMedian = (float) $daxLevels->pluck('close')->filter(fn ($value) => is_numeric($value) && (float) $value > 0)->median();
@@ -191,8 +241,27 @@ class MarketData extends Component
             ->whereIn('run.status', ['completed', 'completed_with_errors'])
             ->selectRaw('trade.entry_date AS day, AVG(trade.ki_score) AS score')
             ->groupBy('trade.entry_date')->orderBy('trade.entry_date')->get()
-            ->map(fn (object $point): array => ['label' => Carbon::parse($point->day)->format('d.m.'), 'value' => (float) $point->score])
+            ->map(fn (object $point): array => ['day' => (string) $point->day, 'label' => Carbon::parse($point->day)->format('d.m.'), 'value' => (float) $point->score])
             ->values();
+        $dailyPredictionScores = DB::table('predictions as prediction')
+            ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+            ->where('instrument.type', 'stock')
+            ->where('instrument.is_active', true)
+            ->whereNull('instrument.deleted_at')
+            ->whereNotNull('prediction.prediction_score')
+            ->where('prediction.prediction_time', '>=', now()->subYear())
+            ->selectRaw('DATE(prediction.prediction_time) AS day, AVG(prediction.prediction_score) AS score')
+            ->groupByRaw('DATE(prediction.prediction_time)')
+            ->orderBy('day')
+            ->get()
+            ->map(fn (object $point): array => [
+                'day' => (string) $point->day,
+                'label' => Carbon::parse($point->day)->format('d.m.'),
+                'value' => (float) (\App\Support\AiScore::toTen($point->score) ?? 0),
+            ]);
+        // Daily predictions supersede an older backtest sample for the same
+        // calendar day, while the backtest remains the long-term history.
+        $aiSeries = $aiSeries->concat($dailyPredictionScores)->keyBy('day')->sortKeys()->values();
         // Seven-point trailing median removes single-day backtest noise while
         // keeping the direction and timing of the KI-score visible.
         $aiSeries = $aiSeries->map(function (array $point, int $index) use ($aiSeries): array {
@@ -236,16 +305,35 @@ class MarketData extends Component
                 $volatility = collect($volatility)->filter(fn (array $_, int $index): bool => $index % $step === 0)->values()->all();
             }
         }
-        return [
-            ['key' => 'ai-dax', 'title' => __('KI-Score vs. DAX'), 'subtitle' => __('letzte 1 Jahr · Median-KI-Score und DAX-Kurs'), 'unit' => '', 'series' => [['name' => __('Median KI-Score'), 'color' => '#22d3ee', 'points' => $aiSeries], ['name' => __('DAX Kurs'), 'color' => '#fbbf24', 'points' => $daxCompareSeries]]],
-            ['key' => 'vdax', 'title' => __('Volatilität'), 'subtitle' => __('VDAX · letzte 1 Jahr · VDAX links · DAX-Kurs rechts'), 'unit' => '%', 'series' => [['name' => __('VDAX'), 'color' => '#fb7185', 'points' => $volatility], ['name' => __('DAX Kurs'), 'color' => '#fbbf24', 'points' => $daxSeries]]],
-            ['key' => 'bonds', 'title' => __('Anleihen'), 'subtitle' => __('Tageswerte · letzte 3 Jahre · AGG Bond-Index-Proxy'), 'unit' => '$', 'series' => [['name' => 'AGG', 'color' => '#34d399', 'points' => $agg]]],
-        ];
+        $spyBars = DB::table('instruments as instrument')
+            ->join('price_bars as bar', 'bar.instrument_id', '=', 'instrument.id')
+            ->where('instrument.symbol', 'SPY')->where('bar.interval', '1d')->where('bar.source', 'twelve_data')
+            ->where('bar.bar_time', '>=', now()->subYear()->subMonths(2))
+            ->orderBy('bar.bar_time')->get(['bar.close', 'bar.bar_time'])->map(fn (object $row): array => [
+                'day' => Carbon::parse($row->bar_time)->toDateString(), 'close' => (float) $row->close,
+            ])->values();
+        $sp500Series = $spyBars->map(fn (array $bar): array => [
+            'label' => Carbon::parse($bar['day'])->format('d.m.Y'),
+            'value' => round((float) $bar['close'], 2),
+        ])->all();
+        $nasdaqBars = DB::table('instruments as instrument')
+            ->join('price_bars as bar', 'bar.instrument_id', '=', 'instrument.id')
+            ->where('instrument.symbol', 'QQQ')->where('bar.interval', '1d')->where('bar.source', 'twelve_data')
+            ->where('bar.bar_time', '>=', now()->subYear()->subMonths(2))
+            ->orderBy('bar.bar_time')->get(['bar.close', 'bar.bar_time']);
+        $nasdaqSeries = $series($nasdaqBars);
+        return collect([
+            ['key' => 'dax-backtest', 'title' => __('DAX · Kursverlauf'), 'subtitle' => __('Letzter DAX-ETF-Kurs von Twelve Data'), 'unit' => ' EUR', 'series' => [['name' => __('DAX-ETF'), 'color' => '#06b6d4', 'points' => $daxSeries, 'axis' => 'price', 'display_unit' => ' EUR']]],
+            ['key' => 'sp500-backtest', 'title' => __('S&P 500 · Kursverlauf'), 'subtitle' => __('Letzter SPY-Kurs von Twelve Data'), 'unit' => ' USD', 'series' => [['name' => __('S&P 500 ETF'), 'color' => '#38bdf8', 'points' => $sp500Series, 'axis' => 'price', 'display_unit' => ' USD']]],
+            ['key' => 'nasdaq-backtest', 'title' => __('NASDAQ · Kursverlauf'), 'subtitle' => __('Letzter QQQ-Kurs von Twelve Data'), 'unit' => ' USD', 'series' => [['name' => __('NASDAQ-100 ETF'), 'color' => '#a78bfa', 'points' => $nasdaqSeries, 'axis' => 'price', 'display_unit' => ' USD']]],
+        ])->filter(fn (array $card): bool => collect($card['series'])->contains(
+            fn (array $series): bool => count($series['points'] ?? []) > 0
+        ))->values()->all();
     }
 
     private function loadSignalTransitionStats(): array
     {
-        return Cache::remember('markets.signal-transition-stats.5d.v2', now()->addMinutes(2), function (): array {
+        return Cache::remember('markets.signal-transition-stats.5d.v3', now()->addMinutes(2), function (): array {
             $history = DB::table('predictions as prediction')
                 ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
                 ->where('instrument.type', 'stock')
@@ -294,25 +382,30 @@ class MarketData extends Component
                 ])
                 ->all();
 
+            // Match the dashboard card exactly: latest prediction per stock,
+            // limited to predictions from the last 48 hours.
+            $latestPredictionIds = DB::table('predictions')
+                ->selectRaw('instrument_id, MAX(id) AS prediction_id')
+                ->groupBy('instrument_id');
             $latestSignals = DB::table('predictions as current_prediction')
+                ->joinSub($latestPredictionIds, 'latest_prediction', fn ($join) =>
+                    $join->on('latest_prediction.prediction_id', '=', 'current_prediction.id'))
                 ->join('instruments as current_instrument', 'current_instrument.id', '=', 'current_prediction.instrument_id')
                 ->where('current_instrument.type', 'stock')
                 ->where(fn ($query) => $query->whereNull('current_instrument.risk_status')->orWhere('current_instrument.risk_status', '<>', 'sleep'))
                 ->where('current_instrument.is_active', true)
                 ->whereNull('current_instrument.deleted_at')
-                ->whereIn(DB::raw('UPPER(current_prediction.signal)'), ['SELL', 'HOLD', 'WATCH', 'BUY'])
-                ->selectRaw('DISTINCT ON (current_prediction.instrument_id) current_prediction.instrument_id')
-                ->selectRaw("UPPER(current_prediction.signal) AS signal")
-                ->orderBy('current_prediction.instrument_id')
-                ->orderByDesc('current_prediction.prediction_time')
-                ->orderByDesc('current_prediction.id');
+                ->where('current_prediction.prediction_time', '>=', now()->subHours(48))
+                ->whereIn(DB::raw('UPPER(current_prediction.signal)'), ['SELL', 'HOLD', 'WAIT', 'BUY'])
+                ->select(['current_prediction.instrument_id'])
+                ->selectRaw("UPPER(current_prediction.signal) AS signal");
             $distribution = DB::query()
                 ->fromSub($latestSignals, 'latest_signal')
                 ->groupBy('signal')
                 ->get(['signal', DB::raw('COUNT(*) AS signal_count')])
                 ->mapWithKeys(fn (object $row): array => [(string) $row->signal => (int) $row->signal_count])
                 ->all();
-            $distribution = collect(['SELL', 'HOLD', 'WATCH', 'BUY'])
+            $distribution = collect(['SELL', 'HOLD', 'WAIT', 'BUY'])
                 ->mapWithKeys(fn (string $signal): array => [$signal => (int) ($distribution[$signal] ?? 0)])
                 ->all();
 

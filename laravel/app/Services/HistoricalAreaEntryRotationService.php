@@ -92,7 +92,7 @@ final class HistoricalAreaEntryRotationService
         $now = now();
         $preferred = 0;
         foreach ($ordered->chunk(500) as $chunk) {
-            DB::table('backtest_strategy_trades')->insert($chunk->map(function (object $trade) use ($runId, $strategy, $now, &$preferred): array {
+            DB::table('backtest_strategy_trades')->insert($chunk->map(function (object $trade) use ($runId, $strategy, $riskStyle, $now, &$preferred): array {
                 if ($trade->area_preferred) $preferred++;
                 return [
                     'backtest_run_id' => $runId,

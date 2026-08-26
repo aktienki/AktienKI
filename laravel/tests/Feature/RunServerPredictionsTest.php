@@ -24,7 +24,7 @@ class RunServerPredictionsTest extends TestCase
                 && $process->command === [
                     '/srv/aktienki/python-engine/.venv/bin/aktienki-engine',
                     'predict-active', '--ai-type', 'horizon',
-                    '--market-region', 'other', '--limit', '5000',
+                    '--market-region', 'other', '--limit', '20000',
                 ];
         });
     }
@@ -39,5 +39,23 @@ class RunServerPredictionsTest extends TestCase
             ->assertSuccessful();
 
         Process::assertNothingRan();
+    }
+
+    public function test_it_runs_all_markets_without_a_region_filter(): void
+    {
+        config()->set('aktienki.python_engine.server_predictions_enabled', true);
+        config()->set('aktienki.python_engine.path', '/srv/aktienki/python-engine');
+        config()->set('aktienki.python_engine.executable', '/srv/aktienki/python-engine/.venv/bin/aktienki-engine');
+        Process::fake();
+
+        $this->artisan('predictions:run-server', [
+            'region' => 'all',
+            '--limit' => 5000,
+        ])->assertSuccessful();
+
+        Process::assertRan(fn (PendingProcess $process): bool => $process->command === [
+            '/srv/aktienki/python-engine/.venv/bin/aktienki-engine',
+            'predict-active', '--ai-type', 'horizon', '--limit', '20000',
+        ]);
     }
 }

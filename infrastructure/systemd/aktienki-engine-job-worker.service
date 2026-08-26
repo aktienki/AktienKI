@@ -1,0 +1,19 @@
+[Unit]
+Description=AktienKI Python engine jobs on production server
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aktienki
+Group=aktienki
+WorkingDirectory=/home/aktienki/AktienKI/python-engine-v2
+ExecStart=/home/aktienki/AktienKI/python-engine-v2/.venv/bin/python -m app.cli.engine_worker --poll-seconds 2
+Restart=always
+RestartSec=5
+TimeoutStopSec=90
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

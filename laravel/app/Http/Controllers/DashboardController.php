@@ -14,6 +14,8 @@ use App\Services\PersonalizedSignalService;
 use App\Services\PlanAccessService;
 use App\Services\StockRiskClassificationService;
 use App\Models\User;
+use App\Models\UserTradeOpportunity;
+use App\Services\TradeOpportunityService;
 
 class DashboardController extends Controller
 {
@@ -24,7 +26,7 @@ class DashboardController extends Controller
         $allowed = [
             'paper-depots', 'watchlists', 'strategies', 'labels', 'reminders', 'best-buy', 'best-wait',
             'watchlist-screener', 'predictions', 'smart-screener', 'market-report', 'stock-comparison', 'mobile-view',
-            'news',
+            'news', 'chartview',
         ];
         $validated = $request->validate([
             'tiles' => ['required', 'array', 'min:1', 'max:12'],
@@ -175,33 +177,110 @@ class DashboardController extends Controller
         );
         $latestStockPredictions = DB::table('predictions')
             ->selectRaw('instrument_id, MAX(id) AS prediction_id')
-            ->where('prediction_time', '>=', now()->subDays(2))
             ->groupBy('instrument_id');
         $personalizedSignalSql = app(PersonalizedSignalService::class)->sql('prediction', $user);
-        $topStockQuery = fn () => DB::table('predictions as prediction')
-            ->joinSub($latestStockPredictions, 'latest_prediction', fn ($join) =>
-                $join->on('latest_prediction.prediction_id', '=', 'prediction.id'))
-            ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
-            ->where('instrument.type', 'stock')
-            ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
-            ->where('instrument.is_active', true)
-            ->whereNull('instrument.deleted_at')
-            ->orderByRaw('COALESCE(prediction.ai_score, prediction.prediction_score, 0) DESC')
-            ->orderByRaw('COALESCE(prediction.horizon_fusion_consensus_return, prediction.market_return_20d, 0) DESC');
+        $topStockQuery = function () use ($latestStockPredictions, $user) {
+            $query = DB::table('predictions as prediction')
+                ->joinSub($latestStockPredictions, 'latest_prediction', fn ($join) =>
+                    $join->on('latest_prediction.prediction_id', '=', 'prediction.id'))
+                ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+                ->where('instrument.type', 'stock')
+                ->where('instrument.is_active', true)
+                ->whereNull('instrument.deleted_at');
+
+            app(StockRiskClassificationService::class)->applyVisibility($query, $user, 'instrument.risk_status');
+
+            return $query
+                ->orderByRaw('COALESCE(prediction.ai_score, prediction.prediction_score, 0) DESC')
+                ->orderByRaw('COALESCE(prediction.horizon_fusion_consensus_return, prediction.market_return_20d, 0) DESC');
+        };
         $topStockToday = $topStockQuery()
             ->whereRaw("UPPER({$personalizedSignalSql}) = ?", ['BUY'])
-            ->first(['prediction.id as prediction_id', 'prediction.ai_score', 'prediction.prediction_score', 'prediction.horizon_fusion_consensus_return', 'prediction.market_return_20d', 'instrument.symbol', 'instrument.name']);
+            ->first(['prediction.id as prediction_id', 'prediction.ai_score', 'prediction.prediction_score', 'prediction.confidence', 'prediction.risk_score', 'prediction.drawdown_risk_factor', 'prediction.current_price', 'prediction.predicted_price_5d', 'prediction.predicted_price_10d', 'prediction.predicted_price_15d', 'prediction.predicted_price_20d', 'prediction.horizon_fusion_consensus_return', 'prediction.market_return_20d', 'instrument.symbol', 'instrument.name', 'instrument.country']);
         $topWatchStock = $topStockQuery()
             ->whereRaw("UPPER({$personalizedSignalSql}) = ?", ['WATCH'])
-            ->first(['prediction.id as prediction_id', 'prediction.ai_score', 'prediction.prediction_score', 'prediction.horizon_fusion_consensus_return', 'prediction.market_return_20d', 'instrument.symbol', 'instrument.name']);
+            ->first(['prediction.id as prediction_id', 'prediction.ai_score', 'prediction.prediction_score', 'prediction.horizon_fusion_consensus_return', 'prediction.market_return_20d', 'instrument.symbol', 'instrument.name', 'instrument.country']);
+        $topRankedStocks = $topStockQuery()
+            ->select(['prediction.id as prediction_id', 'prediction.instrument_id', 'prediction.ai_score', 'prediction.prediction_score', 'prediction.confidence', 'prediction.risk_score', 'prediction.drawdown_risk_factor', 'prediction.current_price', 'prediction.predicted_price_20d', 'prediction.horizon_fusion_consensus_return', 'prediction.market_return_20d', 'instrument.symbol', 'instrument.name', 'instrument.country', 'instrument.currency'])
+            ->selectRaw("UPPER({$personalizedSignalSql}) AS personalized_signal")
+            ->limit(1)
+            ->get();
+        if ($rankedStock = $topRankedStocks->first()) {
+            $quote = DB::table('current_stock_quotes')
+                ->where('instrument_id', $rankedStock->instrument_id)
+                ->where('status', 'current')
+                ->whereRaw('LOWER(provider) = ?', ['twelvedata'])
+                ->orderByDesc('quote_time')->orderByDesc('id')
+                ->first(['price', 'quote_time']);
+            $dailyBars = DB::table('price_bars')
+                ->where('instrument_id', $rankedStock->instrument_id)
+                ->where('interval', '1d')->whereNotNull('close')
+                ->orderByDesc('bar_time')->orderByDesc('id')->limit(2)
+                ->get(['close', 'bar_time']);
+            $latestBar = $dailyBars->get(0);
+            $previousBar = $dailyBars->get(1);
+            $displayPrice = is_numeric($quote?->price) ? (float) $quote->price : (is_numeric($latestBar?->close) ? (float) $latestBar->close : (is_numeric($rankedStock->current_price) ? (float) $rankedStock->current_price : null));
+            $comparisonClose = $latestBar;
+            if ($quote?->quote_time && $latestBar?->bar_time && \Illuminate\Support\Carbon::parse($quote->quote_time)->isSameDay(\Illuminate\Support\Carbon::parse($latestBar->bar_time))) {
+                $comparisonClose = $previousBar;
+            }
+            $rankedStock->display_price = $displayPrice;
+            $rankedStock->display_price_time = $quote?->quote_time ?: $latestBar?->bar_time;
+            $rankedStock->display_price_live = is_numeric($quote?->price);
+            $rankedStock->daily_change_percent = $displayPrice !== null && is_numeric($comparisonClose?->close) && (float) $comparisonClose->close !== 0.0
+                ? (($displayPrice / (float) $comparisonClose->close) - 1) * 100
+                : null;
+        }
+        $dailyTipsQuery = DB::table('chartview_signal_events as event')
+            ->join('chartview_signal_statistics as statistic', 'statistic.event_key', '=', 'event.event_key')
+            ->join('instruments as instrument', 'instrument.id', '=', 'event.instrument_id')
+            ->joinSub($latestStockPredictions, 'latest_prediction', fn ($join) =>
+                $join->on('latest_prediction.instrument_id', '=', 'instrument.id'))
+            ->join('predictions as prediction', 'prediction.id', '=', 'latest_prediction.prediction_id')
+            ->where('instrument.type', 'stock')
+            ->where('instrument.is_active', true)
+            ->whereNull('instrument.deleted_at')
+            ->where('event.bar_time', '>=', now()->subDays(5))
+            ->whereNotNull('event.rise_probability');
+        app(StockRiskClassificationService::class)->applyVisibility($dailyTipsQuery, $user, 'instrument.risk_status');
+        $dailyTips = $dailyTipsQuery
+            ->select([
+                'event.event_key', 'event.tone', 'event.bar_time', 'event.rise_probability',
+                'statistic.label_de', 'statistic.label_en', 'instrument.symbol', 'instrument.name',
+                'instrument.id as instrument_id', 'instrument.country', 'prediction.id as prediction_id',
+                'prediction.ai_score', 'prediction.prediction_score', 'prediction.confidence',
+                'prediction.horizon_fusion_consensus_return', 'prediction.market_return_20d',
+            ])
+            ->selectRaw("({$personalizedSignalSql}) AS personalized_signal")
+            ->selectRaw("CASE WHEN event.tone='negative' THEN 100-event.rise_probability ELSE event.rise_probability END AS relevance")
+            ->orderByDesc('event.bar_time')
+            ->orderByDesc('relevance')
+            ->limit(20)
+            ->get()
+            ->unique('instrument_id')
+            ->take(6)
+            ->values();
+        $dashboardOpportunities = collect();
+        if ($canUsePro) {
+            app(TradeOpportunityService::class)->syncForUser($user);
+            $dashboardOpportunities = UserTradeOpportunity::query()
+                ->where('user_id', $user->id)
+                ->where('expires_at', '>', now())
+                ->whereIn('status', ['open', 'viewed', 'completed'])
+                ->with(['instrument:id,symbol,name,country,sector,currency'])
+                ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'viewed' THEN 1 ELSE 2 END")
+                ->orderBy('expires_at')
+                ->limit(5)
+                ->get();
+        }
         $messageReminders = collect()
             ->merge(
                 DB::table('prediction_purchase_reminders as reminder')
                     ->join('instruments as instrument', 'instrument.id', '=', 'reminder.instrument_id')
                     ->where('reminder.user_id', $user->id)
                     ->whereIn('reminder.status', ['active', 'disabled'])
+                    ->whereDate('reminder.remind_on', '>=', today())
                     ->orderBy('reminder.remind_on')
-                    ->limit(6)
                     ->get(['reminder.id', 'reminder.intent', 'reminder.horizon_days', 'reminder.remind_on', 'reminder.status', 'instrument.symbol', 'instrument.name'])
                     ->map(fn (object $reminder): array => [
                         'id' => $reminder->id,
@@ -221,7 +300,6 @@ class DashboardController extends Controller
                     ->where('alert.user_id', $user->id)
                     ->whereIn('alert.status', ['active', 'disabled'])
                     ->latest('alert.created_at')
-                    ->limit(6)
                     ->get(['alert.id', 'alert.notification_mode', 'alert.status', 'instrument.symbol', 'instrument.name'])
                     ->map(fn (object $alert): array => [
                         'id' => $alert->id,
@@ -244,7 +322,7 @@ class DashboardController extends Controller
                 ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
                 ->where('instrument.is_german_tradeable', true)->whereNull('instrument.deleted_at')
                 ->where('event.event_type', 'earnings')->whereBetween('event.event_date', [today(), today()->addDays(90)])
-                ->orderBy('event.event_date')->limit(12)
+                ->orderBy('event.event_date')
                 ->get(['event.id', 'event.event_date', 'event.event_time', 'event.eps_estimate', 'instrument.symbol', 'instrument.name'])
                 ->map(fn (object $event): array => [
                     'type' => 'earnings', 'symbol' => $event->symbol, 'name' => $event->name,
@@ -253,6 +331,10 @@ class DashboardController extends Controller
                     'sort_at' => (string) $event->event_date,
                 ])
             : collect();
+        $allScheduleItems = $messageReminders
+            ->concat($corporateScheduleItems)
+            ->sortBy(fn (array $item): string => ($item['sort_at'] === '0000-00-00' ? '9999-12-31' : $item['sort_at']).'-'.$item['symbol'])
+            ->values();
         $activeMessageScheduleItems = $scheduleEmailsEnabled
             ? $messageReminders->where('active', true)->sortBy('sort_at')->values()
             : collect();
@@ -260,6 +342,52 @@ class DashboardController extends Controller
             ->concat($corporateScheduleItems->take(max(0, 6 - $activeMessageScheduleItems->count())))
             ->take(6)
             ->values();
+
+        $watchlistInstrumentIds = DB::table('watchlist_items as item')
+            ->join('watchlists as watchlist', 'watchlist.id', '=', 'item.watchlist_id')
+            ->where('watchlist.user_id', $user->id)
+            ->where('watchlist.active', true)
+            ->pluck('item.instrument_id');
+        $portfolioInstrumentIds = DB::table('portfolio_positions as position')
+            ->join('portfolios as portfolio', 'portfolio.id', '=', 'position.portfolio_id')
+            ->where('portfolio.user_id', $user->id)
+            ->where('portfolio.active', true)
+            ->pluck('position.instrument_id');
+        $personalNewsInstrumentIds = $watchlistInstrumentIds
+            ->merge($portfolioInstrumentIds)
+            ->unique()
+            ->values();
+        $newsLocale = str_starts_with(strtolower(app()->getLocale()), 'en') ? 'en' : 'de';
+
+        $newsCenterItems = \App\Models\News::query()
+            ->with('instrument:id,symbol,name,country')
+            ->whereNotNull('published_at')
+            ->where('published_at', '>=', now()->subDays(7))
+            ->whereRaw('(LOWER(language) = ? OR LOWER(language) LIKE ?)', [$newsLocale, $newsLocale.'-%'])
+            ->whereIn('instrument_id', $personalNewsInstrumentIds)
+            ->orderByRaw('relevance_score DESC NULLS LAST')
+            ->orderByDesc('published_at')
+            ->limit(2)
+            ->get();
+        if ($newsCenterItems->count() < 2) {
+            $fallbackNews = \App\Models\News::query()
+                ->with('instrument:id,symbol,name,country')
+                ->whereNotNull('published_at')
+                ->where('published_at', '>=', now()->subDays(7))
+                ->whereRaw('(LOWER(language) = ? OR LOWER(language) LIKE ?)', [$newsLocale, $newsLocale.'-%'])
+                ->whereNotIn('id', $newsCenterItems->pluck('id'))
+                ->orderByRaw('relevance_score DESC NULLS LAST')
+                ->orderByDesc('published_at')
+                ->limit(2 - $newsCenterItems->count())
+                ->get();
+            $newsCenterItems = $newsCenterItems->concat($fallbackNews)->values();
+        }
+        $newsCenterItems->each(function (\App\Models\News $newsItem) use ($watchlistInstrumentIds, $portfolioInstrumentIds): void {
+            $newsItem->setAttribute('dashboard_sources', array_values(array_filter([
+                $watchlistInstrumentIds->contains($newsItem->instrument_id) ? 'watchlist' : null,
+                $portfolioInstrumentIds->contains($newsItem->instrument_id) ? 'portfolio' : null,
+            ])));
+        });
 
         return view('dashboard', compact(
             'riskProfile', 'strategyPortfolio', 'overview', 'marketSituation', 'continentPredictions',
@@ -270,6 +398,7 @@ class DashboardController extends Controller
             'recentEarnings',
             'communityOverview',
             'messageReminders',
+            'allScheduleItems',
             'dashboardScheduleItems',
             'companyNewsEnabled',
             'scheduleEmailsEnabled',
@@ -278,6 +407,10 @@ class DashboardController extends Controller
             'canUsePro',
             'topStockToday',
             'topWatchStock',
+            'topRankedStocks',
+            'dailyTips',
+            'dashboardOpportunities',
+            'newsCenterItems',
         ));
     }
 
@@ -288,7 +421,7 @@ class DashboardController extends Controller
             ->where('type', 'paper')
             ->where('active', true)
             ->whereHas('strategies')
-            ->with(['cashAccount', 'strategies:id,name', 'positions'])
+            ->with(['cashAccount', 'strategies:id,name', 'positions.instrument:id,symbol,name,country'])
             ->get();
 
         $portfolio = $portfolios->first(fn ($candidate): bool =>
@@ -401,7 +534,7 @@ class DashboardController extends Controller
 
     public function signalCockpit(): array
     {
-        return Cache::remember('dashboard.personal.signal-cockpit-v7', now()->addMinutes(5), function (): array {
+        return Cache::remember('dashboard.personal.signal-cockpit-v11', now()->addMinutes(5), function (): array {
             $latestPredictionIds = DB::table('predictions')
                 ->selectRaw('instrument_id, MAX(id) AS prediction_id')
                 ->groupBy('instrument_id');
@@ -433,15 +566,21 @@ class DashboardController extends Controller
 
             $predictionTradingDays = DB::table('predictions')
                 ->selectRaw('prediction_time::date AS trading_day')->distinct()
-                ->orderByDesc('trading_day')->limit(30)->pluck('trading_day');
+                // Load one additional trading day so changes on the first visible day
+                // can still be compared with their preceding signal.
+                ->orderByDesc('trading_day')->limit(6)->pluck('trading_day');
             $predictionHistory = DB::table('predictions as prediction')
                 ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
                 ->when($predictionTradingDays->isNotEmpty(), fn ($query) => $query->whereDate('prediction.prediction_time', '>=', $predictionTradingDays->last()))
                 ->where('instrument.type', 'stock')->where('instrument.is_active', true)->whereNull('instrument.deleted_at')
                 ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
-                ->select(['prediction.id', 'prediction.instrument_id', 'prediction.prediction_time', 'prediction.signal', 'prediction.ai_score', 'prediction.prediction_score',
+                ->select(['prediction.id', 'prediction.instrument_id', 'prediction.prediction_time', 'prediction.signal', 'prediction.ai_score', 'prediction.prediction_score', 'prediction.risk_score', 'prediction.drawdown_risk_factor',
                     'prediction.current_price', 'prediction.predicted_price_5d', 'prediction.predicted_price_10d', 'prediction.predicted_price_15d', 'prediction.predicted_price_20d',
-                    'instrument.symbol', 'instrument.name'])
+                    'instrument.symbol', 'instrument.name', 'instrument.country'])
+                ->selectRaw('(SELECT hp.predicted_price_5d FROM predictions hp WHERE hp.instrument_id = prediction.instrument_id AND hp.prediction_horizon_minutes = 7200 AND hp.predicted_price_5d IS NOT NULL AND hp.prediction_time <= prediction.prediction_time ORDER BY hp.prediction_time DESC NULLS LAST, hp.id DESC LIMIT 1) AS horizon_target_5d')
+                ->selectRaw('(SELECT hp.predicted_price_10d FROM predictions hp WHERE hp.instrument_id = prediction.instrument_id AND hp.prediction_horizon_minutes = 14400 AND hp.predicted_price_10d IS NOT NULL AND hp.prediction_time <= prediction.prediction_time ORDER BY hp.prediction_time DESC NULLS LAST, hp.id DESC LIMIT 1) AS horizon_target_10d')
+                ->selectRaw('(SELECT hp.predicted_price_15d FROM predictions hp WHERE hp.instrument_id = prediction.instrument_id AND hp.prediction_horizon_minutes = 21600 AND hp.predicted_price_15d IS NOT NULL AND hp.prediction_time <= prediction.prediction_time ORDER BY hp.prediction_time DESC NULLS LAST, hp.id DESC LIMIT 1) AS horizon_target_15d')
+                ->selectRaw('(SELECT hp.predicted_price_20d FROM predictions hp WHERE hp.instrument_id = prediction.instrument_id AND hp.prediction_horizon_minutes = 28800 AND hp.predicted_price_20d IS NOT NULL AND hp.prediction_time <= prediction.prediction_time ORDER BY hp.prediction_time DESC NULLS LAST, hp.id DESC LIMIT 1) AS horizon_target_20d')
                 ->get()->groupBy('instrument_id');
             $signalChanges = $predictionHistory->flatMap(function ($rows) {
                 return $rows->sortBy('prediction_time')->values()->map(function (object $row, int $index) use ($rows) {
@@ -449,19 +588,33 @@ class DashboardController extends Controller
                     $previous = $ordered->get($index - 1);
                     if (! $previous || strtoupper((string) $previous->signal) === strtoupper((string) $row->signal)) return null;
                     return [
-                        'symbol' => $row->symbol, 'name' => $row->name, 'prediction_id' => $row->id,
+                        'symbol' => $row->symbol, 'name' => $row->name, 'country' => $row->country, 'prediction_id' => $row->id,
                         'from' => strtoupper((string) $previous->signal), 'to' => strtoupper((string) $row->signal),
                         'at' => $row->prediction_time,
                         'score' => \App\Support\AiScore::toTen(is_numeric($row->ai_score) ? $row->ai_score : $row->prediction_score),
+                        'risk' => \App\Support\RiskScore::toPercent($row->risk_score, $row->drawdown_risk_factor),
                         'horizons' => collect([5, 10, 15, 20])->mapWithKeys(function (int $days) use ($row): array {
                             $current = is_numeric($row->current_price) ? (float) $row->current_price : null;
                             $targetField = "predicted_price_{$days}d";
-                            $target = is_numeric($row->{$targetField}) ? (float) $row->{$targetField} : null;
+                            $horizonField = "horizon_target_{$days}d";
+                            $target = is_numeric($row->{$targetField})
+                                ? (float) $row->{$targetField}
+                                : (is_numeric($row->{$horizonField}) ? (float) $row->{$horizonField} : null);
                             return [$days => $current && $target !== null ? (($target / $current) - 1) * 100 : null];
                         })->all(),
                     ];
                 })->filter();
-            })->sortByDesc('at')->unique('symbol')->values()->all();
+            })
+                ->filter(function (array $change): bool {
+                    if (($change['to'] ?? null) !== 'SELL') return true;
+
+                    $return20d = data_get($change, 'horizons.20');
+
+                    // Ein positives langfristiges Modellbild darf nicht als neuer
+                    // SELL-Kandidat im Signal-Cockpit ausgegeben werden.
+                    return ! is_numeric($return20d) || (float) $return20d <= 0;
+                })
+                ->sortByDesc('at')->unique('symbol')->values()->all();
 
             $indicatorSignals = DB::table('chartview_signal_events as event')
                 ->join('chartview_signal_statistics as statistic', 'statistic.event_key', '=', 'event.event_key')
@@ -489,7 +642,7 @@ class DashboardController extends Controller
         $riskService = app(StockRiskClassificationService::class);
         $level = $riskService->userLevel($user);
 
-        return Cache::remember("dashboard.profile-universe.{$level}.v2", now()->addMinutes(5), function () use ($user, $riskService, $level): array {
+        return Cache::remember("dashboard.profile-universe.{$level}.v3", now()->addMinutes(5), function () use ($user, $riskService, $level): array {
             $latestPredictionIds = DB::table('predictions')
                 ->selectRaw('instrument_id, MAX(id) AS prediction_id')
                 ->groupBy('instrument_id');
@@ -532,10 +685,10 @@ class DashboardController extends Controller
                 if ($signal !== 'SELL' && $returns->filter(fn (float $return): bool => $return <= -.25)->count() >= 3 && $currentScore < $previousScore) return 'sell';
                 return null;
             })->filter();
-            $ranges = [[0, 2], [2, 4], [4, 6], [6, 8], [8, 10.01]];
+            $ranges = [[0, 2, '5', '5− / 5+'], [2, 4, '4', '4− / 4+'], [4, 6, '3', '3− / 3+'], [6, 8, '2', '2− / 2+'], [8, 10.01, '1', '1− / 1+']];
             $bins = collect($ranges)->map(function (array $range) use ($scores): array {
                 $count = $scores->filter(fn (float $score): bool => $score >= $range[0] && $score < $range[1])->count();
-                return ['label' => $range[0].'–'.min(10, $range[1]), 'count' => $count];
+                return ['label' => $range[2], 'range' => $range[3], 'count' => $count];
             })->all();
 
             return [

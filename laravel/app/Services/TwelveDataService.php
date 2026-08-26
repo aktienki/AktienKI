@@ -9,6 +9,51 @@ use Illuminate\Support\Facades\Http;
 
 class TwelveDataService
 {
+    /**
+     * Discover exchange-traded structured products exposed by Twelve Data.
+     * The result is reference data only; it deliberately contains no ranking
+     * or suitability assessment.
+     */
+    public function structuredProducts(string $symbol, string $name, ?string $isin = null): array
+    {
+        $terms = collect([$isin, $symbol, preg_replace('/\s+(AG|SE|N\.V\.|PLC)$/iu', '', $name), $name])
+            ->filter(fn ($term): bool => trim((string) $term) !== '')
+            ->map(fn ($term): string => trim((string) $term))
+            ->unique()
+            ->values();
+
+        return Cache::remember(
+            'twelve_data_structured_products_'.sha1($terms->implode('|')),
+            now()->addHours(3),
+            function () use ($terms): array {
+                $supportedTypes = ['structured product', 'warrant', 'exchange-traded note'];
+
+                return $terms->flatMap(function (string $term) {
+                    $response = $this->request('symbol_search', ['symbol' => $term, 'outputsize' => 120, 'show_plan' => 'true']);
+
+                    return $this->valid($response) ? $response->json('data', []) : [];
+                })->filter(function ($item) use ($supportedTypes): bool {
+                    if (! is_array($item)) return false;
+
+                    return in_array(strtolower(trim((string) ($item['instrument_type'] ?? ''))), $supportedTypes, true);
+                })->map(fn (array $item): array => [
+                    'symbol' => (string) ($item['symbol'] ?? ''),
+                    'name' => (string) ($item['instrument_name'] ?? ''),
+                    'instrument_type' => (string) ($item['instrument_type'] ?? ''),
+                    'exchange' => (string) ($item['exchange'] ?? ''),
+                    'mic_code' => (string) ($item['mic_code'] ?? ''),
+                    'country' => (string) ($item['country'] ?? ''),
+                    'currency' => (string) ($item['currency'] ?? ''),
+                    'access' => data_get($item, 'access.plan') ?: data_get($item, 'access.global'),
+                ])->filter(fn (array $item): bool => $item['symbol'] !== '')
+                    ->unique(fn (array $item): string => strtoupper($item['symbol'].'|'.$item['exchange']))
+                    ->take(50)
+                    ->values()
+                    ->all();
+            }
+        );
+    }
+
     public function usListing(?string $isin, string $name, string $symbol): ?array
     {
         foreach (array_filter([trim((string) $isin), trim($name), trim($symbol)]) as $term) {
@@ -332,7 +377,9 @@ class TwelveDataService
         $symbol = strtoupper(trim($symbol));
 
         $aliases = [
-            '^GDAXI' => 'DAX',
+            // Twelve Data lists the German performance index as GDAXI on XETR.
+            // "DAX" is ambiguous there and can resolve to an unrelated ETF.
+            '^GDAXI' => 'GDAXI',
             '^IXIC' => 'IXIC',
             '^GSPC' => 'SPX',
             '^DJI' => 'DJI',

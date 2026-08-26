@@ -39,15 +39,23 @@ function persistTheme(theme) {
     }).catch(() => {});
 }
 
+function chooseTheme(theme) {
+    if (!['light', 'dark'].includes(theme)) return;
+    localStorage.setItem(storageKey, theme);
+    applyTheme(theme);
+    persistTheme(theme);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     applyTheme();
     document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
         button.addEventListener('click', () => {
             const next = resolvedTheme() === 'dark' ? 'light' : 'dark';
-            localStorage.setItem(storageKey, next);
-            applyTheme(next);
-            persistTheme(next);
+            chooseTheme(next);
         });
+    });
+    document.querySelectorAll('[data-theme-choice]').forEach((button) => {
+        button.addEventListener('click', () => chooseTheme(button.dataset.themeChoice));
     });
 });
 

@@ -165,7 +165,7 @@
                         <label class="group relative cursor-pointer rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-red-500/40 has-[:checked]:border-red-500/60 has-[:checked]:bg-red-500/[.08] has-[:checked]:ring-2 has-[:checked]:ring-red-500/10">
                             <input class="sr-only" type="radio" name="risk_level" value="risk" @checked($selectedRiskLevel === 'risk')>
                             <span class="flex items-center justify-between gap-3"><strong class="text-sm text-red-500">{{ __('Risk') }}</strong><x-heroicon-o-exclamation-triangle class="h-5 w-5 text-red-500 opacity-0 transition group-has-[:checked]:opacity-100" /></span>
-                            <span class="mt-2 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Zeigt das vollständige Aktienuniversum einschließlich SLEEP-Aktien mit einem validierten Profitfaktor unter 1,05.') }}</span>
+                            <span class="mt-2 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Zeigt das vollständige Portfolio einschließlich SLEEP-Aktien mit einem validierten Profitfaktor unter 1,05.') }}</span>
                         </label>
                     </div>
                     @error('risk_level')<p class="mt-3 text-xs text-rose-400">{{ $message }}</p>@enderror

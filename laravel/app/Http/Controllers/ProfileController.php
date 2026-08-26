@@ -15,6 +15,71 @@ use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
 {
+    private const MOBILE_DASHBOARD_CARDS = [
+        'market-summary', 'market', 'schedule', 'strategy', 'signal-cockpit',
+        'personal', 'community', 'mobile-view',
+    ];
+
+    public function mobileView(Request $request): View
+    {
+        $preferences = (array) ($request->user()->preferences ?? []);
+        $selected = data_get($preferences, 'dashboard.mobile_cards');
+        $selected = is_array($selected)
+            ? array_values(array_intersect(self::MOBILE_DASHBOARD_CARDS, $selected))
+            : array_values(array_diff(self::MOBILE_DASHBOARD_CARDS, ['mobile-view']));
+
+        return view('profile.mobile-view', [
+            'cards' => array_values(array_diff(self::MOBILE_DASHBOARD_CARDS, ['mobile-view'])),
+            'selectedCards' => array_values(array_diff($selected, ['mobile-view'])),
+        ]);
+    }
+
+    public function updateMobileView(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'cards' => ['required', 'array', 'min:1', 'max:'.count(self::MOBILE_DASHBOARD_CARDS)],
+            'cards.*' => ['required', 'string', 'distinct', 'in:'.implode(',', self::MOBILE_DASHBOARD_CARDS)],
+        ]);
+        $preferences = (array) ($request->user()->preferences ?? []);
+        data_set($preferences, 'dashboard.mobile_cards', array_values($validated['cards']));
+        $request->user()->forceFill(['preferences' => $preferences])->save();
+
+        return redirect()->route('profile.mobile-view')->with('status', __('Mobile Ansicht gespeichert.'));
+    }
+
+    public function resetMobileView(Request $request): RedirectResponse
+    {
+        $preferences = (array) ($request->user()->preferences ?? []);
+        data_forget($preferences, 'dashboard.mobile_cards');
+        $request->user()->forceFill(['preferences' => $preferences])->save();
+
+        return redirect()->route('profile.mobile-view')->with('status', __('Mobile Ansicht wurde zurückgesetzt.'));
+    }
+
+    public function updateCompanyNews(Request $request): RedirectResponse
+    {
+        $validated = $request->validate(['enabled' => ['required', 'boolean']]);
+        $preferences = (array) ($request->user()->preferences ?? []);
+        $preferences['dashboard_company_news_enabled'] = (bool) $validated['enabled'];
+        $request->user()->forceFill(['preferences' => $preferences])->save();
+
+        return back()->with('status', $validated['enabled']
+            ? __('Unternehmensnachrichten wurden aktiviert.')
+            : __('Unternehmensnachrichten wurden deaktiviert.'));
+    }
+
+    public function updateScheduleEmailVisibility(Request $request): RedirectResponse
+    {
+        $validated = $request->validate(['enabled' => ['required', 'boolean']]);
+        $preferences = (array) ($request->user()->preferences ?? []);
+        $preferences['dashboard_schedule_emails_enabled'] = (bool) $validated['enabled'];
+        $request->user()->forceFill(['preferences' => $preferences])->save();
+
+        return back()->with('status', $validated['enabled']
+            ? __('E-Mails werden in Termine & Erinnerungen angezeigt.')
+            : __('E-Mails werden in Termine & Erinnerungen ausgeblendet.'));
+    }
+
     /**
      * Display the user's profile form.
      */
@@ -51,7 +116,7 @@ class ProfileController extends Controller
 
         $preferences = $user->preferences ?? [];
 
-        foreach (['email_service', 'email_market_summary', 'email_price_alerts', 'email_product_updates'] as $key) {
+        foreach (['email_service', 'email_market_summary', 'email_signal_cockpit', 'email_price_alerts', 'email_product_updates'] as $key) {
             if (array_key_exists($key, $validated)) {
                 $preferences[$key] = (bool) $validated[$key];
             }

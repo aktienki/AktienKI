@@ -4,11 +4,58 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_pro_user_can_configure_mobile_dashboard_cards(): void
+    {
+        $planId = DB::table('tariff_plans')->where('code', 'pro')->value('id');
+        $user = User::factory()->create([
+            'tariff_plan_id' => $planId, 'tariff_status' => 'active', 'tariff_ends_at' => now()->addYear(),
+        ]);
+
+        $this->actingAs($user)->get('/profile/mobile-view')->assertOk();
+        $this->actingAs($user)->patch('/profile/mobile-view', [
+            'cards' => ['personal', 'signal-cockpit', 'mobile-view'],
+        ])->assertSessionHasNoErrors()->assertRedirect('/profile/mobile-view');
+
+        $this->assertSame(
+            ['personal', 'signal-cockpit', 'mobile-view'],
+            data_get($user->refresh()->preferences, 'dashboard.mobile_cards')
+        );
+    }
+
+    public function test_free_user_can_configure_mobile_dashboard_cards(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get('/profile/mobile-view')->assertOk();
+        $this->actingAs($user)->patch('/profile/mobile-view', [
+            'cards' => ['personal', 'market'],
+        ])->assertSessionHasNoErrors()->assertRedirect('/profile/mobile-view');
+
+        $this->assertSame(
+            ['personal', 'market'],
+            data_get($user->refresh()->preferences, 'dashboard.mobile_cards')
+        );
+    }
+
+    public function test_user_can_reset_mobile_dashboard_cards(): void
+    {
+        $user = User::factory()->create([
+            'preferences' => ['dashboard' => ['mobile_cards' => ['personal', 'signal-cockpit']]],
+        ]);
+
+        $this->actingAs($user)->delete('/profile/mobile-view')
+            ->assertRedirect('/profile/mobile-view')
+            ->assertSessionHas('status');
+
+        $this->assertNull(data_get($user->refresh()->preferences, 'dashboard.mobile_cards'));
+    }
 
     public function test_profile_page_is_displayed(): void
     {

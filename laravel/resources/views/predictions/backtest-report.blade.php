@@ -55,7 +55,7 @@
     $filterLabels = [
         'country' => 'Land', 'exchange' => 'Börse', 'sector' => 'Sektor',
         'model' => 'Modell', 'quality_tier' => 'Modellstufe mindestens', 'signal' => 'Signal',
-        'score_min' => 'KI-Score mindestens', 'confidence_min' => 'Konfidenz mindestens',
+        'score_min' => 'Modellscore mindestens', 'confidence_min' => 'Konfidenz mindestens',
         'drawdown_max' => 'Drawdown maximal', 'profit_per_trade_min' => 'Ø Netto-Profit je Trade mindestens',
         'volatility_max' => 'Volatilität maximal', 'pe_max' => 'KGV maximal',
         'dividend_yield_min' => 'Dividendenrendite mindestens', 'market_cap_min' => 'Marktkapitalisierung mindestens',
@@ -63,7 +63,7 @@
         'sector_score_rotation' => 'KI-Score-Sektorrotation', 'index_score_rotation' => 'KI-Score-Indexrotation',
         'entry_strategy' => 'Einstiegsstrategie', 'entry_risk_style' => 'Auswahlprofil',
         'entry_wait_5d_enabled' => 'WAIT-Einstieg (max. 5 Tage)',
-        'signal_change_exit_enabled' => 'Ausstieg beim Signalwechsel',
+        'signal_change_exit_enabled' => 'Ausstieg beim Signal- oder Marktphasenwechsel',
         'position_factor' => 'Maximaler Positionsanteil', 'exit_strategy' => 'Exitstrategie',
     ];
     $formatMoney = fn ($value) => number_format((float) $value, 2, ',', '.').' €';
@@ -83,6 +83,8 @@
     $executionHorizon = (int) ($run->horizon_days ?? 20);
     $exitStrategyLabels = [
         'fixed_20d' => $executionHorizon.' Tage',
+        'signal_change' => 'Signal- oder Marktphasenwechsel',
+        'forecast_below_price' => 'Prognose unter aktuellem Kurs',
         'buy_and_hold' => 'Buy and Hold',
     ];
     $selectedExitStrategyLabel = $exitStrategyLabels[$selectedExitStrategy] ?? $selectedExitStrategy;
@@ -96,8 +98,8 @@
         ! empty($filters['index_score_rotation']) ? 'Bereichspriorität: Index' : null,
         'Auswahl: '.match ($filters['entry_risk_style'] ?? 'balanced') { 'conservative' => 'Konservativ', 'chance' => 'Chance', default => 'Ausgewogen' },
         $automaticComparison ? 'Vergleich: Automatik (alle Entry-/Exitvarianten)' : null,
-        $selectedExitStrategy === 'buy_and_hold' ? 'Haltedauer: Buy and Hold' : 'Exit: '.$executionHorizon.'T',
-        ! empty($filters['signal_change_exit_enabled']) ? 'Exit: Signalwechsel' : null,
+        $selectedExitStrategy === 'buy_and_hold' ? 'Haltedauer: Buy and Hold' : 'Exit: '.$selectedExitStrategyLabel,
+        ! empty($filters['signal_change_exit_enabled']) ? 'Exit: Signal-/Marktphasenwechsel' : null,
         ! empty($filters['support_stop_enabled']) ? 'Exit: Support-Stop' : null,
         ! empty($filters['resistance_trailing_stop_enabled']) ? 'Exit: Resistance-Trailing' : null,
     ])->filter()->unique()->values();
@@ -147,7 +149,7 @@
     </table>
     @if (! empty($filters['entry_wait_5d_enabled']) || ! empty($filters['signal_change_exit_enabled']))
         <table style="margin-top:6px">
-            <tr><th>WAIT &amp; BUY</th><th>Tatsächliche WAIT-Einstiege</th><th>Exit bei Signalwechsel</th><th>Tatsächliche Signalwechsel-Exits</th></tr>
+            <tr><th>WAIT &amp; BUY</th><th>Tatsächliche WAIT-Einstiege</th><th>Exit bei Signal-/Marktphasenwechsel</th><th>Tatsächliche Wechsel-Exits</th></tr>
             <tr>
                 <td>{{ ! empty($filters['entry_wait_5d_enabled']) ? 'Aktiv · maximal 5 Tage' : 'Deaktiviert' }}</td>
                 <td><strong>{{ number_format((int) ($result['wait_entry_count'] ?? 0), 0, ',', '.') }}</strong></td>
@@ -239,7 +241,8 @@
     ])->merge(collect($result['automatic_exit_variants'] ?? [])->mapWithKeys(fn ($variant, $key) => [match($key) {
         'auto_exit_fixed_20d' => 'Direkteinstieg · Exit 20T', 'auto_exit_dynamic_horizon' => 'Direkteinstieg · dynamischer Horizont',
         'auto_exit_support_stop' => 'Support-Stop', 'auto_exit_resistance_trailing' => 'Resistance-Trailing',
-        'auto_exit_signal_change' => 'Signalwechsel', 'auto_entry_wait_5d' => 'WAIT-Einstieg 5T', default => $key,
+        'auto_exit_signal_change' => 'Signalwechsel', 'auto_exit_forecast_below_price' => 'Prognose unter Kurs',
+        'auto_entry_wait_5d' => 'WAIT-Einstieg 5T', default => $key,
     } => $variant]))->filter(fn ($variant) => (int) ($variant['executed_trades'] ?? 0) > 0);
 @endphp
 <div class="section">
@@ -402,6 +405,7 @@
                 'auto_exit_support_stop' => 'Support-Stop',
                 'auto_exit_resistance_trailing' => 'Resistance-Trailing',
                 'auto_exit_signal_change' => 'Signalwechsel',
+                'auto_exit_forecast_below_price' => 'Prognose unter Kurs',
             ];
             $availableExitStrategies = $modelExitMatrix
                 ->flatten(1)

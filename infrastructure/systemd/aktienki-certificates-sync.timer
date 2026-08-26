@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Deutsche Boerse certificates archive refresh
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 02:00:00 Europe/Berlin
+Persistent=true
+Unit=aktienki-certificates-sync.service
+
+[Install]
+WantedBy=timers.target

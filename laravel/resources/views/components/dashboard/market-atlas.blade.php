@@ -13,7 +13,7 @@
 
     <div
         class="relative min-h-0 flex-1 overflow-hidden"
-        x-data="worldMarketMap(@js($countryAiScores), @js(route('indices.index')))">
+        x-data="worldMarketMap(@js($countryAiScores), @js(route('indices.index')), @js(asset('assets/ne_50m_admin_0_countries.geojson')))">
         <svg
             x-ref="map"
             class="h-full min-h-[80px] w-full text-slate-500"
@@ -43,7 +43,7 @@
             <div class="mt-4 grid grid-cols-3 gap-2">
                 <div class="rounded-xl border border-white/5 bg-white/[.04] p-2.5">
                     <p class="text-[9px] uppercase tracking-wide text-slate-500">{{ __('Tagestrend') }}</p>
-                    <p class="mt-1 text-base font-black" :class="selectedCountry?.change > 0 ? 'text-emerald-400' : (selectedCountry?.change < 0 ? 'text-rose-400' : 'text-slate-400')"><span x-text="selectedCountry?.change === null ? '—' : `${selectedCountry.change >= 0 ? '+' : ''}${selectedCountry.change.toFixed(2)} %`"></span></p>
+                    <p class="mt-1 text-base font-black" :class="selectedCountry?.change === null ? 'text-slate-400' : (selectedCountry.change > 0 ? 'text-emerald-400' : (selectedCountry.change < -0.5 ? 'text-rose-400' : 'text-amber-400'))"><span x-text="selectedCountry?.change === null ? '—' : `${selectedCountry.change >= 0 ? '+' : ''}${selectedCountry.change.toFixed(2)} %`"></span></p>
                 </div>
                 <div class="rounded-xl border border-white/5 bg-white/[.04] p-2.5">
                     <p class="text-[9px] uppercase tracking-wide text-slate-500">{{ __('Indexstand') }}</p>
@@ -65,16 +65,9 @@
         </div>
     </div>
 
-    <div class="mt-2 w-full">
-        <div class="ak-atlas-scale grid w-full grid-cols-3 gap-px opacity-60" aria-label="{{ __('Farbskala fallend bis steigend') }}">
-            <i class="ak-atlas-scale-step h-1 bg-rose-500"></i>
-            <i class="ak-atlas-scale-step h-1 bg-slate-500"></i>
-            <i class="ak-atlas-scale-step h-1 bg-emerald-500"></i>
-        </div>
-        <div class="mt-1 flex justify-between text-[8px] font-medium text-slate-600">
-            <span>{{ __('Fallend') }}</span>
-            <span>{{ __('Unverändert') }}</span>
-            <span>{{ __('Steigend') }}</span>
-        </div>
+    <div class="ak-atlas-scale mt-2 flex w-full items-center justify-center gap-3 text-[7px] font-semibold text-slate-500" aria-label="{{ __('Farbskala fallend bis steigend') }}">
+        <span class="inline-flex min-w-0 items-center gap-1 whitespace-nowrap"><i class="ak-atlas-scale-step h-1 w-6 shrink-0 bg-rose-500" data-tone="falling"></i>&lt; −0,5 %</span>
+        <span class="inline-flex min-w-0 items-center gap-1 whitespace-nowrap"><i class="ak-atlas-scale-step h-1 w-6 shrink-0 bg-amber-400" data-tone="neutral"></i>−0,5–0 %</span>
+        <span class="inline-flex min-w-0 items-center gap-1 whitespace-nowrap"><i class="ak-atlas-scale-step h-1 w-6 shrink-0 bg-emerald-500" data-tone="rising"></i>&gt; 0 %</span>
     </div>
 </x-dashboard.card>
