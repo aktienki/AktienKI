@@ -521,18 +521,18 @@
                                     $opportunityReturn20 = $opportunityReturns[20] ?? $opportunityReturns['20'] ?? null;
                                     $opportunityReturn40 = $opportunityReturns[40] ?? $opportunityReturns['40'] ?? null;
                                     $opportunityScore = data_get($snapshot, 'score');
-                                    $opportunityRisk = data_get($snapshot, 'risk');
                                     $opportunityScorePercent = \App\Support\AiScore::toPercent($opportunityScore);
                                     $opportunityScoreGrade = \App\Support\QualityGrade::fromPercent($opportunityScorePercent);
-                                    $opportunityRiskPercent = is_numeric($opportunityRisk) ? (float) $opportunityRisk : null;
-                                    $opportunityRiskLevel = \App\Support\QualityGrade::riskLevel($opportunityRiskPercent);
+                                    $opportunityRiskLevel = is_numeric(data_get($snapshot, 'risk_level'))
+                                        ? max(2, min(5, (int) round((float) data_get($snapshot, 'risk_level'))))
+                                        : null;
                                     $opportunityFlag = $dashboardCountryFlags[strtoupper((string) $opportunity->instrument->country)] ?? '🌐';
                                 @endphp
                                 <a href="{{ route('stocks.show', ['symbol' => $opportunity->instrument->symbol, 'prediction' => $opportunity->prediction_id, 'return_to' => '/dashboard']) }}" class="group flex min-w-0 items-center gap-2.5 rounded-xl border border-amber-400/25 bg-amber-400/[.055] px-3 py-2 transition hover:border-amber-400/55 hover:bg-amber-400/[.09]" title="{{ $opportunity->instrument->name }} · {{ __('Handelschance') }}">
                                     <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-amber-400/35 bg-amber-400/10 text-amber-500">
                                         <x-heroicon-o-arrow-trending-up class="h-5 w-5" />
                                     </span>
-                                    <span class="min-w-0 flex-1"><span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $opportunity->instrument->name ?: $opportunity->instrument->symbol }}</b><em class="shrink-0 rounded-md border border-amber-400/30 px-1.5 py-0.5 text-[8px] font-black not-italic text-amber-500">{{ __($opportunity->status) }}</em></span><small class="mt-0.5 block truncate text-[9px] font-black text-amber-500">{{ __('Rücksetzer beobachten · Einstieg vorbereiten') }}</small><small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $opportunityFlag }} {{ $opportunity->instrument->symbol }}</span>@if($opportunityScoreGrade !== null)<span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ number_format(($opportunityScorePercent ?? 0) / 10, 1, ',', '.') }}/10">KI {{ $opportunityScoreGrade }}</span>@endif @if($opportunityRiskLevel !== null)<span class="text-amber-500" title="{{ __('Rohwert') }}: {{ number_format($opportunityRiskPercent ?? 0, 0, ',', '.') }} %">{{ __('Risiko') }} {{ $opportunityRiskLevel }}</span>@endif @if(is_numeric($opportunityReturn10))<span class="text-cyan-400">10T {{ sprintf('%+.1f', $opportunityReturn10) }}%</span>@endif @if(is_numeric($opportunityReturn20))<span class="text-emerald-500">20T {{ sprintf('%+.1f', $opportunityReturn20) }}%</span>@endif @if(is_numeric($opportunityReturn40))<span class="text-lime-500">40T {{ sprintf('%+.1f', $opportunityReturn40) }}%</span>@endif</small></span>
+                                    <span class="min-w-0 flex-1"><span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $opportunity->instrument->name ?: $opportunity->instrument->symbol }}</b><em class="shrink-0 rounded-md border border-amber-400/30 px-1.5 py-0.5 text-[8px] font-black not-italic text-amber-500">{{ __($opportunity->status) }}</em></span><small class="mt-0.5 block truncate text-[9px] font-black text-amber-500">{{ __('Rücksetzer beobachten · Einstieg vorbereiten') }}</small><small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $opportunityFlag }} {{ $opportunity->instrument->symbol }}</span>@if($opportunityScoreGrade !== null)<span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ number_format(($opportunityScorePercent ?? 0) / 10, 1, ',', '.') }}/10">KI {{ $opportunityScoreGrade }}</span>@endif @if($opportunityRiskLevel !== null)<span class="text-amber-500" title="{{ __('Serving-Risikoklasse') }}: {{ $opportunityRiskLevel }}/5">{{ __('Risiko') }} {{ $opportunityRiskLevel }}</span>@endif @if(is_numeric($opportunityReturn10))<span class="text-cyan-400">10T {{ sprintf('%+.1f', $opportunityReturn10) }}%</span>@endif @if(is_numeric($opportunityReturn20))<span class="text-emerald-500">20T {{ sprintf('%+.1f', $opportunityReturn20) }}%</span>@endif @if(is_numeric($opportunityReturn40))<span class="text-lime-500">40T {{ sprintf('%+.1f', $opportunityReturn40) }}%</span>@endif</small></span>
                                 </a>
                             @empty
                                 <div class="col-span-2 rounded-xl border border-amber-400/15 p-3 text-center text-[10px] font-bold text-[var(--ak-muted)]">{{ $canUsePro ? __('Aktuell liegen keine persönlichen Handelschancen vor.') : __('Meine Handelschancen sind im Pro-Tarif verfügbar.') }}</div>
@@ -556,18 +556,11 @@
                                 $rank = $rankIndex + 1;
                                 $rankFlag = $dashboardCountryFlags[strtoupper((string) ($rankedStock->country ?? ''))] ?? '🌐';
                                 $rankScore = \App\Support\AiScore::toTen(is_numeric($rankedStock->ai_score) ? $rankedStock->ai_score : $rankedStock->prediction_score);
-                                $rankRisk = \App\Support\RiskScore::toPercent(
-                                    $rankedStock->risk_score,
-                                    $rankedStock->drawdown_risk_factor,
-                                    $rankedStock->risk_max_drawdown,
-                                ) ?? match (strtolower((string) ($rankedStock->risk_status ?? ''))) {
-                                    'defensive' => 20.0,
-                                    'balanced' => 40.0,
-                                    'opportunity' => 60.0,
-                                    'risk' => 80.0,
-                                    'sleep' => 100.0,
-                                    default => 50.0,
-                                };
+                                $rankRiskLevel = is_numeric($rankedStock->risk_level ?? null)
+                                    ? max(2, min(5, (int) round((float) $rankedStock->risk_level)))
+                                    : null;
+                                $rankRisk = $rankRiskLevel !== null ? $rankRiskLevel * 20.0 : 0.0;
+                                $rankRiskDisplay = $rankRiskLevel ?? '—';
                                 $rankReturn = is_numeric($rankedStock->current_price) && (float) $rankedStock->current_price !== 0.0 && is_numeric($rankedStock->predicted_price_20d)
                                     ? (((float) $rankedStock->predicted_price_20d / (float) $rankedStock->current_price) - 1) * 100
                                     : (is_numeric($rankedStock->market_return_20d ?? null) ? (float) $rankedStock->market_return_20d : null);
@@ -576,7 +569,6 @@
                                 $rankQualityPercent = is_numeric($rankScore) ? max(0, min(100, (float) $rankScore * 10)) : 0;
                                 $rankQualityGrade = \App\Support\QualityGrade::fromPercent($rankQualityPercent) ?: '—';
                                 $rankQualityLevel = is_numeric(substr($rankQualityGrade, 0, 1)) ? 6 - (int) substr($rankQualityGrade, 0, 1) : 0;
-                                $rankRiskLevel = \App\Support\QualityGrade::riskLevel($rankRisk);
                                 $rankCurrency = strtoupper((string) ($rankedStock->currency ?: 'EUR'));
                                 $rankCurrencyLabel = match($rankCurrency) { 'EUR' => '€', 'USD' => '$', 'GBP' => '£', 'JPY' => '¥', default => $rankCurrency };
                                 $rankDailyChange = is_numeric($rankedStock->daily_change_percent ?? null) ? (float) $rankedStock->daily_change_percent : null;
@@ -591,7 +583,7 @@
                                 <div class="dashboard-champion-entry group grid h-full min-h-0 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] content-center items-center gap-3 overflow-y-auto rounded-xl border border-cyan-400/25 bg-white/[.018] px-4 py-3 transition hover:border-cyan-400/45">
                                     <a href="{{ route('stocks.show', ['symbol' => $rankedStock->symbol, 'prediction' => $rankedStock->prediction_id, 'return_to' => '/dashboard']) }}" class="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
                                         <span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $rankFlag }} {{ $rankedStock->name ?: $rankedStock->symbol }}</b><small class="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $rankedStock->symbol }}</span><span class="{{ $rankSignalTone }}">{{ $rankSignal }}</span><span>{{ ($rankedStock->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($rankedStock->display_price ?? null) ? number_format((float) $rankedStock->display_price, 2, ',', '.').' '.$rankCurrencyLabel : '—' }}</span><span class="{{ $rankDailyChange === null ? '' : ($rankDailyChange >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ __('Tag') }} {{ $rankDailyChange !== null ? sprintf('%+.2f%%', $rankDailyChange) : '—' }}</span></small></span>
-                                        <span class="flex items-center gap-2"><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankQualityPercent" :display="$rankQualityGrade" :level="$rankQualityLevel" type="chance" :label="__('Signalqualität')" /></span><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankRisk" :display="$rankRiskLevel" :level="$rankRiskLevel" type="risk" :label="__('Risiko')" /></span></span>
+                                        <span class="flex items-center gap-2"><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankQualityPercent" :display="$rankQualityGrade" :level="$rankQualityLevel" type="chance" :label="__('Signalqualität')" /></span><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankRisk" :display="$rankRiskDisplay" :level="$rankRiskLevel" type="risk" :label="__('Risiko')" /></span></span>
                                     </a>
                                     <details class="dashboard-champion-reason group col-span-2 min-w-0 border-t border-cyan-400/15 pt-2">
                                         <summary class="flex cursor-pointer list-none items-center gap-2 text-[9px] font-bold leading-4 text-[var(--ak-muted)] [&::-webkit-details-marker]:hidden">
@@ -651,9 +643,11 @@
                         ->map(fn (array $change): array => [...$change, '_cockpit_group' => 'sell'])->values();
                     $displaySignalChanges = $displayBuySignalChanges->concat($displaySellSignalChanges)->values();
                     $cockpitAverageScore = $displaySignalChanges->whereNotNull('score')->avg('score');
-                    $cockpitAverageRisk = $displaySignalChanges->whereNotNull('risk')->avg('risk');
+                    $cockpitAverageRisk = $displaySignalChanges->whereNotNull('risk_level')->avg('risk_level');
                     $cockpitAverageScoreGrade = \App\Support\QualityGrade::fromPercent(\App\Support\AiScore::toPercent($cockpitAverageScore)) ?? '—';
-                    $cockpitAverageRiskLevel = \App\Support\QualityGrade::riskLevel(is_numeric($cockpitAverageRisk) ? (float) $cockpitAverageRisk : null) ?? '—';
+                    $cockpitAverageRiskLevel = is_numeric($cockpitAverageRisk)
+                        ? max(2, min(5, (int) round((float) $cockpitAverageRisk)))
+                        : '—';
                 @endphp
                 <article x-data="{ cockpitOpen: window.innerWidth >= 768 }" data-dashboard-card="signal-cockpit" data-dashboard-width="1" data-dashboard-height="6" data-dashboard-size="6" style="--dashboard-card-order:{{ $dashboardCardOrder('signal-cockpit') }}" class="dashboard-bento-signal-cockpit ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-cyan-400/35 p-4 {{ $dashboardCardVisible('signal-cockpit') ? '' : 'hidden' }}">
                     <div class="dashboard-collapsible-header flex items-center justify-between gap-3" :class="cockpitOpen ? 'mb-3' : ''">
@@ -668,7 +662,7 @@
                                 <span class="mt-1 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[8px] font-black">
                                     <span class="inline-flex shrink-0 rounded border border-cyan-400/20 px-1 py-0.5 sm:hidden"><span class="text-emerald-500">Top 3 BUY</span><span class="mx-1 text-[var(--ak-muted)]">·</span><span class="text-rose-500">1 SELL</span></span>
                                     <span class="text-cyan-600" title="{{ __('Rohwert') }}: {{ is_numeric($cockpitAverageScore) ? number_format((float) $cockpitAverageScore, 1, ',', '.').'/10' : '—' }}">Ø KI {{ $cockpitAverageScoreGrade }}</span>
-                                    <span class="text-amber-600" title="{{ __('Rohwert') }}: {{ is_numeric($cockpitAverageRisk) ? number_format((float) $cockpitAverageRisk, 0, ',', '.').' %' : '—' }}">Ø {{ __('Risiko') }} {{ $cockpitAverageRiskLevel }}</span>
+                                    <span class="text-amber-600" title="{{ __('Ø Serving-Risikoklasse') }}: {{ is_numeric($cockpitAverageRisk) ? number_format((float) $cockpitAverageRisk, 1, ',', '.').'/5' : '—' }}">Ø {{ __('Risiko') }} {{ $cockpitAverageRiskLevel }}</span>
                                 </span>
                             </span>
                         </button>
@@ -730,9 +724,10 @@
                                         $isSellCard = ($change['_cockpit_group'] ?? null) === 'sell';
                                         $cardTone = $isSellCard ? 'border-rose-400/25 hover:border-rose-400/45' : 'border-cyan-400/20 hover:border-cyan-400/45';
                                         $changeScore = is_numeric($change['score'] ?? null) ? (float) $change['score'] : null;
-                                        $changeRisk = is_numeric($change['risk'] ?? null) ? (float) $change['risk'] : null;
                                         $changeScoreGrade = \App\Support\QualityGrade::fromPercent(\App\Support\AiScore::toPercent($changeScore)) ?? '—';
-                                        $changeRiskLevel = \App\Support\QualityGrade::riskLevel($changeRisk) ?? '—';
+                                        $changeRiskLevel = is_numeric($change['risk_level'] ?? null)
+                                            ? max(2, min(5, (int) round((float) $change['risk_level'])))
+                                            : '—';
                                     @endphp
                                     <a href="{{ route('stocks.show', ['symbol' => $change['symbol'], 'prediction' => $change['prediction_id'], 'return_to' => '/dashboard']) }}" title="{{ $change['name'] ?: $change['symbol'] }}" class="aki-signal-compact-card group flex min-w-0 items-center gap-2 rounded-lg border bg-white/[.018] px-2 py-1.5 transition {{ $isSellCard ? 'border-rose-400/30 hover:border-rose-400/55' : 'border-amber-400/30 hover:border-amber-400/55' }}">
                                         <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border {{ $isSellCard ? 'border-rose-400/35 bg-rose-400/10 text-rose-400' : 'border-amber-400/35 bg-amber-400/10 text-amber-500' }}" aria-hidden="true">
@@ -741,7 +736,7 @@
                                         <span class="min-w-0 flex-1">
                                             <span class="flex min-w-0 items-center justify-between gap-2"><b class="truncate text-sm font-black text-[var(--ak-text)]">{{ $change['name'] ?: $change['symbol'] }}</b><time class="shrink-0 rounded-md border border-cyan-400/20 px-1.5 py-0.5 text-[8px] font-black tabular-nums text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($change['at'])->format(app()->getLocale() === 'en' ? 'm/d' : 'd.m.') }}</time></span>
                                             <small class="mt-0.5 block truncate text-[9px] font-black {{ $isSellCard ? 'text-rose-400' : 'text-amber-500' }}">{{ $change['from'] }} → {{ $change['to'] }}</small>
-                                            <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $changeFlag }} {{ $change['symbol'] }}</span><span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ $changeScore !== null ? number_format($changeScore, 1, ',', '.').'/10' : '—' }}">KI {{ $changeScoreGrade }}</span><span class="text-amber-500" title="{{ __('Rohwert') }}: {{ $changeRisk !== null ? number_format($changeRisk, 0, ',', '.').' %' : '—' }}">{{ __('Risiko') }} {{ $changeRiskLevel }}</span>
+                                            <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $changeFlag }} {{ $change['symbol'] }}</span><span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ $changeScore !== null ? number_format($changeScore, 1, ',', '.').'/10' : '—' }}">KI {{ $changeScoreGrade }}</span><span class="text-amber-500" title="{{ __('Serving-Risikoklasse') }}: {{ is_numeric($changeRiskLevel) ? $changeRiskLevel.'/5' : '—' }}">{{ __('Risiko') }} {{ $changeRiskLevel }}</span>
                                         @foreach([10, 20, 40] as $days)
                                             @php
                                                 $forecast = $change['horizons'][$days] ?? null;

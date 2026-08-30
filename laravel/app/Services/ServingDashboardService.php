@@ -17,7 +17,7 @@ class ServingDashboardService
      */
     public function latestStocks(): Collection
     {
-        return Cache::remember('dashboard.serving.latest-stocks.v3', now()->addMinute(), function (): Collection {
+        return Cache::remember('dashboard.serving.latest-stocks.v4', now()->addMinute(), function (): Collection {
             $connection = DB::connection('serving');
             $ranked = $connection->table('serving_predictions as prediction')
                 ->join('serving_prediction_scopes as scope', function ($join): void {
@@ -59,7 +59,7 @@ class ServingDashboardService
 
     public function signalChanges(): array
     {
-        return Cache::remember('dashboard.serving.signal-changes.v2', now()->addMinute(), function (): array {
+        return Cache::remember('dashboard.serving.signal-changes.v3', now()->addMinute(), function (): array {
             $rows = DB::connection('serving')
                 ->table('serving_predictions as prediction')
                 ->join('serving_prediction_scopes as scope', function ($join): void {
@@ -80,7 +80,7 @@ class ServingDashboardService
                     'prediction.instrument_id', 'prediction.as_of', 'prediction.horizon',
                     'prediction.expected_return', 'prediction.calibrated_score',
                     'prediction.risk_score', 'prediction.signal', 'prediction.confidence', 'instrument.symbol',
-                    'instrument.name', 'instrument.country_code',
+                    'instrument.name', 'instrument.country_code', 'instrument.risk_max_drawdown',
                 ]);
 
             return $rows->groupBy('instrument_id')->flatMap(function (Collection $instrumentRows): Collection {
@@ -94,6 +94,10 @@ class ServingDashboardService
                             'signal' => strtoupper((string) $primary->signal),
                             'score' => $this->scoreToTen($primary->calibrated_score, $primary->confidence ?? null),
                             'risk' => is_numeric($primary->risk_score) ? (float) $primary->risk_score : null,
+                            'risk_level' => $this->servingRiskLevel(
+                                $primary->risk_score,
+                                $primary->risk_max_drawdown ?? null,
+                            ),
                             'symbol' => $primary->symbol,
                             'name' => $primary->name,
                             'country' => $primary->country_code,
@@ -146,6 +150,7 @@ class ServingDashboardService
                         'score' => $stock->ai_score,
                         'confidence' => $stock->confidence,
                         'risk' => $stock->risk_score,
+                        'risk_level' => $stock->risk_level,
                     ],
                     'instrument' => (object) [
                         'symbol' => $stock->symbol,
@@ -169,6 +174,10 @@ class ServingDashboardService
                 'target_price' => is_numeric($row->target_price) ? (float) $row->target_price : null,
                 'signal' => strtoupper((string) $row->signal),
                 'as_of' => $row->as_of,
+                'risk_level' => $this->servingRiskLevel(
+                    $row->risk_score,
+                    $row->risk_max_drawdown ?? null,
+                ),
             ]];
         });
         $primaryContext = $this->context($primary->compact_context ?? null);
@@ -179,6 +188,10 @@ class ServingDashboardService
         }
         $score = $this->scoreToTen($primary->calibrated_score, $primary->confidence);
         $confidencePercent = $this->confidencePercent($primary->confidence);
+        $riskLevel = $this->servingRiskLevel(
+            $primary->risk_score,
+            $primary->risk_max_drawdown ?? null,
+        );
 
         return (object) [
             'instrument_id' => (int) $primary->instrument_id,
@@ -196,6 +209,7 @@ class ServingDashboardService
             'prediction_score' => $score,
             'confidence' => $confidencePercent,
             'risk_score' => is_numeric($primary->risk_score) ? (float) $primary->risk_score : null,
+            'risk_level' => $riskLevel,
             'drawdown_risk_factor' => null,
             'current_price' => is_numeric($currentPrice) ? (float) $currentPrice : null,
             'predicted_price_5d' => null,
@@ -262,5 +276,35 @@ class ServingDashboardService
         }
 
         return max(0.0, min(100.0, $numeric));
+    }
+
+    /**
+     * The serving schema stores an ordinal risk class (1..5), not a percent.
+     * The UI deliberately retains a visible residual-risk floor of level 2.
+     */
+    private function servingRiskLevel(mixed $riskScore, mixed $maxDrawdown = null): ?int
+    {
+        if (is_numeric($riskScore)) {
+            $numeric = (float) $riskScore;
+            if ($numeric >= 1.0 && $numeric <= 5.0) {
+                return max(2, min(5, (int) round($numeric)));
+            }
+        }
+
+        if (! is_numeric($maxDrawdown)) {
+            return null;
+        }
+
+        $drawdownPercent = abs((float) $maxDrawdown);
+        if ($drawdownPercent <= 1.0) {
+            $drawdownPercent *= 100.0;
+        }
+
+        return match (true) {
+            $drawdownPercent <= 20.0 => 2,
+            $drawdownPercent <= 35.0 => 3,
+            $drawdownPercent <= 50.0 => 4,
+            default => 5,
+        };
     }
 }

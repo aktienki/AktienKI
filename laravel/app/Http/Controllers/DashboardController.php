@@ -439,7 +439,7 @@ class DashboardController extends Controller
 
     private function servingSignalCockpit(): array
     {
-        return Cache::remember('dashboard.serving.signal-cockpit.v1', now()->addMinute(), function (): array {
+        return Cache::remember('dashboard.serving.signal-cockpit.v2', now()->addMinute(), function (): array {
             $service = app(ServingDashboardService::class);
             $topScores = $service->latestStocks()->take(5)->map(fn (object $row): array => [
                 'symbol' => $row->symbol,
@@ -466,7 +466,7 @@ class DashboardController extends Controller
         $riskService = app(StockRiskClassificationService::class);
         $level = $riskService->userLevel($user);
 
-        return Cache::remember("dashboard.profile-universe.serving.{$level}.v2", now()->addMinutes(2), function () use ($level): array {
+        return Cache::remember("dashboard.profile-universe.serving.{$level}.v3", now()->addMinutes(2), function () use ($level): array {
             $definitions = [
                 ['key' => 'strong_sell', 'label' => 'Strong Sell', 'range' => __('Mindestens zwei SELL-Horizonte')],
                 ['key' => 'sell', 'label' => 'Sell', 'range' => __('Ein bestätigter SELL-Horizont')],
@@ -490,27 +490,28 @@ class DashboardController extends Controller
                     ->table('serving_prediction_scopes')
                     ->where('selected_for_prediction', true)
                     ->where('prediction_enabled', true)
-                    ->get(['instrument_id', 'release_id', 'horizon'])
+                    ->get(['instrument_id', 'release_id', 'horizon', 'variant'])
                     ->groupBy(fn (object $scope): string => $scope->instrument_id.'|'.$scope->release_id);
                 $rankedPredictions = $connection
                     ->table('serving_predictions as prediction')
                     ->join('serving_prediction_scopes as scope', function ($join): void {
                         $join->on('scope.instrument_id', '=', 'prediction.instrument_id')
                             ->on('scope.release_id', '=', 'prediction.release_id')
-                            ->on('scope.horizon', '=', 'prediction.horizon');
+                            ->on('scope.horizon', '=', 'prediction.horizon')
+                            ->on('scope.variant', '=', 'prediction.variant');
                     })
                     ->where('scope.selected_for_prediction', true)
                     ->where('scope.prediction_enabled', true)
                     ->select([
                         'prediction.instrument_id', 'prediction.release_id',
-                        'prediction.horizon', 'prediction.signal',
+                        'prediction.horizon', 'prediction.variant', 'prediction.signal',
                     ])
-                    ->selectRaw('ROW_NUMBER() OVER (PARTITION BY prediction.instrument_id, prediction.release_id, prediction.horizon ORDER BY prediction.as_of DESC, prediction.id DESC) AS scope_rank');
+                    ->selectRaw('ROW_NUMBER() OVER (PARTITION BY prediction.instrument_id, prediction.release_id, prediction.horizon, prediction.variant ORDER BY prediction.as_of DESC, prediction.id DESC) AS scope_rank');
                 $latestPredictions = $connection->query()
                     ->fromSub($rankedPredictions, 'ranked_prediction')
                     ->where('scope_rank', 1)
                     ->get()
-                    ->keyBy(fn (object $prediction): string => $prediction->instrument_id.'|'.$prediction->release_id.'|'.$prediction->horizon);
+                    ->keyBy(fn (object $prediction): string => $prediction->instrument_id.'|'.$prediction->release_id.'|'.$prediction->horizon.'|'.$prediction->variant);
                 $horizons = $connection
                     ->table('serving_model_horizon_status')
                     ->distinct()
@@ -538,7 +539,7 @@ class DashboardController extends Controller
                     : (array) (json_decode((string) $row->compact_metrics, true) ?: []);
                 $signals = collect($selectedScopes->get($releaseKey, []))
                     ->map(function (object $scope) use ($row, $latestPredictions, $compactMetrics): string {
-                        $predictionKey = $row->instrument_id.'|'.$row->release_id.'|'.$scope->horizon;
+                        $predictionKey = $row->instrument_id.'|'.$row->release_id.'|'.$scope->horizon.'|'.$scope->variant;
                         $storedSignal = strtoupper(trim((string) data_get($latestPredictions->get($predictionKey), 'signal', '')));
 
                         if ($storedSignal !== '') {
