@@ -466,23 +466,52 @@ class DashboardController extends Controller
         $riskService = app(StockRiskClassificationService::class);
         $level = $riskService->userLevel($user);
 
-        return Cache::remember("dashboard.profile-universe.serving.{$level}.v1", now()->addMinutes(2), function () use ($level): array {
+        return Cache::remember("dashboard.profile-universe.serving.{$level}.v2", now()->addMinutes(2), function () use ($level): array {
             $definitions = [
-                ['key' => 'underperform', 'label' => __('Nicht qual.'), 'range' => __('Nicht qualifiziert')],
-                ['key' => 'open', 'label' => __('Offen'), 'range' => __('Noch offen')],
-                ['key' => 'basic', 'label' => 'Basic', 'range' => __('Basisqualität')],
-                ['key' => 'solid', 'label' => 'Solid', 'range' => __('Solide Qualität')],
-                ['key' => 'quality', 'label' => 'Quality', 'range' => __('Hohe Qualität')],
+                ['key' => 'strong_sell', 'label' => 'Strong Sell', 'range' => __('Mindestens zwei SELL-Horizonte')],
+                ['key' => 'sell', 'label' => 'Sell', 'range' => __('Ein bestätigter SELL-Horizont')],
+                ['key' => 'hold', 'label' => 'Hold', 'range' => __('Kein eindeutiges Kauf- oder Verkaufssignal')],
+                ['key' => 'buy', 'label' => 'Buy', 'range' => __('Ein bestätigter BUY-Horizont')],
+                ['key' => 'strong_buy', 'label' => 'Strong Buy', 'range' => __('Mindestens zwei BUY-Horizonte')],
             ];
 
             try {
-                $rows = DB::connection('serving')
+                $connection = DB::connection('serving');
+                $rows = $connection
                     ->table('serving_active_models as active_model')
                     ->join('serving_instruments as instrument', 'instrument.id', '=', 'active_model.instrument_id')
                     ->join('serving_releases as release', 'release.id', '=', 'active_model.release_id')
                     ->where('instrument.is_active', true)
-                    ->get(['release.quality_class']);
-                $horizons = DB::connection('serving')
+                    ->get([
+                        'instrument.id as instrument_id', 'active_model.release_id',
+                        'release.compact_metrics',
+                    ]);
+                $selectedScopes = $connection
+                    ->table('serving_prediction_scopes')
+                    ->where('selected_for_prediction', true)
+                    ->where('prediction_enabled', true)
+                    ->get(['instrument_id', 'release_id', 'horizon'])
+                    ->groupBy(fn (object $scope): string => $scope->instrument_id.'|'.$scope->release_id);
+                $rankedPredictions = $connection
+                    ->table('serving_predictions as prediction')
+                    ->join('serving_prediction_scopes as scope', function ($join): void {
+                        $join->on('scope.instrument_id', '=', 'prediction.instrument_id')
+                            ->on('scope.release_id', '=', 'prediction.release_id')
+                            ->on('scope.horizon', '=', 'prediction.horizon');
+                    })
+                    ->where('scope.selected_for_prediction', true)
+                    ->where('scope.prediction_enabled', true)
+                    ->select([
+                        'prediction.instrument_id', 'prediction.release_id',
+                        'prediction.horizon', 'prediction.signal',
+                    ])
+                    ->selectRaw('ROW_NUMBER() OVER (PARTITION BY prediction.instrument_id, prediction.release_id, prediction.horizon ORDER BY prediction.as_of DESC, prediction.id DESC) AS scope_rank');
+                $latestPredictions = $connection->query()
+                    ->fromSub($rankedPredictions, 'ranked_prediction')
+                    ->where('scope_rank', 1)
+                    ->get()
+                    ->keyBy(fn (object $prediction): string => $prediction->instrument_id.'|'.$prediction->release_id.'|'.$prediction->horizon);
+                $horizons = $connection
                     ->table('serving_model_horizon_status')
                     ->distinct()
                     ->orderBy('horizon')
@@ -490,28 +519,63 @@ class DashboardController extends Controller
                     ->map(fn ($horizon): int => (int) $horizon)
                     ->values()
                     ->all();
-                $eligibleConfigurations = DB::connection('serving')
+                $eligibleConfigurations = $connection
                     ->table('serving_prediction_scopes')
                     ->count();
             } catch (\Throwable $error) {
                 report($error);
                 $rows = collect();
+                $selectedScopes = collect();
+                $latestPredictions = collect();
                 $horizons = [];
                 $eligibleConfigurations = 0;
             }
 
-            $qualityCounts = $rows->countBy(function (object $row): string {
-                $quality = strtolower(trim((string) $row->quality_class));
+            $signalCounts = $rows->countBy(function (object $row) use ($selectedScopes, $latestPredictions): string {
+                $releaseKey = $row->instrument_id.'|'.$row->release_id;
+                $compactMetrics = is_array($row->compact_metrics)
+                    ? $row->compact_metrics
+                    : (array) (json_decode((string) $row->compact_metrics, true) ?: []);
+                $signals = collect($selectedScopes->get($releaseKey, []))
+                    ->map(function (object $scope) use ($row, $latestPredictions, $compactMetrics): string {
+                        $predictionKey = $row->instrument_id.'|'.$row->release_id.'|'.$scope->horizon;
+                        $storedSignal = strtoupper(trim((string) data_get($latestPredictions->get($predictionKey), 'signal', '')));
 
-                return match ($quality) {
-                    'not_qualified', 'not-qualified', 'nicht qualifiziert' => 'underperform',
-                    'qualified', 'high', 'premium' => 'quality',
-                    default => $quality !== '' ? $quality : 'open',
-                };
+                        if ($storedSignal !== '') {
+                            return match ($storedSignal) {
+                                'STRONG BUY', 'STRONG_BUY' => 'BUY',
+                                'STRONG SELL', 'STRONG_SELL' => 'SELL',
+                                'WATCH', 'WAIT', 'NEUTRAL' => 'HOLD',
+                                default => in_array($storedSignal, ['BUY', 'HOLD', 'SELL'], true) ? $storedSignal : 'HOLD',
+                            };
+                        }
+
+                        $buy = data_get($compactMetrics, "horizons.{$scope->horizon}.prediction.buy");
+                        $isBuy = $buy === true || $buy === 1 || $buy === '1' || strtolower((string) $buy) === 'true';
+
+                        return $isBuy ? 'BUY' : 'HOLD';
+                    });
+                $buyCount = $signals->filter(fn (string $signal): bool => $signal === 'BUY')->count();
+                $sellCount = $signals->filter(fn (string $signal): bool => $signal === 'SELL')->count();
+
+                if ($buyCount >= 2 && $buyCount > $sellCount) {
+                    return 'strong_buy';
+                }
+                if ($sellCount >= 2 && $sellCount > $buyCount) {
+                    return 'strong_sell';
+                }
+                if ($buyCount > 0 && $sellCount === 0) {
+                    return 'buy';
+                }
+                if ($sellCount > 0 && $buyCount === 0) {
+                    return 'sell';
+                }
+
+                return 'hold';
             });
             $bins = collect($definitions)->map(fn (array $definition): array => [
                 ...$definition,
-                'count' => (int) $qualityCounts->get($definition['key'], 0),
+                'count' => (int) $signalCounts->get($definition['key'], 0),
             ])->all();
             $activeCount = $rows->count();
 
@@ -522,8 +586,8 @@ class DashboardController extends Controller
                 'total_active_count' => $activeCount,
                 'assigned_percent' => $activeCount > 0 ? 100.0 : 0.0,
                 'transition_candidates' => 0,
-                'transition_to_buy' => 0,
-                'transition_to_sell' => 0,
+                'transition_to_buy' => (int) ($signalCounts->get('buy', 0) + $signalCounts->get('strong_buy', 0)),
+                'transition_to_sell' => (int) ($signalCounts->get('sell', 0) + $signalCounts->get('strong_sell', 0)),
                 'average_score' => null,
                 'model_horizons' => $horizons,
                 'eligible_configuration_count' => (int) $eligibleConfigurations,

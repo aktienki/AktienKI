@@ -483,7 +483,7 @@
                                 </div>
                             </div>
                             <div class="aki-profile-universe-score min-w-0">
-                                <div class="flex items-center justify-between text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ __('Modellqualität') }}</span><span>{{ __('Nicht qualifiziert bis Quality') }}</span></div>
+                                <div class="flex items-center justify-between text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ __('Aktuelles Signal') }}</span><span>{{ __('Strong Sell bis Strong Buy') }}</span></div>
                                 <div class="relative mx-1" style="height:64px">
                                     <div class="absolute inset-x-0 h-2 rounded-full border border-white/10 bg-gradient-to-r from-rose-400 via-amber-300 to-emerald-400 shadow-inner" style="top:42px"></div>
                                     @foreach(($profileUniverseStats['bins'] ?? []) as $index => $bin)
@@ -492,8 +492,8 @@
                                     @endforeach
                                     <div class="absolute inset-x-0 bottom-0 grid grid-cols-5 text-center text-[7px] font-black uppercase tracking-wide">
                                         @foreach (($profileUniverseStats['bins'] ?? []) as $index => $bin)
-                                            @php $qualityTone = ['text-rose-500','text-slate-400','text-amber-500','text-cyan-500','text-emerald-500'][$index] ?? 'text-cyan-500'; @endphp
-                                            <span class="truncate {{ $qualityTone }}" title="{{ $bin['range'] ?? $bin['label'] }}">{{ $bin['label'] }}</span>
+                                            @php $signalTone = ['text-rose-500','text-orange-500','text-amber-500','text-lime-600','text-emerald-500'][$index] ?? 'text-cyan-500'; @endphp
+                                            <span class="truncate {{ $signalTone }}" title="{{ $bin['range'] ?? $bin['label'] }}">{{ $bin['label'] }}</span>
                                         @endforeach
                                     </div>
                                 </div>
