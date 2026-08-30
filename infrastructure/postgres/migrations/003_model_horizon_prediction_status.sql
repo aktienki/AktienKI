@@ -19,7 +19,7 @@ SELECT
     variant.key AS variant,
     (r.compact_metrics->'active_models'->horizon.key->>'variant') = variant.key
         AS selected_for_prediction,
-    COALESCE(variant.value->'prediction_status'->>'status', 'ineligible_performance')
+    COALESCE(variant.value->'prediction_status'->>'status', 'not_evaluated')
         AS prediction_status,
     COALESCE(
         (variant.value->'prediction_status'->>'prediction_enabled')::boolean,
