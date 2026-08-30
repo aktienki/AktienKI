@@ -17,16 +17,19 @@ class ServingDashboardService
      */
     public function latestStocks(): Collection
     {
-        return Cache::remember('dashboard.serving.latest-stocks.v1', now()->addMinute(), function (): Collection {
+        return Cache::remember('dashboard.serving.latest-stocks.v3', now()->addMinute(), function (): Collection {
             $connection = DB::connection('serving');
             $ranked = $connection->table('serving_predictions as prediction')
                 ->join('serving_prediction_scopes as scope', function ($join): void {
                     $join->on('scope.instrument_id', '=', 'prediction.instrument_id')
                         ->on('scope.release_id', '=', 'prediction.release_id')
-                        ->on('scope.horizon', '=', 'prediction.horizon');
+                        ->on('scope.horizon', '=', 'prediction.horizon')
+                        ->on('scope.variant', '=', 'prediction.variant');
                 })
                 ->join('serving_instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
                 ->where('instrument.is_active', true)
+                ->where('scope.selected_for_prediction', true)
+                ->where('scope.prediction_enabled', true)
                 ->select([
                     'prediction.id', 'prediction.instrument_id', 'prediction.release_id',
                     'prediction.as_of', 'prediction.horizon', 'prediction.expected_return',
@@ -56,16 +59,19 @@ class ServingDashboardService
 
     public function signalChanges(): array
     {
-        return Cache::remember('dashboard.serving.signal-changes.v1', now()->addMinute(), function (): array {
+        return Cache::remember('dashboard.serving.signal-changes.v2', now()->addMinute(), function (): array {
             $rows = DB::connection('serving')
                 ->table('serving_predictions as prediction')
                 ->join('serving_prediction_scopes as scope', function ($join): void {
                     $join->on('scope.instrument_id', '=', 'prediction.instrument_id')
                         ->on('scope.release_id', '=', 'prediction.release_id')
-                        ->on('scope.horizon', '=', 'prediction.horizon');
+                        ->on('scope.horizon', '=', 'prediction.horizon')
+                        ->on('scope.variant', '=', 'prediction.variant');
                 })
                 ->join('serving_instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
                 ->where('instrument.is_active', true)
+                ->where('scope.selected_for_prediction', true)
+                ->where('scope.prediction_enabled', true)
                 ->where('prediction.as_of', '>=', now()->subDays(45))
                 ->orderBy('prediction.instrument_id')
                 ->orderBy('prediction.as_of')
@@ -172,6 +178,7 @@ class ServingDashboardService
             $currentPrice = (float) $primary->target_price / (1.0 + $primaryReturn);
         }
         $score = $this->scoreToTen($primary->calibrated_score, $primary->confidence);
+        $confidencePercent = $this->confidencePercent($primary->confidence);
 
         return (object) [
             'instrument_id' => (int) $primary->instrument_id,
@@ -187,7 +194,7 @@ class ServingDashboardService
             'personalized_signal' => strtoupper((string) $primary->signal),
             'ai_score' => $score,
             'prediction_score' => $score,
-            'confidence' => is_numeric($primary->confidence) ? (float) $primary->confidence : null,
+            'confidence' => $confidencePercent,
             'risk_score' => is_numeric($primary->risk_score) ? (float) $primary->risk_score : null,
             'drawdown_risk_factor' => null,
             'current_price' => is_numeric($currentPrice) ? (float) $currentPrice : null,
@@ -237,9 +244,23 @@ class ServingDashboardService
             return max(0.0, min(10.0, $base + $adjustment));
         }
         if (is_numeric($confidence)) {
-            return max(0.0, min(10.0, (float) $confidence / 10.0));
+            return $this->confidencePercent($confidence) / 10.0;
         }
 
         return null;
+    }
+
+    private function confidencePercent(mixed $confidence): ?float
+    {
+        if (! is_numeric($confidence)) {
+            return null;
+        }
+
+        $numeric = (float) $confidence;
+        if ($numeric >= 0.0 && $numeric <= 1.0) {
+            $numeric *= 100.0;
+        }
+
+        return max(0.0, min(100.0, $numeric));
     }
 }
