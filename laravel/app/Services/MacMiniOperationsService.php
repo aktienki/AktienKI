@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +13,8 @@ class MacMiniOperationsService
 {
     public function status(): array
     {
-        $database = $this->applicationDatabaseStatus();
+        $applicationDatabase = $this->applicationDatabaseStatus();
+        $servingDatabase = $this->servingDatabaseStatus();
         $databaseStats = $this->databaseStats();
         $macMini = config('operations.mac_mini');
         $remoteCommand = str_replace(
@@ -133,7 +133,8 @@ BASH
         if (! $result->successful()) {
             return $this->unreachableStatus(
                 trim($result->errorOutput() ?: $result->output()) ?: __('Mac mini nicht erreichbar.'),
-                $database,
+                $applicationDatabase,
+                $servingDatabase,
                 $databaseStats,
             );
         }
@@ -150,7 +151,8 @@ BASH
         if (($metrics['platform'] ?? null) !== 'Darwin') {
             return $this->unreachableStatus(
                 __('Der konfigurierte Rechner ist nicht der AktienKI-Mac-mini.'),
-                $database,
+                $applicationDatabase,
+                $servingDatabase,
                 $databaseStats,
             );
         }
@@ -159,7 +161,10 @@ BASH
             'reachable' => true,
             'error' => null,
             'metrics' => $metrics,
-            'database' => $database,
+            // Keep `database` as a backwards-compatible alias for the serving database.
+            'database' => $servingDatabase,
+            'application_database' => $applicationDatabase,
+            'serving_database' => $servingDatabase,
             'database_stats' => $databaseStats,
             'errors' => $this->lines($sections['ERRORS'] ?? ''),
             'log' => $this->lines($sections['LOG'] ?? ''),
@@ -201,8 +206,18 @@ BASH
 
     private function applicationDatabaseStatus(): array
     {
+        return $this->databaseStatus((string) config('database.default'));
+    }
+
+    private function servingDatabaseStatus(): array
+    {
+        return $this->databaseStatus('serving');
+    }
+
+    private function databaseStatus(string $connection): array
+    {
         try {
-            $database = DB::selectOne(<<<'SQL'
+            $database = DB::connection($connection)->selectOne(<<<'SQL'
 SELECT current_database() AS name,
        COALESCE(inet_server_addr()::text, 'lokal') AS server,
        inet_server_port() AS port
@@ -210,6 +225,7 @@ SQL);
 
             return [
                 'connected' => true,
+                'connection' => $connection,
                 'name' => $database->name ?? null,
                 'server' => $database->server ?? null,
                 'host' => $database->server ?? null,
@@ -219,6 +235,7 @@ SQL);
         } catch (Throwable $exception) {
             return [
                 'connected' => false,
+                'connection' => $connection,
                 'name' => null,
                 'server' => null,
                 'host' => null,
@@ -232,15 +249,9 @@ SQL);
     {
         $currentStocks = $this->currentStockQualityStats();
         $latestPrediction = $this->latestPredictionStats();
+        $oldestModel = $this->oldestServingModel();
 
         try {
-            $oldestModel = DB::table('trained_models as model')
-                ->join('instruments as instrument', 'instrument.id', '=', 'model.instrument_id')
-                ->where('model.status', 'active')
-                ->whereNotNull('model.trained_at')
-                ->orderBy('model.trained_at')
-                ->orderBy('model.id')
-                ->first(['instrument.symbol', 'model.trained_at']);
             $subscriptionCounts = DB::table('tariff_plans as plan')
                 ->leftJoin('users as user', 'user.tariff_plan_id', '=', 'plan.id')
                 ->whereNull('plan.deleted_at')
@@ -269,8 +280,8 @@ SQL);
                     ->whereIn('run.status', ['completed', 'completed_with_errors'])
                     ->distinct()
                     ->count('trade.instrument_id'),
-                'oldest_model_symbol' => $oldestModel?->symbol,
-                'oldest_model_trained_at' => $oldestModel?->trained_at,
+                'oldest_model_symbol' => $oldestModel['symbol'],
+                'oldest_model_trained_at' => $oldestModel['created_at'],
                 'subscription_counts' => $subscriptionCounts,
                 'current_stocks' => $currentStocks,
                 'latest_prediction' => $latestPrediction,
@@ -280,8 +291,8 @@ SQL);
                 'users' => null,
                 'active_users' => null,
                 'walk_forward_stocks' => null,
-                'oldest_model_symbol' => null,
-                'oldest_model_trained_at' => null,
+                'oldest_model_symbol' => $oldestModel['symbol'],
+                'oldest_model_trained_at' => $oldestModel['created_at'],
                 'subscription_counts' => [],
                 'current_stocks' => $currentStocks,
                 'latest_prediction' => $latestPrediction,
@@ -296,7 +307,7 @@ SQL);
             'total' => null,
             'classified' => null,
             'latest_calculated_at' => null,
-            'source' => 'stock_individual_thresholds',
+            'source' => 'serving_active_models',
             'quality_counts' => [
                 'quality' => 0,
                 'solid' => 0,
@@ -307,37 +318,32 @@ SQL);
         ];
 
         try {
-            $latestThresholds = DB::table('stock_individual_thresholds as candidate')
-                ->where('candidate.horizon_days', 20)
-                ->where('candidate.algorithm_version', 'like', 'historical-action-%')
-                ->selectRaw('candidate.instrument_id, MAX(candidate.id) AS threshold_id')
-                ->groupBy('candidate.instrument_id');
-
-            $stocks = DB::table('instruments as instrument')
-                ->leftJoinSub($latestThresholds, 'latest_threshold', fn ($join) => $join
-                    ->on('latest_threshold.instrument_id', '=', 'instrument.id'))
-                ->leftJoin('stock_individual_thresholds as threshold', 'threshold.id', '=', 'latest_threshold.threshold_id')
-                ->whereNull('instrument.deleted_at')
+            $stocks = DB::connection('serving')
+                ->table('serving_active_models as active_model')
+                ->join('serving_releases as release', 'release.id', '=', 'active_model.release_id')
+                ->join('serving_instruments as instrument', 'instrument.id', '=', 'active_model.instrument_id')
                 ->where('instrument.is_active', true)
-                ->whereRaw('LOWER(instrument.type) = ?', ['stock'])
                 ->get([
-                    'instrument.meta',
-                    'threshold.status',
-                    'threshold.score_result',
-                    'threshold.calculated_at',
+                    'instrument.id',
+                    'instrument.is_active',
+                    'instrument.is_tradeable',
+                    'release.quality_class',
+                    'release.created_at',
                 ]);
 
             $counts = $empty['quality_counts'];
             foreach ($stocks as $stock) {
-                $counts[$this->stockQualityClass($stock)]++;
+                $counts[$this->stockQualityClass($stock->quality_class)]++;
             }
 
             return [
                 'available' => true,
                 'total' => $stocks->count(),
                 'classified' => $stocks->count() - $counts['unclassified'],
-                'latest_calculated_at' => $stocks->pluck('calculated_at')->filter()->sortDesc()->first(),
-                'source' => 'stock_individual_thresholds',
+                'active_instruments' => $stocks->where('is_active', true)->count(),
+                'tradeable_instruments' => $stocks->where('is_tradeable', true)->count(),
+                'latest_calculated_at' => $stocks->pluck('created_at')->filter()->sortDesc()->first(),
+                'source' => 'serving_active_models',
                 'quality_counts' => $counts,
             ];
         } catch (Throwable) {
@@ -345,31 +351,36 @@ SQL);
         }
     }
 
-    private function stockQualityClass(object $stock): string
+    private function stockQualityClass(mixed $qualityClass): string
     {
-        $scoreResult = is_array($stock->score_result)
-            ? $stock->score_result
-            : (json_decode((string) $stock->score_result, true) ?: []);
-        $meta = is_array($stock->meta)
-            ? $stock->meta
-            : (json_decode((string) $stock->meta, true) ?: []);
-        $qualityClass = data_get($scoreResult, 'final_quality_class')
-            ?? data_get($scoreResult, 'post_filter_evaluation.quality_class')
-            ?? data_get($scoreResult, 'post_filter_evaluation.selected.quality_class')
-            ?? data_get($scoreResult, 'raw_pre_filter_quality_class')
-            ?? data_get($meta, 'model_quality_class');
-
-        if (! is_string($qualityClass) || trim($qualityClass) === '') {
-            $qualityClass = preg_replace('/_(active|documented)$/', '', strtolower((string) $stock->status));
-        }
-
         return match (strtolower(trim((string) $qualityClass))) {
             'quality' => 'quality',
             'solid' => 'solid',
             'basic' => 'basic',
-            'unqualified', 'observation' => 'unqualified',
+            'unqualified', 'not_qualified', 'underperform', 'observation' => 'unqualified',
             default => 'unclassified',
         };
+    }
+
+    private function oldestServingModel(): array
+    {
+        try {
+            $model = DB::connection('serving')
+                ->table('serving_active_models as active_model')
+                ->join('serving_releases as release', 'release.id', '=', 'active_model.release_id')
+                ->join('serving_instruments as instrument', 'instrument.id', '=', 'active_model.instrument_id')
+                ->where('instrument.is_active', true)
+                ->orderBy('release.created_at')
+                ->orderBy('instrument.id')
+                ->first(['instrument.symbol', 'release.created_at']);
+
+            return [
+                'symbol' => $model?->symbol,
+                'created_at' => $model?->created_at,
+            ];
+        } catch (Throwable) {
+            return ['symbol' => null, 'created_at' => null];
+        }
     }
 
     private function latestPredictionStats(): array
@@ -387,82 +398,42 @@ SQL);
             'missing' => 0,
             'coverage_percent' => null,
             'minimum_coverage_percent' => 95.0,
+            'source' => 'serving_prediction_batches',
+            'status' => null,
         ];
 
         try {
-            $horizons = [7200, 14400, 21600, 28800];
-            $latest = DB::table('predictions')
-                ->where('ai_type', 'horizon')
-                ->where('timeframe', '1d')
-                ->whereIn('prediction_horizon_minutes', $horizons)
-                ->orderByDesc('created_at')
+            $connection = DB::connection('serving');
+            $latest = $connection->table('serving_prediction_batches')
+                ->orderByDesc('started_at')
                 ->orderByDesc('id')
-                ->first(['created_at', 'prediction_time']);
+                ->first();
 
-            if (! $latest?->created_at) {
+            if (! $latest) {
                 return $empty;
             }
 
-            $latestAt = CarbonImmutable::parse((string) $latest->created_at);
-            $batch = DB::table('predictions')
-                ->where('ai_type', 'horizon')
-                ->where('timeframe', '1d')
-                ->whereIn('prediction_horizon_minutes', $horizons)
-                ->whereBetween('created_at', [$latestAt->startOfDay(), $latestAt->endOfDay()])
+            $batch = $connection->table('serving_predictions')
+                ->where('batch_id', $latest->id)
                 ->selectRaw('COUNT(*) AS rows')
                 ->selectRaw('COUNT(DISTINCT instrument_id) AS stocks')
-                ->selectRaw('COUNT(DISTINCT prediction_horizon_minutes) AS horizons')
+                ->selectRaw('COUNT(DISTINCT horizon) AS horizons')
                 ->first();
-            $coverage = DB::selectOne(<<<'SQL'
-WITH eligible AS (
-    SELECT instrument.id
-    FROM instruments instrument
-    WHERE instrument.deleted_at IS NULL
-      AND instrument.is_active = TRUE
-      AND LOWER(instrument.type) = 'stock'
-      AND (
-          SELECT COUNT(DISTINCT model.prediction_horizon_minutes)
-          FROM trained_models model
-          WHERE model.instrument_id = instrument.id
-            AND model.deleted_at IS NULL
-            AND model.status = 'active'
-            AND model.ai_type = 'horizon'
-            AND model.feature_set_version = 'triple_daily_macro_v1'
-            AND model.prediction_horizon_minutes IN (7200, 14400, 21600, 28800)
-      ) = 4
-), batch_prediction AS (
-    SELECT prediction.*
-    FROM predictions prediction
-    WHERE prediction.ai_type = 'horizon'
-      AND prediction.timeframe = '1d'
-      AND prediction.prediction_horizon_minutes IN (7200, 14400, 21600, 28800)
-      AND prediction.created_at >= ?
-      AND prediction.created_at <= ?
-), latest_batch_bar AS (
-    SELECT prediction.instrument_id, MAX(prediction.source_bar_time) AS source_bar_time
-    FROM batch_prediction prediction
-    JOIN eligible ON eligible.id = prediction.instrument_id
-    GROUP BY prediction.instrument_id
-), complete AS (
-    SELECT prediction.instrument_id
-    FROM batch_prediction prediction
-    JOIN latest_batch_bar ON latest_batch_bar.instrument_id = prediction.instrument_id
-                         AND latest_batch_bar.source_bar_time = prediction.source_bar_time
-    GROUP BY prediction.instrument_id
-    HAVING COUNT(DISTINCT prediction.prediction_horizon_minutes) = 4
-)
-SELECT (SELECT COUNT(*) FROM eligible) AS eligible,
-       (SELECT COUNT(*) FROM complete) AS complete
-SQL, [$latestAt->startOfDay(), $latestAt->endOfDay()]);
-            $eligible = (int) ($coverage->eligible ?? 0);
-            $complete = (int) ($coverage->complete ?? 0);
+
+            $eligible = (int) ($latest->expected_count ?? 0);
+            $complete = (int) ($latest->completed_count ?? 0);
+            $failed = (int) ($latest->failed_count ?? 0);
             $coveragePercent = $eligible > 0 ? round(($complete / $eligible) * 100, 1) : null;
+            $successful = (string) $latest->status === 'complete'
+                && $eligible > 0
+                && $complete >= $eligible
+                && $failed === 0;
 
             return [
                 'available' => true,
-                'successful' => $coveragePercent !== null && $coveragePercent >= 95.0,
-                'created_at' => $latest->created_at,
-                'prediction_time' => $latest->prediction_time,
+                'successful' => $successful,
+                'created_at' => $latest->finished_at ?? $latest->started_at,
+                'prediction_time' => $latest->calculation_date,
                 'rows' => (int) ($batch->rows ?? 0),
                 'stocks' => (int) ($batch->stocks ?? 0),
                 'horizons' => (int) ($batch->horizons ?? 0),
@@ -471,6 +442,9 @@ SQL, [$latestAt->startOfDay(), $latestAt->endOfDay()]);
                 'missing' => max(0, $eligible - $complete),
                 'coverage_percent' => $coveragePercent,
                 'minimum_coverage_percent' => 95.0,
+                'source' => 'serving_prediction_batches',
+                'status' => (string) $latest->status,
+                'failed' => $failed,
             ];
         } catch (Throwable) {
             return $empty;
@@ -579,13 +553,20 @@ SQL, [$latestAt->startOfDay(), $latestAt->endOfDay()]);
         return array_values(array_filter(array_map('rtrim', preg_split('/\R/', trim($content)))));
     }
 
-    private function unreachableStatus(string $error, array $database, array $databaseStats): array
+    private function unreachableStatus(
+        string $error,
+        array $applicationDatabase,
+        array $servingDatabase,
+        array $databaseStats,
+    ): array
     {
         return [
             'reachable' => false,
             'error' => $error,
             'metrics' => [],
-            'database' => $database,
+            'database' => $servingDatabase,
+            'application_database' => $applicationDatabase,
+            'serving_database' => $servingDatabase,
             'database_stats' => $databaseStats,
             'errors' => [],
             'log' => [],

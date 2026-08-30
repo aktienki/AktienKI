@@ -2,7 +2,9 @@
     @php
         $metrics = $status['metrics'] ?? [];
         $reachable = (bool) ($status['reachable'] ?? false);
-        $databaseActive = (bool) data_get($status, 'database.connected', false);
+        $servingDatabaseActive = (bool) data_get($status, 'serving_database.connected', false);
+        $applicationDatabaseActive = (bool) data_get($status, 'application_database.connected', false);
+        $databaseActive = $servingDatabaseActive;
         $controlPlaneActive = ($metrics['control_plane'] ?? '') === 'active';
         $pipelineDatabaseActive = ($metrics['pipeline_database'] ?? '') === 'active';
         $serverConnectionActive = ($metrics['server_connection'] ?? '') === 'active';
@@ -12,15 +14,17 @@
             ->sum(fn (string $state): int => (int) ($metrics['jobs_'.$state] ?? 0));
         $documentedJobs = (int) ($metrics['jobs_documented'] ?? 0);
         $failedJobs = (int) ($metrics['jobs_failed'] ?? 0);
-        $connectionHealthy = $reachable && $controlPlaneActive && $pipelineDatabaseActive && $serverConnectionActive && $databaseActive;
+        $connectionHealthy = $reachable && $controlPlaneActive && $pipelineDatabaseActive && $serverConnectionActive && $servingDatabaseActive && $applicationDatabaseActive;
         $serverHostname = 'root';
         $serverAddress = request()->getHost();
-        $databaseName = data_get($status, 'database.database')
-            ?? data_get($status, 'database.name')
-            ?? config('database.connections.'.config('database.default').'.database')
+        $databaseName = data_get($status, 'serving_database.name')
+            ?? config('database.connections.serving.database')
             ?? '—';
-        $databaseHost = data_get($status, 'database.host')
-            ?? config('database.connections.'.config('database.default').'.host')
+        $databaseHost = data_get($status, 'serving_database.host')
+            ?? config('database.connections.serving.host')
+            ?? '—';
+        $applicationDatabaseName = data_get($status, 'application_database.name')
+            ?? config('database.connections.'.config('database.default').'.database')
             ?? '—';
         $userCount = data_get($status, 'database_stats.users');
         $activeUserCount = data_get($status, 'database_stats.active_users');
@@ -30,6 +34,7 @@
         $currentStocks = data_get($status, 'database_stats.current_stocks', []);
         $currentStockCount = data_get($currentStocks, 'total');
         $classifiedStockCount = data_get($currentStocks, 'classified');
+        $activeStockCount = data_get($currentStocks, 'active_instruments');
         $stockQualityCounts = data_get($currentStocks, 'quality_counts', []);
         $stockQualityRows = [
             ['quality', 'Quality', 'border-emerald-400/25 bg-emerald-400/[.07] text-emerald-300'],
@@ -159,7 +164,7 @@
                 <article class="ak-card ak-dashboard-card infra-system-card relative flex flex-col overflow-hidden p-4">
                     <span class="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-violet-400/10 blur-3xl"></span>
                     <div class="relative flex items-start justify-between gap-3">
-                        <div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl border border-violet-400/25 bg-violet-400/10 text-violet-300"><x-heroicon-o-circle-stack class="h-5 w-5" /></span><div><p class="text-[9px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Remote-Datenbank') }}</p><h2 class="mt-1 text-lg font-black text-[var(--ak-text)]">{{ $databaseActive ? __('Verbunden') : __('Nicht verbunden') }}</h2></div></div>
+                        <div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl border border-violet-400/25 bg-violet-400/10 text-violet-300"><x-heroicon-o-circle-stack class="h-5 w-5" /></span><div><p class="text-[9px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Serving-Datenbank') }}</p><h2 class="mt-1 text-lg font-black text-[var(--ak-text)]">{{ $databaseActive ? __('Verbunden') : __('Nicht verbunden') }}</h2></div></div>
                         <i class="mt-1 h-2.5 w-2.5 rounded-full {{ $databaseActive ? 'bg-emerald-400 shadow-[0_0_9px_#34d399]' : 'bg-rose-400 shadow-[0_0_9px_#fb7185]' }}"></i>
                     </div>
                     <div class="relative mt-3 grid grid-cols-2 gap-1.5">
@@ -168,12 +173,12 @@
                     </div>
                     <div class="relative mt-3 border-t border-[var(--ak-border)] pt-3">
                         <div class="mb-3 space-y-1.5">
-                            <div class="flex items-center justify-between gap-3 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2"><span class="text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Anzahl Benutzer') }}<small class="mt-0.5 flex items-center gap-1 text-[8px] font-semibold text-emerald-300"><i class="h-1.5 w-1.5 rounded-full bg-emerald-400"></i>{{ __('Aktuell aktiv') }}</small></span><span class="text-right"><b class="block text-xs tabular-nums text-[var(--ak-text)]">{{ $userCount === null ? '—' : number_format((int) $userCount, 0, ',', '.') }}</b><small class="block text-[8px] font-black tabular-nums text-emerald-300">{{ $activeUserCount === null ? '—' : number_format((int) $activeUserCount, 0, ',', '.') }}</small></span></div>
-                            <div class="flex items-center justify-between gap-3 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2"><span class="text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Ältestes aktives Modell') }}</span><span class="text-right"><b class="block text-xs text-amber-300">{{ $oldestModelSymbol ?: '—' }}</b><small class="block text-[8px] tabular-nums text-[var(--ak-muted)]">{{ $oldestModelTimestamp ? \Illuminate\Support\Carbon::parse($oldestModelTimestamp)->format('d.m.Y H:i') : '—' }}</small></span></div>
+                            <div class="flex items-center justify-between gap-3 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2"><span class="text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Anzahl Benutzer') }}<small class="mt-0.5 flex items-center gap-1 text-[8px] font-semibold {{ $applicationDatabaseActive ? 'text-emerald-300' : 'text-rose-300' }}"><i class="h-1.5 w-1.5 rounded-full {{ $applicationDatabaseActive ? 'bg-emerald-400' : 'bg-rose-400' }}"></i>{{ $applicationDatabaseName }} · {{ __('App-DB') }}</small></span><span class="text-right"><b class="block text-xs tabular-nums text-[var(--ak-text)]">{{ $userCount === null ? '—' : number_format((int) $userCount, 0, ',', '.') }}</b><small class="block text-[8px] font-black tabular-nums text-emerald-300">{{ $activeUserCount === null ? '—' : number_format((int) $activeUserCount, 0, ',', '.') }} {{ __('aktiv') }}</small></span></div>
+                            <div class="flex items-center justify-between gap-3 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2"><span class="text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Ältestes aktives Serving-Modell') }}</span><span class="text-right"><b class="block text-xs text-amber-300">{{ $oldestModelSymbol ?: '—' }}</b><small class="block text-[8px] tabular-nums text-[var(--ak-muted)]">{{ $oldestModelTimestamp ? \Illuminate\Support\Carbon::parse($oldestModelTimestamp)->format('d.m.Y H:i') : '—' }}</small></span></div>
                         </div>
                         <div data-testid="remote-stock-quality" class="rounded-xl border border-violet-400/15 bg-violet-400/[.035] p-3">
                             <div class="flex items-start justify-between gap-3">
-                                <span><small class="block text-[8px] font-black uppercase tracking-[.14em] text-violet-300">{{ __('Aktuelle Aktien') }}</small><small class="mt-0.5 block text-[7px] font-semibold text-[var(--ak-muted)]">{{ __('Neue Remote-Datenbank') }}</small></span>
+                                <span><small class="block text-[8px] font-black uppercase tracking-[.14em] text-violet-300">{{ __('Aktuelle Aktien') }}</small><small class="mt-0.5 block text-[7px] font-semibold text-[var(--ak-muted)]">aktienki_serving_next</small></span>
                                 <b class="text-xl leading-5 tabular-nums text-[var(--ak-text)]">{{ $currentStockCount === null ? '—' : number_format((int) $currentStockCount, 0, ',', '.') }}</b>
                             </div>
                             <div class="mt-2 grid grid-cols-5 gap-1">
@@ -186,7 +191,7 @@
                             </div>
                             <div class="mt-2 flex items-center justify-between gap-2 text-[7px] font-bold text-[var(--ak-muted)]">
                                 <span>{{ $classifiedStockCount === null || $currentStockCount === null ? '—' : number_format((int) $classifiedStockCount, 0, ',', '.').'/'.number_format((int) $currentStockCount, 0, ',', '.') }} {{ __('klassifiziert') }}</span>
-                                <span class="text-violet-300">20T · REMOTE</span>
+                                <span class="text-violet-300">{{ $activeStockCount === null || $currentStockCount === null ? '—' : number_format((int) $activeStockCount, 0, ',', '.').'/'.number_format((int) $currentStockCount, 0, ',', '.') }} {{ __('aktiv') }} · 10/20/40T</span>
                             </div>
                         </div>
                         <div data-testid="latest-prediction" class="mt-2 rounded-xl border px-3 py-2.5 {{ $latestPredictionSuccessful === true ? 'border-emerald-400/25 bg-emerald-400/[.055]' : ($latestPredictionAvailable ? 'border-rose-400/25 bg-rose-400/[.055]' : 'border-white/[.08] bg-white/[.025]') }}">
@@ -203,12 +208,12 @@
                         </div>
                         <p class="mt-3 text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Datenfluss') }}</p>
                         <div class="mt-2 rounded-xl border px-3 py-3 {{ $tone($databaseActive) }}">
-                            <div class="flex items-center gap-3"><x-heroicon-o-cloud-arrow-up class="h-5 w-5" /><div class="min-w-0 flex-1"><b class="block text-[10px]">{{ __('Ergebnisse speichern') }}</b><small class="block truncate text-[8px] opacity-75">{{ __('Training · Prognosen · Walk-Forward') }}</small></div></div>
+                            <div class="flex items-center gap-3"><x-heroicon-o-cloud-arrow-up class="h-5 w-5" /><div class="min-w-0 flex-1"><b class="block text-[10px]">{{ __('Ergebnisse speichern') }}</b><small class="block truncate text-[8px] opacity-75">{{ __('Aktien · Modelle · Predictions') }}</small></div></div>
                         </div>
-                        <p class="mt-2 text-[9px] text-[var(--ak-muted)]">{{ __('Laravel-Verbindung') }}: <b class="text-[var(--ak-text)]">{{ data_get($status, 'database.server', '—') }}:{{ data_get($status, 'database.port', '—') }}</b></p>
+                        <p class="mt-2 text-[9px] text-[var(--ak-muted)]">{{ __('Laravel-Verbindungen') }}: <b class="text-[var(--ak-text)]">Serving {{ data_get($status, 'serving_database.server', '—') }}:{{ data_get($status, 'serving_database.port', '—') }}</b> · App <b class="text-[var(--ak-text)]">{{ data_get($status, 'application_database.name', '—') }}</b></p>
                     </div>
                     <div class="relative mt-auto border-t border-[var(--ak-border)] pt-3">
-                        <p class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Benutzer nach Abonnement') }}</p>
+                        <p class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Benutzer nach Abonnement') }} · {{ __('App-DB') }}</p>
                         <div class="mt-1.5 grid grid-cols-3 gap-1.5">
                             @forelse($subscriptionCounts as $plan)
                                 @php $planCode = strtolower((string) ($plan['code'] ?? '')); $planTone = $planCode === 'pro' ? 'border-amber-400/25 bg-amber-400/[.07] text-amber-300' : ($planCode === 'plus' ? 'border-cyan-400/20 bg-cyan-400/[.05] text-cyan-300' : 'border-white/[.07] bg-white/[.025] text-[var(--ak-text)]'); @endphp
