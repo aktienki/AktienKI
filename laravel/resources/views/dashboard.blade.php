@@ -473,9 +473,9 @@
                         <div class="aki-profile-universe-grid grid gap-3">
                             <div class="flex min-w-0 items-start justify-between gap-3">
                                 <div class="min-w-0">
-                                    <p id="profile-universe-title" class="text-[10px] font-black uppercase tracking-[.12em] text-cyan-400">{{ __('Aktives Portfolio') }}</p>
+                                    <p id="profile-universe-title" class="text-[10px] font-black uppercase tracking-[.12em] text-cyan-400">{{ __('Aktuelle Aktien') }}</p>
                                     <div class="mt-1 flex items-end gap-1.5"><strong class="text-2xl font-black leading-none tabular-nums text-[var(--ak-text)]">{{ number_format((int) ($profileUniverseStats['active_count'] ?? 0), 0, ',', '.') }}</strong><span class="pb-0.5 text-[10px] font-bold text-[var(--ak-muted)]">{{ __('Aktien') }}</span></div>
-                                    <p class="mt-1 text-[8px] font-black uppercase tracking-wide text-cyan-400">{{ $profileUniverseLabel }} · Ø {{ is_numeric($profileUniverseStats['average_score'] ?? null) ? number_format($profileUniverseStats['average_score'], 1, ',', '.') : '—' }}</p>
+                                    <p class="mt-1 text-[8px] font-black uppercase tracking-wide text-cyan-400">{{ __('Neue Remote-Datenbank') }}@if(!empty($profileUniverseStats['model_horizons'])) · {{ collect($profileUniverseStats['model_horizons'])->map(fn ($horizon) => $horizon.'T')->implode(' / ') }}@endif</p>
                                 </div>
                                 <div class="flex shrink-0 items-center gap-2">
                                     <span class="inline-flex h-10 min-w-[86px] items-center justify-between gap-2 rounded-lg border bg-transparent px-3 {{ $trendBadge[2] }}" title="{{ __('Trendwert') }}: {{ $trendBadge[1] }}"><small class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Trend') }}</small><b class="text-base leading-none">{{ $trendBadge[0] }}</b></span>
@@ -483,7 +483,7 @@
                                 </div>
                             </div>
                             <div class="aki-profile-universe-score min-w-0">
-                                <div class="flex items-center justify-between text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ __('KI-Rating') }}</span><span>5− bis 1+</span></div>
+                                <div class="flex items-center justify-between text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ __('Modellqualität') }}</span><span>{{ __('Nicht qualifiziert bis Quality') }}</span></div>
                                 <div class="relative mx-1" style="height:64px">
                                     <div class="absolute inset-x-0 h-2 rounded-full border border-white/10 bg-gradient-to-r from-rose-400 via-amber-300 to-emerald-400 shadow-inner" style="top:42px"></div>
                                     @foreach(($profileUniverseStats['bins'] ?? []) as $index => $bin)
@@ -491,8 +491,9 @@
                                         <span class="absolute top-0 -translate-x-1/2" style="left:{{ $position }}%" title="{{ $bin['range'] ?? $bin['label'] }}: {{ $bin['count'] }} {{ __('Aktien') }}"><span class="grid h-8 w-12 place-items-center rounded-md border px-1 text-[10px] font-black leading-none tabular-nums shadow-md {{ $markerTone }}">{{ $bin['count'] }}</span><span class="mx-auto block h-2.5 w-px bg-current opacity-60"></span></span>
                                     @endforeach
                                     <div class="absolute inset-x-0 bottom-0 grid grid-cols-5 text-center text-[7px] font-black uppercase tracking-wide">
-                                        @foreach ([[__('SELL'),'5−/5+','text-rose-500'],[__('WAIT'),'4−/4+','text-orange-500'],[__('HOLD'),'3−/3+','text-amber-500'],[__('WATCH'),'2−/2+','text-lime-600'],[__('BUY'),'1−/1+','text-emerald-500']] as [$signalLabel,$signalRange,$signalTone])
-                                            <span class="truncate {{ $signalTone }}">{{ $signalLabel }} <small class="font-bold text-[var(--ak-muted)]">{{ $signalRange }}</small></span>
+                                        @foreach (($profileUniverseStats['bins'] ?? []) as $index => $bin)
+                                            @php $qualityTone = ['text-rose-500','text-slate-400','text-amber-500','text-cyan-500','text-emerald-500'][$index] ?? 'text-cyan-500'; @endphp
+                                            <span class="truncate {{ $qualityTone }}" title="{{ $bin['range'] ?? $bin['label'] }}">{{ $bin['label'] }}</span>
                                         @endforeach
                                     </div>
                                 </div>
@@ -516,8 +517,9 @@
                                 @php
                                     $snapshot = $opportunity->snapshot ?: [];
                                     $opportunityReturns = data_get($snapshot, 'returns', []);
-                                    $opportunityReturn5 = $opportunityReturns[5] ?? $opportunityReturns['5'] ?? null;
+                                    $opportunityReturn10 = $opportunityReturns[10] ?? $opportunityReturns['10'] ?? null;
                                     $opportunityReturn20 = $opportunityReturns[20] ?? $opportunityReturns['20'] ?? null;
+                                    $opportunityReturn40 = $opportunityReturns[40] ?? $opportunityReturns['40'] ?? null;
                                     $opportunityScore = data_get($snapshot, 'score');
                                     $opportunityConfidence = data_get($snapshot, 'confidence');
                                     $opportunityRisk = data_get($snapshot, 'risk');
@@ -531,7 +533,7 @@
                                     <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-amber-400/35 bg-amber-400/10 text-amber-500">
                                         <x-heroicon-o-arrow-trending-up class="h-5 w-5" />
                                     </span>
-                                    <span class="min-w-0 flex-1"><span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $opportunity->instrument->name ?: $opportunity->instrument->symbol }}</b><em class="shrink-0 rounded-md border border-amber-400/30 px-1.5 py-0.5 text-[8px] font-black not-italic text-amber-500">{{ __($opportunity->status) }}</em></span><small class="mt-0.5 block truncate text-[9px] font-black text-amber-500">{{ __('Rücksetzer beobachten · Einstieg vorbereiten') }}</small><small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $opportunityFlag }} {{ $opportunity->instrument->symbol }}</span>@if($opportunityScoreGrade !== null)<span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ number_format(($opportunityScorePercent ?? 0) / 10, 1, ',', '.') }}/10">KI {{ $opportunityScoreGrade }}</span>@endif @if(is_numeric($opportunityConfidence))<span>{{ __('Konf.') }} {{ number_format((float)$opportunityConfidence, 0, ',', '.') }}%</span>@endif @if($opportunityRiskLevel !== null)<span class="text-amber-500" title="{{ __('Rohwert') }}: {{ number_format($opportunityRiskPercent ?? 0, 0, ',', '.') }} %">{{ __('Risiko') }} {{ $opportunityRiskLevel }}</span>@endif @if(is_numeric($opportunityReturn5))<span class="text-rose-400">5T {{ sprintf('%+.1f', $opportunityReturn5) }}%</span>@endif @if(is_numeric($opportunityReturn20))<span class="text-emerald-500">20T {{ sprintf('%+.1f', $opportunityReturn20) }}%</span>@endif</small></span>
+                                    <span class="min-w-0 flex-1"><span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $opportunity->instrument->name ?: $opportunity->instrument->symbol }}</b><em class="shrink-0 rounded-md border border-amber-400/30 px-1.5 py-0.5 text-[8px] font-black not-italic text-amber-500">{{ __($opportunity->status) }}</em></span><small class="mt-0.5 block truncate text-[9px] font-black text-amber-500">{{ __('Rücksetzer beobachten · Einstieg vorbereiten') }}</small><small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $opportunityFlag }} {{ $opportunity->instrument->symbol }}</span>@if($opportunityScoreGrade !== null)<span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ number_format(($opportunityScorePercent ?? 0) / 10, 1, ',', '.') }}/10">KI {{ $opportunityScoreGrade }}</span>@endif @if(is_numeric($opportunityConfidence))<span>{{ __('Konf.') }} {{ number_format((float)$opportunityConfidence, 0, ',', '.') }}%</span>@endif @if($opportunityRiskLevel !== null)<span class="text-amber-500" title="{{ __('Rohwert') }}: {{ number_format($opportunityRiskPercent ?? 0, 0, ',', '.') }} %">{{ __('Risiko') }} {{ $opportunityRiskLevel }}</span>@endif @if(is_numeric($opportunityReturn10))<span class="text-cyan-400">10T {{ sprintf('%+.1f', $opportunityReturn10) }}%</span>@endif @if(is_numeric($opportunityReturn20))<span class="text-emerald-500">20T {{ sprintf('%+.1f', $opportunityReturn20) }}%</span>@endif @if(is_numeric($opportunityReturn40))<span class="text-lime-500">40T {{ sprintf('%+.1f', $opportunityReturn40) }}%</span>@endif</small></span>
                                 </a>
                             @empty
                                 <div class="col-span-2 rounded-xl border border-amber-400/15 p-3 text-center text-[10px] font-bold text-[var(--ak-muted)]">{{ $canUsePro ? __('Aktuell liegen keine persönlichen Handelschancen vor.') : __('Meine Handelschancen sind im Pro-Tarif verfügbar.') }}</div>
@@ -741,7 +743,7 @@
                                             <span class="flex min-w-0 items-center justify-between gap-2"><b class="truncate text-sm font-black text-[var(--ak-text)]">{{ $change['name'] ?: $change['symbol'] }}</b><time class="shrink-0 rounded-md border border-cyan-400/20 px-1.5 py-0.5 text-[8px] font-black tabular-nums text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($change['at'])->format(app()->getLocale() === 'en' ? 'm/d' : 'd.m.') }}</time></span>
                                             <small class="mt-0.5 block truncate text-[9px] font-black {{ $isSellCard ? 'text-rose-400' : 'text-amber-500' }}">{{ $change['from'] }} → {{ $change['to'] }}</small>
                                             <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $changeFlag }} {{ $change['symbol'] }}</span><span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ $changeScore !== null ? number_format($changeScore, 1, ',', '.').'/10' : '—' }}">KI {{ $changeScoreGrade }}</span><span class="text-amber-500" title="{{ __('Rohwert') }}: {{ $changeRisk !== null ? number_format($changeRisk, 0, ',', '.').' %' : '—' }}">{{ __('Risiko') }} {{ $changeRiskLevel }}</span>
-                                        @foreach([5, 10, 15, 20] as $days)
+                                        @foreach([10, 20, 40] as $days)
                                             @php
                                                 $forecast = $change['horizons'][$days] ?? null;
                                                 $forecastDirection = $forecast === null ? 'empty' : (abs((float) $forecast) < .5 ? 'neutral' : ($forecast > 0 ? 'positive' : 'negative'));

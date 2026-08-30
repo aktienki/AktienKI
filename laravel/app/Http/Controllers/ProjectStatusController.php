@@ -25,27 +25,43 @@ final class ProjectStatusController extends Controller
 
         try {
             DB::select('SELECT 1');
+            DB::connection('serving')->select('SELECT 1');
             $databaseAvailable = true;
+            $serving = DB::connection('serving');
 
             $stats = [
+                // Accounts remain intentionally in the primary application DB.
                 'testers' => min($betaLimit, DB::table('users')->where('account_status', 'tester')->count()),
-                'stocks' => DB::table('instruments')->where('type', 'stock')->whereNull('deleted_at')->count(),
-                'indices' => DB::table('market_indices')->where('is_active', true)->count(),
-                'predictions' => DB::table('predictions')->count(),
-                'validated' => DB::table('predictions')->whereNotNull('validated_at')->count(),
-                'models' => DB::table('model_definitions')->where('is_active', true)->where('is_public', true)->count(),
-                'last_prediction_at' => DB::table('predictions')->max('prediction_time'),
+                'stocks' => $serving->table('serving_active_models as active_model')
+                    ->join('serving_instruments as instrument', 'instrument.id', '=', 'active_model.instrument_id')
+                    ->where('instrument.is_active', true)
+                    ->count(),
+                'indices' => $serving->table('serving_instruments')
+                    ->where('instrument_type', 'index')->where('is_active', true)->count(),
+                'predictions' => $serving->table('serving_predictions')->count(),
+                'validated' => $serving->table('serving_predictions as prediction')
+                    ->join('serving_prediction_scopes as scope', function ($join): void {
+                        $join->on('scope.instrument_id', '=', 'prediction.instrument_id')
+                            ->on('scope.release_id', '=', 'prediction.release_id')
+                            ->on('scope.horizon', '=', 'prediction.horizon');
+                    })->count(),
+                'models' => $serving->table('serving_active_models')->count(),
+                'last_prediction_at' => $serving->table('serving_predictions')->max('as_of'),
             ];
 
-            $modelAliases = DB::table('model_definitions')
-                ->where('is_active', true)
-                ->where('is_public', true)
-                ->whereNotNull('public_alias')
-                ->orderBy('ai_type')
-                ->orderBy('public_alias')
-                ->get(['public_alias', 'ai_type']);
-        } catch (Throwable) {
-            // The public status page remains available during temporary database outages.
+            $modelAliases = $serving->table('serving_model_horizon_status')
+                ->where('selected_for_prediction', true)
+                ->distinct()
+                ->orderBy('horizon')
+                ->orderBy('variant')
+                ->get(['variant', 'horizon'])
+                ->map(fn (object $model): object => (object) [
+                    'public_alias' => $model->variant === 'pure_tcn' ? 'TCN' : 'Standard',
+                    'ai_type' => ((int) $model->horizon).'T',
+                ]);
+        } catch (Throwable $error) {
+            report($error);
+            // The public status page remains available during temporary outages.
         }
 
         $betaProgress = $betaLimit > 0
