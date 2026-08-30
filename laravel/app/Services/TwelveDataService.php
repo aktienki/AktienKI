@@ -332,7 +332,9 @@ class TwelveDataService
         $symbol = strtoupper(trim($symbol));
 
         $aliases = [
-            '^GDAXI' => 'DAX',
+            // Twelve Data lists the German performance index as GDAXI on XETR.
+            // "DAX" is ambiguous there and can resolve to an unrelated ETF.
+            '^GDAXI' => 'GDAXI',
             '^IXIC' => 'IXIC',
             '^GSPC' => 'SPX',
             '^DJI' => 'DJI',

@@ -19,6 +19,10 @@ class Instrument extends Model
         'is_german_tradeable' => 'boolean',
         'german_listing_verified_at' => 'datetime',
         'german_listing_checked_at' => 'datetime',
+        'risk_profit_factor' => 'float',
+        'risk_confidence' => 'float',
+        'risk_max_drawdown' => 'float',
+        'risk_status_updated_at' => 'datetime',
         'meta' => 'array',
     ];
 
@@ -50,6 +54,11 @@ class Instrument extends Model
     public function corporateEvents(): HasMany
     {
         return $this->hasMany(CorporateEvent::class);
+    }
+
+    public function news(): HasMany
+    {
+        return $this->hasMany(News::class);
     }
 
     public function exitProfiles(): HasMany

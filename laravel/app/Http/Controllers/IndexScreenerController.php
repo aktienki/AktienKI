@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PlanLevel;
+use App\Livewire\Dashboard\MarketData;
 use App\Services\FreeRegionalStockUniverseService;
 use App\Services\PersonalizedSignalService;
 use App\Services\PlanAccessService;
@@ -17,6 +18,11 @@ class IndexScreenerController extends Controller
 {
     public function __invoke(Request $request, PersonalizedSignalService $personalizedSignals, PlanAccessService $planAccess): View
     {
+        $mainIndexSymbols = [
+            '^GSPC', '^IXIC', '^DJI', '^RUT', '^GSPTSE', '^BVSP',
+            '^FTSE', '^GDAXI', '^FCHI', '^STOXX50E', '^STOXX',
+            '^N225', '^HSI', '000001.SS', '^KS11', '^NSEI', '^AXJO',
+        ];
         $isFreeRegional = $planAccess->level($request->user()) === PlanLevel::Free;
         $regionalUniverse = app(FreeRegionalStockUniverseService::class);
         $allowedInstrumentIds = $isFreeRegional ? $regionalUniverse->instrumentIds($request->user())->all() : [];
@@ -48,13 +54,15 @@ class IndexScreenerController extends Controller
             ->groupBy('instrument_id');
 
         $query = DB::table('market_indices as market_index')
-            ->leftJoin('index_memberships as membership', function ($join) {
+            ->join('index_memberships as membership', function ($join) {
                 $join->on('membership.market_index_id', '=', 'market_index.id')->whereNull('membership.removed_at');
             })
-            ->leftJoinSub($latestPredictions, 'latest', fn ($join) => $join->on('latest.instrument_id', '=', 'membership.instrument_id'))
-            ->leftJoin('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
+            ->joinSub($latestPredictions, 'latest', fn ($join) => $join->on('latest.instrument_id', '=', 'membership.instrument_id'))
+            ->join('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
             ->leftJoinSub($walkForwardStats, 'walk_forward', fn ($join) => $join->on('walk_forward.instrument_id', '=', 'membership.instrument_id'))
             ->where('market_index.is_active', true)
+            ->whereIn('market_index.symbol', $mainIndexSymbols)
+            ->whereNotNull('prediction.prediction_score')
             ->when($isFreeRegional, fn ($query) => $query->whereIn('membership.instrument_id', $allowedInstrumentIds))
             ->when($request->filled('q'), function ($query) use ($request) {
                 $term = '%'.mb_strtolower(trim((string) $request->query('q'))).'%';
@@ -72,10 +80,12 @@ class IndexScreenerController extends Controller
             ->selectRaw('AVG(prediction.horizon_fusion_stability_score) AS average_stability')
             ->selectRaw('AVG(prediction.risk_score) AS average_risk')
             ->selectRaw('SUM(COALESCE(walk_forward.historical_trades, 0)) AS historical_trades')
-            ->selectRaw('AVG(((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return')
-            ->havingRaw('COUNT(DISTINCT membership.instrument_id) > 0');
+            ->selectRaw('AVG(((prediction.predicted_price_5d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return_5d')
+            ->selectRaw('AVG(((prediction.predicted_price_10d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return_10d')
+            ->selectRaw('AVG(((prediction.predicted_price_15d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return_15d')
+            ->selectRaw('AVG(((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return');
 
-        $aggregateCacheKey = 'index_screener_aggregate_v2_'.sha1(json_encode([
+        $aggregateCacheKey = 'index_screener_aggregate_v6_'.sha1(json_encode([
             'q' => trim((string) $request->query('q')),
             'region' => trim((string) $request->query('region')),
             'universe' => $isFreeRegional ? $allowedInstrumentIds : 'all',
@@ -86,6 +96,32 @@ class IndexScreenerController extends Controller
                     ? AiScore::toTen($index->calculated_rating)
                     : (is_numeric($index->rating) ? (float) $index->rating : null);
             }));
+        $index60Date = Schema::hasTable('market_context_predictions')
+            ? DB::table('market_context_predictions')->where('scope_type', 'index60')->max('prediction_date')
+            : null;
+        $index60Contexts = $index60Date
+            ? DB::table('market_context_predictions')->where('scope_type', 'index60')
+                ->where('prediction_date', $index60Date)->get()->keyBy('scope_key')
+            : collect();
+        $indices->each(function ($index) use ($index60Contexts): void {
+            $context = $index60Contexts->get((string) $index->id);
+            $index->pytorch_60t_probability = $context ? max(0.0, min(1.0, ((float) $context->score) / 10.0)) : null;
+            $index->pytorch_60t_signal = $context?->signal;
+            $index->pytorch_60t_confidence = $context ? (float) $context->confidence : null;
+            $index->pytorch_60t_member_count = $context ? (int) $context->member_count : 0;
+            $index->pytorch_60t_alignment = null;
+            $index->pytorch_60t_stability_adjustment = 0.0;
+            if ($index->pytorch_60t_probability !== null && is_numeric($index->expected_return)) {
+                $decisive = abs($index->pytorch_60t_probability - 0.5) >= 0.05;
+                $aligned = ($index->pytorch_60t_probability >= 0.5) === ((float) $index->expected_return >= 0.0);
+                $index->pytorch_60t_alignment = $decisive ? $aligned : null;
+                $index->pytorch_60t_stability_adjustment = ! $decisive ? 0.0 : ($aligned ? 0.05 : -0.10);
+            }
+            $baseStability = is_numeric($index->average_stability) ? (float) $index->average_stability : null;
+            $index->context_adjusted_stability = $baseStability === null
+                ? null
+                : max(0.0, min(1.0, $baseStability + $index->pytorch_60t_stability_adjustment));
+        });
 
         $latestQuotes = DB::table('current_stock_quotes')
             ->where('status', 'current')
@@ -120,6 +156,7 @@ class IndexScreenerController extends Controller
             ->whereNull('membership.removed_at')
             ->where('market_index.is_active', true)
             ->where('instrument.type', 'stock')
+            ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
             ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
             ->whereNotNull('prediction.prediction_score')
@@ -149,9 +186,33 @@ class IndexScreenerController extends Controller
             ->get(['market_index.id as market_index_id', 'bar.bar_time', 'bar.close'])
             ->groupBy('market_index_id')
             ->map(fn ($bars) => $this->chartPointsWithoutIsolatedOutliers($bars)));
-        $indices->each(function ($index) use ($topIndexStocks, $indexCharts): void {
+        $dailyMemberScores = DB::table('index_memberships as score_membership')
+            ->join('predictions as score_prediction', 'score_prediction.instrument_id', '=', 'score_membership.instrument_id')
+            ->whereNull('score_membership.removed_at')
+            ->where('score_prediction.prediction_time', '>=', now()->subDays(60))
+            ->whereNotNull('score_prediction.prediction_score')
+            ->when($isFreeRegional, fn ($query) => $query->whereIn('score_membership.instrument_id', $allowedInstrumentIds))
+            ->selectRaw('DISTINCT ON (score_membership.market_index_id, score_membership.instrument_id, DATE(score_prediction.prediction_time)) score_membership.market_index_id, score_membership.instrument_id, DATE(score_prediction.prediction_time) AS score_date')
+            ->selectRaw('CASE WHEN score_prediction.prediction_score <= 1 THEN score_prediction.prediction_score * 100 WHEN score_prediction.prediction_score <= 10 THEN score_prediction.prediction_score * 10 ELSE score_prediction.prediction_score END AS normalized_score')
+            ->orderBy('score_membership.market_index_id')
+            ->orderBy('score_membership.instrument_id')
+            ->orderByRaw('DATE(score_prediction.prediction_time)')
+            ->orderByDesc('score_prediction.prediction_time')
+            ->orderByDesc('score_prediction.id');
+        $indexScoreTrends = Cache::remember(
+            'index_screener_score_trends_v1_'.($isFreeRegional ? sha1(implode(',', $allowedInstrumentIds)) : 'all'),
+            now()->addMinutes(10),
+            fn () => DB::query()->fromSub($dailyMemberScores, 'daily_member_score')
+                ->groupBy('market_index_id', 'score_date')
+                ->orderBy('market_index_id')->orderBy('score_date')
+                ->get(['market_index_id', 'score_date', DB::raw('AVG(normalized_score) AS average_score')])
+                ->groupBy('market_index_id')
+                ->map(fn ($points) => $points->take(-30)->values())
+        );
+        $indices->each(function ($index) use ($topIndexStocks, $indexCharts, $indexScoreTrends): void {
             $index->top_stocks = $topIndexStocks->get($index->id, collect());
             $index->chart_points = $indexCharts->get($index->id, collect());
+            $index->score_trend = $indexScoreTrends->get($index->id, collect());
         });
 
         $dailyMarketInfos = ! $isFreeRegional && Schema::hasTable('daily_index_market_infos')
@@ -161,18 +222,24 @@ class IndexScreenerController extends Controller
                 ->get()->keyBy('market_index_id')
             : collect();
         $indices->each(fn ($index) => $index->daily_market_info = $dailyMarketInfos->get($index->id));
-        $regionsCacheKey = 'index_screener_regions_v2_'.($isFreeRegional ? sha1(implode(',', $allowedInstrumentIds)) : 'all');
+        $visibleIndexIds = $indices->pluck('id')->all();
+        $marketData = app(MarketData::class);
+        $indexAnalysisCards = method_exists($marketData, 'loadVisibleIndexComparisonCards')
+            ? $marketData->loadVisibleIndexComparisonCards($indices, $isFreeRegional ? $allowedInstrumentIds : [])
+            : [];
+        $indices->each(fn ($index) => $index->analysis_card = $indexAnalysisCards[(int) $index->id] ?? null);
+        $regionsCacheKey = 'index_screener_regions_v4_'.sha1(implode(',', $visibleIndexIds));
         $regions = Cache::remember($regionsCacheKey, now()->addHour(), fn () => DB::table('market_indices as market_index')
             ->where('market_index.is_active', true)
             ->whereNotNull('market_index.region')
-            ->when($isFreeRegional, fn ($query) => $query->whereExists(fn ($membership) => $membership
-                ->selectRaw('1')->from('index_memberships as membership')
-                ->whereColumn('membership.market_index_id', 'market_index.id')
-                ->whereNull('membership.removed_at')
-                ->whereIn('membership.instrument_id', $allowedInstrumentIds)))
+            ->whereIn('market_index.id', $visibleIndexIds)
             ->distinct()->orderBy('market_index.region')->pluck('market_index.region'));
+        $macroCards = method_exists($marketData, 'loadIndexComparisonCards')
+            ? $marketData->loadIndexComparisonCards()
+            : [];
+        $view = $request->routeIs('indices.redesign') ? 'indices.redesign' : 'indices.index';
 
-        return view('indices.index', compact('indices', 'regions', 'realtimeQuotes', 'isFreeRegional', 'regionalCountry'));
+        return view($view, compact('indices', 'regions', 'realtimeQuotes', 'isFreeRegional', 'regionalCountry', 'macroCards'));
     }
 
     private function chartPointsWithoutIsolatedOutliers($bars)

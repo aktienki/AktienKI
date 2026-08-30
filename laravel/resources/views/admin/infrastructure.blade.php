@@ -2,13 +2,17 @@
     @php
         $metrics = $status['metrics'] ?? [];
         $reachable = (bool) ($status['reachable'] ?? false);
-        $tunnelActive = ($metrics['database_tunnel'] ?? '') === 'active' && (int) ($metrics['database_port'] ?? 0) > 0;
         $databaseActive = (bool) data_get($status, 'database.connected', false);
-        $workerCount = (int) ($metrics['engine_worker'] ?? 0);
-        $trainingCount = (int) ($metrics['training'] ?? 0);
-        $walkForwardCount = (int) ($metrics['walk_forward'] ?? 0);
-        $queueActive = ($metrics['german_queue'] ?? '') === 'active';
-        $connectionHealthy = $reachable && $tunnelActive && $databaseActive;
+        $controlPlaneActive = ($metrics['control_plane'] ?? '') === 'active';
+        $pipelineDatabaseActive = ($metrics['pipeline_database'] ?? '') === 'active';
+        $serverConnectionActive = ($metrics['server_connection'] ?? '') === 'active';
+        $workerActive = ($metrics['worker_status'] ?? '') === 'active';
+        $queuedJobs = (int) ($metrics['jobs_queued'] ?? 0);
+        $runningJobs = collect(['claimed', 'data_ready', 'trained', 'walk_forward_done', 'calibrated', 'filters_evaluated', 'artifact_staged', 'verified', 'released'])
+            ->sum(fn (string $state): int => (int) ($metrics['jobs_'.$state] ?? 0));
+        $documentedJobs = (int) ($metrics['jobs_documented'] ?? 0);
+        $failedJobs = (int) ($metrics['jobs_failed'] ?? 0);
+        $connectionHealthy = $reachable && $controlPlaneActive && $pipelineDatabaseActive && $serverConnectionActive && $databaseActive;
         $serverHostname = 'root';
         $serverAddress = request()->getHost();
         $databaseName = data_get($status, 'database.database')
@@ -20,20 +24,25 @@
             ?? '—';
         $userCount = data_get($status, 'database_stats.users');
         $activeUserCount = data_get($status, 'database_stats.active_users');
-        $walkForwardStockCount = data_get($status, 'database_stats.walk_forward_stocks');
         $oldestModelSymbol = data_get($status, 'database_stats.oldest_model_symbol');
         $oldestModelTimestamp = data_get($status, 'database_stats.oldest_model_trained_at');
         $subscriptionCounts = data_get($status, 'database_stats.subscription_counts', []);
-        $modelServerConnected = ($metrics['model_server_connection'] ?? '') === 'active';
-        $modelSyncActive = in_array(($metrics['model_sync_service'] ?? ''), ['active', 'activating'], true);
-        $modelSyncScheduled = ($metrics['model_sync_timer'] ?? '') === 'active';
-        $modelSyncParts = explode('|', (string) ($metrics['model_sync_status'] ?? 'unknown|||Noch keine Synchronisation'), 3);
-        $modelSyncState = $modelSyncParts[0] ?? 'unknown';
-        $modelSyncTime = !empty($modelSyncParts[1]) ? \Illuminate\Support\Carbon::parse($modelSyncParts[1])->format('d.m. H:i') : '—';
-        $modelSyncMessage = $modelSyncParts[2] ?? __('Noch keine Synchronisation');
-        $cpuTotal = (int) ($metrics['cpu_total'] ?? 12);
-        $cpuReserved = (int) ($metrics['cpu_reserved'] ?? 4);
-        $trainingCpuCount = max(1, $cpuTotal - $cpuReserved);
+        $currentStocks = data_get($status, 'database_stats.current_stocks', []);
+        $currentStockCount = data_get($currentStocks, 'total');
+        $classifiedStockCount = data_get($currentStocks, 'classified');
+        $stockQualityCounts = data_get($currentStocks, 'quality_counts', []);
+        $stockQualityRows = [
+            ['quality', 'Quality', 'border-emerald-400/25 bg-emerald-400/[.07] text-emerald-300'],
+            ['solid', 'Solid', 'border-cyan-400/25 bg-cyan-400/[.07] text-cyan-300'],
+            ['basic', 'Basic', 'border-amber-400/25 bg-amber-400/[.07] text-amber-300'],
+            ['unqualified', __('Nicht qual.'), 'border-rose-400/25 bg-rose-400/[.07] text-rose-300'],
+            ['unclassified', __('Offen'), 'border-white/[.08] bg-white/[.025] text-[var(--ak-muted)]'],
+        ];
+        $latestPrediction = data_get($status, 'database_stats.latest_prediction', []);
+        $latestPredictionAvailable = (bool) data_get($latestPrediction, 'available', false);
+        $latestPredictionSuccessful = data_get($latestPrediction, 'successful');
+        $latestPredictionCoverage = data_get($latestPrediction, 'coverage_percent');
+        $latestPredictionCreatedAt = data_get($latestPrediction, 'created_at');
         $tone = fn (bool $active): string => $active
             ? 'border-emerald-400/30 bg-emerald-400/[.07] text-emerald-300'
             : 'border-rose-400/30 bg-rose-400/[.07] text-rose-300';
@@ -67,55 +76,34 @@
             @endif
 
             <section class="infra-overview-grid mt-4 gap-3">
-                {{-- Workstation --}}
+                {{-- Mac mini workstation --}}
                 <article class="ak-card ak-dashboard-card infra-system-card relative flex flex-col overflow-hidden p-4">
                     <span class="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-orange-400/10 blur-3xl"></span>
                     <div class="relative flex items-start justify-between gap-3">
-                        <div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl border border-orange-400/25 bg-orange-400/10 text-orange-300"><x-heroicon-o-computer-desktop class="h-5 w-5" /></span><div><p class="text-[9px] font-black uppercase tracking-[.16em] text-orange-400">{{ __('Workstation') }}</p><h2 class="mt-1 text-lg font-black text-[var(--ak-text)]">{{ $metrics['hostname'] ?? __('Nicht erreichbar') }}</h2></div></div>
+                        <div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl border border-orange-400/25 bg-orange-400/10 text-orange-300"><x-heroicon-o-computer-desktop class="h-5 w-5" /></span><div><p class="text-[9px] font-black uppercase tracking-[.16em] text-orange-400">Mac mini · AktienKI Workstation</p><h2 class="mt-1 text-lg font-black text-[var(--ak-text)]">{{ $metrics['hostname'] ?? config('operations.mac_mini.name') }}</h2></div></div>
                         <i class="mt-1 h-2.5 w-2.5 rounded-full {{ $reachable ? 'bg-emerald-400 shadow-[0_0_9px_#34d399]' : 'bg-rose-400 shadow-[0_0_9px_#fb7185]' }}"></i>
                     </div>
                     <div class="relative mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                        @foreach ([[__('Uptime'), $metrics['uptime'] ?? '—'], [__('Systemlast'), $metrics['load'] ?? '—'], [__('CPU'), ($metrics['cpu'] ?? '—').' · '.$trainingCpuCount.'/'.$cpuTotal.' '.__('Kerne fürs Training')], [__('RAM'), $metrics['ram'] ?? '—'], [__('Datenträger'), $metrics['disk'] ?? '—']] as [$label,$value])
+                        @foreach ([[__('Modell'), trim(($metrics['model'] ?? 'Mac mini').' '.($metrics['model_identifier'] ?? ''))], ['Chip', $metrics['chip'] ?? '—'], ['macOS', $metrics['os_version'] ?? '—'], [__('Uptime'), $metrics['uptime'] ?? '—'], [__('CPU'), ($metrics['cpu'] ?? '—').' · '.($metrics['cpu_total'] ?? '—').' Kerne'], [__('RAM'), $metrics['ram'] ?? '—'], [__('Datenträger'), $metrics['disk'] ?? '—']] as [$label,$value])
                             <div class="rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] px-2 py-1.5"><small class="block text-[7px] font-black uppercase text-[var(--ak-muted)]">{{ $label }}</small><b class="mt-0.5 block truncate text-[9px] text-[var(--ak-text)]">{{ $value }}</b></div>
                         @endforeach
                     </div>
-                    <div class="relative mt-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] px-2.5 py-2">
-                        <div class="whitespace-nowrap text-[8px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('CPU-Kerne reservieren') }}</div>
-                        <div class="mt-1.5 grid grid-cols-4 gap-1">
-                            @foreach ([0,1,2,4] as $reserve)
-                                <form method="POST" action="{{ route('admin.infrastructure.action') }}">@csrf<input type="hidden" name="action" value="set_cpu_reserve"><input type="hidden" name="reserve_cpus" value="{{ $reserve }}"><button type="submit" aria-pressed="{{ $cpuReserved === $reserve ? 'true' : 'false' }}" class="w-full rounded-md border px-1 py-1.5 text-[8px] font-black transition {{ $cpuReserved === $reserve ? 'border-cyan-200/70 bg-cyan-300/[.18] text-cyan-100 ring-1 ring-cyan-300/35 shadow-[0_0_12px_rgba(34,211,238,.18)]' : 'border-white/[.07] bg-white/[.025] text-[var(--ak-muted)] hover:border-cyan-300/25 hover:text-cyan-300' }}">{{ $cpuReserved === $reserve ? '✓ ' : '' }}{{ $reserve }} {{ __('Kerne frei') }}</button></form>
-                            @endforeach
-                        </div>
-                    </div>
                     <div class="relative mt-2 border-t border-[var(--ak-border)] pt-2">
-                        <p class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Aktuelle Jobs') }}</p>
+                        <div class="flex items-center justify-between gap-2"><p class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">Pipeline Next</p><span class="text-[7px] font-black text-cyan-300">{{ strtoupper($metrics['pipeline_version'] ?? '—') }} · {{ $metrics['git_revision'] ?? '—' }}</span></div>
                         <div class="mt-1.5 grid grid-cols-3 gap-1.5">
-                            @foreach ([[__('Training'),$trainingCount],[__('Walk-Forward'),$walkForwardCount],[__('Worker'),$workerCount]] as [$label,$count])
+                            @foreach ([[__('Wartend'),$queuedJobs],[__('Laufend'),$runningJobs],[__('Dokumentiert'),$documentedJobs]] as [$label,$count])
                                 <div class="rounded-lg border px-2 py-1.5 text-center {{ $count > 0 ? 'border-emerald-400/25 bg-emerald-400/[.06]' : 'border-white/[.07] bg-white/[.025]' }}"><b class="block text-sm leading-4 tabular-nums {{ $count > 0 ? 'text-emerald-300' : 'text-[var(--ak-muted)]' }}">{{ $count }}</b><small class="block truncate text-[7px] font-black uppercase leading-3 text-[var(--ak-muted)]">{{ $label }}</small></div>
                             @endforeach
                         </div>
-                        <p class="mt-1.5 flex items-center gap-2 text-[8px] font-bold leading-3 {{ $queueActive ? 'text-emerald-300' : 'text-[var(--ak-muted)]' }}"><i class="h-1.5 w-1.5 rounded-full {{ $queueActive ? 'bg-emerald-400' : 'bg-slate-500' }}"></i>{{ $queueActive ? __('Trainingswarteschlange aktiv') : __('Keine Trainingswarteschlange aktiv') }}</p>
+                        <div class="mt-1.5 flex items-center justify-between gap-2 text-[8px] font-bold leading-3"><span class="flex min-w-0 items-center gap-2 {{ $workerActive ? 'text-emerald-300' : 'text-amber-300' }}"><i class="h-1.5 w-1.5 shrink-0 rounded-full {{ $workerActive ? 'bg-emerald-400' : 'bg-amber-400' }}"></i><span class="truncate">{{ $metrics['worker_name'] ?? 'macmini-canary-01' }} · {{ strtoupper($metrics['worker_status'] ?? 'UNKNOWN') }}</span></span><span class="shrink-0 {{ $failedJobs > 0 ? 'text-rose-300' : 'text-[var(--ak-muted)]' }}">{{ $failedJobs }} Fehler</span></div>
                     </div>
                     <div class="relative mt-3 border-t border-[var(--ak-border)] pt-3">
-                        <div class="flex items-center justify-between"><p class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Wiederherstellung') }}</p><x-heroicon-o-wrench-screwdriver class="h-4 w-4 text-orange-400" /></div>
-                        <div class="mt-2 space-y-1.5">
-                            @foreach ([
-                                ['restore_database_tunnel',__('Datenbanktunnel'),__('Verbindung neu aufbauen'),'heroicon-o-link','border-cyan-400/20 bg-cyan-400/[.045] hover:bg-cyan-400/[.10]','text-cyan-300'],
-                                ['restart_engine_worker',__('Engine-Worker'),__('Verarbeitung starten'),'heroicon-o-cpu-chip','border-emerald-400/20 bg-emerald-400/[.045] hover:bg-emerald-400/[.10]','text-emerald-300'],
-                                ['restart_walk_forward',__('Walk-Forward'),__('Test fortsetzen'),'heroicon-o-play','border-amber-400/20 bg-amber-400/[.045] hover:bg-amber-400/[.10]','text-amber-300'],
-                                ['toggle_training',$queueActive ? __('Training beenden') : __('Training starten'),$queueActive ? __('Warteschlange anhalten') : __('Warteschlange fortsetzen'),$queueActive ? 'heroicon-o-stop' : 'heroicon-o-play',$queueActive ? 'border-rose-400/20 bg-rose-400/[.045] hover:bg-rose-400/[.10]' : 'border-emerald-400/20 bg-emerald-400/[.045] hover:bg-emerald-400/[.10]',$queueActive ? 'text-rose-300' : 'text-emerald-300'],
-                            ] as [$action,$label,$description,$icon,$buttonTone,$textTone])
-                                <button type="button" @click="confirmAction='{{ $action }}'" class="flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition {{ $buttonTone }}"><x-dynamic-component :component="$icon" class="h-4 w-4 shrink-0 {{ $textTone }}" /><b class="flex-1 text-[9px] text-[var(--ak-text)]">{{ $label }}</b><small class="text-[8px] text-[var(--ak-muted)]">{{ $description }}</small><x-heroicon-o-chevron-right class="h-3.5 w-3.5 text-[var(--ak-muted)]" /></button>
-                            @endforeach
-                        </div>
-                    </div>
-                    <div class="relative mt-3 border-t border-[var(--ak-border)] pt-3">
-                        <div class="flex items-center justify-between gap-2"><p class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Diagnose Workstation') }}</p><span class="rounded-md bg-rose-400/[.08] px-1.5 py-0.5 text-[8px] font-black {{ count($status['errors'] ?? []) ? 'text-rose-300' : 'text-emerald-300' }}">{{ count($status['errors'] ?? []) }} {{ __('Fehler') }}</span></div>
+                        <div class="flex items-center justify-between gap-2"><p class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Diagnose Mac mini') }}</p><span class="rounded-md bg-rose-400/[.08] px-1.5 py-0.5 text-[8px] font-black {{ count($status['errors'] ?? []) ? 'text-rose-300' : 'text-emerald-300' }}">{{ count($status['errors'] ?? []) }} {{ __('Fehler') }}</span></div>
                         <button type="button" @click="errorsOpen=!errorsOpen" class="mt-1.5 flex w-full items-center gap-2 rounded-md border px-2 py-2 text-left {{ count($status['errors'] ?? []) ? 'border-rose-400/15 bg-rose-400/[.04] text-rose-200' : 'border-emerald-400/15 bg-emerald-400/[.04] text-emerald-300' }}"><x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0" /><span class="min-w-0 flex-1 truncate font-mono text-[8px]" title="{{ collect($status['errors'] ?? [])->last() }}">{{ collect($status['errors'] ?? [])->last() ?: __('Keine aktuellen Fehler.') }}</span><x-heroicon-o-chevron-down class="h-3.5 w-3.5 shrink-0 transition" ::class="errorsOpen && 'rotate-180'" /></button>
                         <div x-show="errorsOpen" x-transition.opacity class="mt-1.5 max-h-28 space-y-1 overflow-y-auto font-mono text-[8px] leading-4 text-rose-200/80">@forelse($status['errors'] ?? [] as $line)<p class="break-all rounded-md bg-rose-950/20 px-2 py-1.5">{{ $line }}</p>@empty<p class="px-2 py-1 text-emerald-300">{{ __('Keine aktuellen Fehler.') }}</p>@endforelse</div>
                     </div>
                     <div class="relative mt-3 border-t border-[var(--ak-border)] pt-3">
-                        <button type="button" @click="logOpen=!logOpen" class="flex w-full items-center gap-2 text-left"><x-heroicon-o-command-line class="h-4 w-4 shrink-0 text-violet-300" /><span class="min-w-0 flex-1"><small class="block text-[8px] font-black uppercase tracking-[.14em] text-violet-300">{{ __('Live-Protokoll') }}</small><b class="block truncate text-[9px] text-[var(--ak-text)]">{{ $queueActive ? __('Aktientraining') : 'walk_forward_catchup' }}</b></span><span class="text-[8px] text-[var(--ak-muted)]">{{ count($status['log'] ?? []) }} {{ __('Zeilen') }}</span><x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-[var(--ak-muted)] transition" ::class="logOpen && 'rotate-180'" /></button>
+                        <button type="button" @click="logOpen=!logOpen" class="flex w-full items-center gap-2 text-left"><x-heroicon-o-command-line class="h-4 w-4 shrink-0 text-violet-300" /><span class="min-w-0 flex-1"><small class="block text-[8px] font-black uppercase tracking-[.14em] text-violet-300">{{ __('Live-Protokoll') }}</small><b class="block truncate text-[9px] text-[var(--ak-text)]">Pipeline Control Plane · PID {{ $metrics['control_plane_pid'] ?? '—' }}</b></span><span class="text-[8px] text-[var(--ak-muted)]">{{ count($status['log'] ?? []) }} {{ __('Zeilen') }}</span><x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-[var(--ak-muted)] transition" ::class="logOpen && 'rotate-180'" /></button>
                         <pre x-show="logOpen" x-transition.opacity class="mt-2 max-h-36 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-white/[.06] bg-black/25 p-2 font-mono text-[8px] leading-4 text-slate-300">{{ implode("\n", array_reverse($status['log'] ?? [])) ?: __('Kein Log verfügbar.') }}</pre>
                     </div>
                 </article>
@@ -134,13 +122,13 @@
                     <div class="relative mt-3 border-t border-[var(--ak-border)] pt-3">
                         <p class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Verbindungen') }}</p>
                         <div class="mt-2 space-y-2">
-                            @foreach ([[__('Verbindung zur Workstation'),$reachable,'computer-desktop'],[__('Tunnel zur Datenbank'),$tunnelActive,'arrows-right-left']] as [$label,$active,$icon])
+                            @foreach ([[__('Verbindung zum Mac mini'),$reachable,'computer-desktop'],['Pipeline Control Plane',$controlPlaneActive,'cpu-chip']] as [$label,$active,$icon])
                                 <div class="flex items-center gap-3 rounded-lg border px-3 py-2 {{ $tone($active) }}"><x-dynamic-component :component="'heroicon-o-'.$icon" class="h-4 w-4 shrink-0" /><b class="flex-1 text-[9px]">{{ $label }}</b><span class="text-[8px] font-black uppercase">{{ $active ? __('Verbunden') : __('Getrennt') }}</span></div>
                             @endforeach
                         </div>
                         <div class="mt-2 grid grid-cols-2 gap-2">
-                            <div class="rounded-lg border px-2.5 py-2 {{ $tone($modelServerConnected) }}"><div class="flex items-center gap-2"><x-heroicon-o-cloud class="h-4 w-4" /><b class="text-[9px]">{{ __('Workstation → Server') }}</b></div><small class="mt-1 block text-[8px] opacity-75">{{ $modelServerConnected ? __('SSH für Modelle verbunden') : __('Modellverbindung getrennt') }}</small></div>
-                            <div class="rounded-lg border px-2.5 py-2 {{ $tone($modelSyncActive || ($modelSyncScheduled && $modelSyncState === 'completed')) }}"><div class="flex items-center gap-2"><x-heroicon-o-arrow-path class="h-4 w-4 {{ $modelSyncActive ? 'animate-spin' : '' }}" /><b class="text-[9px]">{{ __('Modell-Sync') }}</b></div><small class="mt-1 block truncate text-[8px] opacity-75" title="{{ $modelSyncMessage }}">{{ $modelSyncActive ? __('Übertragung läuft') : $modelSyncMessage }}</small><small class="mt-0.5 block text-[7px] opacity-60">{{ $modelSyncTime }} · {{ $modelSyncScheduled ? __('automatisch') : __('nicht geplant') }}</small></div>
+                            <div class="rounded-lg border px-2.5 py-2 {{ $tone($serverConnectionActive) }}"><div class="flex items-center gap-2"><x-heroicon-o-cloud class="h-4 w-4" /><b class="text-[9px]">{{ __('Mac mini → Server') }}</b></div><small class="mt-1 block text-[8px] opacity-75">{{ $serverConnectionActive ? __('AktienKI-SSH verbunden') : __('Serververbindung getrennt') }}</small></div>
+                            <div class="rounded-lg border px-2.5 py-2 {{ $tone($pipelineDatabaseActive) }}"><div class="flex items-center gap-2"><x-heroicon-o-circle-stack class="h-4 w-4" /><b class="text-[9px]">Pipeline PostgreSQL</b></div><small class="mt-1 block text-[8px] opacity-75">{{ $pipelineDatabaseActive ? __('Lokal verbunden') : __('Datenbank getrennt') }} · {{ $metrics['pipeline_database_port'] ?? '—' }}</small></div>
                         </div>
                         <div class="mt-2 grid grid-cols-2 gap-2">
                             <button type="button" @click="confirmAction='restart_application_services'" class="rounded-lg border border-cyan-400/20 bg-cyan-400/[.05] px-2 py-2 text-[8px] font-black text-cyan-300 transition hover:bg-cyan-400/[.12]">{{ __('Dienste neu starten') }}</button>
@@ -181,14 +169,43 @@
                     <div class="relative mt-3 border-t border-[var(--ak-border)] pt-3">
                         <div class="mb-3 space-y-1.5">
                             <div class="flex items-center justify-between gap-3 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2"><span class="text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Anzahl Benutzer') }}<small class="mt-0.5 flex items-center gap-1 text-[8px] font-semibold text-emerald-300"><i class="h-1.5 w-1.5 rounded-full bg-emerald-400"></i>{{ __('Aktuell aktiv') }}</small></span><span class="text-right"><b class="block text-xs tabular-nums text-[var(--ak-text)]">{{ $userCount === null ? '—' : number_format((int) $userCount, 0, ',', '.') }}</b><small class="block text-[8px] font-black tabular-nums text-emerald-300">{{ $activeUserCount === null ? '—' : number_format((int) $activeUserCount, 0, ',', '.') }}</small></span></div>
-                            <div class="flex items-center justify-between gap-3 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2"><span class="text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Aktien mit abgeschlossenem Walk-Forward') }}</span><b class="text-xs tabular-nums text-emerald-300">{{ $walkForwardStockCount === null ? '—' : number_format((int) $walkForwardStockCount, 0, ',', '.') }}</b></div>
                             <div class="flex items-center justify-between gap-3 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2"><span class="text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Ältestes aktives Modell') }}</span><span class="text-right"><b class="block text-xs text-amber-300">{{ $oldestModelSymbol ?: '—' }}</b><small class="block text-[8px] tabular-nums text-[var(--ak-muted)]">{{ $oldestModelTimestamp ? \Illuminate\Support\Carbon::parse($oldestModelTimestamp)->format('d.m.Y H:i') : '—' }}</small></span></div>
                         </div>
-                        <p class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Datenfluss') }}</p>
+                        <div data-testid="remote-stock-quality" class="rounded-xl border border-violet-400/15 bg-violet-400/[.035] p-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <span><small class="block text-[8px] font-black uppercase tracking-[.14em] text-violet-300">{{ __('Aktuelle Aktien') }}</small><small class="mt-0.5 block text-[7px] font-semibold text-[var(--ak-muted)]">{{ __('Neue Remote-Datenbank') }}</small></span>
+                                <b class="text-xl leading-5 tabular-nums text-[var(--ak-text)]">{{ $currentStockCount === null ? '—' : number_format((int) $currentStockCount, 0, ',', '.') }}</b>
+                            </div>
+                            <div class="mt-2 grid grid-cols-5 gap-1">
+                                @foreach($stockQualityRows as [$qualityCode, $qualityLabel, $qualityTone])
+                                    <div class="min-w-0 rounded-lg border px-1 py-1.5 text-center {{ $qualityTone }}" title="{{ $qualityLabel }}">
+                                        <b class="block text-xs leading-4 tabular-nums">{{ number_format((int) ($stockQualityCounts[$qualityCode] ?? 0), 0, ',', '.') }}</b>
+                                        <small class="block truncate text-[6px] font-black uppercase leading-3">{{ $qualityLabel }}</small>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <div class="mt-2 flex items-center justify-between gap-2 text-[7px] font-bold text-[var(--ak-muted)]">
+                                <span>{{ $classifiedStockCount === null || $currentStockCount === null ? '—' : number_format((int) $classifiedStockCount, 0, ',', '.').'/'.number_format((int) $currentStockCount, 0, ',', '.') }} {{ __('klassifiziert') }}</span>
+                                <span class="text-violet-300">20T · REMOTE</span>
+                            </div>
+                        </div>
+                        <div data-testid="latest-prediction" class="mt-2 rounded-xl border px-3 py-2.5 {{ $latestPredictionSuccessful === true ? 'border-emerald-400/25 bg-emerald-400/[.055]' : ($latestPredictionAvailable ? 'border-rose-400/25 bg-rose-400/[.055]' : 'border-white/[.08] bg-white/[.025]') }}">
+                            <div class="flex items-start justify-between gap-3">
+                                <span><small class="block text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Letzte Prediction') }}</small><small class="mt-0.5 block text-[7px] tabular-nums text-[var(--ak-muted)]">{{ $latestPredictionCreatedAt ? \Illuminate\Support\Carbon::parse($latestPredictionCreatedAt)->format('d.m.Y H:i') : '—' }}</small></span>
+                                <span class="rounded-md px-2 py-1 text-[7px] font-black uppercase {{ $latestPredictionSuccessful === true ? 'bg-emerald-400/[.12] text-emerald-300' : ($latestPredictionAvailable ? 'bg-rose-400/[.12] text-rose-300' : 'bg-white/[.05] text-[var(--ak-muted)]') }}">{{ $latestPredictionSuccessful === true ? __('Erfolgreich') : ($latestPredictionAvailable ? __('Unvollständig') : __('Keine Daten')) }}</span>
+                            </div>
+                            <div class="mt-2 flex items-end justify-between gap-3">
+                                <span><b class="text-lg leading-5 tabular-nums text-[var(--ak-text)]">{{ $latestPredictionAvailable ? number_format((int) data_get($latestPrediction, 'complete', 0), 0, ',', '.').' / '.number_format((int) data_get($latestPrediction, 'eligible', 0), 0, ',', '.') : '—' }}</b><small class="ml-1 text-[8px] font-bold text-[var(--ak-muted)]">{{ __('modellberechtigte Aktien vollständig') }}</small></span>
+                                <b class="text-xs tabular-nums {{ $latestPredictionSuccessful === true ? 'text-emerald-300' : 'text-rose-300' }}">{{ $latestPredictionCoverage === null ? '—' : number_format((float) $latestPredictionCoverage, 1, ',', '.').' %' }}</b>
+                            </div>
+                            <div class="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[.07]"><i class="block h-full rounded-full {{ $latestPredictionSuccessful === true ? 'bg-emerald-400' : 'bg-rose-400' }}" style="width: {{ max(0, min(100, (float) ($latestPredictionCoverage ?? 0))) }}%"></i></div>
+                            <p class="mt-1.5 text-[7px] font-semibold text-[var(--ak-muted)]">{{ number_format((int) data_get($latestPrediction, 'stocks', 0), 0, ',', '.') }} {{ __('Aktien im Lauf') }} · {{ number_format((int) data_get($latestPrediction, 'rows', 0), 0, ',', '.') }} {{ __('Prognosen') }} · {{ number_format((int) data_get($latestPrediction, 'horizons', 0), 0, ',', '.') }} {{ __('Horizonte') }}</p>
+                        </div>
+                        <p class="mt-3 text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Datenfluss') }}</p>
                         <div class="mt-2 rounded-xl border px-3 py-3 {{ $tone($databaseActive) }}">
                             <div class="flex items-center gap-3"><x-heroicon-o-cloud-arrow-up class="h-5 w-5" /><div class="min-w-0 flex-1"><b class="block text-[10px]">{{ __('Ergebnisse speichern') }}</b><small class="block truncate text-[8px] opacity-75">{{ __('Training · Prognosen · Walk-Forward') }}</small></div></div>
                         </div>
-                        <p class="mt-2 text-[9px] text-[var(--ak-muted)]">{{ __('Lokaler Tunnel-Port') }}: <b class="text-[var(--ak-text)]">{{ $metrics['database_port'] ?? '—' }}</b></p>
+                        <p class="mt-2 text-[9px] text-[var(--ak-muted)]">{{ __('Laravel-Verbindung') }}: <b class="text-[var(--ak-text)]">{{ data_get($status, 'database.server', '—') }}:{{ data_get($status, 'database.port', '—') }}</b></p>
                     </div>
                     <div class="relative mt-auto border-t border-[var(--ak-border)] pt-3">
                         <p class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ __('Benutzer nach Abonnement') }}</p>

@@ -19,7 +19,8 @@ class PersonalizedSignalService
         }
 
         $thresholds = $this->thresholds($this->riskLevel($user));
-        $score = "(CASE WHEN {$predictionAlias}.prediction_score <= 1 THEN {$predictionAlias}.prediction_score * 100 WHEN {$predictionAlias}.prediction_score <= 10 THEN {$predictionAlias}.prediction_score * 10 ELSE {$predictionAlias}.prediction_score END)";
+        $rawScore = "COALESCE({$predictionAlias}.ai_score, {$predictionAlias}.prediction_score, 0)";
+        $score = "(CASE WHEN {$rawScore} <= 1 THEN {$rawScore} * 100 WHEN {$rawScore} <= 10 THEN {$rawScore} * 10 ELSE {$rawScore} END)";
         $confidence = "(CASE WHEN {$predictionAlias}.confidence > 1 THEN {$predictionAlias}.confidence / 100 ELSE {$predictionAlias}.confidence END)";
         $riskSource = "COALESCE({$predictionAlias}.risk_score, {$predictionAlias}.drawdown_risk_factor)";
         $risk = "(CASE WHEN {$riskSource} > 1 THEN {$riskSource} / 100 ELSE {$riskSource} END)";
@@ -72,10 +73,8 @@ class PersonalizedSignalService
                     AND ({$risk} IS NULL OR {$risk} <= {$thresholds['buy_risk']})
                     AND ({$return5d} IS NULL OR {$return5d} >= 0)
                     AND ({$return20d} IS NULL OR {$return20d} >= 0)
-                    AND (
-                        ({$return5d} IS NOT NULL AND {$return5d} >= {$thresholds['buy_return']})
-                        OR ({$return20d} IS NOT NULL AND {$return20d} >= {$thresholds['buy_return_20d']})
-                    )
+                    AND (({$return5d} IS NOT NULL AND {$return5d} >= {$thresholds['buy_return']})
+                        OR ({$return20d} IS NOT NULL AND {$return20d} >= {$thresholds['buy_return_20d']}))
                     THEN 'BUY'
                 WHEN {$score} >= {$thresholds['watch_score']}
                     AND {$hardQualityAccepted}
@@ -96,6 +95,7 @@ class PersonalizedSignalService
         return match ($level) {
             'cautious', 'conservative' => 'cautious',
             'opportunity_oriented', 'opportunity', 'aggressive' => 'opportunity_oriented',
+            'risk' => 'risk',
             default => 'normal',
         };
     }
@@ -105,15 +105,22 @@ class PersonalizedSignalService
         return match ($this->riskLevel($user)) {
             'cautious' => 'Konservativ',
             'opportunity_oriented' => 'Chance',
+            'risk' => 'Risk',
             default => 'Ausgewogen',
         };
+    }
+
+    /** @return array<string, float|int> */
+    public function profileThresholds(?User $user = null): array
+    {
+        return $this->thresholds($this->riskLevel($user));
     }
 
     public function explanation(object $prediction, ?User $user = null): string
     {
         $profile = $this->profileLabel($user);
         $thresholds = $this->thresholds($this->riskLevel($user));
-        $score = (float) ($prediction->prediction_score ?? 0);
+        $score = (float) ($prediction->ranking_score ?? $prediction->prediction_score ?? 0);
         $score = $score <= 1 ? $score * 100 : ($score <= 10 ? $score * 10 : $score);
         $confidence = (float) ($prediction->confidence ?? 0);
         $confidence = $confidence > 1 ? $confidence / 100 : $confidence;
@@ -192,7 +199,7 @@ class PersonalizedSignalService
     {
         $profile = $this->profileLabel($user);
         $thresholds = $this->thresholds($this->riskLevel($user));
-        $score = (float) ($prediction->prediction_score ?? 0);
+        $score = (float) ($prediction->ranking_score ?? $prediction->prediction_score ?? 0);
         $score = $score <= 1 ? $score * 100 : ($score <= 10 ? $score * 10 : $score);
         $confidence = (float) ($prediction->confidence ?? 0);
         $confidence = $confidence > 1 ? $confidence / 100 : $confidence;
@@ -304,6 +311,7 @@ class PersonalizedSignalService
                   AND peer_technical.volatility_20 IS NOT NULL
                 ORDER BY peer_technical.bar_time DESC, peer_technical.id DESC LIMIT 1) AS peer_volatility ON TRUE
             WHERE peer_instrument.type = 'stock' AND peer_instrument.is_active = TRUE AND peer_instrument.deleted_at IS NULL
+              AND (peer_instrument.risk_status IS NULL OR peer_instrument.risk_status <> 'sleep')
               AND peer_instrument.sector IS NOT DISTINCT FROM (SELECT current_instrument.sector FROM instruments AS current_instrument
                   WHERE current_instrument.id = {$predictionAlias}.instrument_id))";
     }
@@ -326,7 +334,7 @@ class PersonalizedSignalService
                 'maximum_annualized_volatility' => 0.45,
                 'maximum_sector_volatility_percentile' => 0.40,
             ],
-            'opportunity_oriented' => [
+            'opportunity_oriented', 'risk' => [
                 'sell_score' => 32,
                 'sell_return' => -4,
                 'buy_score' => 57,

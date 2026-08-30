@@ -153,16 +153,16 @@
                         <div class="h-full rounded-full bg-teal-600" style="width: {{ min(100, $portfolio->positions->count() * 10) }}%"></div>
                     </div>
 
-                    <div class="mt-auto flex items-center justify-between gap-2 border-t border-[var(--ak-border)] {{ $isStrategyAccount ? 'px-4 py-3' : 'px-3 py-2' }}">
-                        <div class="flex min-w-0 items-center gap-1.5">
+                    <div class="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ak-border)] {{ $isStrategyAccount ? 'px-4 py-3' : 'px-3 py-2' }}">
+                        <div class="flex shrink-0 items-center gap-1.5">
                         @if($portfolio->type === 'paper')
-                            <button type="button" @click="strategyOpen=true" title="{{ __('Strategien verwalten') }}" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-orange-400/20 bg-orange-400/[.07] px-2.5 text-[10px] font-black text-orange-400"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" /><span class="hidden 2xl:inline">{{ __('Strategien') }}</span></button>
-                            <button type="button" @click="capitalOpen=true" title="{{ __('Kapital festlegen') }}" class="inline-flex h-9 items-center justify-center rounded-lg border border-teal-300/20 bg-teal-400/[.07] px-2.5 text-teal-300"><x-heroicon-o-banknotes class="h-4 w-4" /></button>
-                            <button type="button" @click="resetOpen=true" title="{{ __('Depot zurücksetzen') }}" class="inline-flex h-9 items-center justify-center rounded-lg border border-amber-300/20 bg-amber-400/[.07] px-2.5 text-amber-300"><x-heroicon-o-arrow-path class="h-4 w-4" /></button>
-                            <button type="button" @click="deleteOpen=true" title="{{ __('Musterdepot löschen') }}" class="inline-flex h-9 items-center justify-center rounded-lg border border-rose-300/20 bg-rose-400/[.07] px-2.5 text-rose-300"><x-heroicon-o-trash class="h-4 w-4" /></button>
+                            <button type="button" @click="strategyOpen=true" title="{{ __('Strategien verwalten') }}" aria-label="{{ __('Strategien verwalten') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-orange-400/20 bg-orange-400/[.07] text-orange-400"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" /></button>
+                            <button type="button" @click="capitalOpen=true" title="{{ __('Kapital festlegen') }}" aria-label="{{ __('Kapital festlegen') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-teal-300/20 bg-teal-400/[.07] text-teal-300"><x-heroicon-o-banknotes class="h-4 w-4" /></button>
+                            <button type="button" @click="resetOpen=true" title="{{ __('Depot zurücksetzen') }}" aria-label="{{ __('Depot zurücksetzen') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-300/20 bg-amber-400/[.07] text-amber-300"><x-heroicon-o-arrow-path class="h-4 w-4" /></button>
+                            <button type="button" @click="deleteOpen=true" title="{{ __('Musterdepot löschen') }}" aria-label="{{ __('Musterdepot löschen') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-300/20 bg-rose-400/[.07] text-rose-300"><x-heroicon-o-trash class="h-4 w-4" /></button>
                         @endif
                         </div>
-                        <div class="flex shrink-0 items-center gap-2">
+                        <div class="ml-auto flex shrink-0 items-center gap-2">
                         @if($portfolio->type === 'paper')
                             @if($canTestPaperDepot)
                             <a href="{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => $paperMode ? 'paper' : 'depots', 'test' => 1]) }}" class="inline-flex h-9 items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/[.09] px-3 text-xs font-black text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,.08)] transition hover:border-cyan-300/45 hover:bg-cyan-400/[.15]">

@@ -1,4 +1,4 @@
-@props(['portfolios', 'instrumentId', 'instrumentName', 'currency', 'price', 'score' => null, 'compact' => false])
+@props(['portfolios', 'instrumentId', 'instrumentName', 'currency', 'price', 'score' => null, 'compact' => false, 'active' => false])
 @php
     $allPortfolios = collect($portfolios);
     $instrumentCurrency = strtoupper(trim((string) $currency));
@@ -7,7 +7,7 @@
     $currencyMismatch = $eligible->isEmpty() && $allPortfolios->isNotEmpty();
 @endphp
 <div x-data="{open:false,qty:1,depot:@js((string) optional($eligible->first())->id),price:@js((float)($price ?? 0)), balances:@js($eligible->mapWithKeys(fn($p)=>[(string)$p->id=>(float)($p->available_capital ?? 0)])), fees:@js($eligible->mapWithKeys(function($p){$meta=is_string($p->meta??null)?(json_decode($p->meta,true)?:[]):(array)($p->meta??[]);return[(string)$p->id=>(float)data_get($meta,'automation.trade_cost',0)];}))}" class="relative" @click.stop>
-    <button type="button" @click="open=true" title="{{ __('Ins Musterdepot kaufen') }}" class="inline-flex {{ $compact ? 'h-8 w-8' : 'h-10 w-10' }} items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-400/[.08] text-cyan-300 transition hover:bg-cyan-400/15"><x-heroicon-o-beaker class="{{ $compact ? 'h-4 w-4' : 'h-5 w-5' }}" /></button>
+    <button type="button" @click="open=true" title="{{ $active ? __('Im Musterdepot') : __('Ins Musterdepot kaufen') }}" class="inline-flex {{ $compact ? 'h-8 w-8' : 'h-10 w-10' }} items-center justify-center rounded-xl border transition {{ $active ? 'border-cyan-400/30 bg-cyan-400/[.08] text-cyan-300 hover:bg-cyan-400/15' : 'border-slate-500/15 bg-slate-500/[.04] text-slate-500/40 hover:text-cyan-300' }}"><x-heroicon-o-beaker class="{{ $compact ? 'h-4 w-4' : 'h-5 w-5' }}" /></button>
     <template x-teleport="body"><div x-cloak x-show="open" class="fixed inset-0 z-[150] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" @keydown.escape.window="open=false" @click.self="open=false">
       <div class="w-full max-w-md rounded-2xl border border-cyan-400/30 bg-[#0d1b2d] p-5 shadow-2xl">
         <div class="flex items-start justify-between"><div><p class="text-[10px] font-black uppercase tracking-[.16em] text-cyan-400">{{ __('Musterdepot') }}</p><h2 class="mt-1 text-xl font-black text-white">{{ __('Virtuellen Kauf simulieren') }}</h2><p class="mt-1 text-xs text-slate-400">{{ $instrumentName }}</p></div><button type="button" @click="open=false" class="text-slate-400"><x-heroicon-o-x-mark class="h-5 w-5"/></button></div>

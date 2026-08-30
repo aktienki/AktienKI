@@ -13,10 +13,13 @@ final class HistoricalDynamicExitService
         'auto_exit_support_stop' => ['support_stop' => true],
         'auto_exit_resistance_trailing' => ['resistance_trailing_stop' => true],
         'auto_exit_signal_change' => ['signal_change_exit' => true],
+        'auto_exit_forecast_below_price' => ['forecast_below_price_exit' => true],
         'auto_entry_wait_5d' => ['entry_wait_5d' => true, 'fixed_20d' => true],
     ];
     private array $barsCache = [];
     private array $predictionCache = [];
+    private array $walkForwardSignalCache = [];
+    private array $marketPhaseCache = [];
     private array $horizonCache = [];
     private array $levelCache = [];
 
@@ -144,16 +147,31 @@ final class HistoricalDynamicExitService
             if ($peak?->exit_date) $endDate = min($endDate, (string) $peak->exit_date);
         }
         if ($rules['signal_change_exit'] ?? false) {
-            $signalChange = $this->signalChangeAfter((int) $trade->instrument_id, $entryDate);
-            if ($signalChange !== null) $endDate = min($endDate, $signalChange);
+            $signalChange = $this->signalChangeAfter((int) $trade->instrument_id, $entryDate, (int) ($trade->horizon_days ?? 20));
+            $marketPhaseChange = $this->marketPhaseChangeAfter((int) $trade->instrument_id, $entryDate);
+            $changeDates = collect([$signalChange, data_get($marketPhaseChange, 'date')])->filter()->sort()->values();
+            // Signal-change is an independent exit strategy. It must not be
+            // capped by the source trade's fixed 20-day exit date; otherwise
+            // both strategies produce the same result whenever the signal
+            // changes after day 20.
+            if ($changeDates->isNotEmpty()) $endDate = (string) $changeDates->first();
+        }
+        if ($rules['forecast_below_price_exit'] ?? false) {
+            $forecastExitDate = $this->forecastBelowPriceAfter((int) $trade->instrument_id, $entryDate, 20);
+            $lastAvailableBarDate = $this->bars((int) $trade->instrument_id)->last()?->date;
+            $endDate = $forecastExitDate ?: ($lastAvailableBarDate ?: $endDate);
         }
         $history = $this->bars((int) $trade->instrument_id)->filter(fn (object $bar): bool => $bar->date <= $endDate)->values();
         $entryIndex = $history->search(fn (object $bar): bool => $bar->date >= $entryDate);
         if ($entryIndex === false) return null;
         $stop = null;
-        $reason = ($rules['signal_change_exit'] ?? false) && $endDate === ($signalChange ?? null)
-            ? 'signal_change'
-            : (($rules['dynamic_horizon'] ?? false) ? 'dynamic_horizon' : 'scheduled_exit');
+        $reason = ($rules['forecast_below_price_exit'] ?? false) && $endDate === ($forecastExitDate ?? null)
+            ? 'forecast_below_current_price'
+            : (($rules['signal_change_exit'] ?? false) && $endDate === data_get($marketPhaseChange ?? null, 'date')
+            ? 'market_phase_change'
+            : (($rules['signal_change_exit'] ?? false) && $endDate === ($signalChange ?? null)
+                ? 'signal_change'
+                : (($rules['dynamic_horizon'] ?? false) ? 'dynamic_horizon' : 'scheduled_exit')));
         $exitBar = $history->last(); $runningLow = $entry;
         for ($index = (int) $entryIndex; $index < $history->count(); $index++) {
             $bar = $history[$index];
@@ -183,7 +201,10 @@ final class HistoricalDynamicExitService
             'net_return' => (($exitPrice - $entry) / $entry) - (float) ($trade->transaction_cost ?? 0),
             'max_drawdown' => ($runningLow - $entry) / $entry,
             'details' => ['reason' => $reason, 'stop_price' => $stop, 'rules' => $rules,
-                'original_entry_date' => $originalEntryDate, 'effective_entry_date' => $entryDate, 'entry_wait_days' => $entryWaitDays],
+                'original_entry_date' => $originalEntryDate, 'effective_entry_date' => $entryDate, 'entry_wait_days' => $entryWaitDays,
+                'signal_change_date' => $signalChange ?? null,
+                'forecast_below_price_date' => $forecastExitDate ?? null,
+                'market_phase_change' => $marketPhaseChange ?? null],
         ];
     }
 
@@ -221,7 +242,7 @@ final class HistoricalDynamicExitService
 
     private function clearCaches(): void
     {
-        $this->barsCache = $this->predictionCache = $this->horizonCache = $this->levelCache = [];
+        $this->barsCache = $this->predictionCache = $this->walkForwardSignalCache = $this->marketPhaseCache = $this->horizonCache = $this->levelCache = [];
     }
 
     private function bars(int $instrumentId): Collection
@@ -244,16 +265,100 @@ final class HistoricalDynamicExitService
         return $this->predictionCache[$instrumentId]->last(fn (object $prediction): bool => substr((string) $prediction->prediction_time, 0, 10) <= $date);
     }
 
-    private function signalChangeAfter(int $instrumentId, string $entryDate): ?string
+    private function signalChangeAfter(int $instrumentId, string $entryDate, int $horizonDays): ?string
     {
-        $this->predictionAt($instrumentId, $entryDate);
+        $key = $instrumentId.':'.$horizonDays;
+        if (! array_key_exists($key, $this->walkForwardSignalCache)) {
+            $this->walkForwardSignalCache[$key] = DB::table('walk_forward_backtest_trades')
+                ->where('instrument_id', $instrumentId)
+                ->where('horizon_days', $horizonDays)
+                ->orderBy('signal_date')->orderByDesc('id')
+                ->get(['id', 'signal_date', 'signal'])
+                ->groupBy(fn (object $row): string => substr((string) $row->signal_date, 0, 10))
+                ->map(function (Collection $rows): object {
+                    $signal = (string) ($rows->countBy(fn (object $row): string => strtoupper((string) $row->signal))
+                        ->sortDesc()->keys()->first() ?? '');
+                    return (object) ['date' => substr((string) $rows->first()->signal_date, 0, 10), 'signal' => $signal];
+                })->values();
+        }
 
+        $historical = $this->walkForwardSignalCache[$key]->first(
+            fn (object $row): bool => $row->date > $entryDate && strtoupper($row->signal) !== 'BUY'
+        );
+        if ($historical !== null) return $historical->date;
+
+        // Fallback for newly added instruments without a completed
+        // walk-forward history yet.
+        $this->predictionAt($instrumentId, $entryDate);
         $prediction = $this->predictionCache[$instrumentId]->first(
             fn (object $prediction): bool => substr((string) $prediction->prediction_time, 0, 10) > $entryDate
                 && strtoupper((string) ($prediction->signal ?? '')) !== 'BUY'
         );
 
         return $prediction === null ? null : substr((string) $prediction->prediction_time, 0, 10);
+    }
+
+    private function forecastBelowPriceAfter(int $instrumentId, string $entryDate, int $horizonDays): ?string
+    {
+        $row = DB::table('walk_forward_backtest_trades')
+            ->where('instrument_id', $instrumentId)
+            ->where('horizon_days', $horizonDays)
+            ->whereDate('signal_date', '>', $entryDate)
+            ->whereNotNull('predicted_return')
+            ->where('predicted_return', '<', 0)
+            ->orderBy('signal_date')
+            ->orderByDesc('id')
+            ->first(['signal_date']);
+
+        if ($row !== null) return substr((string) $row->signal_date, 0, 10);
+
+        $this->predictionAt($instrumentId, $entryDate);
+        $prediction = $this->predictionCache[$instrumentId]->first(function (object $prediction) use ($entryDate): bool {
+            $date = substr((string) $prediction->prediction_time, 0, 10);
+            $current = (float) ($prediction->current_price ?? 0);
+            $forecast = (float) ($prediction->predicted_price_20d ?? 0);
+            return $date > $entryDate && $current > 0 && $forecast > 0 && $forecast < $current;
+        });
+
+        return $prediction === null ? null : substr((string) $prediction->prediction_time, 0, 10);
+    }
+
+    /** @return array{date:string,from:string,to:string}|null */
+    private function marketPhaseChangeAfter(int $instrumentId, string $entryDate): ?array
+    {
+        if (! array_key_exists($instrumentId, $this->marketPhaseCache)) {
+            $rows = DB::table('technical_indicators')->where('instrument_id', $instrumentId)
+                ->where('interval', '1d')->whereNotNull('macd_histogram')->whereNotNull('stochastic_k')
+                ->orderBy('bar_time')->get(['bar_time', 'macd_histogram', 'stochastic_k']);
+            $previousMacd = null;
+            $this->marketPhaseCache[$instrumentId] = $rows->map(function (object $row) use (&$previousMacd): ?object {
+                $macd = (float) $row->macd_histogram;
+                if ($previousMacd === null) { $previousMacd = $macd; return null; }
+                $phase = $this->classifyMarketPhase($macd, $previousMacd, (float) $row->stochastic_k);
+                $previousMacd = $macd;
+                return (object) ['date' => substr((string) $row->bar_time, 0, 10), 'phase' => $phase];
+            })->filter()->values();
+        }
+        $series = $this->marketPhaseCache[$instrumentId];
+        $entryPoint = $series->last(fn (object $row): bool => $row->date <= $entryDate);
+        if ($entryPoint === null) return null;
+        $change = $series->first(fn (object $row): bool => $row->date > $entryDate && $row->phase !== $entryPoint->phase);
+        return $change === null ? null : ['date' => $change->date, 'from' => $entryPoint->phase, 'to' => $change->phase];
+    }
+
+    private function classifyMarketPhase(float $macd, float $previousMacd, float $stochastic): string
+    {
+        $rising = $macd > $previousMacd;
+        return match (true) {
+            $macd >= 0 && $rising && $stochastic >= 50 && $stochastic < 80 => 'bullish_impulse',
+            $macd >= 0 && ! $rising && $stochastic >= 80 => 'overheated_fading',
+            $rising && $stochastic < 50 => 'early_recovery',
+            $macd < 0 && ! $rising && $stochastic < 50 => 'bearish_impulse',
+            $stochastic < 20 && $rising => 'oversold_stabilizing',
+            $macd >= 0 && $stochastic >= 80 => 'mature_uptrend',
+            $macd < 0 && $stochastic >= 50 => 'negative_divergence',
+            default => 'neutral_transition',
+        };
     }
 
     private function horizonAt(int $instrumentId, string $date): ?object

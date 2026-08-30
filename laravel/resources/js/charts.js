@@ -1,5 +1,7 @@
 import ApexCharts from "apexcharts";
 
+window.ApexCharts = ApexCharts;
+
 window.sparkline = (series = []) => ({
 
     chart: null,
@@ -162,7 +164,9 @@ window.candlestick = (series = []) => ({
     },
 });
 
-window.worldMarketMap = (countryScores = {}, indicesUrl = '/indices') => ({
+// Kept temporarily for backwards comparison; the production map lives in
+// market-map.js and must not be overwritten by the lazy ApexCharts bundle.
+window.legacyWorldMarketMap = (countryScores = {}, indicesUrl = '/indices') => ({
     error: false,
     selectedCountry: null,
 
@@ -185,13 +189,15 @@ window.worldMarketMap = (countryScores = {}, indicesUrl = '/indices') => ({
                 const change = countryData === null || countryData.change === null
                     ? null
                     : Number(countryData.change);
-                const direction = change === null || Math.abs(change) < 0.005 ? 0 : (change > 0 ? 1 : -1);
+                const direction = change === null ? null : (change > 0 ? 1 : (change < -0.5 ? -1 : 0));
                 const intensity = change === null ? 0 : Math.min(1, Math.abs(change) / 3);
-                const color = direction === 0
+                const color = direction === null
                     ? (lightTheme ? '#cbd5e1' : '#64748b')
                     : direction > 0
                         ? (lightTheme ? `hsl(152, 46%, ${72 - intensity * 30}%)` : `hsl(152, 66%, ${50 + intensity * 5}%)`)
-                        : (lightTheme ? `hsl(352, 52%, ${78 - intensity * 28}%)` : `hsl(352, 68%, ${56 + intensity * 4}%)`);
+                        : direction < 0
+                            ? (lightTheme ? `hsl(352, 52%, ${78 - intensity * 28}%)` : `hsl(352, 68%, ${56 + intensity * 4}%)`)
+                            : (lightTheme ? '#fbbf24' : '#d6a72b');
                 const inactiveStroke = lightTheme ? '#4b5563' : '#8a9ab8';
                 const activeStroke = color;
                 const restingOpacity = lightTheme ? '0.66' : '0.48';
@@ -362,6 +368,106 @@ window.welcomeStockMap = (countryStocks = {}) => ({
             previousLongitude = longitude;
             return `${index === 0 || crossesDateLine ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
         }).join(' ') + ' Z';
+    },
+});
+
+window.monthlyBacktestAiScoreChart = (series = []) => ({
+    chart: null,
+
+    init() {
+        const element = this.$refs.chart;
+        if (!element) return;
+
+        element.__aktienkiChart?.destroy?.();
+        element.replaceChildren();
+
+        const lightTheme = document.documentElement.dataset.theme === 'light';
+        const values = series.map((point) => point.value === null ? null : Number(point.value));
+        const categories = series.map((point) => point.label);
+        const observations = series.map((point) => Number(point.observations || 0));
+
+        this.chart = new ApexCharts(element, {
+            chart: {
+                type: 'bar',
+                height: '100%',
+                background: 'transparent',
+                toolbar: { show: false },
+                animations: { enabled: true, speed: 420 },
+            },
+            series: [{ name: 'Ø KI-Score', data: values }],
+            colors: [lightTheme ? '#0891b2' : '#facc15'],
+            plotOptions: {
+                bar: {
+                    borderRadius: 4,
+                    borderRadiusApplication: 'end',
+                    columnWidth: '62%',
+                },
+            },
+            dataLabels: { enabled: false },
+            grid: {
+                borderColor: lightTheme ? 'rgba(15, 118, 129, .12)' : 'rgba(148, 163, 184, .13)',
+                strokeDashArray: 4,
+                padding: { top: 4, right: 8, bottom: 0, left: 2 },
+            },
+            xaxis: {
+                categories,
+                tickAmount: 11,
+                axisBorder: { show: false },
+                axisTicks: { show: false },
+                labels: {
+                    rotate: 0,
+                    hideOverlappingLabels: true,
+                    trim: false,
+                    style: { colors: lightTheme ? '#64748b' : '#94a3b8', fontSize: '9px', fontWeight: 600 },
+                },
+            },
+            yaxis: {
+                min: 0,
+                max: 10,
+                tickAmount: 5,
+                labels: {
+                    style: { colors: lightTheme ? '#64748b' : '#94a3b8', fontSize: '9px', fontWeight: 600 },
+                    formatter: (value) => value.toFixed(0),
+                },
+            },
+            annotations: {
+                yaxis: [{
+                    y: 5,
+                    borderColor: lightTheme ? 'rgba(217, 119, 6, .55)' : 'rgba(250, 204, 21, .55)',
+                    strokeDashArray: 5,
+                    label: {
+                        text: 'Neutral 5,0',
+                        position: 'left',
+                        borderColor: 'transparent',
+                        style: {
+                            background: 'transparent',
+                            color: lightTheme ? '#92400e' : '#fde047',
+                            fontSize: '9px',
+                            fontWeight: 700,
+                        },
+                    },
+                }],
+            },
+            tooltip: {
+                theme: lightTheme ? 'light' : 'dark',
+                custom: ({ dataPointIndex }) => {
+                    const point = series[dataPointIndex];
+                    if (!point || point.value === null) {
+                        return `<div class="px-3 py-2 text-xs"><b>${point?.label || '—'}</b><br>Keine Backtestdaten</div>`;
+                    }
+                    return `<div class="px-3 py-2 text-xs"><b>${point.label}</b><br>Ø KI-Score: <b>${Number(point.value).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b><br>Beobachtungen: ${observations[dataPointIndex].toLocaleString('de-DE')}</div>`;
+                },
+            },
+            noData: { text: 'Keine Backtestdaten verfügbar' },
+        });
+
+        element.__aktienkiChart = this.chart;
+        this.chart.render();
+    },
+
+    destroy() {
+        this.chart?.destroy();
+        if (this.$refs.chart?.__aktienkiChart === this.chart) delete this.$refs.chart.__aktienkiChart;
     },
 });
 

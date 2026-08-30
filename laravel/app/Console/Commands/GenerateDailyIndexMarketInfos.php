@@ -79,24 +79,59 @@ class GenerateDailyIndexMarketInfos extends Command
         ])->values();
 
         try {
+            foreach ($snapshot->chunk(6) as $batchNumber => $batch) {
             $response = Http::withToken($apiKey)->acceptJson()->asJson()->timeout(120)->post('https://api.openai.com/v1/responses', [
                 'model' => $model,
                 'instructions' => 'Du bist ein sachlicher Finanzmarkt-Redakteur. Nutze ausschließlich die gelieferten Kennzahlen, erfinde keine Nachrichten oder Ursachen und gib valides JSON ohne Markdown zurück.',
-                'input' => 'Erstelle je Index eine aktuelle, gut verständliche Marktinfo mit 3 bis 4 kurzen Sätzen auf Deutsch und Englisch. Beschreibe Marktbreite, Signalverteilung, erwartete 20-Tage-Tendenz, Risiko und Datenabdeckung. Keine Anlageberatung. Format: [{"id":1,"market_info_de":"...","market_info_en":"..."}]. Daten: '.json_encode($snapshot, JSON_UNESCAPED_UNICODE),
-                'max_output_tokens' => 5000,
-                'metadata' => ['feature' => 'daily-index-market-info', 'analysis_date' => $date],
+                'input' => 'Erstelle je Index eine aktuelle, gut verständliche Marktinfo mit 3 bis 4 kurzen Sätzen auf Deutsch und Englisch. Beschreibe Marktbreite, Signalverteilung, erwartete 20-Tage-Tendenz, Risiko und Datenabdeckung. Keine Anlageberatung. Daten: '.json_encode($batch->values(), JSON_UNESCAPED_UNICODE),
+                'text' => [
+                    'format' => [
+                        'type' => 'json_schema',
+                        'name' => 'daily_index_market_infos',
+                        'strict' => true,
+                        'schema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'items' => [
+                                    'type' => 'array',
+                                    'items' => [
+                                        'type' => 'object',
+                                        'properties' => [
+                                            'id' => ['type' => 'integer'],
+                                            'market_info_de' => ['type' => 'string'],
+                                            'market_info_en' => ['type' => 'string'],
+                                        ],
+                                        'required' => ['id', 'market_info_de', 'market_info_en'],
+                                        'additionalProperties' => false,
+                                    ],
+                                ],
+                            ],
+                            'required' => ['items'],
+                            'additionalProperties' => false,
+                        ],
+                    ],
+                ],
+                'max_output_tokens' => 3000,
+                'metadata' => ['feature' => 'daily-index-market-info', 'analysis_date' => $date, 'batch' => (string) ($batchNumber + 1)],
             ]);
-            if ($response->failed()) throw new RuntimeException('HTTP '.$response->status().': '.(string) data_get($response->json(), 'error.message', 'OpenAI-Fehler'));
+            $responseBody = preg_replace('/[\x00-\x1F\x7F]/', ' ', $response->body()) ?? $response->body();
+            $payload = json_decode($responseBody, true, flags: JSON_THROW_ON_ERROR);
+            if ($response->failed()) throw new RuntimeException('HTTP '.$response->status().': '.(string) data_get($payload, 'error.message', 'OpenAI-Fehler'));
 
-            $payload = $response->json();
             $raw = (string) ($payload['output_text'] ?? data_get($payload, 'output.0.content.0.text', ''));
             $raw = trim(preg_replace('/^```(?:json)?|```$/i', '', trim($raw)) ?? $raw);
-            $start = strpos($raw, '['); $end = strrpos($raw, ']');
-            if ($start !== false && $end !== false) $raw = substr($raw, $start, $end - $start + 1);
-            $items = json_decode($raw, true, flags: JSON_THROW_ON_ERROR);
+            // Defensive fallback for rare model responses containing literal
+            // ASCII control bytes inside an otherwise valid JSON string.
+            foreach (range(0, 31) as $controlByte) {
+                $raw = str_replace(chr($controlByte), ' ', $raw);
+            }
+            $raw = str_replace(chr(127), ' ', $raw);
+            $raw = preg_replace('/\p{Cc}/u', ' ', $raw) ?? $raw;
+            $decoded = json_decode($raw, true, flags: JSON_THROW_ON_ERROR);
+            $items = $decoded['items'] ?? $decoded;
             $byId = collect($items)->filter(fn ($item) => is_array($item) && isset($item['id']))->keyBy('id');
 
-            foreach ($snapshot as $input) {
+            foreach ($batch as $input) {
                 $item = $byId->get($input['id']);
                 $german = trim((string) ($item['market_info_de'] ?? ''));
                 if ($german === '') throw new RuntimeException('Marktinfo fehlt für Index-ID '.$input['id']);
@@ -105,8 +140,9 @@ class GenerateDailyIndexMarketInfos extends Command
                     ['model' => $model, 'market_info_de' => $german, 'market_info_en' => trim((string) ($item['market_info_en'] ?? '')) ?: null, 'input_snapshot' => json_encode($input), 'raw_response' => json_encode($item), 'created_at' => now(), 'updated_at' => now()]
                 );
             }
+            }
         } catch (Throwable $exception) {
-            $this->error($exception->getMessage());
+            $this->error($exception->getMessage().' (Zeile '.$exception->getLine().')');
             return self::FAILURE;
         }
 

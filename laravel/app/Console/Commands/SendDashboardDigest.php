@@ -9,15 +9,28 @@ use App\Services\MarketService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\RecommendationController;
+use App\Http\Controllers\DashboardController;
+use App\Enums\PlanLevel;
+use App\Services\PlanAccessService;
 use Illuminate\Http\Request;
 
 final class SendDashboardDigest extends Command
 {
-    protected $signature = 'dashboard:send-digest {--user= : User ID; defaults to the most recently logged-in account}';
+    protected $signature = 'dashboard:send-digest {--user= : User ID; defaults to the most recently logged-in account} {--all : Send the optional digest to all eligible Pro accounts}';
     protected $description = 'Send a dashboard-style market digest to an account email address';
 
     public function handle(MarketService $marketService, IndexAiScoreService $scores, RecommendationController $recommendations): int
     {
+        if ($this->option('all')) {
+            $planAccess = app(PlanAccessService::class);
+            $users = User::query()->whereNotNull('email')->where('is_active', true)->get()
+                ->filter(fn (User $user): bool => $planAccess->allowsTariff($user, PlanLevel::Pro)
+                    && (bool) data_get($user->preferences, 'email_service', true)
+                    && (bool) data_get($user->preferences, 'email_signal_cockpit', false));
+            foreach ($users as $digestUser) $this->call('dashboard:send-digest', ['--user' => $digestUser->id]);
+            $this->info("Signal-Cockpit digest sent to {$users->count()} Pro account(s).");
+            return self::SUCCESS;
+        }
         $user = User::query()->whereNotNull('email')
             ->when($this->option('user'), fn ($query) => $query->whereKey((int) $this->option('user')))
             ->orderByDesc('last_login_at')->orderByDesc('id')->firstOrFail();
@@ -66,11 +79,13 @@ final class SendDashboardDigest extends Command
             ) recent
             WHERE instrument.type = 'stock'
               AND instrument.is_active = true
+              AND (instrument.risk_status IS NULL OR instrument.risk_status <> 'sleep')
               AND instrument.deleted_at IS NULL
               AND instrument.country IS NOT NULL
               AND ARRAY_LENGTH(recent.closes, 1) = 2
             GROUP BY instrument.country
         SQL))->mapWithKeys(fn (object $row): array => [strtoupper((string) $row->country) => (float) $row->change_percent])->all();
+        $signalCockpit = app(DashboardController::class)->signalCockpit();
 
         $user->notifyNow(new DashboardDigestNotification([
             'markets' => $markets,
@@ -87,6 +102,7 @@ final class SendDashboardDigest extends Command
                 : now()->format('d.m.Y'),
             'topStock' => $topStock,
             'countryChanges' => $countryChanges,
+            'signalCockpit' => $signalCockpit,
         ]));
         $this->info('Dashboard digest sent.');
         return self::SUCCESS;

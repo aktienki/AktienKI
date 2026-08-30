@@ -94,7 +94,7 @@ table.data tbody tr:nth-child(even) td{background:#f3f7fa !important}
 @else<div class="muted">Keine Entwicklungskurve vorhanden.</div>@endif
 </td></tr></table>
 <table class="grid"><tr>
-@foreach([['Startkapital',$run->initial_capital,' '.$portfolio->currency],['Endkapital',$run->final_capital,' '.$portfolio->currency],['Performance',$summary['performance_percent'] ?? 0,' %'],['Trades',$run->trades_count,''],['Trefferquote',$summary['hit_rate_percent'] ?? 0,' %'],['Profitfaktor',$summary['profit_factor'] ?? '—',''],['Max. Drawdown',$summary['max_drawdown_percent'] ?? 0,' %'],['Kosten',$summary['total_costs'] ?? 0,' '.$portfolio->currency]] as [$label,$value,$suffix])
+@foreach([['Startkapital',$run->initial_capital,' '.$portfolio->currency],['Endkapital',$run->final_capital,' '.$portfolio->currency],['Performance',$summary['performance_percent'] ?? 0,' %'],['Trades',$run->trades_count,''],['Trefferquote',$summary['hit_rate_percent'] ?? 0,' %'],['Profitfaktor',\App\Support\ProfitFactor::cap($summary['profit_factor'] ?? null) ?? '—',''],['Max. Drawdown',$summary['max_drawdown_percent'] ?? 0,' %'],['Kosten',$summary['total_costs'] ?? 0,' '.$portfolio->currency]] as [$label,$value,$suffix])
 <td width="12.5%"><div class="card"><b>{{ $label }}</b><div class="value">{{ is_numeric($value)?number_format((float)$value,$label==='Trades'?0:2,',','.'):$value }}{{ $suffix }}</div></div></td>
 @endforeach
 </tr></table>

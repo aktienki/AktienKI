@@ -15,6 +15,83 @@ use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
 {
+    private const MOBILE_DASHBOARD_PREFERENCES_VERSION = 2;
+
+    private const MOBILE_DASHBOARD_CARDS = [
+        'champion', 'market', 'market-summary', 'schedule', 'strategy', 'signal-cockpit',
+        'personal', 'community', 'mobile-view',
+    ];
+
+    public function mobileView(Request $request): View
+    {
+        $visibleCards = array_values(array_diff(self::MOBILE_DASHBOARD_CARDS, ['mobile-view', 'strategy']));
+        $preferences = (array) ($request->user()->preferences ?? []);
+        $selected = data_get($preferences, 'dashboard.mobile_cards');
+        $preferencesVersion = (int) data_get($preferences, 'dashboard.mobile_cards_version', 1);
+        $selected = is_array($selected)
+            ? array_values(array_intersect(self::MOBILE_DASHBOARD_CARDS, $selected))
+            : $visibleCards;
+        if (is_array(data_get($preferences, 'dashboard.mobile_cards'))
+            && $preferencesVersion < self::MOBILE_DASHBOARD_PREFERENCES_VERSION
+            && ! in_array('champion', $selected, true)) {
+            array_unshift($selected, 'champion');
+        }
+
+        return view('profile.mobile-view', [
+            'cards' => $visibleCards,
+            'selectedCards' => array_values(array_intersect($visibleCards, $selected)),
+        ]);
+    }
+
+    public function updateMobileView(Request $request): RedirectResponse
+    {
+        $allowedCards = array_values(array_diff(self::MOBILE_DASHBOARD_CARDS, ['strategy']));
+        $validated = $request->validate([
+            'cards' => ['required', 'array', 'min:1', 'max:'.count($allowedCards)],
+            'cards.*' => ['required', 'string', 'distinct', 'in:'.implode(',', $allowedCards)],
+        ]);
+        $preferences = (array) ($request->user()->preferences ?? []);
+        data_set($preferences, 'dashboard.mobile_cards', array_values($validated['cards']));
+        data_set($preferences, 'dashboard.mobile_cards_version', self::MOBILE_DASHBOARD_PREFERENCES_VERSION);
+        $request->user()->forceFill(['preferences' => $preferences])->save();
+
+        return redirect()->route('dashboard')->with('status', __('Mobile Ansicht gespeichert.'));
+    }
+
+    public function resetMobileView(Request $request): RedirectResponse
+    {
+        $preferences = (array) ($request->user()->preferences ?? []);
+        data_forget($preferences, 'dashboard.mobile_cards');
+        data_forget($preferences, 'dashboard.mobile_cards_version');
+        $request->user()->forceFill(['preferences' => $preferences])->save();
+
+        return redirect()->route('profile.mobile-view')->with('status', __('Mobile Ansicht wurde zurückgesetzt.'));
+    }
+
+    public function updateCompanyNews(Request $request): RedirectResponse
+    {
+        $validated = $request->validate(['enabled' => ['required', 'boolean']]);
+        $preferences = (array) ($request->user()->preferences ?? []);
+        $preferences['dashboard_company_news_enabled'] = (bool) $validated['enabled'];
+        $request->user()->forceFill(['preferences' => $preferences])->save();
+
+        return back()->with('status', $validated['enabled']
+            ? __('Unternehmensnachrichten wurden aktiviert.')
+            : __('Unternehmensnachrichten wurden deaktiviert.'));
+    }
+
+    public function updateScheduleEmailVisibility(Request $request): RedirectResponse
+    {
+        $validated = $request->validate(['enabled' => ['required', 'boolean']]);
+        $preferences = (array) ($request->user()->preferences ?? []);
+        $preferences['dashboard_schedule_emails_enabled'] = (bool) $validated['enabled'];
+        $request->user()->forceFill(['preferences' => $preferences])->save();
+
+        return back()->with('status', $validated['enabled']
+            ? __('E-Mails werden in Termine & Erinnerungen angezeigt.')
+            : __('E-Mails werden in Termine & Erinnerungen ausgeblendet.'));
+    }
+
     /**
      * Display the user's profile form.
      */
@@ -51,7 +128,7 @@ class ProfileController extends Controller
 
         $preferences = $user->preferences ?? [];
 
-        foreach (['email_service', 'email_market_summary', 'email_price_alerts', 'email_product_updates'] as $key) {
+        foreach (['email_service', 'email_market_summary', 'email_signal_cockpit', 'email_price_alerts', 'email_product_updates'] as $key) {
             if (array_key_exists($key, $validated)) {
                 $preferences[$key] = (bool) $validated[$key];
             }

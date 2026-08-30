@@ -25,6 +25,26 @@ class SectorController extends Controller
             ->selectRaw('instrument_id, MAX(id) AS prediction_id')
             ->groupBy('instrument_id');
 
+        $latestCompletedRuns = DB::table('walk_forward_backtest_trades as candidate_trade')
+            ->join('walk_forward_backtest_runs as candidate_run', 'candidate_run.id', '=', 'candidate_trade.run_id')
+            ->where('candidate_run.status', 'completed')
+            ->whereIn('candidate_trade.horizon_days', [5, 10, 15, 20])
+            ->groupBy('candidate_trade.instrument_id', 'candidate_trade.horizon_days')
+            ->select('candidate_trade.instrument_id', 'candidate_trade.horizon_days')
+            ->selectRaw('MAX(candidate_trade.run_id) AS run_id');
+
+        $walkForwardStats = DB::table('walk_forward_backtest_trades as trade')
+            ->joinSub($latestCompletedRuns, 'latest_run', function ($join) {
+                $join->on('latest_run.instrument_id', '=', 'trade.instrument_id')
+                    ->on('latest_run.horizon_days', '=', 'trade.horizon_days')
+                    ->on('latest_run.run_id', '=', 'trade.run_id');
+            })
+            ->groupBy('trade.instrument_id')
+            ->select('trade.instrument_id')
+            ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
+            ->selectRaw('AVG(net_return) * 100 AS profit_per_trade')
+            ->selectRaw('COUNT(*) AS historical_trades');
+
         $fiveDayBaselines = DB::table('predictions')
             ->where('prediction_time', '>=', now()->subDays(5))
             ->selectRaw('instrument_id, MIN(id) AS prediction_id')
@@ -36,9 +56,11 @@ class SectorController extends Controller
 
         $sectors = DB::table('instruments as instrument')
             ->leftJoin('market_sectors as market_sector', fn ($join) => $join->whereRaw('LOWER(market_sector.name) = LOWER(instrument.sector)'))
-            ->leftJoinSub($latestPredictions, 'latest', fn ($join) =>
+            ->joinSub($latestPredictions, 'latest', fn ($join) =>
                 $join->on('latest.instrument_id', '=', 'instrument.id'))
-            ->leftJoin('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
+            ->join('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
+            ->leftJoinSub($walkForwardStats, 'walk_forward', fn ($join) =>
+                $join->on('walk_forward.instrument_id', '=', 'instrument.id'))
             ->leftJoinSub($fiveDayBaselines, 'baseline', fn ($join) =>
                 $join->on('baseline.instrument_id', '=', 'instrument.id'))
             ->leftJoin('predictions as baseline_prediction', 'baseline_prediction.id', '=', 'baseline.prediction_id')
@@ -46,10 +68,12 @@ class SectorController extends Controller
                 $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
             ->leftJoin('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental.fundamental_id')
             ->where('instrument.type', 'stock')
+            ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
             ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
             ->whereNotNull('instrument.sector')
             ->where('instrument.sector', '<>', '')
+            ->whereNotNull('prediction.prediction_score')
             ->when($isFreeRegional, fn ($query) => $query->whereIn('instrument.id', $allowedInstrumentIds))
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $term = '%'.mb_strtolower(trim((string) $request->query('q'))).'%';
@@ -68,6 +92,10 @@ class SectorController extends Controller
                 / NULLIF(prediction.current_price, 0)) * 100
             ) AS average_expected_return_20d')
             ->selectRaw('AVG(prediction.confidence) AS average_confidence')
+            ->selectRaw('AVG(walk_forward.hit_rate) AS average_hit_rate')
+            ->selectRaw('AVG(walk_forward.profit_per_trade) AS average_profit_per_trade')
+            ->selectRaw('AVG(prediction.horizon_fusion_stability_score) AS average_stability')
+            ->selectRaw('SUM(COALESCE(walk_forward.historical_trades, 0)) AS historical_trades')
             ->selectRaw('PERCENTILE_CONT(0.75) WITHIN GROUP (
                 ORDER BY COALESCE(prediction.risk_score, prediction.drawdown_risk_factor)
             ) AS risk_p75')
@@ -112,6 +140,7 @@ class SectorController extends Controller
             ->leftJoinSub($dailyCloses, 'daily_close', fn ($join) =>
                 $join->on('daily_close.instrument_id', '=', 'instrument.id'))
             ->where('instrument.type', 'stock')
+            ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
             ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
             ->whereNotNull('instrument.sector')
@@ -161,6 +190,36 @@ class SectorController extends Controller
                 'close' => (float) $bar->close,
             ])->values());
         $sectors->each(fn ($sector) => $sector->etf_chart_points = $sectorEtfCharts->get($sector->sector, collect()));
+
+        $dailySectorScores = DB::table('instruments as score_instrument')
+            ->join('predictions as score_prediction', 'score_prediction.instrument_id', '=', 'score_instrument.id')
+            ->where('score_instrument.type', 'stock')
+            ->where(fn ($query) => $query->whereNull('score_instrument.risk_status')->orWhere('score_instrument.risk_status', '<>', 'sleep'))
+            ->where('score_instrument.is_active', true)
+            ->whereNull('score_instrument.deleted_at')
+            ->whereNotNull('score_instrument.sector')
+            ->where('score_instrument.sector', '<>', '')
+            ->where('score_prediction.prediction_time', '>=', now()->subDays(60))
+            ->whereNotNull('score_prediction.prediction_score')
+            ->when($isFreeRegional, fn ($query) => $query->whereIn('score_instrument.id', $allowedInstrumentIds))
+            ->selectRaw('DISTINCT ON (score_instrument.sector, score_instrument.id, DATE(score_prediction.prediction_time)) score_instrument.sector, score_instrument.id AS instrument_id, DATE(score_prediction.prediction_time) AS score_date')
+            ->selectRaw('CASE WHEN score_prediction.prediction_score <= 1 THEN score_prediction.prediction_score * 100 WHEN score_prediction.prediction_score <= 10 THEN score_prediction.prediction_score * 10 ELSE score_prediction.prediction_score END AS normalized_score')
+            ->orderBy('score_instrument.sector')
+            ->orderBy('score_instrument.id')
+            ->orderByRaw('DATE(score_prediction.prediction_time)')
+            ->orderByDesc('score_prediction.prediction_time')
+            ->orderByDesc('score_prediction.id');
+        $sectorScoreTrends = Cache::remember(
+            'sector_screener_score_trends_v1_'.($isFreeRegional ? sha1(implode(',', $allowedInstrumentIds)) : 'all'),
+            now()->addMinutes(10),
+            fn () => DB::query()->fromSub($dailySectorScores, 'daily_sector_score')
+                ->groupBy('sector', 'score_date')
+                ->orderBy('sector')->orderBy('score_date')
+                ->get(['sector', 'score_date', DB::raw('AVG(normalized_score) AS average_score')])
+                ->groupBy('sector')
+                ->map(fn ($points) => $points->take(-30)->values())
+        );
+        $sectors->each(fn ($sector) => $sector->score_trend = $sectorScoreTrends->get($sector->sector, collect()));
 
         $latestAnalysis = $isFreeRegional ? null : DB::table('daily_market_ai_analyses')
             ->orderByDesc('analysis_date')

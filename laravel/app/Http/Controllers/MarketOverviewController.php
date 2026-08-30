@@ -74,6 +74,7 @@ class MarketOverviewController extends Controller
                 $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
             ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
             ->where('instrument.type', 'stock')
+            ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
             ->where('instrument.is_active', true)
             ->whereNull('instrument.deleted_at')
             ->whereNotNull(DB::raw('COALESCE(prediction.prediction_score, prediction.ai_score)'))

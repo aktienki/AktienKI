@@ -63,20 +63,28 @@
         'sector_score_rotation' => 'KI-Score-Sektorrotation', 'index_score_rotation' => 'KI-Score-Indexrotation',
         'entry_strategy' => 'Einstiegsstrategie', 'entry_risk_style' => 'Auswahlprofil',
         'entry_wait_5d_enabled' => 'WAIT-Einstieg (max. 5 Tage)',
-        'signal_change_exit_enabled' => 'Ausstieg beim Signalwechsel',
+        'signal_change_exit_enabled' => 'Ausstieg beim Signal- oder Marktphasenwechsel',
         'position_factor' => 'Maximaler Positionsanteil', 'exit_strategy' => 'Exitstrategie',
     ];
     $formatMoney = fn ($value) => number_format((float) $value, 2, ',', '.').' €';
     $formatPercent = fn ($value) => number_format((float) $value, 2, ',', '.').' %';
-    $formatFactorUsage = fn ($usage) => collect((array) $usage)
-        ->filter(fn ($count, $factor) => (float) $factor > 1 && (int) $count > 0)
-        ->map(fn ($count, $factor) => str_replace('.', ',', (string) $factor).'×: '.number_format((int) $count, 0, ',', '.'))
-        ->implode(' · ') ?: 'Keine Aufstockung';
+    $formatFactorUsage = function ($usage, int $totalTrades): string {
+        $increasedTrades = (int) collect((array) $usage)
+            ->filter(fn ($count, $factor) => (float) $factor > 1 && (int) $count > 0)
+            ->sum();
+        $share = $totalTrades > 0 ? ($increasedTrades / $totalTrades) * 100 : 0;
+
+        return number_format($increasedTrades, 0, ',', '.').' von '
+            .number_format($totalTrades, 0, ',', '.').' Trades · '
+            .number_format($share, 2, ',', '.').' %';
+    };
     $spPerformance = (float) ($result['benchmark_performance'] ?? 0);
     $selectedExitStrategy = (string) ($filters['exit_strategy'] ?? 'fixed_20d');
     $executionHorizon = (int) ($run->horizon_days ?? 20);
     $exitStrategyLabels = [
         'fixed_20d' => $executionHorizon.' Tage',
+        'signal_change' => 'Signal- oder Marktphasenwechsel',
+        'forecast_below_price' => 'Prognose unter aktuellem Kurs',
         'buy_and_hold' => 'Buy and Hold',
     ];
     $selectedExitStrategyLabel = $exitStrategyLabels[$selectedExitStrategy] ?? $selectedExitStrategy;
@@ -90,8 +98,8 @@
         ! empty($filters['index_score_rotation']) ? 'Bereichspriorität: Index' : null,
         'Auswahl: '.match ($filters['entry_risk_style'] ?? 'balanced') { 'conservative' => 'Konservativ', 'chance' => 'Chance', default => 'Ausgewogen' },
         $automaticComparison ? 'Vergleich: Automatik (alle Entry-/Exitvarianten)' : null,
-        $selectedExitStrategy === 'buy_and_hold' ? 'Haltedauer: Buy and Hold' : 'Exit: '.$executionHorizon.'T',
-        ! empty($filters['signal_change_exit_enabled']) ? 'Exit: Signalwechsel' : null,
+        $selectedExitStrategy === 'buy_and_hold' ? 'Haltedauer: Buy and Hold' : 'Exit: '.$selectedExitStrategyLabel,
+        ! empty($filters['signal_change_exit_enabled']) ? 'Exit: Signal-/Marktphasenwechsel' : null,
         ! empty($filters['support_stop_enabled']) ? 'Exit: Support-Stop' : null,
         ! empty($filters['resistance_trailing_stop_enabled']) ? 'Exit: Resistance-Trailing' : null,
     ])->filter()->unique()->values();
@@ -132,7 +140,7 @@
                 <td>{{ number_format((int) $horizon['trades'], 0, ',', '.') }}</td>
                 <td class="{{ (float) $horizon['hit_rate'] >= 50 ? 'positive' : 'negative' }}">{{ $formatPercent($horizon['hit_rate']) }}</td>
                 <td class="{{ (float) $horizon['average_return'] >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($horizon['average_return']) }}</td>
-                <td>{{ $horizon['profit_factor'] === null ? '∞' : number_format((float) $horizon['profit_factor'], 2, ',', '.') }}</td>
+                <td>{{ $horizon['profit_factor'] === null ? '3,00' : number_format(\App\Support\ProfitFactor::cap($horizon['profit_factor']), 2, ',', '.') }}</td>
             </tr>
         @empty
             <tr><td colspan="8">Für die verwendeten Horizonte ist keine Walk-Forward-Gesamtstatistik verfügbar.</td></tr>
@@ -141,7 +149,7 @@
     </table>
     @if (! empty($filters['entry_wait_5d_enabled']) || ! empty($filters['signal_change_exit_enabled']))
         <table style="margin-top:6px">
-            <tr><th>WAIT &amp; BUY</th><th>Tatsächliche WAIT-Einstiege</th><th>Exit bei Signalwechsel</th><th>Tatsächliche Signalwechsel-Exits</th></tr>
+            <tr><th>WAIT &amp; BUY</th><th>Tatsächliche WAIT-Einstiege</th><th>Exit bei Signal-/Marktphasenwechsel</th><th>Tatsächliche Wechsel-Exits</th></tr>
             <tr>
                 <td>{{ ! empty($filters['entry_wait_5d_enabled']) ? 'Aktiv · maximal 5 Tage' : 'Deaktiviert' }}</td>
                 <td><strong>{{ number_format((int) ($result['wait_entry_count'] ?? 0), 0, ',', '.') }}</strong></td>
@@ -214,7 +222,7 @@
         <tr><td>Max. Portfolio-Drawdown</td><td class="negative">{{ $formatPercent($result['portfolio_max_drawdown']) }}</td>@if($showAdaptive)<td class="negative">{{ $formatPercent($result['adaptive_rotation_max_drawdown']) }}</td>@endif<td class="negative">{{ $formatPercent($result['benchmark_max_drawdown']) }}</td></tr>
         <tr><td>Ausgeführte Trades</td><td>{{ number_format($result['executed_trades'], 0, ',', '.') }}</td>@if($showAdaptive)<td>{{ number_format($result['adaptive_rotation_executed_trades'], 0, ',', '.') }}</td>@endif<td>1</td></tr>
         <tr><td>Ausgewählte Strategien</td><td class="strategy-cell">{{ $selectedStrategiesLabel }}</td>@if($showAdaptive)<td class="strategy-cell">Adaptive Rotation</td>@endif<td class="strategy-cell">Buy and Hold</td></tr>
-        <tr><td>Aufgestockte Positionen</td><td>{{ $formatFactorUsage($result['position_factor_usage'] ?? []) }}</td>@if($showAdaptive)<td>{{ $formatFactorUsage($result['adaptive_rotation_position_factor_usage'] ?? []) }}</td>@endif<td>—</td></tr>
+        <tr><td>Aufgestockte Positionen</td><td>{{ $formatFactorUsage($result['position_factor_usage'] ?? [], (int) $result['executed_trades']) }}</td>@if($showAdaptive)<td>{{ $formatFactorUsage($result['adaptive_rotation_position_factor_usage'] ?? [], (int) $result['adaptive_rotation_executed_trades']) }}</td>@endif<td>—</td></tr>
         <tr><td>Trades pro Monat</td><td>{{ number_format($result['trades_per_month'], 2, ',', '.') }}</td>@if($showAdaptive)<td>{{ number_format($result['adaptive_rotation_trades_per_month'], 2, ',', '.') }}</td>@endif<td>{{ number_format(1 / max(1, (float) $result['backtest_months']), 2, ',', '.') }}</td></tr>
         <tr><td>Übersprungene Signale</td><td>{{ number_format($result['skipped_trades'], 0, ',', '.') }}</td>@if($showAdaptive)<td>{{ number_format($result['adaptive_rotation_skipped_trades'], 0, ',', '.') }}</td>@endif<td>0</td></tr>
         <tr><td>Ø Kapitalbindung</td><td>{{ $formatPercent($result['average_capital_binding']) }}</td>@if($showAdaptive)<td>{{ $formatPercent($result['adaptive_rotation_average_capital_binding']) }}</td>@endif<td>100,00 %</td></tr>
@@ -231,9 +239,10 @@
         'Indexrotation' => ['final_capital' => data_get($result, 'index_entry_rotation_final_capital'), 'performance' => data_get($result, 'index_entry_rotation_performance'), 'max_drawdown' => data_get($result, 'index_entry_rotation_max_drawdown'), 'executed_trades' => data_get($result, 'index_entry_rotation_executed_trades', 0)],
         'Buy and Hold' => ['final_capital' => data_get($result, 'buy_and_hold_final_capital'), 'performance' => data_get($result, 'buy_and_hold_performance'), 'max_drawdown' => data_get($result, 'buy_and_hold_max_drawdown'), 'executed_trades' => data_get($result, 'buy_and_hold_executed_trades', 0)],
     ])->merge(collect($result['automatic_exit_variants'] ?? [])->mapWithKeys(fn ($variant, $key) => [match($key) {
-        'auto_exit_fixed_20d' => 'Exit 20T', 'auto_exit_dynamic_horizon' => 'Dynamischer Horizont',
+        'auto_exit_fixed_20d' => 'Direkteinstieg · Exit 20T', 'auto_exit_dynamic_horizon' => 'Direkteinstieg · dynamischer Horizont',
         'auto_exit_support_stop' => 'Support-Stop', 'auto_exit_resistance_trailing' => 'Resistance-Trailing',
-        'auto_exit_signal_change' => 'Signalwechsel', 'auto_entry_wait_5d' => 'WAIT-Einstieg 5T', default => $key,
+        'auto_exit_signal_change' => 'Signalwechsel', 'auto_exit_forecast_below_price' => 'Prognose unter Kurs',
+        'auto_entry_wait_5d' => 'WAIT-Einstieg 5T', default => $key,
     } => $variant]))->filter(fn ($variant) => (int) ($variant['executed_trades'] ?? 0) > 0);
 @endphp
 <div class="section">
@@ -297,7 +306,7 @@
     <div class="header">
         <div class="brand">aktienKI.com</div>
         <h1>Statistik der verwendeten Modelle</h1>
-        <p class="subtitle">Historische Ergebnisse der im gefilterten Backtest enthaltenen Modelle</p>
+        <p class="subtitle">Horizonübergreifende Performance der im gefilterten Backtest enthaltenen Modelle – jedes Modell wird einmal ausgewiesen</p>
     </div>
 
     @php
@@ -375,7 +384,7 @@
                     <td>{{ number_format((int) $model->trades, 0, ',', '.') }}</td>
                     <td class="{{ (float) $model->hit_rate >= 50 ? 'positive' : 'negative' }}">{{ $formatPercent($model->hit_rate) }}</td>
                     <td class="{{ (float) $model->average_return >= 0 ? 'positive' : 'negative' }}">{{ $formatPercent($model->average_return) }}</td>
-                    <td>{{ $model->profit_factor === null ? '∞' : number_format((float) $model->profit_factor, 2, ',', '.') }}</td>
+                    <td>{{ $model->profit_factor === null ? '3,00' : number_format(\App\Support\ProfitFactor::cap($model->profit_factor), 2, ',', '.') }}</td>
                     <td class="negative">{{ $formatPercent($model->max_drawdown) }}</td>
                     <td>{{ date('m/y', strtotime((string) $model->first_trade)) }}–{{ date('m/y', strtotime((string) $model->last_trade)) }}</td>
                 </tr>
@@ -389,10 +398,21 @@
     <div class="section">
         <div class="section-title">Matrix Modell × Exit-Strategie</div>
         @php
-            $exitStrategies = [
+            $exitStrategyLabels = [
                 'fixed_20d' => 'Exit '.$executionHorizon.'T',
+                'adaptive_rotation_20d' => 'Adaptive Rotation',
+                'auto_exit_dynamic_horizon' => 'Dynamischer Horizont',
+                'auto_exit_support_stop' => 'Support-Stop',
+                'auto_exit_resistance_trailing' => 'Resistance-Trailing',
+                'auto_exit_signal_change' => 'Signalwechsel',
+                'auto_exit_forecast_below_price' => 'Prognose unter Kurs',
             ];
-            if ($showAdaptive) $exitStrategies['adaptive_rotation_20d'] = 'Adaptive Rotation';
+            $availableExitStrategies = $modelExitMatrix
+                ->flatten(1)
+                ->pluck('strategy')
+                ->unique();
+            $exitStrategies = collect($exitStrategyLabels)
+                ->filter(fn ($label, $strategy) => $availableExitStrategies->contains($strategy));
         @endphp
         <table class="exit-matrix">
             <thead>
@@ -417,7 +437,7 @@
                     @endforeach
                 </tr>
             @empty
-                <tr><td colspan="5">Für diesen Lauf sind keine Daten zur Exit-Matrix verfügbar.</td></tr>
+                <tr><td colspan="{{ max(2, $exitStrategies->count() + 1) }}">Für diesen Lauf sind keine Daten zur Exit-Matrix verfügbar.</td></tr>
             @endforelse
             </tbody>
         </table>

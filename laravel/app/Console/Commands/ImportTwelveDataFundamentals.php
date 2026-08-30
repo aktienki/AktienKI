@@ -9,13 +9,16 @@ use Throwable;
 
 class ImportTwelveDataFundamentals extends Command
 {
-    protected $signature = 'fundamentals:import-twelve-data {--limit=0} {--force} {--analysis-only} {--sleep=61000}';
+    protected $signature = 'fundamentals:import-twelve-data {--limit=0} {--force} {--missing-only : Import only stocks without any fundamental snapshot} {--analysis-only} {--sleep=61000}';
     protected $description = 'One-time import of Twelve Data fundamentals for active stocks';
 
     public function handle(TwelveDataFundamentalImporter $importer): int
     {
         $query = DB::table('instruments')->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at')->orderBy('id');
-        if (! $this->option('force')) {
+        if ($this->option('missing-only') && ! $this->option('analysis-only')) {
+            $query->whereNotExists(fn ($sub) => $sub->selectRaw('1')->from('instrument_fundamentals as f')
+                ->whereColumn('f.instrument_id', 'instruments.id'));
+        } elseif (! $this->option('force')) {
             $table = $this->option('analysis-only') ? 'instrument_analyst_consensuses' : 'instrument_fundamentals';
             $alias = $this->option('analysis-only') ? 'a' : 'f';
             $query->whereNotExists(fn ($sub) => $sub->selectRaw('1')->from($table.' as '.$alias)

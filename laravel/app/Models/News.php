@@ -13,13 +13,14 @@ class News extends Model
 
     protected $casts = [
         'published_at' => 'datetime',
+        'ai_analyzed_at' => 'datetime',
         'sentiment_score' => 'float',
+        'relevance_score' => 'integer',
         'raw_data' => 'array',
-        'meta' => 'array',
     ];
 
-    public function company(): BelongsTo
+    public function instrument(): BelongsTo
     {
-        return $this->belongsTo(Company::class);
+        return $this->belongsTo(Instrument::class);
     }
 }

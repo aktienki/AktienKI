@@ -14,7 +14,11 @@ use App\Http\Controllers\AppleChartController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SectorController;
 use App\Http\Controllers\IndexScreenerController;
+use App\Http\Controllers\MarketDeepAnalysisController;
+use App\Http\Controllers\EtfCertificateController;
 use App\Http\Controllers\WelcomeController;
+use App\Http\Controllers\KlaLandingController;
+use App\Http\Controllers\NvidiaLandingController;
 use App\Http\Controllers\WatchlistController;
 use App\Http\Controllers\TradingIntegrationController;
 use App\Http\Controllers\MarketAssessmentController;
@@ -29,8 +33,13 @@ use App\Http\Controllers\SignalEmailPreviewController;
 use App\Http\Controllers\QualityGateSetupController;
 use App\Http\Controllers\SmartSelectionLabelController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ChartViewSignalController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\AkiChatController;
+use App\Http\Controllers\NewsController;
+use App\Http\Controllers\TradeOpportunityController;
+use App\Http\Controllers\TutorialController;
+use App\Http\Controllers\PerformanceTransparencyController;
 use App\Http\Controllers\BetaInvitationController;
 use App\Http\Controllers\EasyAccessController;
 use Illuminate\Http\Request;
@@ -40,6 +49,14 @@ Route::get('/', WelcomeController::class)->name('welcome');
 Route::get('/welcome', WelcomeController::class)->name('welcome.page');
 Route::get('/welcome-copy', [WelcomeController::class, 'copy'])->name('welcome.copy');
 Route::get('/welcome-original', [WelcomeController::class, 'original'])->name('welcome.original');
+Route::get('/kla', [KlaLandingController::class, 'show'])->name('landing.kla');
+Route::get('/kla/quote', [KlaLandingController::class, 'quote'])
+    ->middleware('throttle:60,1')
+    ->name('landing.kla.quote');
+Route::get('/nvidia', [NvidiaLandingController::class, 'show'])->name('landing.nvidia');
+Route::get('/nvidia/quote', [NvidiaLandingController::class, 'quote'])
+    ->middleware('throttle:60,1')
+    ->name('landing.nvidia.quote');
 Route::get('/easy-access', [EasyAccessController::class, 'index'])->name('easy-access');
 Route::post('/easy-access', [EasyAccessController::class, 'store'])
     ->middleware('throttle:10,1')
@@ -239,9 +256,16 @@ Route::post('/locale/{locale}', function (Request $request, string $locale) {
 })->name('locale.update');
 
 Route::middleware(['auth', 'verified', 'beta'])->group(function () {
+    Route::get('/hilfe', [TutorialController::class, 'index'])->name('tutorial.index');
+    Route::get('/hilfe/handbuch', [TutorialController::class, 'download'])->name('tutorial.download');
+    Route::post('/hilfe/abschliessen', [TutorialController::class, 'complete'])->name('tutorial.complete');
+    Route::post('/hilfe/neu-starten', [TutorialController::class, 'restart'])->name('tutorial.restart');
     Route::post('/aki/chat', AkiChatController::class)->middleware('throttle:10,1')->name('aki.chat');
     Route::post('/live-prices/subscribe', LivePriceSubscriptionController::class)->name('live-prices.subscribe');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/tabellen/performance-transparenz', PerformanceTransparencyController::class)
+        ->middleware('plan:pro')
+        ->name('predictions.performance-transparency');
     Route::patch('/dashboard/layout', [DashboardController::class, 'updateLayout'])->name('dashboard.layout.update');
     Route::patch('/dashboard/card-layout', [DashboardController::class, 'updateCardLayout'])->name('dashboard.card-layout.update');
     Route::view('/maerkte/marktlage', 'markets.situation')->name('markets.situation');
@@ -257,6 +281,11 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::delete('/community/posts/{post}', [CommunityController::class, 'destroy'])->name('community.posts.destroy');
     Route::get('/email-preview/signal', SignalEmailPreviewController::class)->name('email-preview.signal');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::get('/profile/mobile-view', [ProfileController::class, 'mobileView'])->name('profile.mobile-view');
+    Route::patch('/profile/mobile-view', [ProfileController::class, 'updateMobileView'])->name('profile.mobile-view.update');
+    Route::delete('/profile/mobile-view', [ProfileController::class, 'resetMobileView'])->name('profile.mobile-view.reset');
+    Route::patch('/profile/company-news', [ProfileController::class, 'updateCompanyNews'])->name('profile.company-news.update');
+    Route::patch('/profile/schedule-email-visibility', [ProfileController::class, 'updateScheduleEmailVisibility'])->name('profile.schedule-email-visibility.update');
     Route::get('/setup/filter', [PredictionController::class, 'filterSetup'])->name('setup.filter');
     Route::get('/setup/quality', [PredictionController::class, 'qualitySetup'])->name('setup.quality');
     Route::get('/setup/labels', [SmartSelectionLabelController::class, 'index'])->name('setup.labels.index');
@@ -287,7 +316,13 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
         redirect()->route('predictions.index', $request->query())
     )->name('stocks.index');
 Route::get('/predictions', [PredictionController::class, 'index'])->name('predictions.index');
+Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 Route::get('/predictions/signal-history', [\App\Http\Controllers\SignalTransitionController::class, 'index'])->name('predictions.signal-history');
+Route::get('/predictions/chartview-signals', ChartViewSignalController::class)->middleware('plan:pro')->name('predictions.chartview-signals');
+Route::get('/chancen', [TradeOpportunityController::class, 'index'])->middleware('plan:pro')->name('opportunities.index');
+Route::post('/chancen/{opportunity}/oeffnen', [TradeOpportunityController::class, 'open'])->middleware('plan:pro')->name('opportunities.open');
+Route::patch('/chancen/{opportunity}', [TradeOpportunityController::class, 'update'])->middleware('plan:pro')->name('opportunities.update');
+Route::delete('/chancen/{opportunity}', [TradeOpportunityController::class, 'destroy'])->middleware('plan:pro')->name('opportunities.destroy');
 Route::get('/predictions/trade-performance/backtest', [\App\Http\Controllers\BacktestTradePerformanceController::class, 'index'])->name('predictions.trade-performance.backtest');
 Route::get('/reports/{analysisReport}/pdf', [\App\Http\Controllers\AnalysisReportController::class, 'pdf'])->middleware(['auth', 'verified', 'beta'])->name('analysis-reports.pdf');
 Route::get('/reports/{analysisReport}', [\App\Http\Controllers\AnalysisReportController::class, 'show'])->middleware(['auth', 'verified', 'beta'])->name('analysis-reports.show');
@@ -321,7 +356,13 @@ Route::get('/reports/{analysisReport}', [\App\Http\Controllers\AnalysisReportCon
     Route::get('/stocks/{symbol}/chartanalyse', [StockController::class, 'chartAnalysis'])->name('stocks.chart-analysis');
     Route::get('/stocks/{symbol}/chart-data', [StockController::class, 'chartData'])->name('stocks.chart-data');
     Route::get('/stocks/{symbol}/live-quote', [StockController::class, 'liveQuote'])->name('stocks.live-quote');
+    Route::get('/stocks/{symbol}/certificates', [StockController::class, 'certificates'])->name('stocks.certificates');
+    if (app()->environment('local')) {
+        Route::get('/stocks/{symbol}/hebelrisiko', [StockController::class, 'leveragedRisk'])->name('stocks.leveraged-risk');
+        Route::get('/stocks/{symbol}/hebelrisiko/zertifikate', [StockController::class, 'leveragedRiskCertificates'])->name('stocks.leveraged-risk.certificates');
+    }
     Route::get('/stocks/{symbol}/report', [StockController::class, 'report'])->name('stocks.report');
+    Route::post('/stocks/{symbol}/report/email', [StockController::class, 'emailReport'])->name('stocks.report.email');
     Route::get('/stocks/{symbol}', [StockController::class, 'show'])->name('stocks.show');
     Route::post('/stocks/{instrument}/entry-alert', [\App\Http\Controllers\EntrySignalAlertController::class, 'store'])->middleware('plan:pro')->name('stocks.entry-alert.store');
     Route::post('/stocks/{instrument}/purchase-reminder', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'store'])->middleware('plan:pro')->name('stocks.purchase-reminder.store');
@@ -330,9 +371,14 @@ Route::get('/reports/{analysisReport}', [\App\Http\Controllers\AnalysisReportCon
     Route::delete('/notifications/entry-alerts/{alert}', [\App\Http\Controllers\EntrySignalAlertController::class, 'destroy'])->middleware('plan:pro')->name('notifications.entry-alerts.destroy');
     Route::patch('/notifications/purchase-reminders/{reminder}/disable', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'disable'])->middleware('plan:pro')->name('notifications.purchase-reminders.disable');
     Route::patch('/notifications/purchase-reminders/{reminder}/enable', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'enable'])->middleware('plan:pro')->name('notifications.purchase-reminders.enable');
+    Route::patch('/notifications/purchase-reminders/{reminder}/reschedule', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'reschedule'])->middleware('plan:pro')->name('notifications.purchase-reminders.reschedule');
     Route::delete('/notifications/purchase-reminders/{reminder}', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'destroy'])->middleware('plan:pro')->name('notifications.purchase-reminders.destroy');
     Route::get('/sektoren', [SectorController::class, 'index'])->name('sectors.index');
     Route::get('/indizes', IndexScreenerController::class)->name('indices.index');
+    Route::get('/indizes-neu', IndexScreenerController::class)->name('indices.redesign');
+    Route::get('/markt-deep-analysis', MarketDeepAnalysisController::class)->name('markets.deep-analysis');
+    Route::get('/etfs-zertifikate', EtfCertificateController::class)->name('securities.index');
+    Route::get('/zertifikate', EtfCertificateController::class)->name('certificates.index');
     Route::get('/watchlists', [WatchlistController::class, 'index'])->name('watchlists.index');
     Route::get('/watchlists-menu', [WatchlistController::class, 'menu'])->name('watchlists.menu');
     Route::post('/watchlists', [WatchlistController::class, 'store'])->name('watchlists.store');

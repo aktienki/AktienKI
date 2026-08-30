@@ -63,7 +63,7 @@
                         [__('Positionen'), $portfolio->positions->count(), 'text-teal-700'],
                         [__('Trades'), $simulationRun?->trades_count ?? 0, 'text-[var(--ak-text)]'],
                         [__('Trefferquote'), number_format((float) ($simulationSummary['hit_rate_percent'] ?? 0), 1, ',', '.').' %', 'text-orange-400'],
-                        [__('Profitfaktor'), number_format((float) ($simulationSummary['profit_factor'] ?? 0), 2, ',', '.'), 'text-orange-400'],
+                        [__('Profitfaktor'), number_format(\App\Support\ProfitFactor::cap($simulationSummary['profit_factor'] ?? 0) ?? 0, 2, ',', '.'), 'text-orange-400'],
                         [__('Max. Drawdown'), number_format((float) ($simulationSummary['max_drawdown_percent'] ?? 0), 1, ',', '.').' %', 'text-rose-300'],
                         [__('Verschiedene Aktien'), $distinctStocksCount, 'text-orange-400'],
                         [__('Höchster Gewinn'), $highestProfit !== null ? '+'.number_format($highestProfit, 2, ',', '.').' '.$portfolio->currency : '—', 'text-teal-300'],

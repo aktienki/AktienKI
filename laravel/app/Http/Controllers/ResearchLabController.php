@@ -67,7 +67,7 @@ final class ResearchLabController extends Controller
             'macro_lags' => ['nullable', 'array'],
             'benchmark_mode' => ['required', 'in:auto,exchange,index,sector'],
             'minimum_hit_rate' => ['required', 'numeric', 'between:0,100'],
-            'minimum_profit_factor' => ['required', 'numeric', 'between:0,10'],
+            'minimum_profit_factor' => ['required', 'numeric', 'between:0,3'],
             'minimum_trades' => ['required', 'integer', 'between:1,10000'],
             'shadow_days' => ['required', 'integer', 'in:20,60,120'],
         ]);
