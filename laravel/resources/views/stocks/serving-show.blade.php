@@ -23,6 +23,17 @@
 
         <section class="ak-card mt-4 border-cyan-400/20 p-4"><p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-500">Fundamentaldaten · neue Datenbank</p><div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">@foreach([['Marktkap.',$stock->market_cap,'currency'],['KGV',$stock->trailing_pe,'number'],['Forward-KGV',$stock->forward_pe,'number'],['Div.-Rendite',$stock->dividend_yield,'percent'],['Marge',$stock->profit_margin,'percent'],['Umsatzwachstum',$stock->revenue_growth,'percent'],['ROE',$stock->return_on_equity,'percent'],['Debt/Equity',$stock->debt_to_equity,'number']] as [$label,$value,$format])<div><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ $label }}</small><b class="mt-1 block">@if(!is_numeric($value))—@elseif($format==='percent'){{ number_format((float)$value*100,1,',','.') }} % @elseif($format==='currency'){{ number_format((float)$value/1000000000,1,',','.') }} Mrd. @else{{ number_format((float)$value,2,',','.') }}@endif</b></div>@endforeach</div><p class="mt-3 text-[8px] text-[var(--ak-muted)]">Snapshot {{ $stock->fundamental_snapshot_date ? \Illuminate\Support\Carbon::parse($stock->fundamental_snapshot_date)->format('d.m.Y') : '—' }}</p></section>
         <p class="mt-3 text-[9px] text-[var(--ak-muted)]">Modellquelle: aktienki_serving_next. Personenbezogene Daten werden auf dieser Seite nicht aus der Serving-Datenbank gelesen.</p>
+        @php($qualityGateHorizons = $stock->horizons->filter(fn ($scope) => $scope->quality_gate_passed))
+        @if($qualityGateHorizons->isNotEmpty())
+            <section class="ak-card mt-4 border-amber-400/30 bg-amber-400/[.04] p-4">
+                <p class="text-[9px] font-black uppercase tracking-[.16em] text-amber-400">Quality Gate</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    @foreach($qualityGateHorizons as $scope)
+                        <span class="rounded-lg border border-amber-400/40 px-3 py-2 text-[10px] font-black text-amber-300">{{ $scope->horizon }}T · {{ $scope->variant_label }} · PF {{ is_numeric($scope->metrics->profit_factor) ? number_format($scope->metrics->profit_factor,2,',','.') : '—' }}</span>
+                    @endforeach
+                </div>
+            </section>
+        @endif
     </div></main>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
