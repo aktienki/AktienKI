@@ -24,6 +24,9 @@ class MacMiniOperationsService
                 '__DATABASE_PORT__',
                 '__DATABASE_SOCKET__',
                 '__CONTROL_PLANE_LABEL__',
+                '__CONTINUOUS_TRAINING_LABEL__',
+                '__CONTINUOUS_TRAINING_STATE__',
+                '__CONTINUOUS_TRAINING_LOG__',
                 '__SERVER_HOST__',
                 '__SERVER_IDENTITY_FILE__',
             ],
@@ -33,6 +36,9 @@ class MacMiniOperationsService
                 (string) ((int) $macMini['pipeline_database_port']),
                 escapeshellarg((string) $macMini['pipeline_database_socket']),
                 escapeshellarg((string) $macMini['control_plane_label']),
+                escapeshellarg((string) $macMini['continuous_training_label']),
+                escapeshellarg((string) $macMini['continuous_training_state']),
+                escapeshellarg((string) $macMini['continuous_training_log']),
                 escapeshellarg((string) $macMini['server_host']),
                 escapeshellarg((string) $macMini['server_identity_file']),
             ],
@@ -43,10 +49,13 @@ database_name=__DATABASE_NAME__
 database_port=__DATABASE_PORT__
 database_socket=__DATABASE_SOCKET__
 control_plane_label=__CONTROL_PLANE_LABEL__
+continuous_training_label=__CONTINUOUS_TRAINING_LABEL__
+continuous_training_state=__CONTINUOUS_TRAINING_STATE__
+continuous_training_log=__CONTINUOUS_TRAINING_LOG__
 server_host=__SERVER_HOST__
 server_identity_file=__SERVER_IDENTITY_FILE__
 platform="$(uname -s 2>/dev/null || echo unknown)"
-log_file="$project/.local/control-plane/server.log"
+control_plane_log="$project/.local/control-plane/server.log"
 
 echo '---STATUS---'
 echo "platform=$platform"
@@ -79,6 +88,46 @@ if launchctl print "gui/$(id -u)/$control_plane_label" >/dev/null 2>&1; then
 else
   echo 'control_plane=inactive'
   echo 'control_plane_pid=—'
+fi
+
+if launchctl print "gui/$(id -u)/$continuous_training_label" >/dev/null 2>&1; then
+  echo 'continuous_training_service=active'
+  echo "continuous_training_pid=$(launchctl print "gui/$(id -u)/$continuous_training_label" 2>/dev/null | awk -F' = ' '/^[[:space:]]*pid =/{print $2; exit}')"
+else
+  echo 'continuous_training_service=inactive'
+  echo 'continuous_training_pid=—'
+fi
+
+stock_training_processes="$(pgrep -f '[r]un_dax_standard_training.py' 2>/dev/null | wc -l | tr -d ' ')"
+model_training_processes="$(pgrep -f '[t]est_hgb_tcn_buy_exit.py' 2>/dev/null | wc -l | tr -d ' ')"
+process_table="$(ps -axo command= 2>/dev/null)"
+training_symbols="$(printf '%s\n' "$process_table" | sed -nE 's#.*jobs/[0-9]+-rank-[0-9]+-([^ /]+).*#\1#p' | sort -u | paste -sd, - | sed 's/,/, /g')"
+training_horizons="$(printf '%s\n' "$process_table" | sed -nE 's#.*result-([0-9]+)t\.json.*#\1#p' | sort -nu | sed 's/$/T/' | paste -sd, - | sed 's/,/, /g')"
+training_details="$(printf '%s\n' "$process_table" | sed -nE 's#.*jobs/[0-9]+-rank-[0-9]+-[^/]+/[0-9]+-([^/]+)/result-([0-9]+)t\.json.*#\1 \2T#p' | sort -u | paste -sd, - | sed 's/,/, /g')"
+echo "training_stock_processes=${stock_training_processes:-0}"
+echo "training_model_processes=${model_training_processes:-0}"
+echo "training_symbols=${training_symbols:-—}"
+echo "training_horizons=${training_horizons:-—}"
+echo "training_details=${training_details:-—}"
+
+if [ "${stock_training_processes:-0}" -gt 0 ] || [ "${model_training_processes:-0}" -gt 0 ]; then
+  echo 'training_activity=running'
+elif launchctl print "gui/$(id -u)/$continuous_training_label" >/dev/null 2>&1; then
+  echo 'training_activity=ready'
+else
+  echo 'training_activity=stopped'
+fi
+
+if [ -r "$continuous_training_state" ]; then
+  echo "training_controller_state=$(sed -nE 's/^[[:space:]]*"state":[[:space:]]*"([^"]+)".*/\1/p' "$continuous_training_state" | head -1)"
+  echo "training_next_rank=$(sed -nE 's/^[[:space:]]*"next_rank":[[:space:]]*([0-9]+).*/\1/p' "$continuous_training_state" | head -1)"
+  echo "training_universe_count=$(sed -nE 's/^[[:space:]]*"universe_count":[[:space:]]*([0-9]+).*/\1/p' "$continuous_training_state" | head -1)"
+  echo "training_updated_at=$(sed -nE 's/^[[:space:]]*"updated_at":[[:space:]]*"([^"]+)".*/\1/p' "$continuous_training_state" | head -1)"
+else
+  echo 'training_controller_state=unknown'
+  echo 'training_next_rank=—'
+  echo 'training_universe_count=—'
+  echo 'training_updated_at=—'
 fi
 
 psql_bin="$(command -v psql 2>/dev/null)"
@@ -122,9 +171,14 @@ else
 fi
 
 echo '---ERRORS---'
-test -n "$log_file" && grep -E 'ERROR|Error|Traceback|FAILED|Connection refused' "$log_file" 2>/dev/null | tail -35
+test -r "$continuous_training_log" && grep -E 'ERROR|Error|Traceback|FAILED|Connection refused' "$continuous_training_log" 2>/dev/null | tail -35
+test -r "$control_plane_log" && grep -E 'ERROR|Error|Traceback|FAILED|Connection refused' "$control_plane_log" 2>/dev/null | tail -10
 echo '---LOG---'
-test -n "$log_file" && tail -70 "$log_file" 2>/dev/null
+if [ -r "$continuous_training_log" ]; then
+  tail -70 "$continuous_training_log" 2>/dev/null
+elif [ -r "$control_plane_log" ]; then
+  tail -70 "$control_plane_log" 2>/dev/null
+fi
 exit 0
 BASH
         );
