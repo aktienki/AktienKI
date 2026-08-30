@@ -1226,7 +1226,7 @@
                         </div>
                     </details>
                 </div>
-                @if ($chartCandles->isNotEmpty())
+                @if (! empty($historicalChartAllowed))
                     <div class="relative min-h-[160px] min-w-0 flex-1 overflow-hidden lg:min-h-0">
                         <div id="stock-detail-chart" class="absolute inset-0" aria-label="{{ __('Kurschart') }} {{ $instrument->symbol }}"></div>
                         <svg id="stock-indicator-overlay" class="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible" aria-hidden="true"></svg>
@@ -1241,15 +1241,11 @@
                     </div>
                     <div id="stock-secondary-indicator-panels" class="mt-2 grid max-h-44 shrink-0 grid-cols-1 gap-2 overflow-y-auto"></div>
                 @else
-                    <div class="grid min-h-[200px] flex-1 place-items-center rounded-2xl border border-dashed {{ empty($historicalChartAllowed) ? 'border-amber-400/25 bg-amber-400/[.04]' : 'border-[var(--ak-border)]' }} px-6 text-center text-sm text-[var(--ak-muted)]">
+                    <div class="grid min-h-[200px] flex-1 place-items-center rounded-2xl border border-dashed border-amber-400/25 bg-amber-400/[.04] px-6 text-center text-sm text-[var(--ak-muted)]">
                         <div class="max-w-xl">
-                            @if (empty($historicalChartAllowed))
-                                <x-heroicon-o-shield-exclamation class="mx-auto mb-3 h-8 w-8 text-amber-400" />
-                                <strong class="block text-sm font-black text-amber-300">{{ __('Historischer Chart nicht verfügbar') }}</strong>
-                                <span class="mt-2 block text-xs leading-5">{{ $historicalChartRestrictionReason }}</span>
-                            @else
-                                {{ __('Keine OHLC-Tageskurse verfügbar.') }}
-                            @endif
+                            <x-heroicon-o-shield-exclamation class="mx-auto mb-3 h-8 w-8 text-amber-400" />
+                            <strong class="block text-sm font-black text-amber-300">{{ __('Historischer Chart nicht verfügbar') }}</strong>
+                            <span class="mt-2 block text-xs leading-5">{{ $historicalChartRestrictionReason }}</span>
                         </div>
                     </div>
                 @endif
@@ -2683,12 +2679,34 @@
         });
     </script>
 
+    @php
+        $indicatorChartCards = $indicatorCards->map(function (array $card): array {
+            $points = collect($card['points'] ?? [])->sortBy('x')->values();
+            $binSize = max(8, (int) ceil($points->count() / 24));
+            $histogram = $points->chunk($binSize)->map(function ($sample): array {
+                $probability = $sample->isEmpty()
+                    ? 0.0
+                    : ($sample->where('up', true)->count() / $sample->count()) * 100;
+
+                return [
+                    'x' => (float) $sample->avg('x'),
+                    'y' => $probability,
+                    'fillColor' => $probability > 55 ? '#2a9d96' : ($probability < 45 ? '#b86470' : '#b6a15b'),
+                ];
+            })->values();
+
+            unset($card['points']);
+            $card['histogram'] = $histogram;
+
+            return $card;
+        })->values();
+    @endphp
     <script>
         const initializeStockIndicatorStatistics = () => {
             if (!window.ApexCharts) return;
             if (document.documentElement.dataset.stockIndicatorStatisticsInitialized === 'true') return;
             document.documentElement.dataset.stockIndicatorStatisticsInitialized = 'true';
-            const cards = @json($indicatorCards);
+            const cards = @json($indicatorChartCards);
             let rendered = false;
 
             const renderIndicatorCards = () => {
@@ -2697,21 +2715,8 @@
 
                 cards.forEach((card, index) => {
                     const element = document.querySelector(`#stock-indicator-probability-chart-${index}`);
-                    if (!element || !card.points?.length) return;
-                    const sorted = [...card.points].sort((left, right) => left.x - right.x);
-                    const binSize = Math.max(8, Math.ceil(sorted.length / 24));
-                    const histogram = [];
-
-                    for (let start = 0; start < sorted.length; start += binSize) {
-                        const sample = sorted.slice(start, start + binSize);
-                        if (!sample.length) continue;
-                        const probability = sample.filter(point => point.up).length / sample.length * 100;
-                        histogram.push({
-                            x: sample.reduce((sum, point) => sum + point.x, 0) / sample.length,
-                            y: probability,
-                            fillColor: probability > 55 ? '#2a9d96' : (probability < 45 ? '#b86470' : '#b6a15b'),
-                        });
-                    }
+                    if (!element || !card.histogram?.length) return;
+                    const histogram = card.histogram;
 
                     const chart = new ApexCharts(element, {
                         series: [{ name: @json(__('20-Tage-Steigwahrscheinlichkeit')), data: histogram }],
@@ -2796,7 +2801,7 @@
             return [$days => is_numeric($price) ? (float) $price : null];
         })->all();
     @endphp
-    @if ($chartCandles->isNotEmpty())
+    @if (! empty($historicalChartAllowed))
         <script>
             const initializeStockDetailChart = () => {
                 const element = document.querySelector('#stock-detail-chart');
@@ -2850,6 +2855,7 @@
                 let rsiChart;
                 const secondaryCharts = new Map();
                 let currentCandles = initialCandles;
+                let chartLoadComplete = initialCandles.length > 0;
                 let chartPatterns = initialChartPatterns;
                 let watchlistEntry = initialWatchlistEntry;
                 let liveTimer;
@@ -3725,6 +3731,16 @@
                     const height = element.clientHeight;
                     if (!width || !height) return;
 
+                    if (currentCandles.length === 0) {
+                        const emptyState = document.createElement('div');
+                        emptyState.className = 'grid h-full place-items-center px-6 text-center text-xs text-[var(--ak-muted)]';
+                        emptyState.textContent = chartLoadComplete
+                            ? @json(__('Aktuell sind keine Kursdaten verfügbar.'))
+                            : @json(__('Kursdaten werden geladen …'));
+                        element.replaceChildren(emptyState);
+                        return;
+                    }
+
                     const light = document.documentElement.dataset.theme === 'light';
                     const timeRange = chartTimeRange();
                     const priceRange = chartPriceRange();
@@ -4391,7 +4407,7 @@
                 if (canViewRealtime) {
                     updateLiveClock();
                     refreshTwelveDataQuote();
-                    liveQuoteTimer = window.setInterval(refreshTwelveDataQuote, 2_000);
+                    liveQuoteTimer = window.setInterval(refreshTwelveDataQuote, 15_000);
                     liveClockTimer = window.setInterval(updateLiveClock, 1_000);
                     window.addEventListener('pagehide', () => {
                         window.clearInterval(liveQuoteTimer);
@@ -4406,13 +4422,18 @@
                         const response = await fetch(dataUrl, {
                             headers: { 'Accept': 'application/json' },
                             credentials: 'same-origin',
-                            cache: 'no-store'
+                            cache: 'default'
                         });
-                        if (!response.ok) return;
+                        if (!response.ok) {
+                            chartLoadComplete = true;
+                            if (currentCandles.length === 0) renderMainChart();
+                            return;
+                        }
 
                         const payload = await response.json();
                         const nextCandles = Array.isArray(payload.candles) ? payload.candles : [];
                         const nextChartPatterns = Array.isArray(payload.chart_patterns) ? payload.chart_patterns : [];
+                        chartLoadComplete = true;
                         const entryChanged = JSON.stringify(payload.watchlist_entry) !== JSON.stringify(watchlistEntry);
                         if (JSON.stringify(nextCandles) !== JSON.stringify(currentCandles) || JSON.stringify(nextChartPatterns) !== JSON.stringify(chartPatterns) || entryChanged) {
                             currentCandles = nextCandles;
@@ -4434,22 +4455,25 @@
                                 changeElement.className = `rounded-xl px-3 py-2 text-sm font-black ${change >= 0 ? 'bg-emerald-400/10 text-emerald-400' : 'bg-rose-400/10 text-rose-400'}`;
                             }
                         }
+                        if (currentCandles.length === 0) renderMainChart();
 
                         if (updatedElement) {
                             updatedElement.textContent = new Date(payload.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                         }
                     } catch (_) {
                         // Keep the last valid chart visible during temporary connection issues.
+                        chartLoadComplete = true;
+                        if (currentCandles.length === 0) renderMainChart();
                     }
                 };
 
                 const startLiveUpdates = () => {
                     window.clearInterval(liveTimer);
-                    liveTimer = window.setInterval(refreshChart, 60000);
+                    liveTimer = window.setInterval(refreshChart, 900_000);
                 };
 
+                refreshChart();
                 if (!Number.isFinite(chartFocusAt)) {
-                    refreshChart();
                     startLiveUpdates();
                     document.addEventListener('visibilitychange', () => {
                         if (document.visibilityState === 'visible') {

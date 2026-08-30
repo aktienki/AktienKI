@@ -629,7 +629,7 @@ class StockController extends Controller
         $sectorRankings = $this->sectorRankings($instrument, $fundamentalData);
 
         ['candles' => $chartCandles, 'source' => $chartSource] = $historicalChartAllowed
-            ? $this->chartSeries($instrument, $yahooFinance, $chartFocusAt)
+            ? $this->chartSeries($instrument, $yahooFinance, $chartFocusAt, false)
             : ['candles' => collect(), 'source' => 'license_restricted'];
         $chartPatterns = $this->recentChartPatterns($chartCandles);
         $chartPatternStats = $historicalChartAllowed
@@ -965,15 +965,24 @@ class StockController extends Controller
 
         $series = $this->chartSeries($instrument, $yahooFinance, $chartFocusAt);
 
-        return response()->json([
+        $latestCandleAt = data_get($series['candles']->last(), 'x');
+        $updatedAt = is_numeric($latestCandleAt)
+            ? CarbonImmutable::createFromTimestampMs((int) $latestCandleAt)->toIso8601String()
+            : now()->startOfMinute()->toIso8601String();
+        $response = response()->json([
             'symbol' => $instrument->symbol,
             'candles' => $series['candles']->values(),
             'source' => $series['source'],
             'currency' => $this->usesEuroDisplay($instrument) ? 'EUR' : (string) ($instrument->currency ?: ''),
             'chart_patterns' => $this->recentChartPatterns($series['candles']),
             'watchlist_entry' => $this->watchlistEntry($instrument->id),
-            'updated_at' => now()->toIso8601String(),
+            'updated_at' => $updatedAt,
         ]);
+        $response->headers->set('Cache-Control', 'private, max-age=300, stale-while-revalidate=86400');
+        $response->setEtag(hash('sha256', (string) $response->getContent()));
+        $response->isNotModified($request);
+
+        return $response;
     }
 
     /** Detect the latest occurrence of every supported formation in the loaded chart range. */
@@ -1266,15 +1275,22 @@ class StockController extends Controller
         object $instrument,
         TwelveDataService $yahooFinance,
         ?CarbonImmutable $focusAt = null,
+        bool $allowProviderFetch = true,
     ): array
     {
-        if ($this->usesEuroDisplay($instrument)) {
+        if ($allowProviderFetch) {
             try {
-                $providerSymbol = (string) $instrument->german_listing_symbol;
-                if (filled($instrument->german_listing_exchange)) {
-                    $providerSymbol .= ':'.trim((string) $instrument->german_listing_exchange);
+                $usesEuroDisplay = $this->usesEuroDisplay($instrument);
+                if ($usesEuroDisplay) {
+                    $providerSymbol = (string) $instrument->german_listing_symbol;
+                    if (filled($instrument->german_listing_exchange)) {
+                        $providerSymbol .= ':'.trim((string) $instrument->german_listing_exchange);
+                    }
+                } else {
+                    $providerSymbol = (string) ($instrument->provider_symbol ?: $instrument->symbol);
                 }
-                $downloaded = $yahooFinance->dailyCandles($providerSymbol, $focusAt ? 140 : 300);
+
+                $downloaded = $yahooFinance->chartHistory($providerSymbol, 300, $focusAt);
                 if ($downloaded) {
                     return [
                         'candles' => collect($downloaded)->map(fn (array $bar): array => [
@@ -1282,7 +1298,7 @@ class StockController extends Controller
                             'y' => [(float) $bar['open'], (float) $bar['high'], (float) $bar['low'], (float) $bar['close']],
                             'volume' => is_numeric($bar['volume'] ?? null) ? (float) $bar['volume'] : null,
                         ]),
-                        'source' => 'twelve_data_eur_listing',
+                        'source' => $usesEuroDisplay ? 'twelve_data_eur_listing_file_cache' : 'twelve_data_file_cache',
                     ];
                 }
             } catch (Throwable $exception) {
@@ -1291,42 +1307,6 @@ class StockController extends Controller
         }
 
         $bars = $this->dailyBars((int) $instrument->id, $focusAt);
-
-        if ($bars->count() < ($focusAt ? 50 : 252)) {
-            try {
-                $downloaded = $yahooFinance->dailyCandles(
-                    $instrument->provider_symbol ?: $instrument->symbol,
-                    $focusAt ? 140 : 300,
-                );
-
-                if ($downloaded) {
-                    $now = now();
-                    $rows = collect($downloaded)->map(fn (array $bar) => [
-                        'instrument_id' => (int) $instrument->id,
-                        'interval' => '1d',
-                        'bar_time' => CarbonImmutable::createFromTimestampUTC($bar['timestamp']),
-                        'open' => $bar['open'],
-                        'high' => $bar['high'],
-                        'low' => $bar['low'],
-                        'close' => $bar['close'],
-                        'adjusted_close' => $bar['adjusted_close'],
-                        'volume' => $bar['volume'],
-                        'source' => 'twelve_data',
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ])->all();
-
-                    DB::table('price_bars')->upsert(
-                        $rows,
-                        ['instrument_id', 'interval', 'bar_time'],
-                        ['open', 'high', 'low', 'close', 'adjusted_close', 'volume', 'source', 'updated_at'],
-                    );
-                    $bars = $this->dailyBars((int) $instrument->id, $focusAt);
-                }
-            } catch (Throwable $exception) {
-                report($exception);
-            }
-        }
 
         return [
             'candles' => $bars->map(fn ($bar) => [
@@ -1339,7 +1319,7 @@ class StockController extends Controller
                 ],
                 'volume' => is_numeric($bar->volume) ? (float) $bar->volume : null,
             ]),
-            'source' => $bars->isEmpty() ? 'unavailable' : ($bars->every(fn ($bar) => $bar->source === 'twelve_data') ? 'twelve_data' : 'price_bars'),
+            'source' => $bars->isEmpty() ? 'unavailable' : 'legacy_price_bars_fallback',
         ];
     }
 

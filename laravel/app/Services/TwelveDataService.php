@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 class TwelveDataService
 {
@@ -92,7 +93,7 @@ class TwelveDataService
             ->filter()
             ->unique()
             ->mapWithKeys(function (string $symbol): array {
-                $quote = Cache::remember(
+                $quote = Cache::store('file')->remember(
                     'twelve_data_index_quote_'.sha1(strtoupper($symbol)),
                     now()->addMinutes(5),
                     function () use ($symbol): ?array {
@@ -133,16 +134,16 @@ class TwelveDataService
 
     public function quote(string $symbol): ?array
     {
-        return Cache::remember(
+        return Cache::store('file')->remember(
             'twelve_data_quote_'.sha1(strtoupper($symbol)),
-            now()->addMinute(),
+            now()->addMinutes(5),
             fn (): ?array => $this->fetchQuote($symbol),
         );
     }
 
     public function liveQuote(string $symbol): ?array
     {
-        return Cache::remember(
+        return Cache::store('file')->remember(
             'twelve_data_live_quote_'.sha1(strtoupper($symbol)),
             now()->addSeconds(15),
             fn (): ?array => $this->fetchQuote($symbol),
@@ -151,7 +152,7 @@ class TwelveDataService
 
     public function sparkline(string $symbol): array
     {
-        return Cache::remember(
+        return Cache::store('file')->remember(
             'twelve_data_sparkline_'.sha1(strtoupper($symbol)),
             now()->addMinute(),
             fn (): array => collect($this->timeSeries($symbol, '5min', 48)['values'] ?? [])
@@ -166,7 +167,7 @@ class TwelveDataService
 
     public function candles(string $symbol): array
     {
-        return Cache::remember(
+        return Cache::store('file')->remember(
             'twelve_data_candles_'.sha1(strtoupper($symbol)),
             now()->addMinute(),
             function () use ($symbol): array {
@@ -191,7 +192,7 @@ class TwelveDataService
     {
         $days = max(5, min(120, $days));
 
-        return Cache::remember(
+        return Cache::store('file')->remember(
             'twelve_data_daily_'.sha1(strtoupper($symbol))."_{$days}",
             now()->addMinutes(15),
             function () use ($symbol, $days): array {
@@ -211,13 +212,84 @@ class TwelveDataService
     {
         $tradingDays = max(20, min(5000, $tradingDays));
 
-        return Cache::remember(
+        return Cache::store('file')->remember(
             'twelve_data_daily_history_'.sha1(strtoupper($symbol))."_{$tradingDays}",
             now()->addDay(),
             fn (): array => $this->ohlc($this->timeSeries($symbol, '1day', $tradingDays, ['adjust' => 'all']))
                 ->map(fn (array $bar): array => [...$bar, 'adjusted_close' => $bar['close']])
                 ->all(),
         );
+    }
+
+    /**
+     * Load chart candles without persisting market history in PostgreSQL.
+     *
+     * The short-lived file cache keeps the web request fast on this single
+     * application server. A longer stale copy preserves chart availability
+     * during a temporary provider outage without growing the database cache.
+     */
+    public function chartHistory(
+        string $symbol,
+        int $tradingDays = 300,
+        ?CarbonImmutable $focusAt = null,
+    ): array {
+        $tradingDays = max(20, min(5000, $tradingDays));
+        $normalizedSymbol = strtoupper(trim($symbol));
+        $focusKey = $focusAt?->format('Y-m-d') ?? 'latest';
+        $cacheKey = 'twelve_data_chart_history_v1_'.sha1($normalizedSymbol."|{$tradingDays}|{$focusKey}");
+        $staleKey = $cacheKey.'_stale';
+        $cache = Cache::store('file');
+        $cached = $cache->get($cacheKey);
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        try {
+            $parameters = ['adjust' => 'all'];
+            $outputSize = $tradingDays;
+            if ($focusAt) {
+                // TwelveData recommends omitting outputsize when both date
+                // boundaries are present, otherwise the range is truncated.
+                $parameters['start_date'] = $focusAt->subYear()->subDays(35)->format('Y-m-d');
+                $parameters['end_date'] = $focusAt->addDays(50)->format('Y-m-d');
+                $outputSize = null;
+            }
+
+            $candles = $this->ohlc($this->timeSeries(
+                $normalizedSymbol,
+                '1day',
+                $outputSize,
+                $parameters,
+            ))->map(fn (array $bar): array => [
+                ...$bar,
+                'adjusted_close' => $bar['close'],
+            ])->all();
+
+            if ($candles !== []) {
+                $cache->put(
+                    $cacheKey,
+                    $candles,
+                    $focusAt ? now()->addDays(30) : now()->addMinutes(15),
+                );
+                $cache->put(
+                    $staleKey,
+                    $candles,
+                    $focusAt ? now()->addDays(90) : now()->addDays(14),
+                );
+
+                return $candles;
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
+        $stale = $cache->get($staleKey);
+        $fallback = is_array($stale) ? $stale : [];
+        // Negative-cache a provider failure briefly to avoid a request storm.
+        $cache->put($cacheKey, $fallback, now()->addMinutes(5));
+
+        return $fallback;
     }
 
     private function quoteFromDailySeries(string $symbol): ?array
@@ -266,14 +338,17 @@ class TwelveDataService
         ];
     }
 
-    private function timeSeries(string $symbol, string $interval, int $outputSize, array $parameters = []): array
+    private function timeSeries(string $symbol, string $interval, ?int $outputSize, array $parameters = []): array
     {
-        $response = $this->request('time_series', [
+        $request = [
             'symbol' => $this->symbol($symbol),
             'interval' => $interval,
-            'outputsize' => $outputSize,
             ...$parameters,
-        ]);
+        ];
+        if ($outputSize !== null) {
+            $request['outputsize'] = $outputSize;
+        }
+        $response = $this->request('time_series', $request);
 
         return $this->valid($response) ? $response->json() : [];
     }
@@ -310,8 +385,9 @@ class TwelveDataService
         return Http::baseUrl((string) config('aktienki.twelve_data.base_url', 'https://api.twelvedata.com'))
             ->withHeaders(['Authorization' => "apikey {$apiKey}"])
             ->acceptJson()
+            ->connectTimeout(3)
             ->retry(2, 300, throw: false)
-            ->timeout(12)
+            ->timeout(8)
             ->get($endpoint, $parameters);
     }
 
