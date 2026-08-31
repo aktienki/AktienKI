@@ -17,25 +17,26 @@
         $suffixes = ['score_min' => ' / 10', 'confidence_min' => ' %', 'drawdown_max' => ' %', 'volatility_max' => ' %', 'dividend_yield_min' => ' %', 'revenue_growth_min' => ' %', 'hit_rate_min' => ' %'];
         $defaults = \App\Http\Controllers\SavedPredictionFilterController::FILTER_DEFAULTS;
     @endphp
-    <div class="ak-strategy-manager flex h-[calc(100dvh-89px)] min-h-0 flex-col py-4 text-[var(--ak-text)]">
-        <header class="mb-4 flex shrink-0 items-center justify-between gap-4">
+    <div id="personal-dashboard" class="ak-body min-h-[calc(100dvh-73px)] xl:h-[calc(100dvh-89px)] xl:min-h-0">
+    <div class="ak-container ak-strategy-manager flex h-[calc(100dvh-89px)] min-h-0 flex-col py-4 text-[var(--ak-text)] lg:py-5">
+        <header class="dashboard-main-header mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
             <div class="flex min-w-0 items-center gap-3">
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300"><x-heroicon-o-bookmark-square class="h-6 w-6" /></div>
-                <div><p class="text-[10px] font-black uppercase tracking-[.16em] text-teal-400">{{ __('Strategie') }}</p><h1 class="text-2xl font-black">{{ __('Strategie Manager') }}</h1><p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Gespeicherte Strategien öffnen, bearbeiten oder löschen.') }}</p></div>
+                <div><p class="text-[10px] font-black uppercase tracking-[.2em] text-orange-400">{{ __('Strategie') }}</p><h1 class="mt-1 text-2xl font-black text-[var(--ak-text)] sm:text-3xl">{{ __('Strategie Manager') }}</h1><p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Gespeicherte Strategien öffnen, bearbeiten oder löschen.') }}</p></div>
             </div>
-            <a href="{{ route('setup.filter', $returnFilters) }}" class="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] hover:border-teal-500/35 hover:text-teal-400"><x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Zurück zur Strategie') }}</a>
+            <a href="{{ route('setup.filter', $returnFilters) }}" class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-cyan-400/25 bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] shadow-[var(--ak-shadow)] transition hover:border-cyan-400/45 hover:text-cyan-400"><x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Zurück zur Strategie') }}</a>
         </header>
 
-        <section class="mb-3 grid shrink-0 grid-cols-3 gap-3">
-            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 py-3"><span class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Eigene Strategien') }}</span><strong class="mt-1 block text-xl font-black text-teal-400">{{ $ownedSavedFilterCount }}</strong></div>
-            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 py-3"><span class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Tariflimit') }}</span><strong class="mt-1 block text-xl font-black text-amber-300">{{ $savedFilterLimit }}</strong></div>
-            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 py-3"><span class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Noch verfügbar') }}</span><strong class="mt-1 block text-xl font-black">{{ max(0, $savedFilterLimit - $ownedSavedFilterCount) }}</strong></div>
+        <section class="mb-3 grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3">
+            <div class="ak-card ak-dashboard-card ak-card-static min-h-0 p-4"><span class="text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Eigene Strategien') }}</span><strong class="mt-1 block text-xl font-black text-cyan-400">{{ $ownedSavedFilterCount }}</strong></div>
+            <div class="ak-card ak-dashboard-card ak-card-static min-h-0 p-4"><span class="text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Tariflimit') }}</span><strong class="mt-1 block text-xl font-black text-amber-300">{{ $savedFilterLimit }}</strong></div>
+            <div class="ak-card ak-dashboard-card ak-card-static min-h-0 p-4"><span class="text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Noch verfügbar') }}</span><strong class="mt-1 block text-xl font-black text-[var(--ak-text)]">{{ max(0, $savedFilterLimit - $ownedSavedFilterCount) }}</strong></div>
         </section>
 
-        <section id="saved-filter-management" class="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3">
-            <div class="grid gap-2 xl:grid-cols-2">
+        <section id="saved-filter-management" class="min-h-0 flex-1 overflow-y-auto pr-1">
+            <div class="grid gap-3 xl:grid-cols-2">
                 @forelse ($savedFilters as $savedFilter)
-                    <article x-data="{ rename: false }" @if ((int) request('highlight') === (int) $savedFilter->id) id="saved-filter-highlight" @endif class="rounded-xl border {{ (int) request('highlight') === (int) $savedFilter->id ? 'border-teal-300/45 bg-teal-400/[.09] shadow-[0_0_28px_rgba(34, 211, 238,.10)]' : 'border-white/[.08] bg-white/[.035]' }} p-4">
+                    <article x-data="{ rename: false }" @if ((int) request('highlight') === (int) $savedFilter->id) id="saved-filter-highlight" @endif class="ak-strategy-entry ak-card ak-dashboard-card ak-card-static min-h-0 p-4 {{ (int) request('highlight') === (int) $savedFilter->id ? 'ak-strategy-entry--highlight' : '' }}">
                         @php
                             $metrics = $filterMetrics->get($savedFilter->id);
                             $assignedPortfolios = $savedFilter->portfolios;
@@ -128,22 +129,23 @@
             </div>
         </section>
     </div>
+    </div>
     <style>
         #saved-filter-highlight { scroll-margin-top: 12px; }
+        .ak-strategy-manager .ak-dashboard-card { border-radius: 14px; }
+        .ak-strategy-manager .ak-strategy-entry--highlight {
+            border-color: rgba(103, 232, 249, .48) !important;
+            box-shadow: 0 0 28px rgba(34, 211, 238, .12), inset 3px 0 0 #22d3ee !important;
+        }
         #saved-filter-management select.ak-input,
         #saved-filter-management input.ak-input {
             padding-top: 0 !important;
             padding-bottom: 0 !important;
             line-height: 34px !important;
         }
-        :root[data-theme="light"] .ak-strategy-manager #saved-filter-management {
-            border-color: #b7cdd2 !important;
-            background: rgba(248, 252, 252, .94) !important;
-        }
         :root[data-theme="light"] .ak-strategy-manager #saved-filter-management article {
-            border-color: #b7cdd2 !important;
-            background: #ffffff !important;
-            box-shadow: 0 5px 16px rgba(15, 73, 82, .07);
+            border-color: #d9e7e4 !important;
+            background: rgba(255, 255, 255, .94) !important;
         }
         :root[data-theme="light"] .ak-strategy-manager #saved-filter-management article#saved-filter-highlight {
             border-color: #5eaeb8 !important;

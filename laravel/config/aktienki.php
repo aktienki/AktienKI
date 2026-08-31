@@ -86,4 +86,13 @@ return [
         // must neither be fetched for nor returned to public chart surfaces.
         'restricted_historical_chart_countries' => ['AU', 'JP'],
     ],
+    'serving' => [
+        // The screener reads production-ready predictions and model metadata
+        // only from the compact pipeline-next serving database.
+        'screener_enabled' => (bool) env('AKTIENKI_SERVING_SCREENER_ENABLED', true),
+        // Price history never belongs in the serving database. Charts are
+        // fetched on demand and retained in Laravel's filesystem cache.
+        'chart_cache_hours' => (int) env('AKTIENKI_SERVING_CHART_CACHE_HOURS', 12),
+        'chart_cache_store' => env('AKTIENKI_SERVING_CHART_CACHE_STORE', 'file'),
+    ],
 ];

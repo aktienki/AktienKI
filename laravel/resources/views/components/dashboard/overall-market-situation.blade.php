@@ -1,6 +1,7 @@
 @props(['assessment' => []])
 
 @php
+    $isServing = ($assessment['source'] ?? null) === 'serving';
     $toneClasses = match ($assessment['tone'] ?? 'neutral') {
         'positive' => 'border-emerald-400/20 bg-emerald-400/[.07] text-emerald-300',
         'cautious' => 'border-rose-400/20 bg-rose-400/[.07] text-rose-300',
@@ -30,31 +31,36 @@
         <ul class="ak-market-assessment-list mt-3 space-y-1.5 text-xs">
             <li class="flex items-center gap-2">
                 <span class="ak-market-point h-2.5 w-2.5 shrink-0 rounded-full bg-cyan-300"></span>
-                <span>{{ __(':positive von :total Märkten im Plus', [
-                    'positive' => $assessment['positiveMarkets'] ?? 0,
-                    'total' => $assessment['marketCount'] ?? 0,
-                ]) }}</span>
+                <span>{{ $isServing
+                    ? __(':positive von :total Aktien mit BUY', ['positive' => $assessment['positiveMarkets'] ?? 0, 'total' => $assessment['marketCount'] ?? 0])
+                    : __(':positive von :total Märkten im Plus', ['positive' => $assessment['positiveMarkets'] ?? 0, 'total' => $assessment['marketCount'] ?? 0]) }}</span>
             </li>
             <li class="flex items-center gap-2">
                 <span class="ak-market-point h-2.5 w-2.5 shrink-0 rounded-full {{ ($assessment['averageChange'] ?? 0) >= 0 ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
-                <span>{{ __('Durchschnittliche Marktbewegung: :value %', [
+                <span>{{ $isServing ? __('Ø kalibrierte Prognose: :value %', [
+                    'value' => number_format($assessment['averageChange'] ?? 0, 2, ',', '.'),
+                ]) : __('Durchschnittliche Marktbewegung: :value %', [
                     'value' => number_format($assessment['averageChange'] ?? 0, 2, ',', '.'),
                 ]) }}</span>
             </li>
             <li class="flex items-center gap-2">
                 <span class="ak-market-point h-2.5 w-2.5 shrink-0 rounded-full {{ ($assessment['averageVolatility'] ?? 0) >= 1 ? 'bg-amber-500' : 'bg-cyan-300' }}"></span>
-                <span>{{ __('Stündliche Volatilität: :value %', [
+                <span>{{ $isServing ? __('Ø Serving-Risiko: :value von 5', [
+                    'value' => number_format($assessment['averageVolatility'] ?? 0, 2, ',', '.'),
+                ]) : __('Stündliche Volatilität: :value %', [
                     'value' => number_format($assessment['averageVolatility'] ?? 0, 2, ',', '.'),
                 ]) }}</span>
             </li>
             <li class="flex items-center gap-2">
                 <span class="ak-market-point h-2.5 w-2.5 shrink-0 rounded-full bg-slate-400"></span>
-                <span>{{ __('Berücksichtigtes Risikoprofil: :profile', [
+                <span>{{ $isServing ? __('Modellrisiko: :profile', [
+                    'profile' => $assessment['riskName'] ?? '—',
+                ]) : __('Berücksichtigtes Risikoprofil: :profile', [
                     'profile' => $assessment['riskName'] ?? __('ausgewogen'),
                 ]) }}</span>
             </li>
         </ul>
     </div>
 
-    <p class="mt-auto pt-3 text-[9px] leading-4 text-slate-600">{{ __('Automatisierte KI-Auswertung deiner Daten · keine Anlageberatung.') }}</p>
+    <p class="mt-auto pt-3 text-[9px] leading-4 text-slate-600">{{ $isServing ? __('Aktueller vollständiger Serving-Lauf · keine Anlageberatung.') : __('Automatisierte KI-Auswertung deiner Daten · keine Anlageberatung.') }}</p>
 </x-dashboard.card>

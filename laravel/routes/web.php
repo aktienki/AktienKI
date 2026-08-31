@@ -337,6 +337,9 @@ Route::get('/reports/{analysisReport}', [\App\Http\Controllers\AnalysisReportCon
     Route::get('/recommendations/live-quotes', [RecommendationController::class, 'liveQuotes'])->name('recommendations.live-quotes');
     Route::get('/recommendations', RecommendationController::class)->name('recommendations.index');
     Route::get('/screener', [RecommendationController::class, 'screener'])->name('screener.index');
+    Route::get('/screener/charts/{instrument}', [RecommendationController::class, 'screenerChart'])
+        ->whereNumber('instrument')
+        ->name('screener.chart');
     Route::get('/screener/history', [RecommendationController::class, 'screeningHistory'])->name('screener.history');
     Route::get('/markteinschaetzung', MarketAssessmentController::class)->name('market-assessment');
     Route::get('/taegliche-marktanalyse', DailyMarketAnalysisController::class)->name('daily-market-analysis');

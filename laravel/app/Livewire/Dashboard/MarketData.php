@@ -9,6 +9,7 @@ use App\Services\FreeRegionalStockUniverseService;
 use App\Services\MarketService;
 use App\Services\IndexAiScoreService;
 use App\Services\PlanAccessService;
+use App\Services\ServingMarketSnapshotService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -108,15 +109,6 @@ class MarketData extends Component
             ))
             ->all();
 
-        $this->dailyAiScores = $indexAiScores->dailyAverages(20);
-        $this->countryAiScores = $indexAiScores->countryScores();
-
-        $riskLevel = data_get(auth()->user()?->meta, 'risk_profile.level', 'normal');
-        $this->overallAssessment = $marketService->overallAssessment(
-            $this->markets,
-            $this->dailyAiScores,
-            (string) $riskLevel,
-        );
         $user = auth()->user();
         $this->isRegionalFreeView = $user !== null
             && app(PlanAccessService::class)->level($user) === PlanLevel::Free;
@@ -127,14 +119,17 @@ class MarketData extends Component
             $this->regionalCountry = $universe->country($user);
         }
 
-        $ruleBasedAnalysis = $this->loadRuleBasedMarketAnalysis($regionalUniverseIds->all());
-        $this->marketAnalysis = $this->isRegionalFreeView
-            ? $ruleBasedAnalysis
-            : ($this->loadExternalMarketAnalysis($ruleBasedAnalysis) ?? $ruleBasedAnalysis);
+        $servingSnapshot = app(ServingMarketSnapshotService::class)->snapshot(
+            $this->isRegionalFreeView ? $regionalUniverseIds->all() : null,
+        );
+        $this->dailyAiScores = $servingSnapshot['daily_scores'];
+        $this->countryAiScores = $indexAiScores->countryScores();
+        $this->overallAssessment = $servingSnapshot['assessment'];
+        $this->marketAnalysis = $servingSnapshot['analysis'];
         $this->marketComment = $this->marketAnalysis['summary'] ?? null;
 
         $this->sentiment = $marketService->sentiment($this->markets);
-        $this->signalTransitionStats = $this->loadSignalTransitionStats();
+        $this->signalTransitionStats = $servingSnapshot['transition_stats'];
         $this->macroCards = $this->loadMacroCards();
         $this->monthlyBacktestAiScores = $this->loadMonthlyBacktestAiScores();
     }

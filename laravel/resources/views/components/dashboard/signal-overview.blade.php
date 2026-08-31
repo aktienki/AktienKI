@@ -10,7 +10,7 @@
     $biasColor = $average < -.05 ? '#e87989' : ($average > .05 ? '#4fbf91' : '#d6ad45');
     $signals = ['SELL', 'WAIT', 'HOLD', 'WATCH', 'BUY'];
     $distribution = $stats['distribution'] ?? [];
-    $distributionChanges = app(\App\Services\SignalDistributionDeltaService::class)->changes();
+    $distributionChanges = $stats['distribution_changes'] ?? app(\App\Services\SignalDistributionDeltaService::class)->changes();
     $distributionTotal = max(1, (int) ($stats['distribution_total'] ?? 0));
 @endphp
 
@@ -22,7 +22,7 @@
         <div>
             <p class="text-[10px] font-black uppercase tracking-[.18em] text-orange-400">{{ __('Signale') }}</p>
             <h3 class="mt-0.5 text-sm font-black text-[var(--ak-text)]">{{ __('Signal Bias & aktuelle Verteilung') }}</h3>
-            <p class="mt-0.5 text-[9px] text-[var(--ak-muted)]">{{ __('Richtungswechsel der letzten 5 Tage und KI-Score-Verteilung des aktiven Portfolios') }}</p>
+            <p class="mt-0.5 text-[9px] text-[var(--ak-muted)]">{{ ($stats['source'] ?? null) === 'serving' ? __('Richtungswechsel und Signalverteilung des aktuellen Serving-Laufs') : __('Richtungswechsel der letzten 5 Tage und KI-Score-Verteilung des aktiven Portfolios') }}</p>
         </div>
     </div>
 

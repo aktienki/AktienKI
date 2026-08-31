@@ -6,6 +6,7 @@ use App\Enums\PlanLevel;
 use App\Services\FreeRegionalStockUniverseService;
 use App\Services\PlanAccessService;
 use App\Services\PersonalizedSignalService;
+use App\Services\ServingScreenerService;
 use App\Services\TwelveDataService;
 use App\Services\StockRiskClassificationService;
 use App\Support\AiScore;
@@ -79,8 +80,12 @@ final class RecommendationController extends Controller
     /**
      * Beginner-friendly screener with only the decision-relevant fields.
      */
-    public function screener(Request $request): View
+    public function screener(Request $request, ServingScreenerService $servingScreener): View
     {
+        if (config('aktienki.serving.screener_enabled', true)) {
+            return view('screener.index', $servingScreener->data($request));
+        }
+
         $riskClassification = app(StockRiskClassificationService::class);
         $riskUser = $riskClassification->userLevel($request->user()) === 'risk';
         $visibleRiskStatuses = $riskClassification->visibleStatuses($request->user());
@@ -997,6 +1002,11 @@ final class RecommendationController extends Controller
         });
 
         return view('screener.index', compact('stocks', 'countries', 'sectors', 'indices', 'userWatchlists', 'paperPortfolios', 'watchlistMemberships', 'paperPortfolioMemberships', 'certificateInstrumentIds', 'recentNewsByInstrument', 'isFreeRegional', 'regionalCountry'));
+    }
+
+    public function screenerChart(Request $request, int $instrument, ServingScreenerService $servingScreener): View
+    {
+        return view('screener.partials.chart', $servingScreener->chart($instrument, $request));
     }
 
     public function screeningHistory(Request $request): View

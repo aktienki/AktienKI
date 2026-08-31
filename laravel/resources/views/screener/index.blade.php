@@ -211,15 +211,25 @@
                         default => 'border-orange-400/35',
                     };
                     $hasLongCompanyName = mb_strlen((string) ($stock->name ?: $stock->symbol)) > 45;
-                    $mobileForecasts = collect([5, 10, 15, 20])->mapWithKeys(function (int $days) use ($stock): array {
+                    $forecastHorizons = ($stock->data_source ?? null) === 'serving' ? [10, 20, 40] : [5, 10, 15, 20];
+                    $mobileForecasts = collect($forecastHorizons)->mapWithKeys(function (int $days) use ($stock): array {
                         $value = $stock->{"expected_return_{$days}d"} ?? null;
                         return [$days => is_numeric($value) ? (float) $value : null];
                     });
+                    $primaryForecastHorizon = $mobileForecasts->has(20) ? 20 : (int) $mobileForecasts->keys()->last();
+                    $primaryForecast = $mobileForecasts->get($primaryForecastHorizon);
                     $calibratedSignalQuality = data_get($stock->stock_signal_calibration, 'quality_percent');
-                    $buySignalRating = \App\Support\DirectionalSignalRating::calculate(
-                        $mobileForecasts->all(),
-                        is_numeric($calibratedSignalQuality) ? (float) $calibratedSignalQuality : $rankingScorePercent,
-                    );
+                    $buySignalRating = ($stock->data_source ?? null) === 'serving' && filled($stock->serving_buy_rating ?? null)
+                        ? [
+                            'percent' => $rankingScorePercent,
+                            'label' => (string) $stock->serving_buy_rating,
+                            'weighted_return' => (float) ($primaryForecast ?? 0),
+                            'quality' => is_numeric($calibratedSignalQuality) ? (float) $calibratedSignalQuality : $rankingScorePercent,
+                        ]
+                        : \App\Support\DirectionalSignalRating::calculate(
+                            $mobileForecasts->all(),
+                            is_numeric($calibratedSignalQuality) ? (float) $calibratedSignalQuality : $rankingScorePercent,
+                        );
                     $buySignalScorePercent = (float) $buySignalRating['percent'];
                     $buySignalScoreLabel = (string) $buySignalRating['label'];
                     $buySignalScoreColor = $qualityDonutColor($buySignalScorePercent);
@@ -241,7 +251,7 @@
                     $buySignalSectorEnd = max(1, $buySignalScorePercent);
                     $riskSectorStart = max(0, (float) ($rankingRiskPercent ?? 0) - 5);
                     $riskSectorEnd = max(1, (float) ($rankingRiskPercent ?? 0));
-                    $signalStrength = \App\Support\SignalStrength::label($mobileForecasts[20]);
+                    $signalStrength = \App\Support\SignalStrength::label($primaryForecast);
                     $priceChange = is_numeric($stock->price_change_percent ?? null) ? (float) $stock->price_change_percent : null;
                 @endphp
                 <article
@@ -284,8 +294,8 @@
                                     <small>{{ __('Stärke') }} {{ $signalStrength }}</small>
                                 </span>
                                 <span class="screener-mobile-summary-metric">
-                                    <span class="screener-mobile-return" data-tone="{{ $mobileForecasts[20] === null ? 'neutral' : ($mobileForecasts[20] > 0 ? 'positive' : ($mobileForecasts[20] < 0 ? 'negative' : 'neutral')) }}" title="{{ __('Mögliche Rendite in 20 Tagen') }}">
-                                        {{ $mobileForecasts[20] === null ? '—' : (($mobileForecasts[20] > 0 ? '+' : '').number_format($mobileForecasts[20], 1, ',', '.').' %') }}
+                                    <span class="screener-mobile-return" data-tone="{{ $primaryForecast === null ? 'neutral' : ($primaryForecast > 0 ? 'positive' : ($primaryForecast < 0 ? 'negative' : 'neutral')) }}" title="{{ __('Mögliche Rendite in :days Tagen', ['days' => $primaryForecastHorizon]) }}">
+                                        {{ $primaryForecast === null ? '—' : (($primaryForecast > 0 ? '+' : '').number_format($primaryForecast, 1, ',', '.').' %') }}
                                     </span>
                                     <small>{{ __('Mögliche Rendite') }}</small>
                                 </span>
@@ -375,7 +385,7 @@
                                     @endif
                                 </div>
                                 <p class="mt-3 text-[9px] font-black uppercase text-[var(--ak-muted)]">{{ __('Performance · Prognosehorizonte') }}</p>
-                                <div class="screener-performance-horizons mt-1.5 grid grid-cols-2 gap-1 sm:grid-cols-4">
+                                <div class="screener-performance-horizons mt-1.5 grid grid-cols-2 gap-1 {{ $mobileForecasts->count() === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-4' }}">
                                     @foreach($mobileForecasts as $days => $forecast)
                                         @php
                                             $forecastBadgeTone = $forecast === null
@@ -396,7 +406,7 @@
                             <div class="screener-expanded-chart md:col-span-2">
                                 <div class="mb-3 md:hidden">
                                     <p class="text-[10px] font-black uppercase tracking-[.14em] text-cyan-300">{{ __('Mögliche Renditen') }}</p>
-                                    <div class="mt-2 grid grid-cols-4 gap-1.5">
+                                    <div class="mt-2 grid {{ $mobileForecasts->count() === 3 ? 'grid-cols-3' : 'grid-cols-4' }} gap-1.5">
                                         @foreach($mobileForecasts as $days => $forecast)
                                             <div class="rounded-lg border border-cyan-300/15 bg-cyan-400/[.05] px-1.5 py-2 text-center">
                                                 <p class="text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ $days }} {{ __('Tage') }}</p>
@@ -407,12 +417,9 @@
                                         @endforeach
                                     </div>
                                 </div>
-                                <div class="mb-1 flex flex-wrap items-center justify-between gap-1 text-[9px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]"><span>{{ __('Chart · 1 Jahr') }} · {{ $stock->chart_currency ?? $stock->currency }}</span><span class="flex gap-2">@if ($signalTransitionDate)<span class="text-violet-300">│ {{ __('Signalwechsel') }} {{ $signalTransitionDate }}</span>@endif @if ($predictionPrice !== null)<span class="text-amber-300">— {{ __('Prognose 20 Tage') }}</span>@endif</span></div>
-                                @if ($chartPolyline !== '')
-                                    <svg viewBox="0 0 600 128" class="h-24 w-full" role="img" aria-label="{{ __('Kursverlauf des letzten Jahres mit Prognose') }}" preserveAspectRatio="none"><defs><linearGradient id="screener-line-{{ $stock->id }}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs><path d="M0 108H600" stroke="#0d9488" stroke-opacity=".28" stroke-width="1.4"/>@foreach([0,125,250,375,500] as $tickX)<line x1="{{ $tickX }}" y1="108" x2="{{ $tickX }}" y2="112" stroke="#0d9488" stroke-opacity=".28" stroke-width="1"/>@endforeach<g fill="#94a3b8" font-size="7" font-weight="700"><text x="0" y="124" text-anchor="start">−1J</text><text x="125" y="124" text-anchor="middle">−9M</text><text x="250" y="124" text-anchor="middle">−6M</text><text x="375" y="124" text-anchor="middle">−3M</text><text x="500" y="124" text-anchor="middle">{{ __('Heute') }}</text><text x="600" y="124" text-anchor="end">20T</text></g>@if ($signalTransitionX !== null)<line x1="{{ number_format($signalTransitionX * (500 / 600), 1, '.', '') }}" y1="4" x2="{{ number_format($signalTransitionX * (500 / 600), 1, '.', '') }}" y2="108" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="4 4"><title>{{ __('Signalwechsel') }} {{ $stock->signal_transition_from }} → {{ $signal }} · {{ $signalTransitionDate }}</title></line>@endif<polyline points="{{ $chartPolyline }}" fill="none" stroke="url(#screener-line-{{ $stock->id }})" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>@if ($predictionY !== null && $latestChartY !== null)<line x1="500" y1="4" x2="500" y2="108" stroke="#fbbf24" stroke-opacity=".85" stroke-width="1.5" stroke-dasharray="4 4"><title>{{ __('Signaldatum') }} {{ $predictionSignalDate ?: '—' }}</title></line><text x="494" y="11" text-anchor="end" fill="#fbbf24" font-size="7" font-weight="800">{{ __('Signal') }} {{ $predictionSignalDate }}</text><line x1="500" y1="{{ number_format($latestChartY, 1, '.', '') }}" x2="600" y2="{{ number_format($predictionY, 1, '.', '') }}" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="7 5"/><circle cx="500" cy="{{ number_format($latestChartY, 1, '.', '') }}" r="2.5" fill="#fbbf24"/><circle cx="600" cy="{{ number_format($predictionY, 1, '.', '') }}" r="3" fill="#fbbf24"/>@endif</svg>
-                                @else
-                                    <div class="flex h-24 items-center justify-center text-xs italic text-[var(--ak-muted)]">{{ __('Keine Daten') }}</div>
-                                @endif
+                                <div data-screener-chart data-chart-url="{{ route('screener.chart', ['instrument' => $stock->instrument_id]) }}" aria-live="polite">
+                                    <div class="flex h-[116px] items-center justify-center text-xs italic text-[var(--ak-muted)]">{{ __('Chart wird aus dem Cache geladen …') }}</div>
+                                </div>
                             </div>
                             <div class="screener-card-actions absolute right-3 top-2 z-30 flex gap-2">
                                 <a href="{{ route('setup.labels.index') }}" title="{{ __('Labels') }}" aria-label="{{ __('Labels verwalten') }}" class="inline-flex h-8 w-8 items-center justify-center rounded-xl border transition {{ $stock->has_matching_label ? 'border-cyan-400/30 bg-cyan-400/[.08] text-cyan-300 hover:bg-cyan-400/[.16]' : 'border-slate-500/15 bg-slate-500/[.04] text-slate-500/40 hover:text-cyan-300' }}">
@@ -429,7 +436,7 @@
                                         @forelse($userWatchlists as $watchlist)
                                             <form method="POST" action="{{ route('watchlists.items.toggle', ['watchlist' => $watchlist->id, 'instrument' => $stock->instrument_id]) }}">
                                                 @csrf
-                                                <input type="hidden" name="prediction_id" value="{{ $stock->id }}">
+                                                @if (($stock->data_source ?? null) !== 'serving')<input type="hidden" name="prediction_id" value="{{ $stock->id }}">@endif
                                                 <button type="submit" class="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-[10px] font-bold text-[var(--ak-text)] hover:bg-amber-400/10">
                                                     <span>{{ $watchlist->name }}</span>
                                                     <span class="text-amber-300">{{ $stockWatchlistIds->contains((int) $watchlist->id) ? '✓' : '+' }}</span>
@@ -454,7 +461,7 @@
                                         <x-heroicon-o-document-chart-bar class="h-4 w-4" />
                                     </span>
                                 @endif
-                                <a href="{{ route('stocks.show', ['symbol' => $stock->symbol, 'prediction' => $stock->id, 'return_to' => request()->getRequestUri()]) }}" title="{{ __('Zur Aktiendetailseite') }}" aria-label="{{ __('Details zu :stock anzeigen', ['stock' => $stock->name ?: $stock->symbol]) }}" class="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-violet-400/30 bg-violet-400/[.08] text-violet-300 transition hover:bg-violet-400/[.16]">
+                                <a href="{{ route('stocks.show', array_filter(['symbol' => $stock->symbol, 'prediction' => ($stock->data_source ?? null) === 'serving' ? null : $stock->id, 'return_to' => request()->getRequestUri()], fn ($value) => $value !== null)) }}" title="{{ __('Zur Aktiendetailseite') }}" aria-label="{{ __('Details zu :stock anzeigen', ['stock' => $stock->name ?: $stock->symbol]) }}" class="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-violet-400/30 bg-violet-400/[.08] text-violet-300 transition hover:bg-violet-400/[.16]">
                                     <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                                 </a>
                             </div>
@@ -765,4 +772,51 @@
         </section>
         </div>
     </div>
+
+    @once
+        <script>
+            (() => {
+                const initializeServingCharts = () => {
+                    const charts = document.querySelectorAll('[data-screener-chart]:not([data-chart-state])');
+                    if (!charts.length) return;
+
+                    const load = async (chart) => {
+                        if (chart.dataset.chartState) return;
+                        chart.dataset.chartState = 'loading';
+                        try {
+                            const response = await fetch(chart.dataset.chartUrl, {
+                                credentials: 'same-origin',
+                                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            });
+                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                            chart.innerHTML = await response.text();
+                            chart.dataset.chartState = 'loaded';
+                        } catch (error) {
+                            chart.dataset.chartState = 'failed';
+                            chart.innerHTML = '<div class="flex h-24 items-center justify-center px-4 text-center text-xs italic text-[var(--ak-muted)]">{{ __('Der Kurschart ist momentan nicht verfügbar.') }}</div>';
+                        }
+                    };
+
+                    if (!('IntersectionObserver' in window)) {
+                        charts.forEach(load);
+                        return;
+                    }
+
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach((entry) => {
+                            if (!entry.isIntersecting) return;
+                            observer.unobserve(entry.target);
+                            load(entry.target);
+                        });
+                    }, { rootMargin: '320px 0px' });
+                    charts.forEach((chart) => observer.observe(chart));
+                };
+
+                document.readyState === 'loading'
+                    ? document.addEventListener('DOMContentLoaded', initializeServingCharts, { once: true })
+                    : initializeServingCharts();
+                document.addEventListener('livewire:navigated', initializeServingCharts);
+            })();
+        </script>
+    @endonce
 </x-app-layout>

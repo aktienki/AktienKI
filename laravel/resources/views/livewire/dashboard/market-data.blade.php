@@ -19,6 +19,7 @@
     $marketCount = max(1, (int) ($overallAssessment['marketCount'] ?? count($markets)));
     $breadth = ($positiveMarkets / $marketCount) * 100;
     $averageChange = (float) ($overallAssessment['averageChange'] ?? 0);
+    $isServingAssessment = ($overallAssessment['source'] ?? null) === 'serving';
     $tone = $overallAssessment['tone'] ?? 'neutral';
     $toneLabel = $overallAssessment['status'] ?? __('Neutral');
     $analysisHeadline = $marketAnalysis['headline'] ?? __('Marktdaten statt Marktgeräusche');
@@ -93,12 +94,12 @@
                 <div class="ak-market-hero-stat">
                     <span>{{ __('Marktbreite') }}</span>
                     <strong>{{ number_format($breadth, 0, ',', '.') }}<small>%</small></strong>
-                    <small>{{ $positiveMarkets }}/{{ $marketCount }} {{ __('positiv') }}</small>
+                    <small>{{ $positiveMarkets }}/{{ $marketCount }} {{ $isServingAssessment ? 'BUY' : __('positiv') }}</small>
                 </div>
                 <div class="ak-market-hero-stat" data-tone="{{ $tone }}">
                     <span>{{ __('Regime') }}</span>
                     <strong class="text-base sm:text-lg">{{ $toneLabel }}</strong>
-                    <small>{{ $averageChange >= 0 ? '+' : '' }}{{ number_format($averageChange, 2, ',', '.') }} %</small>
+                    <small>{{ $isServingAssessment ? 'Ø 20T ' : '' }}{{ $averageChange >= 0 ? '+' : '' }}{{ number_format($averageChange, 2, ',', '.') }} %</small>
                 </div>
             </div>
         </div>
