@@ -7,8 +7,11 @@ use App\Models\Portfolio;
 use App\Services\PlanAccessService;
 use App\Services\PersonalCollectionLimitService;
 use App\Services\PersonalizedSignalService;
+use App\Services\ServingPortfolioCalculator;
+use App\Services\ServingPortfolioSimulationService;
 use App\Services\TwelveDataService;
 use App\Support\AiScore;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +21,7 @@ use Illuminate\View\View;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 final class DepotController extends Controller
 {
@@ -777,7 +781,11 @@ final class DepotController extends Controller
             : __('Strategiekonto deaktiviert.'));
     }
 
-    public function startSimulation(Request $request, Portfolio $portfolio): RedirectResponse
+    public function startSimulation(
+        Request $request,
+        Portfolio $portfolio,
+        ServingPortfolioSimulationService $servingSimulation,
+    ): RedirectResponse
     {
         abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active && $portfolio->type === 'paper', 404);
         if (! app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Plus)) {
@@ -791,64 +799,191 @@ final class DepotController extends Controller
             ]);
         }
 
-        $assignments = DB::table('portfolio_strategy_assignments')
-            ->where('portfolio_id', $portfolio->id)->where('enabled', true)
-            ->orderBy('priority')->get();
-        if ($assignments->isEmpty()) return back()->withErrors(['simulation' => __('Ordne dem Depot zuerst mindestens eine Strategie zu.')]);
+        $allocationSettings = validator([
+            'allocation_mode' => $request->input(
+                'allocation_mode',
+                ServingPortfolioCalculator::ALLOCATION_EQUAL_WEIGHT,
+            ),
+            'maximum_positions' => $request->input(
+                'maximum_positions',
+                ServingPortfolioSimulationService::MAXIMUM_POSITIONS,
+            ),
+            'max_stock_allocation_percent' => $request->input(
+                'max_stock_allocation_percent',
+                ServingPortfolioSimulationService::DEFAULT_MAX_STOCK_ALLOCATION_PERCENT,
+            ),
+        ], [
+            'allocation_mode' => ['required', 'in:'.implode(',', [
+                ServingPortfolioCalculator::ALLOCATION_FULL_INVESTMENT,
+                ServingPortfolioCalculator::ALLOCATION_EQUAL_WEIGHT,
+            ])],
+            'maximum_positions' => [
+                'required', 'integer', 'between:1,'.ServingPortfolioSimulationService::MAXIMUM_POSITIONS,
+            ],
+            'max_stock_allocation_percent' => ['required', 'numeric', 'between:5,100'],
+        ])->validate();
+
+        $assignments = DB::table('portfolio_strategy_assignments as assignment')
+            ->join('saved_prediction_filters as strategy', 'strategy.id', '=', 'assignment.saved_prediction_filter_id')
+            ->where('assignment.portfolio_id', $portfolio->id)
+            ->where('assignment.enabled', true)
+            ->orderBy('assignment.priority')
+            ->get([
+                'assignment.saved_prediction_filter_id', 'assignment.priority',
+                'assignment.capital_weight', 'strategy.name as strategy_name', 'strategy.filters',
+            ]);
+        if ($assignments->isEmpty()) {
+            return back()->withErrors(['simulation' => __('Ordne dem Depot zuerst mindestens eine Strategie zu.')]);
+        }
+
+        $initial = max(1000.0, (float) data_get($portfolio->meta, 'automation.initial_capital', 10000));
+        $usesServingConfigurations = $servingSimulation->hasServingConfigurations($assignments);
+        if ($usesServingConfigurations && ! $servingSimulation->allAssignmentsUseServingConfigurations($assignments)) {
+            return back()->withErrors([
+                'simulation' => __('Serving-Modellkonfigurationen und alte Filterstrategien können nicht im selben Lauf gemischt werden.'),
+            ]);
+        }
+        $servingResult = null;
+        if ($usesServingConfigurations) {
+            try {
+                // Resolve and validate the exact release/horizon/variant trade set
+                // before any existing portfolio history is cleared.
+                $servingResult = $servingSimulation->calculate(
+                    $portfolio,
+                    $assignments,
+                    $initial,
+                    (string) $allocationSettings['allocation_mode'],
+                    (int) $allocationSettings['maximum_positions'],
+                    (float) $allocationSettings['max_stock_allocation_percent'],
+                );
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return back()->withErrors(['simulation' => $exception->getMessage()]);
+            }
+        }
 
         $publicId = (string) Str::uuid();
-        DB::transaction(function () use ($request, $portfolio, $assignments, $publicId): void {
-            DB::table('python_engine_jobs')
-                ->whereIn('status', ['queued', 'running'])
-                ->whereRaw("payload->>'portfolio_id' = ?", [(string) $portfolio->id])
-                ->update([
-                    'status' => 'cancelled',
-                    'error_message' => __('Durch einen neuen Simulationslauf ersetzt.'),
-                    'finished_at' => now(),
+        try {
+            DB::transaction(function () use (
+                $request,
+                $portfolio,
+                $assignments,
+                $publicId,
+                $initial,
+                $servingResult,
+                $servingSimulation,
+            ): void {
+                DB::table('python_engine_jobs')
+                    ->whereIn('status', ['queued', 'running'])
+                    ->whereRaw("payload->>'portfolio_id' = ?", [(string) $portfolio->id])
+                    ->update([
+                        'status' => 'cancelled',
+                        'error_message' => __('Durch einen neuen Simulationslauf ersetzt.'),
+                        'finished_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                $account = DB::table('portfolio_cash_accounts')->where('portfolio_id', $portfolio->id)->lockForUpdate()->first();
+                abort_if($account === null, 422, __('Das Verrechnungskonto fehlt.'));
+                $transactionIds = DB::table('portfolio_transactions')->where('portfolio_id', $portfolio->id)->pluck('id');
+                DB::table('portfolio_cash_ledger')->where('portfolio_cash_account_id', $account->id)->delete();
+                DB::table('portfolio_automation_executions')->where('portfolio_id', $portfolio->id)->delete();
+                DB::table('portfolio_transactions')->whereIn('id', $transactionIds)->delete();
+                DB::table('portfolio_positions')->where('portfolio_id', $portfolio->id)->delete();
+                DB::table('portfolio_simulation_runs')->where('portfolio_id', $portfolio->id)->delete();
+                DB::table('portfolio_cash_accounts')->where('id', $account->id)->update([
+                    'balance' => $initial,
+                    'reserved_balance' => 0,
                     'updated_at' => now(),
                 ]);
-            $account = DB::table('portfolio_cash_accounts')->where('portfolio_id', $portfolio->id)->lockForUpdate()->first();
-            abort_if($account === null, 422, __('Das Verrechnungskonto fehlt.'));
-            $initial = max(1000.0, (float) data_get($portfolio->meta, 'automation.initial_capital', 10000));
-            $transactionIds = DB::table('portfolio_transactions')->where('portfolio_id', $portfolio->id)->pluck('id');
-            DB::table('portfolio_cash_ledger')->where('portfolio_cash_account_id', $account->id)->delete();
-            DB::table('portfolio_automation_executions')->where('portfolio_id', $portfolio->id)->delete();
-            DB::table('portfolio_transactions')->whereIn('id', $transactionIds)->delete();
-            DB::table('portfolio_positions')->where('portfolio_id', $portfolio->id)->delete();
-            DB::table('portfolio_simulation_runs')->where('portfolio_id', $portfolio->id)->delete();
-            DB::table('portfolio_cash_accounts')->where('id', $account->id)->update(['balance' => $initial, 'reserved_balance' => 0, 'updated_at' => now()]);
-            DB::table('portfolio_cash_ledger')->insert([
-                'portfolio_cash_account_id' => $account->id, 'type' => 'initial_deposit',
-                'amount' => $initial, 'balance_after' => $initial, 'currency' => $account->currency,
-                'occurred_at' => now(), 'meta' => json_encode(['source' => 'portfolio_simulation_reset'], JSON_THROW_ON_ERROR),
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-            $sourceRunId = (int) DB::table('backtest_runs')->whereIn('status', ['completed', 'completed_with_errors'])
-                ->whereRaw("COALESCE(settings->>'run_type','system') <> 'user_filter'")
-                // Some maintenance runs are completed without any trades.
-                // They are not valid simulation sources and would yield an
-                // apparently successful but completely empty depot run.
-                ->where('trades_count', '>', 0)
-                ->latest('id')->value('id');
-            abort_if($sourceRunId < 1, 422, __('Kein Ausgangs-Backtest vorhanden.'));
-            $runId = DB::table('portfolio_simulation_runs')->insertGetId([
-                'public_id' => $publicId, 'user_id' => $request->user()->id,
-                'saved_prediction_filter_id' => $assignments->first()->saved_prediction_filter_id,
-                'portfolio_id' => $portfolio->id, 'backtest_run_id' => $sourceRunId,
-                'status' => 'queued', 'started_at' => now(), 'initial_capital' => $initial,
-                'settings' => json_encode(['strategy_ids' => $assignments->pluck('saved_prediction_filter_id')->map(fn ($id) => (int) $id)->all(), 'parallel' => true], JSON_THROW_ON_ERROR),
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-            DB::table('python_engine_jobs')->insert([
-                'public_id' => (string) Str::uuid(), 'user_id' => $request->user()->id,
-                'type' => 'portfolio_simulation', 'calculation_version' => 'portfolio-v2',
-                'status' => 'queued', 'progress' => 0,
-                'payload' => json_encode(['portfolio_id' => $portfolio->id, 'simulation_run_id' => $runId, 'source_run_id' => $sourceRunId, 'strategy_ids' => $assignments->pluck('saved_prediction_filter_id')->map(fn ($id) => (int) $id)->all()], JSON_THROW_ON_ERROR),
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-        });
+                $initialOccurredAt = $servingResult
+                    ? CarbonImmutable::parse($servingResult['start_date'], 'UTC')->startOfDay()
+                    : now();
+                DB::table('portfolio_cash_ledger')->insert([
+                    'portfolio_cash_account_id' => $account->id,
+                    'type' => 'initial_deposit',
+                    'amount' => $initial,
+                    'balance_after' => $initial,
+                    'currency' => $account->currency,
+                    'occurred_at' => $initialOccurredAt,
+                    'meta' => json_encode([
+                        'source' => $servingResult ? 'portfolio_serving_simulation_reset' : 'portfolio_simulation_reset',
+                    ], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
-        return redirect()->route('depots.show', [$portfolio, 'simulation' => $publicId])->with('status', __('Depotsimulation gestartet.'));
+                if ($servingResult) {
+                    $strategyIds = $assignments->pluck('saved_prediction_filter_id')->map(fn ($id) => (int) $id)->all();
+                    $runId = DB::table('portfolio_simulation_runs')->insertGetId([
+                        'public_id' => $publicId,
+                        'user_id' => $request->user()->id,
+                        'saved_prediction_filter_id' => $assignments->first()->saved_prediction_filter_id,
+                        'portfolio_id' => $portfolio->id,
+                        'backtest_run_id' => null,
+                        'status' => 'running',
+                        'started_at' => now(),
+                        'simulation_start_date' => $servingResult['start_date'],
+                        'simulation_end_date' => $servingResult['end_date'],
+                        'initial_capital' => $initial,
+                        'settings' => json_encode([
+                            'source_type' => 'serving_model_configurations',
+                            'strategy_ids' => $strategyIds,
+                            'configuration_keys' => collect($servingResult['model_references'])->pluck('configuration_key')->all(),
+                            'allocation_mode' => $servingResult['allocation_mode'],
+                            'maximum_positions' => $servingResult['maximum_positions'],
+                            'requested_maximum_positions' => $servingResult['requested_maximum_positions'],
+                            'max_stock_allocation_percent' => $servingResult['max_stock_allocation_percent'],
+                            'effective_max_stock_allocation_percent' => $servingResult['effective_max_stock_allocation_percent'],
+                            'initial_equal_weight_budget' => $servingResult['initial_equal_weight_budget'],
+                            'fee_rate' => ServingPortfolioSimulationService::FEE_RATE,
+                            'minimum_fee' => ServingPortfolioSimulationService::MINIMUM_FEE,
+                        ], JSON_THROW_ON_ERROR),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                    $servingSimulation->persist($portfolio, $runId, $servingResult);
+
+                    return;
+                }
+
+                $sourceRunId = (int) DB::table('backtest_runs')->whereIn('status', ['completed', 'completed_with_errors'])
+                    ->whereRaw("COALESCE(settings->>'run_type','system') <> 'user_filter'")
+                    ->where('trades_count', '>', 0)
+                    ->latest('id')->value('id');
+                abort_if($sourceRunId < 1, 422, __('Kein Ausgangs-Backtest vorhanden.'));
+                $runId = DB::table('portfolio_simulation_runs')->insertGetId([
+                    'public_id' => $publicId, 'user_id' => $request->user()->id,
+                    'saved_prediction_filter_id' => $assignments->first()->saved_prediction_filter_id,
+                    'portfolio_id' => $portfolio->id, 'backtest_run_id' => $sourceRunId,
+                    'status' => 'queued', 'started_at' => now(), 'initial_capital' => $initial,
+                    'settings' => json_encode(['strategy_ids' => $assignments->pluck('saved_prediction_filter_id')->map(fn ($id) => (int) $id)->all(), 'parallel' => true], JSON_THROW_ON_ERROR),
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+                DB::table('python_engine_jobs')->insert([
+                    'public_id' => (string) Str::uuid(), 'user_id' => $request->user()->id,
+                    'type' => 'portfolio_simulation', 'calculation_version' => 'portfolio-v2',
+                    'status' => 'queued', 'progress' => 0,
+                    'payload' => json_encode(['portfolio_id' => $portfolio->id, 'simulation_run_id' => $runId, 'source_run_id' => $sourceRunId, 'strategy_ids' => $assignments->pluck('saved_prediction_filter_id')->map(fn ($id) => (int) $id)->all()], JSON_THROW_ON_ERROR),
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            });
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->withErrors([
+                'simulation' => $usesServingConfigurations
+                    ? __('Die Serving-Depotsimulation konnte nicht gespeichert werden: :message', ['message' => $exception->getMessage()])
+                    : __('Die Depotsimulation konnte nicht gestartet werden.'),
+            ]);
+        }
+
+        return redirect()->route('depots.show', [$portfolio, 'simulation' => $publicId])->with(
+            'status',
+            $usesServingConfigurations
+                ? __('Serving-Depotsimulation wurde mit den exakten Modell-Trades berechnet.')
+                : __('Depotsimulation gestartet.'),
+        );
     }
 
     public function simulationStatus(Request $request, Portfolio $portfolio, string $publicId): \Illuminate\Http\JsonResponse
@@ -903,10 +1038,17 @@ final class DepotController extends Controller
             $trade = $backtestRows->get((int) ($meta['backtest_trade_id'] ?? 0));
             return [
                 'id' => (int) $transaction->id,
-                'ki_score' => $trade?->ki_score,
-                'confidence' => $trade?->confidence,
-                'risk' => $trade?->max_drawdown !== null ? (float) $trade->max_drawdown * 100 : ($meta['max_drawdown'] ?? null),
+                'ki_score' => $trade?->ki_score ?? ($meta['ki_score'] ?? null),
+                'confidence' => $trade?->confidence ?? ($meta['confidence'] ?? null),
+                'risk' => $trade?->max_drawdown !== null
+                    ? (float) $trade->max_drawdown * 100
+                    : (isset($meta['model_max_drawdown']) ? abs((float) $meta['model_max_drawdown']) * 100 : ($meta['max_drawdown'] ?? null)),
                 'pnl' => $transaction->type === 'sell' ? ($meta['realized_profit'] ?? null) : null,
+                'signal' => $meta['signal'] ?? null,
+                'horizon_days' => $meta['horizon_days'] ?? null,
+                'variant_label' => $meta['variant_label'] ?? null,
+                'model_name' => $meta['model_name'] ?? null,
+                'model_net_return' => isset($meta['model_net_return']) ? (float) $meta['model_net_return'] * 100 : null,
             ];
         })->keyBy('id')->all();
         $stockRows = $transactions->groupBy(fn ($transaction): string => (string) ($transaction->instrument?->symbol ?: '—'))

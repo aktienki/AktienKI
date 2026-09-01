@@ -24,6 +24,26 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        // Compact, read-optimized production output of pipeline-next. This is
+        // intentionally separate from the Laravel application database: no
+        // training rows, price history, features or backtest trades belong
+        // here. Keep the default connection on `pgsql` until the serving
+        // compatibility checks and the canary cutover have passed.
+        'serving' => [
+            'driver' => 'pgsql',
+            'url' => env('SERVING_DB_URL'),
+            'host' => env('SERVING_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('SERVING_DB_PORT', env('DB_PORT', '5432')),
+            'database' => env('SERVING_DB_DATABASE', 'aktienki_serving_next'),
+            'username' => env('SERVING_DB_USERNAME', env('DB_USERNAME', 'aktienki_app')),
+            'password' => env('SERVING_DB_PASSWORD', env('DB_PASSWORD')),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('SERVING_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
+        ],
+
     ],
     'migrations' => [
         'table' => 'migrations',
