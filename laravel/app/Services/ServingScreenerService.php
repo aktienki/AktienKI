@@ -387,13 +387,14 @@ final class ServingScreenerService
         }
         $ratingPercent = $this->ratingPercent($rating);
         $servingRisk = is_numeric($row->risk_score) ? (int) $row->risk_score : null;
-        $riskPercent = match ($servingRisk) {
+        $fallbackRiskPercent = match ($servingRisk) {
             2 => 25.0,
             3 => 50.0,
             4 => 70.0,
             5 => 90.0,
             default => null,
         };
+        $riskPercent = $this->predictionRiskPercent(data_get($primaryPrediction, 'risk_score')) ?? $fallbackRiskPercent;
         $qualityClass = (string) ($primaryStatus?->model_quality_class ?: 'basic');
         $qualityName = (string) ($primaryStatus?->model_quality_label ?: ucfirst($qualityClass));
         $qualityTier = match ($qualityClass) {
@@ -528,6 +529,7 @@ final class ServingScreenerService
             $stock->{"predicted_price_{$horizon}d"} = is_numeric($prediction?->target_price)
                 ? (float) $prediction->target_price
                 : null;
+            $stock->{"risk_percent_{$horizon}d"} = $this->predictionRiskPercent(data_get($prediction, 'risk_score'));
         }
         $stock->expected_return_20d = $stock->expected_return_20d ?? null;
         $stock->predicted_price_20d = $stock->predicted_price_20d ?? null;
@@ -547,6 +549,23 @@ final class ServingScreenerService
         $stock->personal_signal_explanation = $stock->personal_signal_breakdown['summary'];
 
         return $stock;
+    }
+
+    private function predictionRiskPercent(mixed $risk): ?float
+    {
+        if (! is_numeric($risk) || (float) $risk <= 0) return null;
+
+        $value = (float) $risk;
+        if ($value >= 2 && $value <= 5 && abs($value - round($value)) < .0001) {
+            return match ((int) round($value)) {
+                2 => 25.0,
+                3 => 50.0,
+                4 => 70.0,
+                5 => 90.0,
+            };
+        }
+
+        return max(1.0, min(100.0, $value <= 1 ? $value * 100 : $value));
     }
 
     private function selectPrediction(Collection $predictions, Collection $statuses, ?int $horizon = null): ?object
