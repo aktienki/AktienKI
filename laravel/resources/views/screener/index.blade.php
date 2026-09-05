@@ -58,6 +58,13 @@
             .screener-page .sms-v2-forecast>i.has-dynamic-risk.is-critical-dynamic-risk{border-bottom-color:#fb7185!important}
             .screener-page .sms-v2-scale>.screener-dynamic-risk-marker{position:absolute!important;top:50%!important;left:clamp(3%,var(--dynamic-risk-position),97%)!important;z-index:10!important;display:block!important;box-sizing:border-box;width:5px!important;height:1.35rem!important;border:1px solid rgba(255,255,255,.9)!important;outline:2px solid color-mix(in srgb,var(--ak-bg) 78%,transparent);border-radius:999px;background:var(--dynamic-risk-color,#22d3ee)!important;box-shadow:0 0 .65rem color-mix(in srgb,var(--dynamic-risk-color,#22d3ee) 92%,transparent);opacity:1;visibility:visible;transform:translate(-50%,-50%) translateX(3px);transition:left .55s cubic-bezier(.22,1,.36,1),background-color .3s ease,border-color .3s ease}
             .screener-page .sms-v2-scale>.screener-dynamic-risk-marker::after{position:absolute;top:-.22rem;left:50%;width:.42rem;height:.42rem;border:1px solid rgba(255,255,255,.9);border-radius:999px;background:var(--dynamic-risk-color,#22d3ee);box-shadow:0 0 .45rem color-mix(in srgb,var(--dynamic-risk-color,#22d3ee) 90%,transparent);content:"";transform:translateX(-50%)}
+            :root[data-theme="light"] .screener-page .screener-mobile-summary-v2{border-color:rgba(8,145,178,.42)!important;background:linear-gradient(110deg,rgba(224,242,254,.95),rgba(255,255,255,.9))!important}
+            :root[data-theme="light"] .screener-page .sms-v2-scale::before{opacity:.58!important;filter:saturate(1.35)}
+            :root[data-theme="light"] .screener-page .sms-v2-forecast>strong[data-signal="buy"]{border-color:rgba(5,150,105,.52)!important;background:rgba(16,185,129,.14)!important;color:#047857!important}
+            :root[data-theme="light"] .screener-page .sms-v2-forecast>i{border-color:rgba(71,85,105,.22)!important;background:rgba(255,255,255,.82)!important}
+            :root[data-theme="light"] .screener-page .sms-v2-forecast>i.is-trigger-horizon{border-top-color:#0891b2!important}
+            :root[data-theme="light"] .screener-page .sms-v2-forecast>i.is-time-downgraded{border-bottom-color:#d97706!important}
+            :root[data-theme="light"] .screener-page .sms-v2-forecast>i.is-negative-forecast{border-bottom-color:#e11d48!important}
             .screener-page .screener-mobile-details .screener-fundamental-strip,
             .screener-page .screener-mobile-details .screener-fundamentals-slide,
             .screener-page .screener-mobile-details .screener-mobile-fundamentals{display:none!important}
