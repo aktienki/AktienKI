@@ -19,6 +19,9 @@
             .screener-page .screener-table-head>span:not(:first-child),.screener-page .screener-desktop-summary>.screener-desktop-price,.screener-page .screener-desktop-summary>.screener-desktop-signal,.screener-page .screener-desktop-summary>.screener-trigger-model,.screener-page .screener-desktop-summary>.screener-desktop-grade,.screener-page .screener-desktop-summary>.screener-desktop-forecasts>i,.screener-page .screener-desktop-summary>svg{border-left:1px solid color-mix(in srgb,var(--ak-muted) 13%,transparent)!important}
             .screener-page .screener-desktop-summary>.screener-desktop-forecasts>i:first-of-type{border-left:1px solid color-mix(in srgb,var(--ak-muted) 13%,transparent)!important}
             .screener-page .screener-desktop-forecasts>i.is-trigger-horizon{border-left-color:color-mix(in srgb,var(--ak-muted) 13%,transparent)!important;border-bottom:2px solid color-mix(in srgb,#22d3ee 72%,transparent)!important;background:transparent!important;box-shadow:none!important}
+            .screener-page .screener-desktop-forecasts>i.is-trigger-horizon.is-time-downgraded{border-bottom-color:#fbbf24!important}
+            .screener-page .screener-desktop-forecasts>i.is-trigger-horizon.is-time-downgraded>strong:not(.text-rose-400){color:#fbbf24!important}
+            .screener-page .screener-desktop-forecasts>i.is-trigger-horizon.is-time-downgraded:has(>strong.text-rose-400){border-bottom-color:#fb7185!important}
             .screener-page .screener-desktop-forecasts>i.is-live-recalculated{position:relative}
             .screener-page .screener-desktop-forecasts>i.is-live-recalculated::after{position:absolute;top:.25rem;right:.25rem;width:.28rem;height:.28rem;border-radius:999px;background:#34d399;box-shadow:0 0 .35rem rgba(52,211,153,.72);content:""}
             .screener-page .screener-desktop-forecasts>i.is-delayed-recalculated::after{position:absolute;top:.25rem;right:.25rem;width:.28rem;height:.28rem;border-radius:999px;background:#fbbf24;content:""}
@@ -376,6 +379,12 @@
                             $mobileForecasts->all(),
                             is_numeric($calibratedSignalQuality) ? (float) $calibratedSignalQuality : $rankingScorePercent,
                         );
+                    $timeAdjustedRating = \App\Support\TimeAdjustedSignalRating::calculate(
+                        $mobileForecasts->all(),
+                        $stock->prediction_time ?? null,
+                        is_numeric($calibratedSignalQuality) ? (float) $calibratedSignalQuality : $rankingScorePercent,
+                    );
+                    $buySignalRating = array_merge($buySignalRating, $timeAdjustedRating);
                     $buySignalScorePercent = (float) $buySignalRating['percent'];
                     $buySignalScoreLabel = (string) $buySignalRating['label'];
                     $buySignalScoreColor = $qualityDonutColor($buySignalScorePercent);
@@ -412,6 +421,8 @@
                         default => $triggerModelName,
                     };
                     $triggerHorizon = is_numeric($stock->trigger_model_horizon ?? null) ? (int) $stock->trigger_model_horizon : null;
+                    $triggerForecast = $triggerHorizon !== null ? $mobileForecasts->get($triggerHorizon) : null;
+                    $isTimeDowngraded = is_numeric($triggerForecast) && (float) $triggerForecast < 1.0;
                     $triggerRelease = trim((string) ($stock->trigger_model_release_id ?? ''));
                     $triggerDescription = implode(' · ', array_filter([
                         $triggerModelName,
@@ -425,6 +436,10 @@
                     data-forecast-20="{{ is_numeric($stock->expected_return_20d ?? null) ? (float) $stock->expected_return_20d : '' }}"
                     data-forecast-40="{{ is_numeric($stock->expected_return_40d ?? null) ? (float) $stock->expected_return_40d : '' }}"
                     data-indicators="{{ is_numeric($stock->indicator_strength_percent ?? null) ? (float) $stock->indicator_strength_percent : '' }}"
+                    data-assessment-quality="{{ number_format(is_numeric($calibratedSignalQuality) ? (float) $calibratedSignalQuality : $rankingScorePercent, 2, '.', '') }}"
+                    data-assessment-cost="{{ number_format(max(0, (float) config('aktienki.signals.round_trip_cost_percent', .5)), 3, '.', '') }}"
+                    data-assessment-minimum-return="{{ number_format(max(0, (float) config('aktienki.signals.minimum_net_return_percent', 1)), 3, '.', '') }}"
+                    data-prediction-date="{{ filled($stock->prediction_time ?? null) ? \Illuminate\Support\Carbon::parse($stock->prediction_time)->toDateString() : '' }}"
                     class="screener-stock-card {{ $hasLongCompanyName ? 'screener-stock-card-long-name' : '' }} ak-card ak-dashboard-card relative overflow-hidden p-3 {{ $rankClass }}"
                     x-data="{ signalInfoOpen: false, mobileExpanded: false }"
                 >
@@ -451,9 +466,9 @@
                         </span>
                         <span class="screener-desktop-signal" data-signal="{{ strtolower($signal) }}"><strong>{{ $signalLabel }}</strong><small>{{ __('Signal') }}</small></span>
                         <span class="screener-trigger-model" data-model="{{ strtolower($triggerModelShort) }}" title="{{ $triggerDescription }}"><strong>{{ $triggerModelShort ?: '—' }}</strong></span>
-                        <span class="screener-desktop-grade screener-desktop-scale-grade">
-                            <strong>{{ __('Bewertung') }} · {{ $buySignalScoreLabel }}</strong>
-                            <i class="screener-desktop-scale signal" style="--position:{{ number_format($buySignalScorePercent, 2, '.', '') }}%;--marker:{{ $buySignalScoreColor }}" role="meter" aria-label="{{ __('Signalqualität') }} {{ $buySignalScoreLabel }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($buySignalScorePercent, 1, '.', '') }}"><em></em></i>
+                        <span class="screener-desktop-grade screener-desktop-scale-grade" data-screener-assessment>
+                            <strong data-screener-assessment-label>{{ __('Bewertung') }} · {{ $buySignalScoreLabel }}</strong>
+                            <i class="screener-desktop-scale signal" data-screener-assessment-scale style="--position:{{ number_format($buySignalScorePercent, 2, '.', '') }}%;--marker:{{ $buySignalScoreColor }}" role="meter" aria-label="{{ __('Signalqualität') }} {{ $buySignalScoreLabel }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($buySignalScorePercent, 1, '.', '') }}"><em></em></i>
                         </span>
                         <span class="screener-desktop-grade screener-desktop-scale-grade">
                             <strong>{{ __('Risiko') }} · {{ \App\Support\QualityGrade::risk($rankingRiskPercent) ?? '—' }}</strong>
@@ -462,7 +477,7 @@
                         <span class="screener-desktop-forecasts">
                             <span class="screener-desktop-forecast-label"><small>{{ __('Prognose') }}</small><strong>{{ __('Mögliche Rendite') }}</strong></span>
                             @foreach($mobileForecasts as $days => $forecast)
-                                <i class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon' : '' }}" title="{{ $triggerHorizon === (int) $days ? __('Signalauslösender Horizont').' · '.$days.'T' : '' }}"><small>{{ $days }}T</small><strong
+                                <i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon'.($isTimeDowngraded ? ' is-time-downgraded' : '') : '' }}" title="{{ $triggerHorizon === (int) $days ? __('Signalauslösender Horizont').' · '.$days.'T' : '' }}"><small>{{ $days }}T</small><strong
                                     class="{{ $forecast === null ? 'text-slate-400' : ($forecast >= 0 ? 'text-emerald-400' : 'text-rose-400') }}"
                                     @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null))
                                         data-screener-live-forecast="{{ $stock->symbol }}"
@@ -477,7 +492,7 @@
                     <button type="button" class="screener-mobile-summary screener-mobile-summary-v2 md:hidden" @click="mobileExpanded = ! mobileExpanded; if (mobileExpanded) $nextTick(async () => { await window.loadAktienKiCharts?.(); window.initializeServingCharts?.() })" :aria-expanded="mobileExpanded.toString()">
                         <span class="sms-v2-head"><b>{{ $ranking > 0 ? '#'.$ranking : '—' }}</b><i>{{ $countryFlag }}</i><span><strong>{{ $stock->name ?: $stock->symbol }}</strong><small>@if($riskProfileKey)<span class="screener-mobile-profile-badge" style="{{ $riskProfileKey === 'defensive' ? '--profile-color:#6ee7b7;--profile-border:rgba(52,211,153,.34);--profile-bg:rgba(52,211,153,.06)' : ($riskProfileKey === 'balanced' ? '--profile-color:#fcd34d;--profile-border:rgba(251,191,36,.34);--profile-bg:rgba(251,191,36,.06)' : '--profile-color:#fda4af;--profile-border:rgba(251,113,133,.34);--profile-bg:rgba(251,113,133,.06)') }}" title="{{ __('Profil') }}: {{ $riskProfileLabel }}">@if($riskProfileKey === 'defensive')<x-heroicon-o-shield-check />@elseif($riskProfileKey === 'balanced')<x-heroicon-o-scale />@else<x-heroicon-o-bolt />@endif</span>@endif{{ $stock->symbol }} · {{ $stock->sector ?: '—' }}</small></span><em>{{ is_numeric($stock->current_price) ? number_format((float)$stock->current_price,2,',','.') : '—' }} {{ $displayCurrencySymbol }}</em><x-heroicon-o-chevron-down class="h-4 w-4 text-cyan-300 transition" x-bind:class="mobileExpanded && 'rotate-180'" /></span>
                         <span class="sms-v2-forecast"><strong data-signal="{{ strtolower($signal) }}">{{ $signalLabel }}</strong>@foreach($mobileForecasts as $days=>$forecast)<i><small>{{ $days }}T</small><b class="{{ $forecast===null?'text-slate-400':($forecast>=0?'text-emerald-400':'text-rose-400') }}">{{ $forecast===null?'—':(($forecast>0?'+':'').number_format($forecast,1,',','.').' %') }}</b></i>@endforeach</span>
-                        <span class="sms-v2-scales"><i><small>{{ __('Signalqualität') }} · {{ $buySignalScoreLabel }}</small><span class="sms-v2-scale signal" style="--position:{{ $buySignalScorePercent }}%;--marker:{{ $buySignalScoreColor }}"><em></em></span></i><i><small>{{ __('Risiko') }} · {{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</small><span class="sms-v2-scale risk" style="--position:{{ 100 - ($rankingRiskPercent ?? 0) }}%;--marker:{{ $riskDonutColor }}"><em></em></span></i></span>
+                        <span class="sms-v2-scales"><i><small data-screener-assessment-label>{{ __('Bewertung') }} · {{ $buySignalScoreLabel }}</small><span class="sms-v2-scale signal" data-screener-assessment-scale style="--position:{{ $buySignalScorePercent }}%;--marker:{{ $buySignalScoreColor }}"><em></em></span></i><i><small>{{ __('Risiko') }} · {{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</small><span class="sms-v2-scale risk" style="--position:{{ 100 - ($rankingRiskPercent ?? 0) }}%;--marker:{{ $riskDonutColor }}"><em></em></span></i></span>
                     </button>
                     <template x-if="mobileExpanded">
                     <div class="screener-mobile-details screener-desktop-details grid h-full min-h-0 gap-2 md:grid-cols-2 xl:grid-cols-6" x-bind:class="{ 'is-mobile-open': mobileExpanded }">
@@ -1113,6 +1128,59 @@
                     }));
                 };
 
+                const updateTimeAdjustedAssessment=(row)=>{
+                    if(!row)return;
+                    const weights={5:.10,10:.20,15:.20,20:.30,40:.20};
+                    const cost=Math.max(0,Number(row.dataset.assessmentCost??.5));
+                    const minimum=Math.max(0,Number(row.dataset.assessmentMinimumReturn??1));
+                    const quality=Math.max(0,Math.min(100,Number(row.dataset.assessmentQuality??50)));
+                    const startValue=row.dataset.predictionDate;
+                    const start=startValue?new Date(`${startValue}T12:00:00`):null;
+                    const today=new Date();today.setHours(12,0,0,0);
+                    let elapsed=0;
+                    if(start&&!Number.isNaN(start.getTime())&&today>start){
+                        const cursor=new Date(start);
+                        while(cursor<today){cursor.setDate(cursor.getDate()+1);const day=cursor.getDay();if(day!==0&&day!==6)elapsed++}
+                    }
+                    const values=[];
+                    row.querySelectorAll('[data-assessment-horizon]').forEach(cell=>{
+                        const horizon=Number(cell.dataset.assessmentHorizon);
+                        const rawReturn=cell.dataset.assessmentReturn;
+                        const gross=Number(rawReturn);
+                        const remaining=Math.max(0,horizon-elapsed);
+                        if(rawReturn===''||!weights[horizon]||!Number.isFinite(gross)||remaining===0)return;
+                        values.push({net:gross-cost,weight:weights[horizon]*(remaining/horizon)});
+                    });
+                    const weightSum=values.reduce((sum,value)=>sum+value.weight,0);
+                    let percent=0,weightedReturn=0;
+                    if(weightSum>0){
+                        let positive=0,negative=0;
+                        values.forEach(value=>{const weight=value.weight/weightSum;weightedReturn+=value.net*weight;if(value.net>.25)positive+=weight;else if(value.net<-.25)negative+=weight});
+                        const agreement=Math.max(positive,negative);
+                        const direction=Math.sign(weightedReturn);
+                        const strength=Math.min(1,Math.tanh(Math.abs(weightedReturn)/6)*(.55+.45*quality/100)*(.70+.30*agreement));
+                        percent=50+direction*50*strength;
+                        if(weightedReturn<minimum)percent=Math.min(percent,49.99);
+                    }
+                    percent=Math.max(0,Math.min(100,percent));
+                    const grades=['5−','5+','4−','4+','3−','3+','2−','2+','1−','1+'];
+                    const label=grades[Math.min(9,Math.floor(percent/10))];
+                    const hue=percent<=50?(percent/50)*48:48+((percent-50)/50)*94;
+                    const color=`hsl(${hue.toFixed(1)} 78% 52%)`;
+                    row.querySelectorAll('[data-screener-assessment-label]').forEach(element=>element.textContent=`{{ __('Bewertung') }} · ${label}`);
+                    row.querySelectorAll('[data-screener-assessment-scale]').forEach(element=>{
+                        element.style.setProperty('--position',`${percent.toFixed(2)}%`);
+                        element.style.setProperty('--marker',color);
+                        element.setAttribute('aria-valuenow',percent.toFixed(1));
+                        element.title=`Netto ${weightedReturn.toLocaleString(document.documentElement.lang,{minimumFractionDigits:2,maximumFractionDigits:2})} % · Kosten ${cost.toLocaleString(document.documentElement.lang)} %`;
+                    });
+                    row.querySelectorAll('.is-trigger-horizon').forEach(cell=>{
+                        const rawDistance=cell.dataset.assessmentReturn;
+                        const distance=Number(rawDistance);
+                        cell.classList.toggle('is-time-downgraded',rawDistance!==''&&Number.isFinite(distance)&&distance<1);
+                    });
+                };
+
                 const applyScreenerLivePrice = (event) => {
                     const symbol=String(event.detail?.symbol??'');
                     const price=Number(event.detail?.price);
@@ -1135,12 +1203,13 @@
                         forecast.classList.remove('text-emerald-400','text-rose-400','text-slate-400');
                         forecast.classList.add(value>=0?'text-emerald-400':'text-rose-400');
                         forecast.dataset.liveUpdatedAt=String(Number(event.detail?.timestamp??Date.now()/1000));
+                        forecast.closest('[data-assessment-horizon]')?.setAttribute('data-assessment-return',String(value));
                         forecast.title=`${event.detail?.realtime===true?'Live':'15 Min. verzögert'} neu berechnet · ${updatedAt.toLocaleTimeString(document.documentElement.lang,{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/Berlin'})}`;
                         const forecastCell=forecast.closest('i');
                         forecastCell?.classList.remove('is-live-recalculated','is-delayed-recalculated');
                         forecastCell?.classList.add(event.detail?.realtime===true?'is-live-recalculated':'is-delayed-recalculated');
                         const row=forecast.closest('.screener-stock-card');
-                        if(row)row.dataset[`forecast${forecast.dataset.horizon}`]=String(value);
+                        if(row){row.dataset[`forecast${forecast.dataset.horizon}`]=String(value);updateTimeAdjustedAssessment(row)}
                     });
                 };
 
