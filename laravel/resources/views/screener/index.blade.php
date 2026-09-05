@@ -1224,6 +1224,7 @@
                             {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/Berlin'},
                         );
                     });
+                    const affectedRows=new Set();
                     document.querySelectorAll(`[data-screener-live-forecast="${escaped}"]`).forEach(forecast=>{
                         const target=Number(forecast.dataset.targetPrice);
                         if(!Number.isFinite(target)||target<=0)return;
@@ -1240,15 +1241,16 @@
                         const forecastCell=forecast.closest('i');
                         forecastCell?.classList.remove('is-live-recalculated','is-delayed-recalculated');
                         forecastCell?.classList.add(event.detail?.realtime===true?'is-live-recalculated':'is-delayed-recalculated');
-                        if(row){row.dataset[`forecast${forecast.dataset.horizon}`]=String(value);updateForecastWarnings(row)}
+                        if(row){row.dataset[`forecast${forecast.dataset.horizon}`]=String(value);affectedRows.add(row)}
                     });
+                    affectedRows.forEach(updateForecastWarnings);
                 };
 
                 window.addEventListener('aktienki:live-price',applyScreenerLivePrice);
 
                 const initializeLiveSimulation=()=>{
                     const page=document.querySelector('[data-simulate-live="1"]');
-                    if(!page||page.dataset.simulationReady)return;
+                    if(!page||page.dataset.simulationReady||window.matchMedia('(max-width:767px)').matches)return;
                     page.dataset.simulationReady='true';
                     const prices=[...page.querySelectorAll('[data-live-symbol][data-live-base-price]')];
                     let tick=0;
