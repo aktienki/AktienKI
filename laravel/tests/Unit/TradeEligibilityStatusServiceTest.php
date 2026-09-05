@@ -31,4 +31,13 @@ final class TradeEligibilityStatusServiceTest extends TestCase
         self::assertSame(TradeEligibilityStatusService::NOT_BUY, $status);
         self::assertSame('model_signal_not_buy', $reason);
     }
+
+    public function test_screener_marks_a_one_percentage_point_live_improvement(): void
+    {
+        $view = file_get_contents(dirname(__DIR__, 2).'/resources/views/screener/index.blade.php');
+
+        self::assertStringContainsString('data-assessment-base-return', $view);
+        self::assertStringContainsString("netForecast-baseForecast>=1", $view);
+        self::assertStringContainsString("'has-improved-forecast'", $view);
+    }
 }
