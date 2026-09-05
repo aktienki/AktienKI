@@ -21,7 +21,7 @@
             .screener-page .screener-desktop-forecasts>i.is-trigger-horizon{border-left-color:color-mix(in srgb,var(--ak-muted) 13%,transparent)!important;border-bottom:2px solid color-mix(in srgb,#22d3ee 72%,transparent)!important;background:transparent!important;box-shadow:none!important}
             .screener-page .screener-desktop-forecasts>i.is-time-downgraded{border-bottom:2px solid #fbbf24!important}
             .screener-page .screener-desktop-forecasts>i.is-time-downgraded>strong:not(.text-rose-400){color:#fbbf24!important}
-            .screener-page .screener-desktop-forecasts>i.is-time-downgraded:has(>strong.text-rose-400){border-bottom-color:#fb7185!important}
+            .screener-page .screener-desktop-forecasts>i.is-negative-forecast{border-bottom:2px solid #fb7185!important}
             .screener-page .screener-desktop-forecasts>i.is-live-recalculated{position:relative}
             .screener-page .screener-desktop-forecasts>i.is-live-recalculated::after{position:absolute;top:.25rem;right:.25rem;width:.28rem;height:.28rem;border-radius:999px;background:#34d399;box-shadow:0 0 .35rem rgba(52,211,153,.72);content:""}
             .screener-page .screener-desktop-forecasts>i.is-delayed-recalculated::after{position:absolute;top:.25rem;right:.25rem;width:.28rem;height:.28rem;border-radius:999px;background:#fbbf24;content:""}
@@ -475,7 +475,7 @@
                         <span class="screener-desktop-forecasts">
                             <span class="screener-desktop-forecast-label"><small>{{ __('Prognose') }}</small><strong>{{ __('Mögliche Rendite') }}</strong></span>
                             @foreach($mobileForecasts as $days => $forecast)
-                                <i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 1.0 ? 'is-time-downgraded' : '' }}" title="{{ $triggerHorizon === (int) $days ? __('Signalauslösender Horizont').' · '.$days.'T' : '' }}"><small>{{ $days }}T</small><strong
+                                <i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 1.0 ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}" title="{{ $triggerHorizon === (int) $days ? __('Signalauslösender Horizont').' · '.$days.'T' : '' }}"><small>{{ $days }}T</small><strong
                                     class="{{ $forecast === null ? 'text-slate-400' : ($forecast >= 0 ? 'text-emerald-400' : 'text-rose-400') }}"
                                     @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null))
                                         data-screener-live-forecast="{{ $stock->symbol }}"
@@ -1176,6 +1176,7 @@
                         const rawDistance=cell.dataset.assessmentReturn;
                         const distance=Number(rawDistance);
                         cell.classList.toggle('is-time-downgraded',rawDistance!==''&&Number.isFinite(distance)&&distance<1);
+                        cell.classList.toggle('is-negative-forecast',rawDistance!==''&&Number.isFinite(distance)&&distance<0);
                     });
                 };
 
