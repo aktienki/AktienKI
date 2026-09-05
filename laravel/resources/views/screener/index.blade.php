@@ -441,6 +441,9 @@
                     $showDynamicRisk = is_numeric($dynamicRiskPercent)
                         && is_numeric($baseRankingRiskPercent)
                         && (float) $dynamicRiskPercent > (float) $baseRankingRiskPercent + .01;
+                    $showDynamicRiskBorder = $showDynamicRisk
+                        && is_numeric($activeNetForecast)
+                        && (float) $activeNetForecast < 2.0;
                     $dynamicRiskColor = (float) ($dynamicRiskPercent ?? 0) >= 90 ? '#fb7185' : '#fbbf24';
                     $triggerRelease = trim((string) ($stock->trigger_model_release_id ?? ''));
                     $triggerDescription = implode(' · ', array_filter([
@@ -495,7 +498,7 @@
                         <span class="screener-desktop-forecasts">
                             <span class="screener-desktop-forecast-label"><small>{{ __('Prognose') }}</small><strong>{{ __('Mögliche Rendite') }}</strong></span>
                             @foreach($mobileForecasts as $days => $forecast)
-                                <i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon '.(($realtimeQuotes ?? false) && $showDynamicRisk ? 'has-dynamic-risk '.((float) $dynamicRiskPercent >= 90 ? 'is-critical-dynamic-risk ' : '') : '') : '' }}{{ is_numeric($forecast) && (float) $forecast < 1.0 ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}" title="{{ __('Nettoprognose nach :cost % erwarteten Kosten', ['cost' => number_format($forecastCostPercent, 2, ',', '.')]).($triggerHorizon === (int) $days ? ' · '.__('Signalauslösender Horizont').' · '.$days.'T' : '') }}"><small>{{ $days }}T</small><strong
+                                <i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon '.(($realtimeQuotes ?? false) && $showDynamicRiskBorder ? 'has-dynamic-risk '.((float) $dynamicRiskPercent >= 90 ? 'is-critical-dynamic-risk ' : '') : '') : '' }}{{ is_numeric($forecast) && (float) $forecast < 2.0 ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}" title="{{ __('Nettoprognose nach :cost % erwarteten Kosten', ['cost' => number_format($forecastCostPercent, 2, ',', '.')]).($triggerHorizon === (int) $days ? ' · '.__('Signalauslösender Horizont').' · '.$days.'T' : '') }}"><small>{{ $days }}T</small><strong
                                     class="{{ $forecast === null ? 'text-slate-400' : ($forecast >= 0 ? 'text-emerald-400' : 'text-rose-400') }}"
                                     @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null))
                                         data-screener-live-forecast="{{ $stock->symbol }}"
@@ -509,7 +512,7 @@
                     </a>
                     <button type="button" class="screener-mobile-summary screener-mobile-summary-v2 md:hidden" @click="mobileExpanded = ! mobileExpanded; if (mobileExpanded) $nextTick(async () => { await window.loadAktienKiCharts?.(); window.initializeServingCharts?.() })" :aria-expanded="mobileExpanded.toString()">
                         <span class="sms-v2-head"><b>{{ $ranking > 0 ? '#'.$ranking : '—' }}</b><i>{{ $countryFlag }}</i><span><strong>{{ $stock->name ?: $stock->symbol }}</strong><small>@if($riskProfileKey)<span class="screener-mobile-profile-badge" style="{{ $riskProfileKey === 'defensive' ? '--profile-color:#6ee7b7;--profile-border:rgba(52,211,153,.34);--profile-bg:rgba(52,211,153,.06)' : ($riskProfileKey === 'balanced' ? '--profile-color:#fcd34d;--profile-border:rgba(251,191,36,.34);--profile-bg:rgba(251,191,36,.06)' : '--profile-color:#fda4af;--profile-border:rgba(251,113,133,.34);--profile-bg:rgba(251,113,133,.06)') }}" title="{{ __('Profil') }}: {{ $riskProfileLabel }}">@if($riskProfileKey === 'defensive')<x-heroicon-o-shield-check />@elseif($riskProfileKey === 'balanced')<x-heroicon-o-scale />@else<x-heroicon-o-bolt />@endif</span>@endif{{ $stock->symbol }} · {{ $stock->sector ?: '—' }}</small></span><em>{{ is_numeric($stock->current_price) ? number_format((float)$stock->current_price,2,',','.') : '—' }} {{ $displayCurrencySymbol }}</em><x-heroicon-o-chevron-down class="h-4 w-4 text-cyan-300 transition" x-bind:class="mobileExpanded && 'rotate-180'" /></span>
-                        <span class="sms-v2-forecast"><strong data-signal="{{ strtolower($signal) }}">{{ $signalLabel }}</strong>@foreach($mobileForecasts as $days=>$forecast)<i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon '.(($realtimeQuotes ?? false) && $showDynamicRisk ? 'has-dynamic-risk '.((float) $dynamicRiskPercent >= 90 ? 'is-critical-dynamic-risk ' : '') : '') : '' }}{{ is_numeric($forecast) && (float) $forecast < 1.0 ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}"><small>{{ $days }}T</small><b class="{{ $forecast===null?'text-slate-400':($forecast>=0?'text-emerald-400':'text-rose-400') }}" @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null)) data-screener-live-forecast="{{ $stock->symbol }}" data-horizon="{{ $days }}" data-target-price="{{ (float) $stock->{"predicted_price_{$days}d"} }}" @endif>{{ $forecast===null?'—':(($forecast>0?'+':'').number_format($forecast,1,',','.').' %') }}</b></i>@endforeach</span>
+                        <span class="sms-v2-forecast"><strong data-signal="{{ strtolower($signal) }}">{{ $signalLabel }}</strong>@foreach($mobileForecasts as $days=>$forecast)<i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon '.(($realtimeQuotes ?? false) && $showDynamicRiskBorder ? 'has-dynamic-risk '.((float) $dynamicRiskPercent >= 90 ? 'is-critical-dynamic-risk ' : '') : '') : '' }}{{ is_numeric($forecast) && (float) $forecast < 2.0 ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}"><small>{{ $days }}T</small><b class="{{ $forecast===null?'text-slate-400':($forecast>=0?'text-emerald-400':'text-rose-400') }}" @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null)) data-screener-live-forecast="{{ $stock->symbol }}" data-horizon="{{ $days }}" data-target-price="{{ (float) $stock->{"predicted_price_{$days}d"} }}" @endif>{{ $forecast===null?'—':(($forecast>0?'+':'').number_format($forecast,1,',','.').' %') }}</b></i>@endforeach</span>
                         <span class="sms-v2-scales"><i><small>{{ __('Signalqualität') }} · {{ $buySignalScoreLabel }}</small><span class="sms-v2-scale signal" style="--position:{{ $buySignalScorePercent }}%;--marker:{{ $buySignalScoreColor }}"><em></em></span></i><i><small>{{ __('Risiko') }} · {{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</small><span class="sms-v2-scale risk" style="--position:{{ 100 - ($rankingRiskPercent ?? 0) }}%;--marker:{{ $riskDonutColor }}"><em></em>@if($realtimeQuotes ?? false)<b class="screener-dynamic-risk-marker" data-screener-dynamic-risk style="--dynamic-risk-position:{{ number_format(100 - (float) ($dynamicRiskPercent ?? 0), 2, '.', '') }}%;--dynamic-risk-color:{{ $dynamicRiskColor }}" title="{{ __('Dynamisches Risiko') }}: {{ number_format((float) ($dynamicRiskPercent ?? 0), 1, ',', '.') }} %" @if(! $showDynamicRisk) hidden @endif></b>@endif</span></i></span>
                     </button>
                     <template x-if="mobileExpanded">
@@ -1151,7 +1154,7 @@
                     row.querySelectorAll('[data-assessment-horizon]').forEach(cell=>{
                         const rawDistance=cell.dataset.assessmentReturn;
                         const distance=Number(rawDistance);
-                        cell.classList.toggle('is-time-downgraded',rawDistance!==''&&Number.isFinite(distance)&&distance<1);
+                        cell.classList.toggle('is-time-downgraded',rawDistance!==''&&Number.isFinite(distance)&&distance<2);
                         cell.classList.toggle('is-negative-forecast',rawDistance!==''&&Number.isFinite(distance)&&distance<0);
                     });
                     if(row.dataset.dynamicRiskEnabled!=='1')return;
@@ -1163,8 +1166,8 @@
                     const risk=Math.max(baseRisk,forecastRisk);
                     const quality=Math.max(0,Math.min(100,100-risk));
                     row.querySelectorAll('.is-trigger-horizon').forEach(cell=>{
-                        cell.classList.toggle('has-dynamic-risk',risk>baseRisk+.01);
-                        cell.classList.toggle('is-critical-dynamic-risk',risk>=90&&risk>baseRisk+.01);
+                        cell.classList.toggle('has-dynamic-risk',netForecast<2&&risk>baseRisk+.01);
+                        cell.classList.toggle('is-critical-dynamic-risk',netForecast<2&&risk>=90&&risk>baseRisk+.01);
                     });
                     row.querySelectorAll('[data-screener-dynamic-risk]').forEach(marker=>{
                         marker.hidden=risk<=baseRisk+.01;
