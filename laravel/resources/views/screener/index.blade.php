@@ -1,6 +1,5 @@
 <x-app-layout>
     @php
-        $renderMobileDetails = preg_match('/Mobile|Android|iPhone|iPad|iPod/i', (string) request()->userAgent()) === 1;
         $simulateLiveQuotes = request()->boolean('simulate_live')
             && ((bool) (auth()->user()?->is_admin ?? false) || strtolower((string) (auth()->user()?->role ?? '')) === 'admin');
     @endphp
@@ -43,7 +42,8 @@
             .screener-page .screener-mobile-profile-badge{display:inline-grid!important;width:1rem!important;height:1rem!important;margin-right:.28rem;place-items:center!important;border:1px solid var(--profile-border);border-radius:.3rem;background:var(--profile-bg);color:var(--profile-color);vertical-align:-.18rem}
             .screener-page .screener-mobile-profile-badge svg{width:.65rem!important;height:.65rem!important;stroke-width:2.2!important}
             .screener-page .screener-mobile-details .screener-fundamental-strip,
-            .screener-page .screener-mobile-details .screener-percentile-profile{display:none!important}
+            .screener-page .screener-mobile-details .screener-fundamentals-slide,
+            .screener-page .screener-mobile-details .screener-mobile-fundamentals{display:none!important}
         }
     </style>
     <div data-simulate-live="{{ $simulateLiveQuotes ? '1' : '0' }}" x-data="{ filtering: false, submitFilters(form) { this.filtering = true; requestAnimationFrame(() => form.submit()) } }" @pageshow.window="filtering = false" class="screener-page mx-auto max-w-[96rem] px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
@@ -479,7 +479,6 @@
                         <span class="sms-v2-forecast"><strong data-signal="{{ strtolower($signal) }}">{{ $signalLabel }}</strong>@foreach($mobileForecasts as $days=>$forecast)<i><small>{{ $days }}T</small><b class="{{ $forecast===null?'text-slate-400':($forecast>=0?'text-emerald-400':'text-rose-400') }}">{{ $forecast===null?'—':(($forecast>0?'+':'').number_format($forecast,1,',','.').' %') }}</b></i>@endforeach</span>
                         <span class="sms-v2-scales"><i><small>{{ __('Signalqualität') }} · {{ $buySignalScoreLabel }}</small><span class="sms-v2-scale signal" style="--position:{{ $buySignalScorePercent }}%;--marker:{{ $buySignalScoreColor }}"><em></em></span></i><i><small>{{ __('Risiko') }} · {{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</small><span class="sms-v2-scale risk" style="--position:{{ 100 - ($rankingRiskPercent ?? 0) }}%;--marker:{{ $riskDonutColor }}"><em></em></span></i></span>
                     </button>
-                    @if($renderMobileDetails)
                     <template x-if="mobileExpanded">
                     <div class="screener-mobile-details screener-desktop-details grid h-full min-h-0 gap-2 md:grid-cols-2 xl:grid-cols-6" x-bind:class="{ 'is-mobile-open': mobileExpanded }">
                         <div class="screener-chart-panel relative h-full min-h-0 rounded-xl border border-transparent p-3 pt-5 xl:col-span-2">
@@ -779,7 +778,7 @@
                                             </summary>
                                             @if($businessSummary)<p class="mt-1 text-[10px] leading-4 text-[var(--ak-muted)]">{{ $businessSummary }}</p><span class="mt-1 inline-block text-[8px] font-black text-cyan-300/70">{{ __('Weniger') }} ↑</span>@endif
                                         </details>
-                                        <div class="grid grid-cols-2 gap-1.5">
+                                        <div class="screener-mobile-fundamentals grid grid-cols-2 gap-1.5">
                                             <div class="rounded-lg border border-cyan-300/15 bg-cyan-400/[.045] px-2 py-1.5 text-center">
                                                 <small class="block text-[7px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('KGV') }}</small>
                                                 <b class="mt-0.5 block text-[10px] font-black tabular-nums text-[var(--ak-text)]">{{ $priceEarningsRatio !== null ? number_format($priceEarningsRatio, 2, ',', '.') : '—' }}</b>
@@ -976,7 +975,6 @@
                         </div>
                     </div>
                     </template>
-                    @endif
                 </article>
             @empty
                 <div class="rounded-2xl border border-cyan-400/25 bg-[var(--ak-card)] p-8 text-center text-sm text-[var(--ak-muted)] sm:col-span-2 xl:col-span-3">{{ __('Keine Aktien für diese Auswahl gefunden.') }}</div>
