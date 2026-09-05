@@ -1,6 +1,8 @@
 <x-app-layout>
     @php
         $renderMobileDetails = preg_match('/Mobile|Android|iPhone|iPad|iPod/i', (string) request()->userAgent()) === 1;
+        $simulateLiveQuotes = request()->boolean('simulate_live')
+            && ((bool) (auth()->user()?->is_admin ?? false) || strtolower((string) (auth()->user()?->role ?? '')) === 'admin');
     @endphp
     <style>
         @media (min-width:768px) {
@@ -43,7 +45,7 @@
             .screener-page .screener-mobile-details .screener-percentile-profile{display:none!important}
         }
     </style>
-    <div x-data="{ filtering: false, submitFilters(form) { this.filtering = true; requestAnimationFrame(() => form.submit()) } }" @pageshow.window="filtering = false" class="screener-page mx-auto max-w-[96rem] px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
+    <div data-simulate-live="{{ $simulateLiveQuotes ? '1' : '0' }}" x-data="{ filtering: false, submitFilters(form) { this.filtering = true; requestAnimationFrame(() => form.submit()) } }" @pageshow.window="filtering = false" class="screener-page mx-auto max-w-[96rem] px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
         <header class="mb-3">
             <h1 class="text-3xl font-black tracking-tight">{{ __('Aktienscreener') }}</h1>
         </header>
@@ -439,6 +441,7 @@
                                     data-live-symbol="{{ $stock->symbol }}"
                                     data-live-decimals="2"
                                     data-live-currency="{{ $displayCurrencySymbol }}"
+                                    data-live-base-price="{{ (float) $stock->current_price }}"
                                     data-screener-live-price="{{ $stock->symbol }}"
                                 @endif
                             >{{ is_numeric($stock->current_price) ? number_format((float) $stock->current_price, 2, ',', '.') : '—' }} <em>{{ $displayCurrencySymbol }}</em></strong>@if($priceChange !== null)<b class="{{ $priceChange >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ ($priceChange > 0 ? '+' : '').number_format($priceChange, 2, ',', '.').' %' }}</b>@endif @if($realtimeQuotes ?? false)<i class="screener-live-status" data-screener-live-status="{{ $stock->symbol }}" hidden>{{ __('Live') }}</i>@endif</span>
@@ -1118,6 +1121,7 @@
                     const escaped=CSS.escape(symbol);
                     document.querySelectorAll(`[data-screener-live-status="${escaped}"]`).forEach(status=>{
                         status.hidden=false;
+                        if(event.detail?.simulation===true)status.textContent='Simulation';
                         status.title=new Date(Number(event.detail?.timestamp??Date.now()/1000)*1000).toLocaleTimeString(
                             document.documentElement.lang,
                             {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/Berlin'},
@@ -1142,6 +1146,29 @@
                 };
 
                 window.addEventListener('aktienki:live-price',applyScreenerLivePrice);
+
+                const initializeLiveSimulation=()=>{
+                    const page=document.querySelector('[data-simulate-live="1"]');
+                    if(!page||page.dataset.simulationReady)return;
+                    page.dataset.simulationReady='true';
+                    const prices=[...page.querySelectorAll('[data-live-symbol][data-live-base-price]')];
+                    let tick=0;
+                    const update=()=>{
+                        const timestamp=Math.floor(Date.now()/1000);
+                        prices.forEach((element,index)=>{
+                            const base=Number(element.dataset.liveBasePrice);
+                            if(!Number.isFinite(base)||base<=0)return;
+                            const price=base*(1+(Math.sin((tick+index)*.73)*.004));
+                            const decimals=Number(element.dataset.liveDecimals??2);
+                            const currency=element.dataset.liveCurrency??'';
+                            element.textContent=`${price.toLocaleString(document.documentElement.lang,{minimumFractionDigits:decimals,maximumFractionDigits:decimals})}${currency?` ${currency}`:''}`;
+                            window.dispatchEvent(new CustomEvent('aktienki:live-price',{detail:{symbol:element.dataset.liveSymbol,price,timestamp,realtime:true,simulation:true}}));
+                        });
+                        tick+=1;
+                    };
+                    update();
+                    window.setInterval(update,5000);
+                };
 
                 const initializeScreenerMiniCharts = () => {
                     const charts=document.querySelectorAll('[data-screener-minichart-url]:not([data-minichart-state])');
@@ -1169,8 +1196,8 @@
                 };
 
                 document.readyState === 'loading'
-                    ? document.addEventListener('DOMContentLoaded', ()=>{initializeServingCharts();initializeScreenerSorting();initializeScreenerMiniCharts()}, { once: true })
-                    : (initializeServingCharts(),initializeScreenerSorting(),initializeScreenerMiniCharts());
+                    ? document.addEventListener('DOMContentLoaded', ()=>{initializeServingCharts();initializeScreenerSorting();initializeScreenerMiniCharts();initializeLiveSimulation()}, { once: true })
+                    : (initializeServingCharts(),initializeScreenerSorting(),initializeScreenerMiniCharts(),initializeLiveSimulation());
                 document.addEventListener('livewire:navigated', ()=>{initializeServingCharts();initializeScreenerMiniCharts()});
             })();
         </script>
