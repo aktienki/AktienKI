@@ -56,7 +56,7 @@
             .screener-page .sms-v2-forecast>i.is-negative-forecast{border-bottom:2px solid #fb7185!important}
             .screener-page .sms-v2-forecast>i.has-dynamic-risk{border-bottom:2px solid #fbbf24!important}
             .screener-page .sms-v2-forecast>i.has-dynamic-risk.is-critical-dynamic-risk{border-bottom-color:#fb7185!important}
-            .screener-page .sms-v2-scale>.screener-dynamic-risk-marker{position:absolute;top:50%;left:clamp(2%,var(--dynamic-risk-position),98%);z-index:4;width:2px;height:.9rem;border-radius:999px;background:var(--dynamic-risk-color,#fbbf24);box-shadow:0 0 .35rem color-mix(in srgb,var(--dynamic-risk-color,#fbbf24) 72%,transparent);transform:translate(-50%,-50%)}
+            .screener-page .sms-v2-scale>.screener-dynamic-risk-marker{position:absolute;top:50%;left:clamp(2%,var(--dynamic-risk-position),98%);z-index:4;box-sizing:border-box;width:4px;height:1rem;border:1px solid color-mix(in srgb,var(--dynamic-risk-color,#fbbf24) 72%,white);border-radius:999px;background:var(--dynamic-risk-color,#fbbf24);box-shadow:0 0 .5rem color-mix(in srgb,var(--dynamic-risk-color,#fbbf24) 88%,transparent);transform:translate(-50%,-50%)}
             .screener-page .screener-mobile-details .screener-fundamental-strip,
             .screener-page .screener-mobile-details .screener-fundamentals-slide,
             .screener-page .screener-mobile-details .screener-mobile-fundamentals{display:none!important}
@@ -1250,9 +1250,13 @@
 
                 const initializeLiveSimulation=()=>{
                     const page=document.querySelector('[data-simulate-live="1"]');
-                    if(!page||page.dataset.simulationReady||window.matchMedia('(max-width:767px)').matches)return;
+                    if(!page||page.dataset.simulationReady)return;
                     page.dataset.simulationReady='true';
-                    const prices=[...page.querySelectorAll('[data-live-symbol][data-live-base-price]')];
+                    const isMobile=window.matchMedia('(max-width:767px)').matches;
+                    const allPrices=[...page.querySelectorAll('[data-live-symbol][data-live-base-price]')];
+                    const prices=isMobile
+                        ? [...new Map(allPrices.map(element=>[element.dataset.liveSymbol,element])).values()].slice(0,20)
+                        : allPrices;
                     let tick=0;
                     const update=()=>{
                         const timestamp=Math.floor(Date.now()/1000);
@@ -1268,7 +1272,7 @@
                         tick+=1;
                     };
                     update();
-                    window.setInterval(update,5000);
+                    window.setInterval(update,isMobile?10000:5000);
                 };
 
                 const initializeScreenerMiniCharts = () => {
