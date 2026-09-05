@@ -19,9 +19,9 @@
             .screener-page .screener-table-head>span:not(:first-child),.screener-page .screener-desktop-summary>.screener-desktop-price,.screener-page .screener-desktop-summary>.screener-desktop-signal,.screener-page .screener-desktop-summary>.screener-trigger-model,.screener-page .screener-desktop-summary>.screener-desktop-grade,.screener-page .screener-desktop-summary>.screener-desktop-forecasts>i,.screener-page .screener-desktop-summary>svg{border-left:1px solid color-mix(in srgb,var(--ak-muted) 13%,transparent)!important}
             .screener-page .screener-desktop-summary>.screener-desktop-forecasts>i:first-of-type{border-left:1px solid color-mix(in srgb,var(--ak-muted) 13%,transparent)!important}
             .screener-page .screener-desktop-forecasts>i.is-trigger-horizon{border-left-color:color-mix(in srgb,var(--ak-muted) 13%,transparent)!important;border-bottom:2px solid color-mix(in srgb,#22d3ee 72%,transparent)!important;background:transparent!important;box-shadow:none!important}
-            .screener-page .screener-desktop-forecasts>i.is-trigger-horizon.is-time-downgraded{border-bottom-color:#fbbf24!important}
-            .screener-page .screener-desktop-forecasts>i.is-trigger-horizon.is-time-downgraded>strong:not(.text-rose-400){color:#fbbf24!important}
-            .screener-page .screener-desktop-forecasts>i.is-trigger-horizon.is-time-downgraded:has(>strong.text-rose-400){border-bottom-color:#fb7185!important}
+            .screener-page .screener-desktop-forecasts>i.is-time-downgraded{border-bottom:2px solid #fbbf24!important}
+            .screener-page .screener-desktop-forecasts>i.is-time-downgraded>strong:not(.text-rose-400){color:#fbbf24!important}
+            .screener-page .screener-desktop-forecasts>i.is-time-downgraded:has(>strong.text-rose-400){border-bottom-color:#fb7185!important}
             .screener-page .screener-desktop-forecasts>i.is-live-recalculated{position:relative}
             .screener-page .screener-desktop-forecasts>i.is-live-recalculated::after{position:absolute;top:.25rem;right:.25rem;width:.28rem;height:.28rem;border-radius:999px;background:#34d399;box-shadow:0 0 .35rem rgba(52,211,153,.72);content:""}
             .screener-page .screener-desktop-forecasts>i.is-delayed-recalculated::after{position:absolute;top:.25rem;right:.25rem;width:.28rem;height:.28rem;border-radius:999px;background:#fbbf24;content:""}
@@ -421,8 +421,6 @@
                         default => $triggerModelName,
                     };
                     $triggerHorizon = is_numeric($stock->trigger_model_horizon ?? null) ? (int) $stock->trigger_model_horizon : null;
-                    $triggerForecast = $triggerHorizon !== null ? $mobileForecasts->get($triggerHorizon) : null;
-                    $isTimeDowngraded = is_numeric($triggerForecast) && (float) $triggerForecast < 1.0;
                     $triggerRelease = trim((string) ($stock->trigger_model_release_id ?? ''));
                     $triggerDescription = implode(' · ', array_filter([
                         $triggerModelName,
@@ -477,7 +475,7 @@
                         <span class="screener-desktop-forecasts">
                             <span class="screener-desktop-forecast-label"><small>{{ __('Prognose') }}</small><strong>{{ __('Mögliche Rendite') }}</strong></span>
                             @foreach($mobileForecasts as $days => $forecast)
-                                <i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon'.($isTimeDowngraded ? ' is-time-downgraded' : '') : '' }}" title="{{ $triggerHorizon === (int) $days ? __('Signalauslösender Horizont').' · '.$days.'T' : '' }}"><small>{{ $days }}T</small><strong
+                                <i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 1.0 ? 'is-time-downgraded' : '' }}" title="{{ $triggerHorizon === (int) $days ? __('Signalauslösender Horizont').' · '.$days.'T' : '' }}"><small>{{ $days }}T</small><strong
                                     class="{{ $forecast === null ? 'text-slate-400' : ($forecast >= 0 ? 'text-emerald-400' : 'text-rose-400') }}"
                                     @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null))
                                         data-screener-live-forecast="{{ $stock->symbol }}"
@@ -1174,7 +1172,7 @@
                         element.setAttribute('aria-valuenow',percent.toFixed(1));
                         element.title=`Netto ${weightedReturn.toLocaleString(document.documentElement.lang,{minimumFractionDigits:2,maximumFractionDigits:2})} % · Kosten ${cost.toLocaleString(document.documentElement.lang)} %`;
                     });
-                    row.querySelectorAll('.is-trigger-horizon').forEach(cell=>{
+                    row.querySelectorAll('[data-assessment-horizon]').forEach(cell=>{
                         const rawDistance=cell.dataset.assessmentReturn;
                         const distance=Number(rawDistance);
                         cell.classList.toggle('is-time-downgraded',rawDistance!==''&&Number.isFinite(distance)&&distance<1);
