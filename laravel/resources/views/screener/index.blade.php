@@ -29,6 +29,7 @@
             .screener-page .screener-risk-choice svg{width:1rem;height:1rem;flex:none;stroke-width:2}
             .screener-page .screener-desktop-scale::before{position:absolute;inset:0;border-radius:inherit;background:linear-gradient(90deg,#fb7185,#fbbf24 48%,#34d399);content:"";-webkit-mask:repeating-linear-gradient(90deg,#000 0 calc(10% - 2px),transparent calc(10% - 2px) 10%);mask:repeating-linear-gradient(90deg,#000 0 calc(10% - 2px),transparent calc(10% - 2px) 10%);opacity:.32}
             .screener-page .screener-desktop-scale>em{position:absolute;top:50%;left:clamp(5%,var(--position),95%);z-index:2;width:calc(10% - 2px);min-width:5px;height:.72rem;border:1px solid color-mix(in srgb,var(--marker,#22d3ee) 72%,white);border-radius:.14rem;background:var(--marker,#22d3ee);box-shadow:0 0 .35rem color-mix(in srgb,var(--marker,#22d3ee) 70%,transparent);transform:translate(-50%,-50%)}
+            .screener-page .screener-desktop-scale>.screener-dynamic-risk-marker{position:absolute;top:50%;left:clamp(2%,var(--dynamic-risk-position),98%);z-index:4;width:2px;height:1rem;border-radius:999px;background:var(--dynamic-risk-color,#fbbf24);box-shadow:0 0 .38rem color-mix(in srgb,var(--dynamic-risk-color,#fbbf24) 72%,transparent);transform:translate(-50%,-50%)}
         }
         @media (max-width:767px) {
             .screener-page{padding-top:.75rem!important}
@@ -425,10 +426,13 @@
                     $forecastRiskFloor = is_numeric($activeNetForecast)
                         ? max(0, min(100, 100 - (max(0, (float) $activeNetForecast) * 20)))
                         : null;
-                    if ($forecastRiskFloor !== null) {
-                        $rankingRiskPercent = max((float) ($baseRankingRiskPercent ?? 0), $forecastRiskFloor);
-                        $riskDonutColor = $qualityDonutColor(100 - $rankingRiskPercent);
-                    }
+                    $dynamicRiskPercent = $forecastRiskFloor !== null
+                        ? max((float) ($baseRankingRiskPercent ?? 0), $forecastRiskFloor)
+                        : $baseRankingRiskPercent;
+                    $showDynamicRisk = is_numeric($dynamicRiskPercent)
+                        && is_numeric($baseRankingRiskPercent)
+                        && (float) $dynamicRiskPercent > (float) $baseRankingRiskPercent + .01;
+                    $dynamicRiskColor = (float) ($dynamicRiskPercent ?? 0) >= 90 ? '#fb7185' : '#fbbf24';
                     $triggerRelease = trim((string) ($stock->trigger_model_release_id ?? ''));
                     $triggerDescription = implode(' · ', array_filter([
                         $triggerModelName,
@@ -443,6 +447,7 @@
                     data-forecast-40="{{ is_numeric($mobileForecasts->get(40)) ? (float) $mobileForecasts->get(40) : '' }}"
                     data-forecast-cost="{{ number_format($forecastCostPercent, 3, '.', '') }}"
                     data-base-risk="{{ is_numeric($baseRankingRiskPercent) ? number_format((float) $baseRankingRiskPercent, 3, '.', '') : '' }}"
+                    data-dynamic-risk-enabled="{{ ($realtimeQuotes ?? false) ? '1' : '0' }}"
                     data-indicators="{{ is_numeric($stock->indicator_strength_percent ?? null) ? (float) $stock->indicator_strength_percent : '' }}"
                     class="screener-stock-card {{ $hasLongCompanyName ? 'screener-stock-card-long-name' : '' }} ak-card ak-dashboard-card relative overflow-hidden p-3 {{ $rankClass }}"
                     x-data="{ signalInfoOpen: false, mobileExpanded: false }"
@@ -475,8 +480,8 @@
                             <i class="screener-desktop-scale signal" style="--position:{{ number_format($buySignalScorePercent, 2, '.', '') }}%;--marker:{{ $buySignalScoreColor }}" role="meter" aria-label="{{ __('Signalqualität') }} {{ $buySignalScoreLabel }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($buySignalScorePercent, 1, '.', '') }}"><em></em></i>
                         </span>
                         <span class="screener-desktop-grade screener-desktop-scale-grade">
-                            <strong data-screener-risk-label data-risk-label-mode="grade">{{ __('Risiko') }} · {{ \App\Support\QualityGrade::risk($rankingRiskPercent) ?? '—' }}</strong>
-                            <i class="screener-desktop-scale risk" data-screener-risk-scale style="--position:{{ number_format(100 - ($rankingRiskPercent ?? 0), 2, '.', '') }}%;--marker:{{ $riskDonutColor }}" role="meter" aria-label="{{ __('Risiko') }} {{ \App\Support\QualityGrade::risk($rankingRiskPercent) ?? '—' }}" aria-valuemin="0" aria-valuemax="100" @if($rankingRiskPercent !== null) aria-valuenow="{{ number_format(100 - $rankingRiskPercent, 1, '.', '') }}" @endif><em @if($rankingRiskPercent === null) hidden @endif></em></i>
+                            <strong>{{ __('Risiko') }} · {{ \App\Support\QualityGrade::risk($rankingRiskPercent) ?? '—' }}</strong>
+                            <i class="screener-desktop-scale risk" style="--position:{{ number_format(100 - ($rankingRiskPercent ?? 0), 2, '.', '') }}%;--marker:{{ $riskDonutColor }}" role="meter" aria-label="{{ __('Risiko') }} {{ \App\Support\QualityGrade::risk($rankingRiskPercent) ?? '—' }}" aria-valuemin="0" aria-valuemax="100" @if($rankingRiskPercent !== null) aria-valuenow="{{ number_format(100 - $rankingRiskPercent, 1, '.', '') }}" @endif><em @if($rankingRiskPercent === null) hidden @endif></em>@if($realtimeQuotes ?? false)<b class="screener-dynamic-risk-marker" data-screener-dynamic-risk style="--dynamic-risk-position:{{ number_format(100 - (float) ($dynamicRiskPercent ?? 0), 2, '.', '') }}%;--dynamic-risk-color:{{ $dynamicRiskColor }}" title="{{ __('Dynamisches Risiko') }}: {{ number_format((float) ($dynamicRiskPercent ?? 0), 1, ',', '.') }} %" @if(! $showDynamicRisk) hidden @endif></b>@endif</i>
                         </span>
                         <span class="screener-desktop-forecasts">
                             <span class="screener-desktop-forecast-label"><small>{{ __('Prognose') }}</small><strong>{{ __('Mögliche Rendite') }}</strong></span>
@@ -496,7 +501,7 @@
                     <button type="button" class="screener-mobile-summary screener-mobile-summary-v2 md:hidden" @click="mobileExpanded = ! mobileExpanded; if (mobileExpanded) $nextTick(async () => { await window.loadAktienKiCharts?.(); window.initializeServingCharts?.() })" :aria-expanded="mobileExpanded.toString()">
                         <span class="sms-v2-head"><b>{{ $ranking > 0 ? '#'.$ranking : '—' }}</b><i>{{ $countryFlag }}</i><span><strong>{{ $stock->name ?: $stock->symbol }}</strong><small>@if($riskProfileKey)<span class="screener-mobile-profile-badge" style="{{ $riskProfileKey === 'defensive' ? '--profile-color:#6ee7b7;--profile-border:rgba(52,211,153,.34);--profile-bg:rgba(52,211,153,.06)' : ($riskProfileKey === 'balanced' ? '--profile-color:#fcd34d;--profile-border:rgba(251,191,36,.34);--profile-bg:rgba(251,191,36,.06)' : '--profile-color:#fda4af;--profile-border:rgba(251,113,133,.34);--profile-bg:rgba(251,113,133,.06)') }}" title="{{ __('Profil') }}: {{ $riskProfileLabel }}">@if($riskProfileKey === 'defensive')<x-heroicon-o-shield-check />@elseif($riskProfileKey === 'balanced')<x-heroicon-o-scale />@else<x-heroicon-o-bolt />@endif</span>@endif{{ $stock->symbol }} · {{ $stock->sector ?: '—' }}</small></span><em>{{ is_numeric($stock->current_price) ? number_format((float)$stock->current_price,2,',','.') : '—' }} {{ $displayCurrencySymbol }}</em><x-heroicon-o-chevron-down class="h-4 w-4 text-cyan-300 transition" x-bind:class="mobileExpanded && 'rotate-180'" /></span>
                         <span class="sms-v2-forecast"><strong data-signal="{{ strtolower($signal) }}">{{ $signalLabel }}</strong>@foreach($mobileForecasts as $days=>$forecast)<i><small>{{ $days }}T</small><b class="{{ $forecast===null?'text-slate-400':($forecast>=0?'text-emerald-400':'text-rose-400') }}">{{ $forecast===null?'—':(($forecast>0?'+':'').number_format($forecast,1,',','.').' %') }}</b></i>@endforeach</span>
-                        <span class="sms-v2-scales"><i><small>{{ __('Signalqualität') }} · {{ $buySignalScoreLabel }}</small><span class="sms-v2-scale signal" style="--position:{{ $buySignalScorePercent }}%;--marker:{{ $buySignalScoreColor }}"><em></em></span></i><i><small data-screener-risk-label data-risk-label-mode="level">{{ __('Risiko') }} · {{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</small><span class="sms-v2-scale risk" data-screener-risk-scale style="--position:{{ 100 - ($rankingRiskPercent ?? 0) }}%;--marker:{{ $riskDonutColor }}"><em></em></span></i></span>
+                        <span class="sms-v2-scales"><i><small>{{ __('Signalqualität') }} · {{ $buySignalScoreLabel }}</small><span class="sms-v2-scale signal" style="--position:{{ $buySignalScorePercent }}%;--marker:{{ $buySignalScoreColor }}"><em></em></span></i><i><small>{{ __('Risiko') }} · {{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</small><span class="sms-v2-scale risk" style="--position:{{ 100 - ($rankingRiskPercent ?? 0) }}%;--marker:{{ $riskDonutColor }}"><em></em></span></i></span>
                     </button>
                     <template x-if="mobileExpanded">
                     <div class="screener-mobile-details screener-desktop-details grid h-full min-h-0 gap-2 md:grid-cols-2 xl:grid-cols-6" x-bind:class="{ 'is-mobile-open': mobileExpanded }">
@@ -1140,6 +1145,7 @@
                         cell.classList.toggle('is-time-downgraded',rawDistance!==''&&Number.isFinite(distance)&&distance<1);
                         cell.classList.toggle('is-negative-forecast',rawDistance!==''&&Number.isFinite(distance)&&distance<0);
                     });
+                    if(row.dataset.dynamicRiskEnabled!=='1')return;
                     const activeCell=row.querySelector('.is-trigger-horizon')??row.querySelector('[data-assessment-horizon="20"]')??row.querySelector('[data-assessment-horizon]');
                     const netForecast=Number(activeCell?.dataset.assessmentReturn);
                     const baseRisk=Number(row.dataset.baseRisk);
@@ -1147,17 +1153,11 @@
                     const forecastRisk=Math.max(0,Math.min(100,100-Math.max(0,netForecast)*20));
                     const risk=Math.max(baseRisk,forecastRisk);
                     const quality=Math.max(0,Math.min(100,100-risk));
-                    const grades=['5−','5+','4−','4+','3−','3+','2−','2+','1−','1+'];
-                    const grade=grades[Math.min(9,Math.floor(quality/10))];
-                    const level=risk<=40?2:(risk<=60?3:(risk<=80?4:5));
-                    const hue=quality<=50?(quality/50)*48:48+((quality-50)/50)*94;
-                    const color=`hsl(${hue.toFixed(1)} 78% 52%)`;
-                    row.querySelectorAll('[data-screener-risk-label]').forEach(label=>label.textContent=`{{ __('Risiko') }} · ${label.dataset.riskLabelMode==='level'?level:grade}`);
-                    row.querySelectorAll('[data-screener-risk-scale]').forEach(scale=>{
-                        scale.style.setProperty('--position',`${quality.toFixed(2)}%`);
-                        scale.style.setProperty('--marker',color);
-                        scale.setAttribute('aria-valuenow',quality.toFixed(1));
-                        scale.title=`Risiko ${risk.toLocaleString(document.documentElement.lang,{minimumFractionDigits:1,maximumFractionDigits:1})} % · Nettoabstand ${netForecast.toLocaleString(document.documentElement.lang,{minimumFractionDigits:2,maximumFractionDigits:2})} %`;
+                    row.querySelectorAll('[data-screener-dynamic-risk]').forEach(marker=>{
+                        marker.hidden=risk<=baseRisk+.01;
+                        marker.style.setProperty('--dynamic-risk-position',`${quality.toFixed(2)}%`);
+                        marker.style.setProperty('--dynamic-risk-color',risk>=90?'#fb7185':'#fbbf24');
+                        marker.title=`{{ __('Dynamisches Risiko') }} ${risk.toLocaleString(document.documentElement.lang,{minimumFractionDigits:1,maximumFractionDigits:1})} % · Nettoabstand ${netForecast.toLocaleString(document.documentElement.lang,{minimumFractionDigits:2,maximumFractionDigits:2})} %`;
                     });
                 };
 
