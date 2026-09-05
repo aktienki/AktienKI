@@ -39,6 +39,8 @@
             .screener-page .screener-risk-choice .risk-profile-text{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important}
             .screener-page .screener-mobile-profile-badge{display:inline-grid!important;width:1rem!important;height:1rem!important;margin-right:.28rem;place-items:center!important;border:1px solid var(--profile-border);border-radius:.3rem;background:var(--profile-bg);color:var(--profile-color);vertical-align:-.18rem}
             .screener-page .screener-mobile-profile-badge svg{width:.65rem!important;height:.65rem!important;stroke-width:2.2!important}
+            .screener-page .screener-mobile-details .screener-fundamental-strip,
+            .screener-page .screener-mobile-details .screener-percentile-profile{display:none!important}
         }
     </style>
     <div x-data="{ filtering: false, submitFilters(form) { this.filtering = true; requestAnimationFrame(() => form.submit()) } }" @pageshow.window="filtering = false" class="screener-page mx-auto max-w-[96rem] px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
