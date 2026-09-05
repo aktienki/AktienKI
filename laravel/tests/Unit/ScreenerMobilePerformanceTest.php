@@ -22,5 +22,7 @@ final class ScreenerMobilePerformanceTest extends TestCase
         self::assertStringContainsString("riskIncreased?(risk>=90?'#fb7185':'#fbbf24'):'#22d3ee'", $view);
         self::assertStringContainsString('translateX(3px)', $view);
         self::assertStringContainsString('screener-dynamic-risk-marker::after', $view);
+        self::assertStringContainsString('Math.floor(risk/10)>Math.floor(baseRisk/10)', $view);
+        self::assertStringContainsString("cell.classList.toggle('is-time-downgraded',netForecast<2&&changedRiskSector)", $view);
     }
 }
