@@ -65,6 +65,12 @@
         background:rgba(0,135,95,.11) !important;
     }
 
+    :root[data-theme="light"] .screener-page .screener-desktop-signal[data-signal="wait"] strong {
+        border-color:rgba(217,119,6,.42) !important;
+        background:rgba(245,158,11,.10) !important;
+        color:#b45309 !important;
+    }
+
     :root[data-theme="light"] .screener-page .screener-desktop-summary > svg {
         color:#0e7490 !important;
     }
@@ -6619,6 +6625,7 @@ body:not(.welcome-background) :is(.ak-risk-donut, .ak-mobile-risk-logo, .screene
     .screener-desktop-signal,.screener-desktop-grade { display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .screener-desktop-signal strong { border:1px solid rgba(34,211,238,.24); border-radius:.45rem; padding:.3rem .55rem; font-size:.65rem; }
     .screener-desktop-signal[data-signal="buy"] strong { border-color:rgba(52,211,153,.35); background:rgba(52,211,153,.1); color:#34d399; }
+    .screener-desktop-signal[data-signal="wait"] strong { border-color:rgba(251,191,36,.38); background:rgba(245,158,11,.1); color:#fbbf24; }
     .screener-desktop-signal[data-signal="watch"] strong { border-color:rgba(163,230,53,.3); background:rgba(163,230,53,.08); color:#a3e635; }
     .screener-desktop-grade strong { font-size:.85rem; }
     .screener-desktop-forecasts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.35rem; }

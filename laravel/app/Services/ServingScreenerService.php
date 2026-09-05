@@ -20,6 +20,7 @@ final class ServingScreenerService
         private readonly PlanAccessService $plans,
         private readonly FreeRegionalStockUniverseService $regionalUniverse,
         private readonly PersonalizedSignalService $personalizedSignals,
+        private readonly TradeEligibilityStatusService $tradeEligibility,
     ) {}
 
     /** @return array<string, mixed> */
@@ -78,8 +79,9 @@ final class ServingScreenerService
                 $request,
             );
         });
-
-        if ($this->plans->allowsTariff($request->user(), PlanLevel::Pro)) {
+        $canUsePro = $this->plans->allowsTariff($request->user(), PlanLevel::Pro);
+        if ($canUsePro) {
+            $this->tradeEligibility->apply($stocks);
             $this->applyExternalReviewAdjustments($stocks);
         }
         $indexMemberships = $this->hasTable('market_indices') && $this->hasTable('index_memberships') && $instrumentIds !== []

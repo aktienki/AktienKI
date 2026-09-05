@@ -215,6 +215,9 @@
                     // signal. Keep the visible badge consistent with that ranking
                     // instead of applying the user's stricter short-term overlay.
                     $signal = strtoupper((string) ($stock->personalized_signal ?: $stock->model_signal ?: 'HOLD'));
+                    $isBuyPaused = ($realtimeQuotes ?? false)
+                        && $signal === 'BUY'
+                        && ($stock->trade_status ?? null) === \App\Services\TradeEligibilityStatusService::PAUSED_LOW_RETURN;
                     $tone = match ($signal) {
                         'BUY' => 'border-emerald-300/80 bg-emerald-500/[.35] text-white shadow-[0_0_18px_rgba(16,185,129,.42)]',
                         'SELL' => 'border-rose-400/45 bg-rose-400/[.10] text-rose-300',
@@ -222,7 +225,11 @@
                         'WAIT' => 'border-emerald-300/80 bg-emerald-500/[.35] text-white shadow-[0_0_18px_rgba(16,185,129,.42)]',
                         default => 'border-amber-400/40 bg-amber-400/[.08] text-amber-300',
                     };
-                    $signalLabel = $signal;
+                    if ($isBuyPaused) {
+                        $tone = 'border-amber-400/40 bg-amber-400/[.08] text-amber-300';
+                    }
+                    $signalLabel = $isBuyPaused ? __('BUY pausiert') : $signal;
+                    $displaySignalKey = $isBuyPaused ? 'wait' : strtolower($signal);
                     $recentNews = $recentNewsByInstrument->get((int) $stock->instrument_id);
                     $recentNewsSentiment = is_numeric($recentNews?->sentiment_score) ? (float) $recentNews->sentiment_score : null;
                     [$recentNewsTone, $recentNewsLabel] = match (true) {
@@ -461,6 +468,9 @@
                     data-forecast-cost="{{ number_format($forecastCostPercent, 3, '.', '') }}"
                     data-base-risk="{{ is_numeric($baseRankingRiskPercent) ? number_format((float) $baseRankingRiskPercent, 3, '.', '') : '' }}"
                     data-dynamic-risk-enabled="{{ ($realtimeQuotes ?? false) ? '1' : '0' }}"
+                    data-trade-status="{{ ($realtimeQuotes ?? false) ? ($stock->trade_status ?? '') : '' }}"
+                    data-pause-return="{{ number_format((float) config('trade_eligibility.pause_below_net_return_percent', 1), 3, '.', '') }}"
+                    data-resume-return="{{ number_format((float) config('trade_eligibility.resume_at_net_return_percent', 2), 3, '.', '') }}"
                     data-indicators="{{ is_numeric($stock->indicator_strength_percent ?? null) ? (float) $stock->indicator_strength_percent : '' }}"
                     class="screener-stock-card {{ $hasLongCompanyName ? 'screener-stock-card-long-name' : '' }} ak-card ak-dashboard-card relative overflow-hidden p-3 {{ $rankClass }}"
                     x-data="{ signalInfoOpen: false, mobileExpanded: false }"
@@ -486,7 +496,7 @@
                             <svg class="screener-price-sparkline {{ $miniChartPolyline === '' ? 'invisible' : '' }}" viewBox="0 0 88 26" preserveAspectRatio="none" role="img" aria-label="{{ __('Kursverlauf der letzten 20 Handelstage') }}" @if($miniChartPolyline === '') data-screener-minichart-url="{{ route('stocks.chart-data', ['symbol' => $stock->symbol]) }}" @endif><polyline points="{{ $miniChartPolyline }}" fill="none" stroke="{{ $miniChartPositive ? '#34d399' : '#fb7185' }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" /></svg>
                             <small>{{ __('Kurs') }}</small>
                         </span>
-                        <span class="screener-desktop-signal" data-signal="{{ strtolower($signal) }}"><strong>{{ $signalLabel }}</strong><small>{{ __('Signal') }}</small></span>
+                        <span class="screener-desktop-signal" data-signal="{{ $displaySignalKey }}" data-trade-status-signal><strong>{{ $signalLabel }}</strong><small>{{ __('Signal') }}</small></span>
                         <span class="screener-trigger-model" data-model="{{ strtolower($triggerModelShort) }}" title="{{ $triggerDescription }}"><strong>{{ $triggerModelShort ?: '—' }}</strong></span>
                         <span class="screener-desktop-grade screener-desktop-scale-grade">
                             <strong>{{ __('Bewertung') }} · {{ $buySignalScoreLabel }}</strong>
@@ -513,7 +523,7 @@
                     </a>
                     <button type="button" class="screener-mobile-summary screener-mobile-summary-v2 md:hidden" @click="mobileExpanded = ! mobileExpanded; if (mobileExpanded) $nextTick(async () => { await window.loadAktienKiCharts?.(); window.initializeServingCharts?.() })" :aria-expanded="mobileExpanded.toString()">
                         <span class="sms-v2-head"><b>{{ $ranking > 0 ? '#'.$ranking : '—' }}</b><i>{{ $countryFlag }}</i><span><strong>{{ $stock->name ?: $stock->symbol }}</strong><small>@if($riskProfileKey)<span class="screener-mobile-profile-badge" style="{{ $riskProfileKey === 'defensive' ? '--profile-color:#6ee7b7;--profile-border:rgba(52,211,153,.34);--profile-bg:rgba(52,211,153,.06)' : ($riskProfileKey === 'balanced' ? '--profile-color:#fcd34d;--profile-border:rgba(251,191,36,.34);--profile-bg:rgba(251,191,36,.06)' : '--profile-color:#fda4af;--profile-border:rgba(251,113,133,.34);--profile-bg:rgba(251,113,133,.06)') }}" title="{{ __('Profil') }}: {{ $riskProfileLabel }}">@if($riskProfileKey === 'defensive')<x-heroicon-o-shield-check />@elseif($riskProfileKey === 'balanced')<x-heroicon-o-scale />@else<x-heroicon-o-bolt />@endif</span>@endif{{ $stock->symbol }} · {{ $stock->sector ?: '—' }}</small></span><em>{{ is_numeric($stock->current_price) ? number_format((float)$stock->current_price,2,',','.') : '—' }} {{ $displayCurrencySymbol }}</em><x-heroicon-o-chevron-down class="h-4 w-4 text-cyan-300 transition" x-bind:class="mobileExpanded && 'rotate-180'" /></span>
-                        <span class="sms-v2-forecast"><strong data-signal="{{ strtolower($signal) }}">{{ $signalLabel }}</strong>@foreach($mobileForecasts as $days=>$forecast)<i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon '.(($realtimeQuotes ?? false) && $showDynamicRiskBorder ? 'has-dynamic-risk '.((float) $dynamicRiskPercent >= 90 ? 'is-critical-dynamic-risk ' : '') : '') : '' }}{{ is_numeric($forecast) && (float) $forecast < 2.0 ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}"><small>{{ $days }}T</small><b class="{{ $forecast===null?'text-slate-400':($forecast>=0?'text-emerald-400':'text-rose-400') }}" @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null)) data-screener-live-forecast="{{ $stock->symbol }}" data-horizon="{{ $days }}" data-target-price="{{ (float) $stock->{"predicted_price_{$days}d"} }}" @endif>{{ $forecast===null?'—':(($forecast>0?'+':'').number_format($forecast,1,',','.').' %') }}</b></i>@endforeach</span>
+                        <span class="sms-v2-forecast"><strong data-signal="{{ $displaySignalKey }}" data-trade-status-signal>{{ $signalLabel }}</strong>@foreach($mobileForecasts as $days=>$forecast)<i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon '.(($realtimeQuotes ?? false) && $showDynamicRiskBorder ? 'has-dynamic-risk '.((float) $dynamicRiskPercent >= 90 ? 'is-critical-dynamic-risk ' : '') : '') : '' }}{{ is_numeric($forecast) && (float) $forecast < 2.0 ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}"><small>{{ $days }}T</small><b class="{{ $forecast===null?'text-slate-400':($forecast>=0?'text-emerald-400':'text-rose-400') }}" @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null)) data-screener-live-forecast="{{ $stock->symbol }}" data-horizon="{{ $days }}" data-target-price="{{ (float) $stock->{"predicted_price_{$days}d"} }}" @endif>{{ $forecast===null?'—':(($forecast>0?'+':'').number_format($forecast,1,',','.').' %') }}</b></i>@endforeach</span>
                         <span class="sms-v2-scales"><i><small>{{ __('Signalqualität') }} · {{ $buySignalScoreLabel }}</small><span class="sms-v2-scale signal" style="--position:{{ $buySignalScorePercent }}%;--marker:{{ $buySignalScoreColor }}"><em></em></span></i><i><small>{{ __('Risiko') }} · {{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</small><span class="sms-v2-scale risk" style="--position:{{ 100 - ($rankingRiskPercent ?? 0) }}%;--marker:{{ $riskDonutColor }}"><em></em>@if($realtimeQuotes ?? false)<b class="screener-dynamic-risk-marker" data-screener-dynamic-risk style="--dynamic-risk-position:{{ number_format(100 - (float) ($dynamicRiskPercent ?? 0), 2, '.', '') }}%;--dynamic-risk-color:{{ $dynamicRiskColor }}" title="{{ __('Dynamisches Risiko') }}: {{ number_format((float) ($dynamicRiskPercent ?? 0), 1, ',', '.') }} %" @if(! $showDynamicRisk) hidden @endif></b>@endif</span></i></span>
                     </button>
                     <template x-if="mobileExpanded">
@@ -1163,6 +1173,24 @@
                     const netForecast=Number(activeCell?.dataset.assessmentReturn);
                     const baseRisk=Number(row.dataset.baseRisk);
                     if(!activeCell||activeCell.dataset.assessmentReturn===''||!Number.isFinite(netForecast)||!Number.isFinite(baseRisk))return;
+                    const pauseReturn=Number(row.dataset.pauseReturn??1);
+                    const resumeReturn=Number(row.dataset.resumeReturn??2);
+                    const previousTradeStatus=row.dataset.tradeStatus;
+                    let tradeStatus=previousTradeStatus;
+                    if(tradeStatus==='actionable'&&Number.isFinite(pauseReturn)&&netForecast<pauseReturn){
+                        tradeStatus='paused_low_return';
+                    }else if(tradeStatus==='paused_low_return'&&Number.isFinite(resumeReturn)&&netForecast>=resumeReturn){
+                        tradeStatus='actionable';
+                    }
+                    if(tradeStatus!==previousTradeStatus){
+                        row.dataset.tradeStatus=tradeStatus;
+                        row.querySelectorAll('[data-trade-status-signal]').forEach(badge=>{
+                            const paused=tradeStatus==='paused_low_return';
+                            badge.dataset.signal=paused?'wait':'buy';
+                            const label=badge.matches('strong')?badge:badge.querySelector('strong');
+                            if(label)label.textContent=paused?'{{ __('BUY pausiert') }}':'BUY';
+                        });
+                    }
                     const forecastRisk=Math.max(0,Math.min(100,100-Math.max(0,netForecast)*20));
                     const risk=Math.max(baseRisk,forecastRisk);
                     const quality=Math.max(0,Math.min(100,100-risk));
