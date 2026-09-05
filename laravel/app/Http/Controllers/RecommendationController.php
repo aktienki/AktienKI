@@ -6,6 +6,7 @@ use App\Enums\PlanLevel;
 use App\Services\FreeRegionalStockUniverseService;
 use App\Services\PlanAccessService;
 use App\Services\PersonalizedSignalService;
+use App\Services\ServingScreenerService;
 use App\Services\TwelveDataService;
 use App\Services\StockRiskClassificationService;
 use App\Support\AiScore;
@@ -20,53 +21,32 @@ use Throwable;
 
 final class RecommendationController extends Controller
 {
-    public function liveQuotes(Request $request, TwelveDataService $marketData): JsonResponse
+    public function liveQuotes(Request $request): JsonResponse
     {
+        abort_unless(
+            $request->user() && app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Pro),
+            403,
+        );
         $symbols = collect(explode(',', (string) $request->query('symbols')))
             ->map(fn (string $symbol): string => strtoupper(trim($symbol)))
             ->filter()
             ->unique()
-            ->take(3);
-
-        $instruments = DB::table('instruments')
-            ->whereIn(DB::raw('UPPER(symbol)'), $symbols)
-            ->where('type', 'stock')
-            ->where('is_active', true)
-            ->whereNull('deleted_at')
-            ->get(['symbol', 'provider_symbol', 'currency', 'german_listing_symbol', 'german_listing_exchange', 'german_listing_currency']);
-
-        $quotes = $instruments->mapWithKeys(function (object $instrument) use ($marketData): array {
-            $streamQuote = Cache::get('twelve_data_stream_quote_'.sha1(strtoupper((string) $instrument->symbol)));
-            try {
-                $usesGermanListing = filled($instrument->german_listing_symbol)
-                    && strtoupper((string) $instrument->german_listing_currency) === 'EUR';
-                $referenceQuote = $usesGermanListing
-                    ? $marketData->listingQuote((string) $instrument->german_listing_symbol, $instrument->german_listing_exchange ?: null)
-                    : $marketData->quote((string) ($instrument->provider_symbol ?: $instrument->symbol));
-                $quote = is_numeric($streamQuote['price'] ?? null)
-                    ? [...($referenceQuote ?? []), ...$streamQuote]
-                    : ($usesGermanListing
-                        ? $marketData->listingQuote((string) $instrument->german_listing_symbol, $instrument->german_listing_exchange ?: null)
-                        : $marketData->liveQuote((string) ($instrument->provider_symbol ?: $instrument->symbol)));
-            } catch (Throwable) {
-                $quote = null;
-            }
-
-            if (! is_numeric($quote['price'] ?? null)) {
-                return [];
-            }
-
-            $timestamp = is_numeric($quote['timestamp'] ?? null)
-                ? (int) $quote['timestamp']
-                : now()->timestamp;
+            ->take(100)
+            ->values();
+        $cacheKeys = $symbols->mapWithKeys(fn (string $symbol): array => [
+            $symbol => 'twelve_data_stream_quote_'.sha1($symbol),
+        ]);
+        $cachedQuotes = Cache::many($cacheKeys->values()->all());
+        $quotes = $cacheKeys->mapWithKeys(function (string $cacheKey, string $symbol) use ($cachedQuotes): array {
+            $quote = $cachedQuotes[$cacheKey] ?? null;
+            if (! is_numeric($quote['price'] ?? null)) return [];
+            $timestamp = is_numeric($quote['timestamp'] ?? null) ? (int) $quote['timestamp'] : now()->timestamp;
             $ageSeconds = max(0, now()->timestamp - $timestamp);
 
-            return [(string) $instrument->symbol => [
+            return [$symbol => [
                 'price' => (float) $quote['price'],
-                'currency' => $usesGermanListing ? 'EUR' : (string) (($quote['currency'] ?? null) ?: $instrument->currency ?: ''),
-                'change_percent' => is_numeric($quote['change_percent'] ?? null)
-                    ? (float) $quote['change_percent']
-                    : null,
+                'currency' => (string) ($quote['currency'] ?? ''),
+                'change_percent' => null,
                 'timestamp' => $timestamp,
                 'age_seconds' => $ageSeconds,
                 'realtime' => $ageSeconds < 120,
@@ -79,9 +59,17 @@ final class RecommendationController extends Controller
     /**
      * Beginner-friendly screener with only the decision-relevant fields.
      */
-    public function screener(Request $request): View
+    public function screener(Request $request, ServingScreenerService $servingScreener): View
     {
+        // Card and table view must use the identical Serving snapshot. A
+        // configuration fallback here previously allowed the card view to
+        // silently read legacy predictions while the table always used the
+        // Service database.
+        return view('screener.index', $servingScreener->data($request));
+
+        if (false) { // Legacy screener retained temporarily for migration reference.
         $riskClassification = app(StockRiskClassificationService::class);
+        $canUsePro = app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Pro);
         $riskUser = $riskClassification->userLevel($request->user()) === 'risk';
         $visibleRiskStatuses = $riskClassification->visibleStatuses($request->user());
         $isFreeRegional = app(PlanAccessService::class)->level($request->user()) === PlanLevel::Free;
@@ -97,13 +85,13 @@ final class RecommendationController extends Controller
         $personalizedSignals = app(PersonalizedSignalService::class);
         $signalSql = $personalizedSignals->sql('prediction', $request->user());
         $sectorVolatilityPercentileSql = $personalizedSignals->sectorVolatilityPercentileSql('prediction');
-        $requestedLimit = strtolower((string) $request->query('limit', '10'));
+        $requestedLimit = strtolower((string) $request->query('limit', 'all'));
         $resultLimit = match ($requestedLimit) {
             '25' => 25,
             '50' => 50,
             '100' => 100,
             'all' => null,
-            default => 10,
+            default => null,
         };
         $transitionDays = in_array((int) $request->query('transition_days'), [1, 5, 10, 20], true)
             ? (int) $request->query('transition_days')
@@ -680,6 +668,18 @@ final class RecommendationController extends Controller
                 ->unique('instrument_id')
                 ->keyBy('instrument_id');
         }
+        $externalReviews = collect();
+        if ($canUsePro && Schema::hasTable('external_buy_reviews')) {
+            $externalReviews = DB::table('external_buy_reviews')
+                ->whereIn('prediction_id', $stocks->pluck('id')->all())
+                ->get([
+                    'prediction_id', 'status', 'verdict', 'confidence', 'summary',
+                    'positive_factors', 'risk_factors', 'key_findings',
+                    'research_limitations', 'sources', 'model', 'triggered_at',
+                    'researched_at', 'search_call_count', 'estimated_cost_microusd',
+                ])
+                ->keyBy('prediction_id');
+        }
         $decodeAssessmentItems = static function ($value): array {
             if (is_array($value)) {
                 return array_values($value);
@@ -688,7 +688,7 @@ final class RecommendationController extends Controller
 
             return is_array($decoded) ? array_values($decoded) : [];
         };
-        $stocks->each(function (object $stock) use ($latestAssessments, $decodeAssessmentItems, $personalizedSignals, $request): void {
+        $stocks->each(function (object $stock) use ($latestAssessments, $externalReviews, $decodeAssessmentItems, $personalizedSignals, $request): void {
             $assessment = $latestAssessments->get($stock->instrument_id);
             $stock->assessment_pros = $decodeAssessmentItems($assessment?->opportunities);
             $stock->assessment_cons = $decodeAssessmentItems($assessment?->risks);
@@ -701,6 +701,25 @@ final class RecommendationController extends Controller
             $stock->assessment_is_detailed_buy = $assessment !== null
                 && (int) $assessment->prediction_id === (int) $stock->id
                 && strtoupper((string) $stock->personalized_signal) === 'BUY';
+
+            $externalReview = $externalReviews->get($stock->id);
+            $stock->external_review_is_current = $externalReview !== null;
+            $stock->external_review_status = $externalReview?->status;
+            $stock->external_review_verdict = $externalReview?->verdict;
+            $stock->external_review_confidence = $externalReview?->confidence;
+            $stock->external_review_summary = $externalReview?->summary;
+            $stock->external_review_positive_factors = $decodeAssessmentItems($externalReview?->positive_factors);
+            $stock->external_review_risk_factors = $decodeAssessmentItems($externalReview?->risk_factors);
+            $stock->external_review_key_findings = $decodeAssessmentItems($externalReview?->key_findings);
+            $stock->external_review_limitations = $decodeAssessmentItems($externalReview?->research_limitations);
+            $stock->external_review_sources = $decodeAssessmentItems($externalReview?->sources);
+            $stock->external_review_model = $externalReview?->model;
+            $stock->external_review_triggered_at = $externalReview?->triggered_at;
+            $stock->external_review_researched_at = $externalReview?->researched_at;
+            $stock->external_review_search_calls = $externalReview?->search_call_count;
+            $stock->external_review_cost_usd = is_numeric($externalReview?->estimated_cost_microusd)
+                ? (float) $externalReview->estimated_cost_microusd / 1_000_000
+                : null;
         });
         if (! $hasBusinessSummary) {
             $stocks->each(fn (object $stock) => $stock->business_summary = null);
@@ -997,6 +1016,12 @@ final class RecommendationController extends Controller
         });
 
         return view('screener.index', compact('stocks', 'countries', 'sectors', 'indices', 'userWatchlists', 'paperPortfolios', 'watchlistMemberships', 'paperPortfolioMemberships', 'certificateInstrumentIds', 'recentNewsByInstrument', 'isFreeRegional', 'regionalCountry'));
+        }
+    }
+
+    public function screenerChart(Request $request, int $instrument, ServingScreenerService $servingScreener): View
+    {
+        return view('screener.partials.chart', $servingScreener->chart($instrument, $request));
     }
 
     public function screeningHistory(Request $request): View
