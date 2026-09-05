@@ -17,7 +17,7 @@ final class ScreenerMobilePerformanceTest extends TestCase
         self::assertStringContainsString('const affectedRows=new Set()', $view);
         self::assertStringContainsString('affectedRows.forEach(updateForecastWarnings)', $view);
         self::assertStringContainsString('data-live-base-price="{{ (float) $stock->current_price }}"', $view);
-        self::assertStringContainsString('screener-dynamic-marker-pulse', $view);
+        self::assertStringNotContainsString('screener-dynamic-marker-pulse', $view);
         self::assertStringContainsString('marker.hidden=false', $view);
         self::assertStringContainsString("riskIncreased?(risk>=90?'#fb7185':'#fbbf24'):'#22d3ee'", $view);
         self::assertStringContainsString('translateX(3px)', $view);
