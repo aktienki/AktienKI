@@ -201,6 +201,15 @@ final class ServingScreenerService
             $ranked = $ranked->take($limit)->values();
         }
 
+        $isMobileRequest = preg_match('/Mobile|iPhone|iPod|Android/i', (string) $request->userAgent()) === 1;
+        $mobilePerPage = 25;
+        $mobileTotal = $ranked->count();
+        $mobileLastPage = max(1, (int) ceil($mobileTotal / $mobilePerPage));
+        $mobilePage = min(max(1, (int) $request->query('mobile_page', 1)), $mobileLastPage);
+        if ($isMobileRequest) {
+            $ranked = $ranked->slice(($mobilePage - 1) * $mobilePerPage, $mobilePerPage)->values();
+        }
+
         $this->applyCachedCharts($ranked);
         $this->applyStoredChartFallbacks($ranked);
 
@@ -217,6 +226,13 @@ final class ServingScreenerService
             'canViewModelOverview' => $this->plans->allowsTariff($request->user(), PlanLevel::Pro),
             'realtimeQuotes' => $this->plans->allowsTariff($request->user(), PlanLevel::Pro),
             'regionalCountry' => $this->regionalUniverse->country($request->user()),
+            'mobilePagination' => [
+                'enabled' => $isMobileRequest,
+                'page' => $mobilePage,
+                'last_page' => $mobileLastPage,
+                'per_page' => $mobilePerPage,
+                'total' => $mobileTotal,
+            ],
         ];
     }
 

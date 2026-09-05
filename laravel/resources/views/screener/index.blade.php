@@ -1039,6 +1039,21 @@
                 <div class="rounded-2xl border border-cyan-400/25 bg-[var(--ak-card)] p-8 text-center text-sm text-[var(--ak-muted)] sm:col-span-2 xl:col-span-3">{{ __('Keine Aktien für diese Auswahl gefunden.') }}</div>
             @endforelse
         </section>
+        @if(data_get($mobilePagination ?? [], 'enabled') && data_get($mobilePagination, 'last_page', 1) > 1)
+            <nav class="mt-3 flex items-center justify-between gap-3 border-t border-cyan-500/25 pt-3 md:hidden" aria-label="{{ __('Seitennavigation') }}">
+                @if(data_get($mobilePagination, 'page', 1) > 1)
+                    <a href="{{ request()->fullUrlWithQuery(['mobile_page' => data_get($mobilePagination, 'page') - 1]) }}" class="ak-button-secondary px-3 py-2 text-xs font-black">← {{ __('Zurück') }}</a>
+                @else
+                    <span></span>
+                @endif
+                <span class="text-[10px] font-black text-[var(--ak-muted)]">{{ data_get($mobilePagination, 'page') }} / {{ data_get($mobilePagination, 'last_page') }} · {{ data_get($mobilePagination, 'total') }} {{ __('Aktien') }}</span>
+                @if(data_get($mobilePagination, 'page') < data_get($mobilePagination, 'last_page'))
+                    <a href="{{ request()->fullUrlWithQuery(['mobile_page' => data_get($mobilePagination, 'page') + 1]) }}" class="ak-button-secondary px-3 py-2 text-xs font-black">{{ __('Weiter') }} →</a>
+                @else
+                    <span></span>
+                @endif
+            </nav>
+        @endif
         </div>
     </div>
 
