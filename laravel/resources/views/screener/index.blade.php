@@ -361,12 +361,14 @@
                     };
                     $hasLongCompanyName = mb_strlen((string) ($stock->name ?: $stock->symbol)) > 45;
                     $forecastHorizons = ($stock->data_source ?? null) === 'serving' ? [10, 20, 40] : [5, 10, 15, 20];
-                    $mobileForecasts = collect($forecastHorizons)->mapWithKeys(function (int $days) use ($stock): array {
+                    $forecastCostPercent = max(0, (float) config('aktienki.signals.round_trip_cost_percent', .5));
+                    $grossForecasts = collect($forecastHorizons)->mapWithKeys(function (int $days) use ($stock): array {
                         $value = $stock->{"expected_return_{$days}d"} ?? null;
                         return [$days => is_numeric($value) ? (float) $value : null];
                     });
-                    $primaryForecastHorizon = $mobileForecasts->has(20) ? 20 : (int) $mobileForecasts->keys()->last();
-                    $primaryForecast = $mobileForecasts->get($primaryForecastHorizon);
+                    $mobileForecasts = $grossForecasts->map(fn (?float $value): ?float => $value === null ? null : $value - $forecastCostPercent);
+                    $primaryForecastHorizon = $grossForecasts->has(20) ? 20 : (int) $grossForecasts->keys()->last();
+                    $primaryForecast = $grossForecasts->get($primaryForecastHorizon);
                     $calibratedSignalQuality = data_get($stock->stock_signal_calibration, 'quality_percent');
                     $buySignalRating = ($stock->data_source ?? null) === 'serving' && filled($stock->serving_buy_rating ?? null)
                         ? [
@@ -376,7 +378,7 @@
                             'quality' => is_numeric($calibratedSignalQuality) ? (float) $calibratedSignalQuality : $rankingScorePercent,
                         ]
                         : \App\Support\DirectionalSignalRating::calculate(
-                            $mobileForecasts->all(),
+                            $grossForecasts->all(),
                             is_numeric($calibratedSignalQuality) ? (float) $calibratedSignalQuality : $rankingScorePercent,
                         );
                     $buySignalScorePercent = (float) $buySignalRating['percent'];
@@ -424,9 +426,10 @@
                 @endphp
                 <article
                     data-ranking="{{ $ranking }}"
-                    data-forecast-10="{{ is_numeric($stock->expected_return_10d ?? null) ? (float) $stock->expected_return_10d : '' }}"
-                    data-forecast-20="{{ is_numeric($stock->expected_return_20d ?? null) ? (float) $stock->expected_return_20d : '' }}"
-                    data-forecast-40="{{ is_numeric($stock->expected_return_40d ?? null) ? (float) $stock->expected_return_40d : '' }}"
+                    data-forecast-10="{{ is_numeric($mobileForecasts->get(10)) ? (float) $mobileForecasts->get(10) : '' }}"
+                    data-forecast-20="{{ is_numeric($mobileForecasts->get(20)) ? (float) $mobileForecasts->get(20) : '' }}"
+                    data-forecast-40="{{ is_numeric($mobileForecasts->get(40)) ? (float) $mobileForecasts->get(40) : '' }}"
+                    data-forecast-cost="{{ number_format($forecastCostPercent, 3, '.', '') }}"
                     data-indicators="{{ is_numeric($stock->indicator_strength_percent ?? null) ? (float) $stock->indicator_strength_percent : '' }}"
                     class="screener-stock-card {{ $hasLongCompanyName ? 'screener-stock-card-long-name' : '' }} ak-card ak-dashboard-card relative overflow-hidden p-3 {{ $rankClass }}"
                     x-data="{ signalInfoOpen: false, mobileExpanded: false }"
@@ -465,7 +468,7 @@
                         <span class="screener-desktop-forecasts">
                             <span class="screener-desktop-forecast-label"><small>{{ __('Prognose') }}</small><strong>{{ __('Mögliche Rendite') }}</strong></span>
                             @foreach($mobileForecasts as $days => $forecast)
-                                <i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 1.0 ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}" title="{{ $triggerHorizon === (int) $days ? __('Signalauslösender Horizont').' · '.$days.'T' : '' }}"><small>{{ $days }}T</small><strong
+                                <i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 1.0 ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}" title="{{ __('Nettoprognose nach :cost % erwarteten Kosten', ['cost' => number_format($forecastCostPercent, 2, ',', '.')]).($triggerHorizon === (int) $days ? ' · '.__('Signalauslösender Horizont').' · '.$days.'T' : '') }}"><small>{{ $days }}T</small><strong
                                     class="{{ $forecast === null ? 'text-slate-400' : ($forecast >= 0 ? 'text-emerald-400' : 'text-rose-400') }}"
                                     @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null))
                                         data-screener-live-forecast="{{ $stock->symbol }}"
@@ -1142,7 +1145,9 @@
                     document.querySelectorAll(`[data-screener-live-forecast="${escaped}"]`).forEach(forecast=>{
                         const target=Number(forecast.dataset.targetPrice);
                         if(!Number.isFinite(target)||target<=0)return;
-                        const value=((target-price)/price)*100;
+                        const row=forecast.closest('.screener-stock-card');
+                        const cost=Math.max(0,Number(row?.dataset.forecastCost??0));
+                        const value=((target-price)/price)*100-cost;
                         const updatedAt=new Date(Number(event.detail?.timestamp??Date.now()/1000)*1000);
                         forecast.textContent=`${value>0?'+':''}${value.toLocaleString(document.documentElement.lang,{minimumFractionDigits:2,maximumFractionDigits:2})} %`;
                         forecast.classList.remove('text-emerald-400','text-rose-400','text-slate-400');
@@ -1153,7 +1158,6 @@
                         const forecastCell=forecast.closest('i');
                         forecastCell?.classList.remove('is-live-recalculated','is-delayed-recalculated');
                         forecastCell?.classList.add(event.detail?.realtime===true?'is-live-recalculated':'is-delayed-recalculated');
-                        const row=forecast.closest('.screener-stock-card');
                         if(row){row.dataset[`forecast${forecast.dataset.horizon}`]=String(value);updateForecastWarnings(row)}
                     });
                 };
