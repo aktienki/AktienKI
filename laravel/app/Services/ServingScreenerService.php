@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Enums\PlanLevel;
+use App\Models\ExternalBuyReview;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -18,6 +20,7 @@ final class ServingScreenerService
         private readonly PlanAccessService $plans,
         private readonly FreeRegionalStockUniverseService $regionalUniverse,
         private readonly PersonalizedSignalService $personalizedSignals,
+        private readonly TradeEligibilityStatusService $tradeEligibility,
     ) {}
 
     /** @return array<string, mixed> */
@@ -35,29 +38,30 @@ final class ServingScreenerService
 
         $instrumentIds = $rows->pluck('instrument_id')->map(fn ($id): int => (int) $id)->all();
         $batchIds = $rows->pluck('batch_id')->filter()->unique()->all();
+        $snapshotKey = sha1(implode(',', $instrumentIds).'|'.implode(',', $batchIds));
         $predictions = $instrumentIds === []
             ? collect()
-            : DB::connection('serving')->table('serving_predictions')
+            : Cache::store('file')->remember('screener.serving.predictions.v1.'.$snapshotKey, now()->addMinutes(5), fn () => DB::connection('serving')->table('serving_predictions')
                 ->whereIn('instrument_id', $instrumentIds)
                 ->whereIn('batch_id', $batchIds)
                 ->orderByDesc('as_of')
                 ->orderByDesc('id')
-                ->get()
+                ->get())
                 ->groupBy('instrument_id');
         $statuses = $instrumentIds === []
             ? collect()
-            : DB::connection('serving')->table('serving_model_horizon_status')
+            : Cache::store('file')->remember('screener.serving.statuses.v1.'.$snapshotKey, now()->addMinutes(5), fn () => DB::connection('serving')->table('serving_model_horizon_status')
                 ->whereIn('instrument_id', $instrumentIds)
-                ->get()
+                ->get())
                 ->groupBy('instrument_id');
         $transitions = $instrumentIds === []
             ? collect()
-            : DB::connection('serving')->table('serving_signal_transitions')
+            : Cache::store('file')->remember('screener.serving.transitions.v1.'.$snapshotKey, now()->addMinutes(5), fn () => DB::connection('serving')->table('serving_signal_transitions')
                 ->whereIn('instrument_id', $instrumentIds)
                 ->orderBy('instrument_id')
                 ->orderByDesc('changed_at')
                 ->orderByDesc('id')
-                ->get()
+                ->get())
                 ->unique('instrument_id')
                 ->keyBy('instrument_id');
 
@@ -75,11 +79,36 @@ final class ServingScreenerService
                 $request,
             );
         });
-
-        $countries = $stocks->pluck('country')->filter()->unique()->sort()->values();
-        $sectors = $stocks->pluck('sector')->filter()->unique()->sort()->values();
-        $indices = $stocks->pluck('primary_index_symbol')->filter()->unique()->sort()->values()
-            ->map(fn (string $symbol): object => (object) ['symbol' => $symbol, 'name' => $symbol]);
+        $canUsePro = $this->plans->allowsTariff($request->user(), PlanLevel::Pro);
+        if ($canUsePro) {
+            $this->tradeEligibility->apply($stocks);
+            $this->applyExternalReviewAdjustments($stocks);
+        }
+        $indexMemberships = $this->hasTable('market_indices') && $this->hasTable('index_memberships') && $instrumentIds !== []
+            ? DB::table('index_memberships as membership')
+                ->join('market_indices as market_index', 'market_index.id', '=', 'membership.market_index_id')
+                ->whereIn('membership.instrument_id', $instrumentIds)
+                ->whereNull('membership.removed_at')
+                ->where('market_index.is_active', true)
+                ->orderBy('market_index.global_rank')
+                ->get(['membership.instrument_id', 'market_index.symbol', 'market_index.name'])
+            : collect();
+        $membershipsByInstrument = $indexMemberships->groupBy(fn (object $membership): int => (int) $membership->instrument_id);
+        $stocks->each(function (object $stock) use ($membershipsByInstrument): void {
+            $primaryIndex = $membershipsByInstrument->get((int) $stock->instrument_id)?->first();
+            if ($primaryIndex) {
+                $stock->primary_index_symbol = (string) $primaryIndex->symbol;
+                $stock->primary_index_name = (string) ($primaryIndex->name ?: $primaryIndex->symbol);
+            }
+        });
+        $indices = $indexMemberships->unique('symbol')->map(fn (object $membership): object => (object) [
+            'symbol' => (string) $membership->symbol,
+            'name' => (string) ($membership->name ?: $membership->symbol),
+        ])->values();
+        if ($indices->isEmpty()) {
+            $indices = $stocks->pluck('primary_index_symbol')->filter()->unique()->sort()->values()
+                ->map(fn (string $symbol): object => (object) ['symbol' => $symbol, 'name' => $symbol]);
+        }
 
         $ranked = $stocks
             ->filter(fn (object $stock): bool => in_array($stock->personalized_signal, ['BUY', 'WATCH'], true))
@@ -88,14 +117,38 @@ final class ServingScreenerService
         $ranked->each(fn (object $stock, int $index) => $stock->screening_rank = $index + 1);
         $this->applyComparisonPercentiles($ranked);
 
+        // Quick filters only advertise countries that contain screener-eligible
+        // stocks. Sector availability is narrowed by the selected country so
+        // impossible combinations can be shown as disabled in the UI.
+        $sectors = $ranked->pluck('sector')->filter()->unique()->sort()->values();
+        $selectedQuickSector = trim((string) $request->query('sector'));
+        $selectedQuickCountry = strtoupper(trim((string) $request->query('country')));
+        $countries = $ranked
+            ->when($selectedQuickSector !== '', fn (Collection $items) => $items->where('sector', $selectedQuickSector))
+            ->pluck('country')->filter()->unique()->sort()->values();
+        $availableSectorFilters = $ranked
+            ->when($selectedQuickCountry !== '', fn (Collection $items) => $items->where('country', $selectedQuickCountry))
+            ->pluck('sector')->filter()->unique()->values();
+
         $requestedSignal = strtoupper(trim((string) $request->query('signal')));
         $requestedSignal = $requestedSignal === 'WAIT' ? 'WATCH' : $requestedSignal;
         $selectedIndex = trim((string) $request->query('index'));
         $queryText = mb_strtolower(trim((string) $request->query('q')));
         $country = strtoupper(trim((string) $request->query('country')));
         $sector = trim((string) $request->query('sector'));
+        $riskFilterPresent = $request->boolean('risk_profiles');
+        $riskClasses = collect($request->query('risk_class', []))
+            ->map(fn ($value): string => strtolower(trim((string) $value)))
+            ->filter(fn (string $value): bool => in_array($value, ['defensive', 'balanced', 'offensive'], true))
+            ->unique()
+            ->values();
         $transitionDays = in_array((int) $request->query('transition_days'), [1, 5, 10, 20], true)
             ? (int) $request->query('transition_days')
+            : null;
+        $holdingSource = trim((string) $request->query('bestand'));
+        $holdingInstrumentIds = $this->holdingInstrumentIds($holdingSource, (int) $request->user()->id);
+        $minimumMaximumReturn = is_numeric($request->query('min_max_return'))
+            ? (float) $request->query('min_max_return')
             : null;
 
         $ranked = $ranked
@@ -103,34 +156,125 @@ final class ServingScreenerService
                 || str_contains(mb_strtolower((string) $stock->name), $queryText)))
             ->when($country !== '', fn (Collection $items) => $items->where('country', $country))
             ->when($sector !== '', fn (Collection $items) => $items->where('sector', $sector))
-            ->when($selectedIndex !== '', fn (Collection $items) => $items->where('primary_index_symbol', $selectedIndex))
+            ->when($riskFilterPresent && $riskClasses->count() < 3, fn (Collection $items) => $items->filter(function (object $stock) use ($riskClasses): bool {
+                if (! is_numeric($stock->risk_percent ?? null)) return false;
+                $risk = (float) $stock->risk_percent;
+                $stockRiskClass = match (true) {
+                    $risk <= 25 => 'defensive',
+                    $risk <= 50 => 'balanced',
+                    default => 'offensive',
+                };
+
+                return $riskClasses->contains($stockRiskClass);
+            }))
+            ->when($selectedIndex !== '', function (Collection $items) use ($selectedIndex, $indexMemberships): Collection {
+                $memberIds = $indexMemberships->where('symbol', $selectedIndex)
+                    ->pluck('instrument_id')->map(fn ($id): int => (int) $id);
+
+                return $memberIds->isNotEmpty()
+                    ? $items->whereIn('instrument_id', $memberIds)
+                    : $items->where('primary_index_symbol', $selectedIndex);
+            })
             ->when(in_array($requestedSignal, ['BUY', 'WATCH'], true), fn (Collection $items) => $items->where('personalized_signal', $requestedSignal))
+            ->when($holdingSource !== '', fn (Collection $items) => $items->whereIn('instrument_id', $holdingInstrumentIds))
+            ->when($minimumMaximumReturn !== null, fn (Collection $items) => $items->filter(function (object $stock) use ($minimumMaximumReturn): bool {
+                $maximum = collect(self::HORIZONS)
+                    ->map(fn (int $horizon) => $stock->{"expected_return_{$horizon}d"} ?? null)
+                    ->filter(fn ($value) => is_numeric($value))
+                    ->map(fn ($value): float => (float) $value)
+                    ->max();
+
+                return $maximum !== null && $maximum >= $minimumMaximumReturn;
+            }))
             ->when($transitionDays !== null, fn (Collection $items) => $items->filter(fn (object $stock): bool => filled($stock->signal_transition_at)
                 && Carbon::parse($stock->signal_transition_at)->gte(now()->subDays($transitionDays))))
             ->values();
 
-        $limit = match (strtolower((string) $request->query('limit', '10'))) {
+        $limit = match (strtolower((string) $request->query('limit', 'all'))) {
             '25' => 25,
             '50' => 50,
             '100' => 100,
             'all' => null,
-            default => 10,
+            default => null,
         };
         if ($limit !== null) {
             $ranked = $ranked->take($limit)->values();
         }
 
+        $isMobileRequest = preg_match('/Mobile|iPhone|iPod|Android/i', (string) $request->userAgent()) === 1;
+        $mobilePerPage = 25;
+        $mobileTotal = $ranked->count();
+        $mobileLastPage = max(1, (int) ceil($mobileTotal / $mobilePerPage));
+        $mobilePage = min(max(1, (int) $request->query('mobile_page', 1)), $mobileLastPage);
+        if ($isMobileRequest) {
+            $ranked = $ranked->slice(($mobilePage - 1) * $mobilePerPage, $mobilePerPage)->values();
+        }
+
+        $this->applyCachedCharts($ranked);
+        $this->applyStoredChartFallbacks($ranked);
+
         return [
             'stocks' => $this->addApplicationData($ranked, $request),
             'countries' => $countries,
             'sectors' => $sectors,
+            'availableSectorFilters' => $availableSectorFilters,
             'indices' => $indices,
             ...$this->applicationCollections($ranked, $request),
             'certificateInstrumentIds' => collect(),
             'recentNewsByInstrument' => collect(),
             'isFreeRegional' => $isFreeRegional,
+            'canViewModelOverview' => $this->plans->allowsTariff($request->user(), PlanLevel::Pro),
+            'realtimeQuotes' => $this->plans->allowsTariff($request->user(), PlanLevel::Pro),
             'regionalCountry' => $this->regionalUniverse->country($request->user()),
+            'mobilePagination' => [
+                'enabled' => $isMobileRequest,
+                'page' => $mobilePage,
+                'last_page' => $mobileLastPage,
+                'per_page' => $mobilePerPage,
+                'total' => $mobileTotal,
+            ],
         ];
+    }
+
+    private function holdingInstrumentIds(string $source, int $userId): Collection
+    {
+        if ($source === 'watchlists') {
+            return DB::table('watchlist_items as item')
+                ->join('watchlists as watchlist', 'watchlist.id', '=', 'item.watchlist_id')
+                ->where('watchlist.user_id', $userId)
+                ->where('watchlist.active', true)
+                ->pluck('item.instrument_id')
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values();
+        }
+
+        if (preg_match('/^watchlist:(\d+)$/', $source, $matches) === 1) {
+            return DB::table('watchlist_items as item')
+                ->join('watchlists as watchlist', 'watchlist.id', '=', 'item.watchlist_id')
+                ->where('watchlist.id', (int) $matches[1])
+                ->where('watchlist.user_id', $userId)
+                ->where('watchlist.active', true)
+                ->pluck('item.instrument_id')
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values();
+        }
+
+        if (preg_match('/^portfolio:(\d+)$/', $source, $matches) === 1) {
+            return DB::table('portfolio_positions as position')
+                ->join('portfolios as portfolio', 'portfolio.id', '=', 'position.portfolio_id')
+                ->where('portfolio.id', (int) $matches[1])
+                ->where('portfolio.user_id', $userId)
+                ->where('portfolio.type', 'paper')
+                ->where('portfolio.active', true)
+                ->pluck('position.instrument_id')
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values();
+        }
+
+        return collect();
     }
 
     /** @return array<string, mixed> */
@@ -176,6 +320,10 @@ final class ServingScreenerService
         $forecast = collect([20, 40, 10])
             ->map(fn (int $horizon) => $this->selectPrediction($predictions, $statuses, $horizon))
             ->first();
+        $forecastPoints = collect([10, 20, 40])->mapWithKeys(function (int $horizon) use ($predictions, $statuses): array {
+            $prediction = $this->selectPrediction($predictions, $statuses, $horizon);
+            return [$horizon => is_numeric($prediction?->expected_return) ? (float) $prediction->expected_return * 100 : null];
+        })->filter(fn ($value) => $value !== null)->all();
         $transition = DB::connection('serving')->table('serving_signal_transitions')
             ->where('instrument_id', $instrumentId)
             ->orderByDesc('changed_at')
@@ -184,6 +332,7 @@ final class ServingScreenerService
 
         return [
             'instrumentId' => $instrumentId,
+            'symbol' => (string) $instrument->symbol,
             'chart' => $chart,
             'restricted' => $restricted,
             'restrictionReason' => $restricted
@@ -192,6 +341,7 @@ final class ServingScreenerService
             'expectedReturnPercent' => is_numeric($forecast?->expected_return)
                 ? (float) $forecast->expected_return * 100
                 : null,
+            'forecastPoints' => $forecastPoints,
             'forecastHorizon' => is_numeric($forecast?->horizon) ? (int) $forecast->horizon : null,
             'predictionAt' => $forecast?->as_of ?: $signal->as_of,
             'signal' => strtoupper((string) ($signal->signal ?: 'HOLD')),
@@ -202,7 +352,7 @@ final class ServingScreenerService
 
     private function servingRows(): Collection
     {
-        return DB::connection('serving')->table('serving_current_stock_signals as current_signal')
+        return Cache::store('file')->remember('screener.serving.rows.v1', now()->addMinutes(5), fn () => DB::connection('serving')->table('serving_current_stock_signals as current_signal')
             ->join('serving_instruments as instrument', 'instrument.id', '=', 'current_signal.instrument_id')
             ->leftJoin('serving_instrument_fundamentals as fundamental', 'fundamental.instrument_id', '=', 'instrument.id')
             ->where('instrument.instrument_type', 'stock')
@@ -222,7 +372,7 @@ final class ServingScreenerService
                 'fundamental.revenue_growth', 'fundamental.profit_margin',
                 'fundamental.return_on_equity', 'fundamental.debt_to_equity',
             ])
-            ->get();
+            ->get());
     }
 
     private function stock(
@@ -250,15 +400,19 @@ final class ServingScreenerService
         $context = $this->json($primaryPrediction?->compact_context);
         $currentPrice = $this->currentPrice($primaryPrediction, $context);
         $rating = (string) (($row->buy_rating ?? null) ?: ($row->underlying_buy_rating ?? null) ?: '3');
+        if ($rating === '1++') {
+            $rating = '1+';
+        }
         $ratingPercent = $this->ratingPercent($rating);
         $servingRisk = is_numeric($row->risk_score) ? (int) $row->risk_score : null;
-        $riskPercent = match ($servingRisk) {
+        $fallbackRiskPercent = match ($servingRisk) {
             2 => 25.0,
             3 => 50.0,
             4 => 70.0,
             5 => 90.0,
             default => null,
         };
+        $riskPercent = $this->predictionRiskPercent(data_get($primaryPrediction, 'risk_score')) ?? $fallbackRiskPercent;
         $qualityClass = (string) ($primaryStatus?->model_quality_class ?: 'basic');
         $qualityName = (string) ($primaryStatus?->model_quality_label ?: ucfirst($qualityClass));
         $qualityTier = match ($qualityClass) {
@@ -283,6 +437,7 @@ final class ServingScreenerService
             'sector' => (string) ($row->sector_code ?: ''),
             'currency' => $currency,
             'original_currency' => $currency,
+            'provider_symbol' => $providerSymbol,
             'exchange_code' => (string) $row->exchange,
             'exchange_name' => (string) $row->exchange,
             'primary_index_symbol' => (string) ($row->home_index_symbol ?: ''),
@@ -310,9 +465,11 @@ final class ServingScreenerService
             'risk_max_drawdown' => $row->risk_max_drawdown,
             'risk_profit_per_trade' => $row->risk_profit_per_trade,
             'ranking_profit_factor' => is_numeric($metrics['profit_factor'] ?? null) ? (float) $metrics['profit_factor'] : null,
+            'ranking_trade_count' => is_numeric($metrics['trades'] ?? null) ? (int) $metrics['trades'] : null,
             'ranking_hit_rate' => is_numeric($metrics['hit_rate'] ?? null) ? (float) $metrics['hit_rate'] * 100 : null,
             'ranking_drawdown' => is_numeric($metrics['max_drawdown'] ?? null) ? abs((float) $metrics['max_drawdown']) * 100 : null,
             'display_profit_per_trade_percent' => is_numeric($metrics['average_net_trade'] ?? null) ? (float) $metrics['average_net_trade'] * 100 : null,
+            'ranking_median_return' => is_numeric($metrics['median_net_trade'] ?? null) ? (float) $metrics['median_net_trade'] * 100 : null,
             'annualized_volatility' => is_numeric($metrics['stddev_net_trade'] ?? null) && is_numeric($primaryPrediction?->horizon)
                 ? abs((float) $metrics['stddev_net_trade']) * sqrt(252 / max(1, (int) $primaryPrediction->horizon))
                 : null,
@@ -320,6 +477,14 @@ final class ServingScreenerService
             'ranking_stability_percent' => 0.0,
             'model_quality_tier_code' => $qualityTier,
             'model_quality_tier_name' => $qualityName,
+            'trigger_model_name' => match ((string) ($primaryPrediction?->variant ?: '')) {
+                'pure_tcn' => 'Pure TCN',
+                'standard' => 'Standard · Tabular + TCN',
+                default => ucfirst(str_replace('_', ' ', (string) ($primaryPrediction?->variant ?: ''))),
+            },
+            'trigger_model_horizon' => is_numeric($primaryPrediction?->horizon) ? (int) $primaryPrediction->horizon : null,
+            'trigger_model_release_id' => (string) ($primaryPrediction?->release_id ?: ''),
+            'trigger_model_quality_gate_passed' => $qualityGatePassed,
             'quality_gate_blockers' => $failedGates,
             'stock_signal_calibration' => ['quality_percent' => $ratingPercent, 'quality_gate_passed' => $qualityGatePassed],
             'trailing_pe' => $row->trailing_pe,
@@ -370,6 +535,8 @@ final class ServingScreenerService
             'external_review_triggered_at' => null,
             'external_review_researched_at' => null,
             'external_review_cost_usd' => null,
+            'external_review_ranking_downgraded' => false,
+            'ranking_score_before_external_review' => null,
             'has_matching_label' => false,
             'has_matching_strategy' => false,
         ];
@@ -382,13 +549,10 @@ final class ServingScreenerService
             $stock->{"predicted_price_{$horizon}d"} = is_numeric($prediction?->target_price)
                 ? (float) $prediction->target_price
                 : null;
+            $stock->{"risk_percent_{$horizon}d"} = $this->predictionRiskPercent(data_get($prediction, 'risk_score'));
         }
         $stock->expected_return_20d = $stock->expected_return_20d ?? null;
         $stock->predicted_price_20d = $stock->predicted_price_20d ?? null;
-
-        if ($cachedChart = $this->charts->peek((int) $row->instrument_id, $providerSymbol)) {
-            $this->applyCachedChart($stock, $cachedChart);
-        }
 
         [$pros, $cons] = $this->assessmentItems($stock, $qualityGatePassed, $failedGates);
         $stock->simple_pros = $pros;
@@ -405,6 +569,23 @@ final class ServingScreenerService
         $stock->personal_signal_explanation = $stock->personal_signal_breakdown['summary'];
 
         return $stock;
+    }
+
+    private function predictionRiskPercent(mixed $risk): ?float
+    {
+        if (! is_numeric($risk) || (float) $risk <= 0) return null;
+
+        $value = (float) $risk;
+        if ($value >= 2 && $value <= 5 && abs($value - round($value)) < .0001) {
+            return match ((int) round($value)) {
+                2 => 25.0,
+                3 => 50.0,
+                4 => 70.0,
+                5 => 90.0,
+            };
+        }
+
+        return max(1.0, min(100.0, $value <= 1 ? $value * 100 : $value));
     }
 
     private function selectPrediction(Collection $predictions, Collection $statuses, ?int $horizon = null): ?object
@@ -478,6 +659,69 @@ final class ServingScreenerService
         $stock->indicator_ranking_direction = $positive >= 2 ? 'up' : ($positive <= 1 ? 'down' : 'neutral');
     }
 
+    private function applyStoredChartFallbacks(Collection $stocks): void
+    {
+        $missingStocks = $stocks->filter(fn (object $stock): bool => count((array) ($stock->chart_points ?? [])) < 2);
+        if ($missingStocks->isEmpty()) {
+            return;
+        }
+        $localInstruments = DB::table('instruments')
+            ->whereIn(DB::raw('UPPER(symbol)'), $missingStocks->pluck('symbol')->map(fn ($symbol) => strtoupper((string) $symbol))->all())
+            ->where('type', 'stock')
+            ->whereNull('deleted_at')
+            ->get(['id', 'symbol'])
+            ->keyBy(fn (object $instrument): string => strtoupper((string) $instrument->symbol));
+        $localIds = $localInstruments->pluck('id')->map(fn ($id): int => (int) $id)->values();
+        if ($localIds->isEmpty()) {
+            return;
+        }
+
+        $rankedBars = DB::table('price_bars')
+            ->whereIn('instrument_id', $localIds)
+            ->where('interval', '1d')
+            ->where('close', '>', 0)
+            ->select(['instrument_id', 'bar_time', 'close'])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY instrument_id ORDER BY bar_time DESC) AS row_number');
+        $bars = DB::query()->fromSub($rankedBars, 'ranked_bars')
+            ->where('row_number', '<=', 20)
+            ->orderBy('instrument_id')
+            ->orderBy('bar_time')
+            ->get()
+            ->groupBy('instrument_id');
+
+        $stocks->each(function (object $stock) use ($bars, $localInstruments): void {
+            if (count((array) ($stock->chart_points ?? [])) >= 2) {
+                return;
+            }
+            $localInstrument = $localInstruments->get(strtoupper((string) $stock->symbol));
+            if (! $localInstrument) {
+                return;
+            }
+            $points = collect($bars->get((int) $localInstrument->id, collect()))
+                ->map(fn (object $bar): array => [
+                    'timestamp' => Carbon::parse($bar->bar_time)->timestamp,
+                    'close' => (float) $bar->close,
+                ])
+                ->all();
+            if (count($points) >= 2) {
+                $this->applyCachedChart($stock, [
+                    'points' => $points,
+                    'currency' => $stock->currency,
+                ]);
+            }
+        });
+    }
+
+    private function applyCachedCharts(Collection $stocks): void
+    {
+        $stocks->each(function (object $stock): void {
+            $providerSymbol = trim((string) ($stock->provider_symbol ?? $stock->symbol));
+            if ($cachedChart = $this->charts->peek((int) $stock->instrument_id, $providerSymbol)) {
+                $this->applyCachedChart($stock, $cachedChart);
+            }
+        });
+    }
+
     /** @return array{0:list<string>,1:list<string>} */
     private function assessmentItems(object $stock, bool $qualityGatePassed, array $failedGates): array
     {
@@ -539,6 +783,56 @@ final class ServingScreenerService
             + ((float) $stock->ranking_score * 1_000)
             + ((float) ($stock->expected_return_20d ?? 0) * 10)
             - (float) ($stock->risk_percent ?? 100);
+    }
+
+    private function applyExternalReviewAdjustments(Collection $stocks): void
+    {
+        if ($stocks->isEmpty() || ! $this->hasTable('external_buy_reviews')) {
+            return;
+        }
+
+        $reviews = ExternalBuyReview::query()
+            ->whereIn('instrument_id', $stocks->pluck('instrument_id')->all())
+            ->where('status', 'completed')
+            ->orderByDesc('triggered_at')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('instrument_id')
+            ->keyBy('instrument_id');
+
+        $stocks->each(function (object $stock) use ($reviews): void {
+            $review = $reviews->get((int) $stock->instrument_id);
+            $isCurrent = $review !== null
+                && $stock->personalized_signal === 'BUY'
+                && (! filled($stock->signal_transition_at)
+                    || $review->triggered_at?->greaterThanOrEqualTo(Carbon::parse($stock->signal_transition_at)));
+
+            if (! $isCurrent) {
+                return;
+            }
+
+            $stock->external_review_is_current = true;
+            $stock->external_review_status = $review->status;
+            $stock->external_review_verdict = $review->verdict;
+            $stock->external_review_confidence = $review->confidence;
+            $stock->external_review_summary = $review->summary;
+            $stock->external_review_positive_factors = $review->positive_factors ?? [];
+            $stock->external_review_risk_factors = $review->risk_factors ?? [];
+            $stock->external_review_sources = $review->sources ?? [];
+            $stock->external_review_model = $review->model;
+            $stock->external_review_triggered_at = $review->triggered_at;
+            $stock->external_review_researched_at = $review->researched_at;
+            $stock->external_review_cost_usd = is_numeric($review->estimated_cost_microusd)
+                ? (float) $review->estimated_cost_microusd / 1_000_000
+                : null;
+            $stock->external_review_ranking_downgraded = $review->verdict === 'OBJECTION';
+
+            if ($stock->external_review_ranking_downgraded) {
+                $stock->ranking_score_before_external_review = (float) $stock->ranking_score;
+                $stock->ranking_score = max(0.0, (float) $stock->ranking_score - 10.0);
+                $stock->score_10 = $stock->ranking_score / 10;
+            }
+        });
     }
 
     private function ratingPercent(string $rating): float
@@ -619,7 +913,7 @@ final class ServingScreenerService
     private function addApplicationData(Collection $stocks, Request $request): Collection
     {
         $instrumentIds = $stocks->pluck('instrument_id');
-        $labeledInstrumentIds = Schema::hasTable('smart_selection_label_instruments')
+        $labeledInstrumentIds = $this->hasTable('smart_selection_label_instruments')
             ? DB::table('smart_selection_label_instruments as membership')
                 ->join('smart_selection_labels as label', 'label.id', '=', 'membership.smart_selection_label_id')
                 ->where('label.user_id', $request->user()->id)
@@ -627,7 +921,7 @@ final class ServingScreenerService
                 ->whereIn('membership.instrument_id', $instrumentIds)
                 ->pluck('membership.instrument_id')->map(fn ($id): int => (int) $id)->unique()
             : collect();
-        $savedStrategies = Schema::hasTable('saved_prediction_filters')
+        $savedStrategies = $this->hasTable('saved_prediction_filters')
             ? DB::table('saved_prediction_filters')->where('user_id', $request->user()->id)->get(['filters'])
             : collect();
 
@@ -636,12 +930,17 @@ final class ServingScreenerService
             $stock->has_matching_strategy = $savedStrategies->contains(function (object $strategy) use ($stock): bool {
                 $criteria = $this->json($strategy->filters);
 
-                return (float) $stock->score_10 >= (float) ($criteria['score_min'] ?? 0)
+                return (! filled($criteria['signal'] ?? null) || strtoupper((string) $stock->personalized_signal) === strtoupper((string) $criteria['signal']))
+                    && (float) $stock->score_10 >= (float) ($criteria['score_min'] ?? 0)
                     && (float) ($stock->confidence_percent ?? 0) >= (float) ($criteria['confidence_min'] ?? 0)
+                    && ((float) ($criteria['risk_max'] ?? 100) >= 100 || (float) ($stock->risk_percent ?? 999) <= (float) $criteria['risk_max'])
                     && (float) ($stock->expected_return_20d ?? -999) >= (float) ($criteria['predicted_return_min'] ?? -20)
                     && ((float) ($criteria['drawdown_max'] ?? 50) >= 50 || (float) ($stock->ranking_drawdown ?? 999) <= (float) $criteria['drawdown_max'])
+                    && ((float) ($criteria['profit_per_trade_min'] ?? 0) <= 0 || (float) ($stock->display_profit_per_trade_percent ?? -999) >= (float) $criteria['profit_per_trade_min'])
+                    && (! is_numeric($criteria['median_return_min'] ?? null) || (is_numeric($stock->ranking_median_return ?? null) && (float) $stock->ranking_median_return >= (float) $criteria['median_return_min']))
                     && ((float) ($criteria['profit_factor_min'] ?? 0) <= 0 || (float) ($stock->ranking_profit_factor ?? 0) >= (float) $criteria['profit_factor_min'])
-                    && ((float) ($criteria['hit_rate_min'] ?? 0) <= 0 || (float) ($stock->ranking_hit_rate ?? 0) >= (float) $criteria['hit_rate_min']);
+                    && ((float) ($criteria['hit_rate_min'] ?? 0) <= 0 || (float) ($stock->ranking_hit_rate ?? 0) >= (float) $criteria['hit_rate_min'])
+                    && ((int) ($criteria['minimum_trades'] ?? 0) <= 0 || (int) ($stock->ranking_trade_count ?? 0) >= (int) $criteria['minimum_trades']);
             });
         });
 
@@ -680,5 +979,14 @@ final class ServingScreenerService
         $decoded = is_string($value) ? json_decode($value, true) : null;
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function hasTable(string $table): bool
+    {
+        return Cache::store('file')->remember(
+            'screener.schema.table.'.sha1($table),
+            now()->addHour(),
+            fn (): bool => Schema::hasTable($table),
+        );
     }
 }

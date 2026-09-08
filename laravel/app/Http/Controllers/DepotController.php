@@ -7,8 +7,12 @@ use App\Models\Portfolio;
 use App\Services\PlanAccessService;
 use App\Services\PersonalCollectionLimitService;
 use App\Services\PersonalizedSignalService;
+use App\Services\ServingPortfolioCalculator;
+use App\Services\ServingPortfolioSimulationService;
+use App\Services\StockSpecificExitPortfolioSimulationService;
 use App\Services\TwelveDataService;
 use App\Support\AiScore;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +22,7 @@ use Illuminate\View\View;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 final class DepotController extends Controller
 {
@@ -37,7 +42,7 @@ final class DepotController extends Controller
 
     public function paperIndex(Request $request): View
     {
-        $portfolios = $this->portfolios((int) $request->user()->id, 'paper')
+        $portfolios = $this->portfolios((int) $request->user()->id, 'paper', true)
             ->sortByDesc(fn (Portfolio $portfolio): int => data_get($portfolio->meta, 'automation.live_enabled', false) ? 1 : 0)
             ->values();
         $paperMode = true;
@@ -47,14 +52,41 @@ final class DepotController extends Controller
 
         $paperDepotLimit = app(PersonalCollectionLimitService::class)->paperDepots($request->user());
         $canTestPaperDepot = app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Plus);
+        $followedPortfolioIds = DB::table('portfolio_followers')->where('user_id', $request->user()->id)->pluck('portfolio_id');
 
-        return view('depots.index', compact('portfolios', 'paperMode', 'stockInstrumentIds', 'strategyTemplates', 'availableStrategies', 'paperDepotLimit', 'canTestPaperDepot'));
+        $latestSimulationRuns = DB::table('portfolio_simulation_runs')
+            ->whereIn('portfolio_id', $portfolios->pluck('id'))
+            ->where('status', 'completed')
+            ->orderByDesc('id')
+            ->get(['portfolio_id', 'summary'])
+            ->unique('portfolio_id')
+            ->keyBy('portfolio_id');
+
+        $portfolios->each(function (Portfolio $portfolio) use ($latestSimulationRuns): void {
+            $summary = $latestSimulationRuns->get($portfolio->id)?->summary;
+            $summary = is_string($summary) ? (json_decode($summary, true) ?: []) : (array) $summary;
+            $curve = collect($summary['equity_curve'] ?? [])
+                ->filter(fn ($point): bool => is_array($point) && is_numeric($point['equity'] ?? null))
+                ->map(fn (array $point): array => [
+                    'date' => (string) ($point['date'] ?? ''),
+                    'equity' => (float) $point['equity'],
+                ])
+                ->values();
+
+            if ($curve->count() > 48) {
+                $step = max(1, (int) ceil($curve->count() / 48));
+                $curve = $curve->filter(fn ($point, int $index): bool => $index % $step === 0 || $index === $curve->count() - 1)->values();
+            }
+
+            $portfolio->setAttribute('simulation_sparkline', $curve->all());
+        });
+
+        return view('depots.index', compact('portfolios', 'paperMode', 'stockInstrumentIds', 'strategyTemplates', 'availableStrategies', 'paperDepotLimit', 'canTestPaperDepot', 'followedPortfolioIds'));
     }
 
     public function addInstrument(Request $request, Portfolio $portfolio, int $instrument, TwelveDataService $marketData): RedirectResponse
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id
-            && $portfolio->active && $portfolio->type === 'paper', 404);
+        $this->authorizePortfolioEdit($request, $portfolio, true);
         $validated = $request->validate(['quantity' => ['required', 'integer', 'min:1', 'max:100000']]);
 
         $stock = DB::table('instruments')->where('id', $instrument)->where('type', 'stock')
@@ -127,6 +159,7 @@ final class DepotController extends Controller
                 'fees' => $fee, 'currency' => $portfolio->currency, 'meta' => json_encode(['source' => 'screener_manual', 'ai_score' => $aiScore, 'prediction_id' => $prediction?->id, 'signal' => $prediction?->signal, 'pricing_source' => $usesGermanListing ? 'german_listing' : 'primary_listing', 'pricing_listing' => $listing, 'primary_currency' => $stock->currency]),
                 'created_at' => now(), 'updated_at' => now(),
             ]);
+            DB::afterCommit(fn () => app(\App\Services\PublicPortfolioFollowerNotifier::class)->send((int) $transactionId));
             $balance = (float) $account->balance - $totalDebit;
             DB::table('portfolio_cash_accounts')->where('id', $account->id)->update(['balance' => $balance, 'updated_at' => now()]);
             DB::table('portfolio_cash_ledger')->insert([
@@ -142,7 +175,7 @@ final class DepotController extends Controller
 
     public function sellInstrument(Request $request, Portfolio $portfolio, int $instrument): RedirectResponse
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active && $portfolio->type === 'paper', 404);
+        $this->authorizePortfolioEdit($request, $portfolio, true);
         $position = DB::table('portfolio_positions')->where('portfolio_id', $portfolio->id)->where('instrument_id', $instrument)->first();
         abort_unless($position, 404);
         $validated = $request->validate(['quantity' => ['required', 'numeric', 'min:0.0001', 'max:'.$position->quantity]]);
@@ -162,6 +195,7 @@ final class DepotController extends Controller
                 'meta'=>json_encode(['source'=>'manual','ai_score'=>AiScore::toPercent($prediction?->prediction_score),'prediction_id'=>$prediction?->id,'signal'=>$prediction?->signal,'realized_profit'=>$profit,'performance_percent'=>$costBasis > 0 ? ($profit/$costBasis)*100 : null]),
                 'created_at'=>now(),'updated_at'=>now(),
             ]);
+            DB::afterCommit(fn () => app(\App\Services\PublicPortfolioFollowerNotifier::class)->send((int) $transactionId));
             $remaining = (float) $position->quantity - $quantity;
             if ($remaining <= 0.000001) DB::table('portfolio_positions')->where('id', $position->id)->delete();
             else DB::table('portfolio_positions')->where('id', $position->id)->update(['quantity'=>$remaining,'current_price'=>$price,'updated_at'=>now()]);
@@ -349,10 +383,11 @@ final class DepotController extends Controller
         return [$positions->all(), $history];
     }
 
-    private function portfolios(int $userId, ?string $type = null)
+    private function portfolios(int $userId, ?string $type = null, bool $includePublic = false)
     {
         return Portfolio::query()
-            ->where('user_id', $userId)
+            ->where(fn ($query) => $query->where('user_id', $userId)
+                ->when($includePublic, fn ($query) => $query->orWhere('is_public_readonly', true)))
             ->where('active', true)
             ->when($type, fn ($query) => $query->where('type', $type))
             ->with(['strategies', 'cashAccount', 'positions' => fn ($query) => $query
@@ -407,7 +442,9 @@ final class DepotController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'initial_capital' => ['required_if:type,paper', 'nullable', 'numeric', 'between:1000,1000000'],
             'trade_cost' => ['required_if:type,paper', 'nullable', 'numeric', 'between:0,1000'],
+            'is_public_readonly' => ['nullable', 'boolean'],
         ]);
+        abort_if($request->boolean('is_public_readonly') && ! (bool) $request->user()->is_admin, 403);
 
         if ($validated['type'] !== 'paper'
             && ! app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Pro)) {
@@ -448,6 +485,7 @@ final class DepotController extends Controller
                 'description' => $validated['description'] ?? null,
                 'is_default' => $isFirst,
                 'active' => true,
+                'is_public_readonly' => (bool) $request->user()->is_admin && $request->boolean('is_public_readonly'),
                 'meta' => $validated['type'] === 'paper' ? [
                     'automation' => [
                         'initial_capital' => round((float) $validated['initial_capital'], 2),
@@ -475,9 +513,13 @@ final class DepotController extends Controller
         return back()->with('status', 'portfolio-created');
     }
 
-    public function show(Request $request, Portfolio $portfolio): View
+    public function show(Request $request, Portfolio $portfolio, TwelveDataService $marketData): View
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active, 404);
+        abort_unless($portfolio->active && ((int) $portfolio->user_id === (int) $request->user()->id || $portfolio->is_public_readonly), 404);
+        $canEditPortfolio = (int) $portfolio->user_id === (int) $request->user()->id
+            && (! $portfolio->is_public_readonly || (bool) $request->user()->is_admin);
+        $isFollowingPortfolio = $portfolio->is_public_readonly && DB::table('portfolio_followers')
+            ->where('portfolio_id', $portfolio->id)->where('user_id', $request->user()->id)->exists();
 
         $portfolio->load(['strategies', 'positions' => fn ($query) => $query
             ->whereHas('instrument', fn ($instrument) => $instrument
@@ -628,6 +670,50 @@ final class DepotController extends Controller
         $averageCapitalUtilization = is_numeric($simulationSummary['average_capital_utilization_percent'] ?? null)
             ? min(100.0, max(0.0, (float) $simulationSummary['average_capital_utilization_percent']))
             : $capitalUtilization;
+        $homeIndexSeries = [];
+        $homeIndexLabel = null;
+        if ($simulationRun?->status === 'completed' && ! empty($simulationSummary['equity_curve'])) {
+            // The portfolio comparison deliberately uses one stable benchmark,
+            // independent of the countries represented by its constituents.
+            $homeIndexProvider = 'EXS1:XETR';
+            $homeIndexLabel = 'DAX';
+            $startsAt = (string) ($simulationSummary['start_date'] ?? '');
+            $endsAt = (string) ($simulationSummary['end_date'] ?? '');
+            $benchmarkCapital = (float) ($simulationSummary['initial_capital'] ?? $initialCapital ?: 10000);
+            $benchmarkFeeRate = (float) ($simulationSummary['fee_rate'] ?? 0.003);
+            $benchmarkMinimumFee = (float) ($simulationSummary['minimum_fee'] ?? 10);
+            $benchmarkNotional = max(0.0, min(
+                $benchmarkCapital - $benchmarkMinimumFee,
+                $benchmarkCapital / (1.0 + $benchmarkFeeRate),
+            ));
+            $benchmarkBuyFee = max($benchmarkMinimumFee, $benchmarkNotional * $benchmarkFeeRate);
+            $benchmarkCash = max(0.0, $benchmarkCapital - $benchmarkNotional - $benchmarkBuyFee);
+            try {
+                $bars = collect($marketData->dailyHistory($homeIndexProvider, 1200))
+                    ->filter(function (array $bar) use ($startsAt, $endsAt): bool {
+                        $date = date('Y-m-d', (int) ($bar['timestamp'] ?? 0));
+
+                        return $date >= $startsAt && $date <= $endsAt && (float) ($bar['adjusted_close'] ?? $bar['close'] ?? 0) > 0;
+                    })->sortBy('timestamp')->values();
+                $firstBar = $bars->first();
+                $base = is_array($firstBar)
+                    ? (float) ($firstBar['adjusted_close'] ?? $firstBar['close'] ?? 0)
+                    : 0.0;
+                if ($base > 0) {
+                    $homeIndexSeries = $bars->map(function (array $bar) use ($base, $benchmarkNotional, $benchmarkCash, $benchmarkFeeRate, $benchmarkMinimumFee): array {
+                        $grossValue = $benchmarkNotional * (float) ($bar['adjusted_close'] ?? $bar['close']) / $base;
+                        $hypotheticalSellFee = max($benchmarkMinimumFee, $grossValue * $benchmarkFeeRate);
+
+                        return [
+                            'date' => date('Y-m-d', (int) $bar['timestamp']),
+                            'equity' => round($benchmarkCash + $grossValue - $hypotheticalSellFee, 2),
+                        ];
+                    })->all();
+                }
+            } catch (Throwable) {
+                $homeIndexSeries = [];
+            }
+        }
         $distinctStocksCount = $portfolio->transactions
             ->pluck('instrument_id')->filter()->unique()->count();
         $realizedResults = $portfolio->transactions
@@ -675,13 +761,13 @@ final class DepotController extends Controller
             'canViewSignalChanges', 'positionSignalChanges',
             'positionEntryData', 'portfolioValueCurve',
             'performance', 'backUrl', 'backLabel', 'availableStrategies', 'strategyNames', 'strategyPerformance',
-            'simulationRun', 'simulationSummary', 'chartTrades'
+            'simulationRun', 'simulationSummary', 'chartTrades', 'homeIndexSeries', 'homeIndexLabel', 'canEditPortfolio', 'isFollowingPortfolio'
         ));
     }
 
     public function updateStrategies(Request $request, Portfolio $portfolio): RedirectResponse
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active, 404);
+        $this->authorizePortfolioEdit($request, $portfolio);
         $validated = $request->validate([
             'strategies' => ['nullable', 'array', 'max:20'],
             'strategies.*' => ['integer', 'distinct'],
@@ -738,7 +824,7 @@ final class DepotController extends Controller
 
     public function updateAutomation(Request $request, Portfolio $portfolio, PlanAccessService $plans): RedirectResponse
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active && $portfolio->type === 'paper', 404);
+        $this->authorizePortfolioEdit($request, $portfolio, true);
         abort_unless($plans->allows($request->user(), PlanLevel::Pro), 403);
 
         $validated = $request->validate([
@@ -777,83 +863,251 @@ final class DepotController extends Controller
             : __('Strategiekonto deaktiviert.'));
     }
 
-    public function startSimulation(Request $request, Portfolio $portfolio): RedirectResponse
+    public function startSimulation(
+        Request $request,
+        Portfolio $portfolio,
+        ServingPortfolioSimulationService $servingSimulation,
+        StockSpecificExitPortfolioSimulationService $exitSimulation,
+    ): RedirectResponse
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active && $portfolio->type === 'paper', 404);
+        $this->authorizePortfolioEdit($request, $portfolio, true);
         if (! app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Plus)) {
             return back()->withErrors([
                 'simulation' => __('Das Testen eines Musterdepots ist ab dem Plus-Tarif verfügbar.'),
             ]);
         }
-        if ((bool) data_get($portfolio->meta, 'automation.live_enabled', false)) {
+        $validated = $request->validate([
+            'exit_policy' => [
+                'nullable',
+                'string',
+                'in:'.implode(',', array_keys(StockSpecificExitPortfolioSimulationService::selectablePolicies())),
+            ],
+        ]);
+        $exitPolicy = (string) ($validated['exit_policy']
+            ?? StockSpecificExitPortfolioSimulationService::STRATEGY_DEFAULT);
+        $usesPreparedExitPolicy = StockSpecificExitPortfolioSimulationService::isPreparedExitPolicy($exitPolicy);
+
+        $assignments = DB::table('portfolio_strategy_assignments as assignment')
+            ->join('saved_prediction_filters as strategy', 'strategy.id', '=', 'assignment.saved_prediction_filter_id')
+            ->where('assignment.portfolio_id', $portfolio->id)
+            ->where('assignment.enabled', true)
+            ->orderBy('assignment.priority')
+            ->get([
+                'assignment.saved_prediction_filter_id', 'assignment.priority',
+                'assignment.capital_weight', 'strategy.name as strategy_name', 'strategy.filters',
+            ]);
+        if ($assignments->isEmpty()) {
+            return back()->withErrors(['simulation' => __('Ordne dem Depot zuerst mindestens eine Strategie zu.')]);
+        }
+
+        // Capital sizing belongs to the saved strategies. The depot test must
+        // not overlay a second, potentially contradictory balancing setup.
+        $strategySizing = $assignments->map(function (object $assignment): array {
+            $filters = is_string($assignment->filters)
+                ? (json_decode($assignment->filters, true) ?: [])
+                : (array) $assignment->filters;
+            $maximumPositions = max(1, min(
+                ServingPortfolioSimulationService::MAXIMUM_POSITIONS,
+                (int) ($filters['max_positions'] ?? ServingPortfolioSimulationService::DEFAULT_MAXIMUM_POSITIONS),
+            ));
+            $positionFactor = max(1, min($maximumPositions, (int) ($filters['position_factor'] ?? 1)));
+
+            return compact('maximumPositions', 'positionFactor');
+        });
+        $maximumPositions = max(1, (int) $strategySizing->max('maximumPositions'));
+        $maxStockAllocationPercent = min(100.0, max(
+            5.0,
+            (float) $strategySizing->max(fn (array $sizing): float => $sizing['positionFactor'] / $sizing['maximumPositions'] * 100),
+        ));
+        $allocationSettings = [
+            'allocation_mode' => $maxStockAllocationPercent > (100 / $maximumPositions)
+                ? ServingPortfolioCalculator::ALLOCATION_DYNAMIC_WEIGHT
+                : ServingPortfolioCalculator::ALLOCATION_EQUAL_WEIGHT,
+            'maximum_positions' => $maximumPositions,
+            'max_stock_allocation_percent' => $maxStockAllocationPercent,
+        ];
+
+        $initial = max(1000.0, (float) data_get($portfolio->meta, 'automation.initial_capital', 10000));
+        $usesServingConfigurations = $servingSimulation->hasServingConfigurations($assignments);
+        if (! $usesPreparedExitPolicy
+            && $usesServingConfigurations
+            && ! $servingSimulation->allAssignmentsUseServingConfigurations($assignments)) {
             return back()->withErrors([
-                'simulation' => __('Deaktiviere zuerst das mitlaufende Strategiedepot, bevor du eine historische Simulation startest.'),
+                'simulation' => __('Serving-Modellkonfigurationen und alte Filterstrategien können nicht im selben Lauf gemischt werden.'),
+            ]);
+        }
+        $servingResult = null;
+        if ($usesPreparedExitPolicy || $usesServingConfigurations) {
+            try {
+                // Resolve and validate the complete source data before any
+                // existing portfolio history is cleared.
+                $servingResult = $usesPreparedExitPolicy
+                    ? $exitSimulation->calculate(
+                        $portfolio,
+                        $assignments,
+                        $exitPolicy,
+                        $initial,
+                        (string) $allocationSettings['allocation_mode'],
+                        (int) $allocationSettings['maximum_positions'],
+                        (float) $allocationSettings['max_stock_allocation_percent'],
+                    )
+                    : $servingSimulation->calculate(
+                        $portfolio,
+                        $assignments,
+                        $initial,
+                        (string) $allocationSettings['allocation_mode'],
+                        (int) $allocationSettings['maximum_positions'],
+                        (float) $allocationSettings['max_stock_allocation_percent'],
+                    );
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return back()->withErrors(['simulation' => $exception->getMessage()]);
+            }
+        }
+
+        $publicId = (string) Str::uuid();
+        try {
+            DB::transaction(function () use (
+                $request,
+                $portfolio,
+                $assignments,
+                $publicId,
+                $initial,
+                $servingResult,
+                $servingSimulation,
+                $exitPolicy,
+            ): void {
+                DB::table('python_engine_jobs')
+                    ->whereIn('status', ['queued', 'running'])
+                    ->whereRaw("payload->>'portfolio_id' = ?", [(string) $portfolio->id])
+                    ->update([
+                        'status' => 'cancelled',
+                        'error_message' => __('Durch einen neuen Simulationslauf ersetzt.'),
+                        'finished_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                $account = DB::table('portfolio_cash_accounts')->where('portfolio_id', $portfolio->id)->lockForUpdate()->first();
+                abort_if($account === null, 422, __('Das Verrechnungskonto fehlt.'));
+                $portfolioMeta = (array) $portfolio->meta;
+                data_set($portfolioMeta, 'automation.live_enabled', false);
+                data_set($portfolioMeta, 'automation.activated_at', null);
+                $portfolio->forceFill(['meta' => $portfolioMeta])->save();
+                $transactionIds = DB::table('portfolio_transactions')->where('portfolio_id', $portfolio->id)->pluck('id');
+                DB::table('portfolio_cash_ledger')->where('portfolio_cash_account_id', $account->id)->delete();
+                DB::table('portfolio_automation_executions')->where('portfolio_id', $portfolio->id)->delete();
+                DB::table('portfolio_strategy_reservations')->where('portfolio_id', $portfolio->id)->delete();
+                DB::table('portfolio_transactions')->whereIn('id', $transactionIds)->delete();
+                DB::table('portfolio_positions')->where('portfolio_id', $portfolio->id)->delete();
+                DB::table('portfolio_simulation_runs')->where('portfolio_id', $portfolio->id)->delete();
+                DB::table('portfolio_cash_accounts')->where('id', $account->id)->update([
+                    'balance' => $initial,
+                    'reserved_balance' => 0,
+                    'updated_at' => now(),
+                ]);
+                $initialOccurredAt = $servingResult
+                    ? CarbonImmutable::parse($servingResult['start_date'], 'UTC')->startOfDay()
+                    : now();
+                DB::table('portfolio_cash_ledger')->insert([
+                    'portfolio_cash_account_id' => $account->id,
+                    'type' => 'initial_deposit',
+                    'amount' => $initial,
+                    'balance_after' => $initial,
+                    'currency' => $account->currency,
+                    'occurred_at' => $initialOccurredAt,
+                    'meta' => json_encode([
+                        'source' => $servingResult ? 'portfolio_serving_simulation_reset' : 'portfolio_simulation_reset',
+                    ], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                if ($servingResult) {
+                    $strategyIds = $assignments->pluck('saved_prediction_filter_id')->map(fn ($id) => (int) $id)->all();
+                    $runId = DB::table('portfolio_simulation_runs')->insertGetId([
+                        'public_id' => $publicId,
+                        'user_id' => $request->user()->id,
+                        'saved_prediction_filter_id' => $assignments->first()->saved_prediction_filter_id,
+                        'portfolio_id' => $portfolio->id,
+                        'backtest_run_id' => null,
+                        'status' => 'running',
+                        'started_at' => now(),
+                        'simulation_start_date' => $servingResult['start_date'],
+                        'simulation_end_date' => $servingResult['end_date'],
+                        'initial_capital' => $initial,
+                        'settings' => json_encode([
+                            'source_type' => (string) ($servingResult['source_type'] ?? 'serving_model_configurations'),
+                            'strategy_ids' => $strategyIds,
+                            'configuration_keys' => collect($servingResult['model_references'])->pluck('configuration_key')->all(),
+                            'exit_policy' => $exitPolicy,
+                            'exit_policy_label' => $servingResult['exit_policy_label'] ?? null,
+                            'entry_policy' => $servingResult['entry_policy'] ?? null,
+                            'dataset_window' => $servingResult['dataset_window'] ?? null,
+                            'source_payload_sha256' => $servingResult['source_payload_sha256'] ?? null,
+                            'research_only' => (bool) ($servingResult['research_only'] ?? false),
+                            'allocation_mode' => $servingResult['allocation_mode'],
+                            'maximum_positions' => $servingResult['maximum_positions'],
+                            'requested_maximum_positions' => $servingResult['requested_maximum_positions'],
+                            'max_stock_allocation_percent' => $servingResult['max_stock_allocation_percent'],
+                            'effective_max_stock_allocation_percent' => $servingResult['effective_max_stock_allocation_percent'],
+                            'initial_equal_weight_budget' => $servingResult['initial_equal_weight_budget'],
+                            'fee_rate' => ServingPortfolioSimulationService::FEE_RATE,
+                            'minimum_fee' => ServingPortfolioSimulationService::MINIMUM_FEE,
+                        ], JSON_THROW_ON_ERROR),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                    $servingSimulation->persist($portfolio, $runId, $servingResult);
+
+                    return;
+                }
+
+                $sourceRunId = (int) DB::table('backtest_runs')->whereIn('status', ['completed', 'completed_with_errors'])
+                    ->whereRaw("COALESCE(settings->>'run_type','system') <> 'user_filter'")
+                    ->where('trades_count', '>', 0)
+                    ->latest('id')->value('id');
+                abort_if($sourceRunId < 1, 422, __('Kein Ausgangs-Backtest vorhanden.'));
+                $runId = DB::table('portfolio_simulation_runs')->insertGetId([
+                    'public_id' => $publicId, 'user_id' => $request->user()->id,
+                    'saved_prediction_filter_id' => $assignments->first()->saved_prediction_filter_id,
+                    'portfolio_id' => $portfolio->id, 'backtest_run_id' => $sourceRunId,
+                    'status' => 'queued', 'started_at' => now(), 'initial_capital' => $initial,
+                    'settings' => json_encode(['strategy_ids' => $assignments->pluck('saved_prediction_filter_id')->map(fn ($id) => (int) $id)->all(), 'parallel' => true], JSON_THROW_ON_ERROR),
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+                DB::table('python_engine_jobs')->insert([
+                    'public_id' => (string) Str::uuid(), 'user_id' => $request->user()->id,
+                    'type' => 'portfolio_simulation', 'calculation_version' => 'portfolio-v2',
+                    'status' => 'queued', 'progress' => 0,
+                    'payload' => json_encode(['portfolio_id' => $portfolio->id, 'simulation_run_id' => $runId, 'source_run_id' => $sourceRunId, 'strategy_ids' => $assignments->pluck('saved_prediction_filter_id')->map(fn ($id) => (int) $id)->all()], JSON_THROW_ON_ERROR),
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            });
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->withErrors([
+                'simulation' => ($usesPreparedExitPolicy || $usesServingConfigurations)
+                    ? __('Die Depotsimulation konnte nicht gespeichert werden: :message', ['message' => $exception->getMessage()])
+                    : __('Die Depotsimulation konnte nicht gestartet werden.'),
             ]);
         }
 
-        $assignments = DB::table('portfolio_strategy_assignments')
-            ->where('portfolio_id', $portfolio->id)->where('enabled', true)
-            ->orderBy('priority')->get();
-        if ($assignments->isEmpty()) return back()->withErrors(['simulation' => __('Ordne dem Depot zuerst mindestens eine Strategie zu.')]);
-
-        $publicId = (string) Str::uuid();
-        DB::transaction(function () use ($request, $portfolio, $assignments, $publicId): void {
-            DB::table('python_engine_jobs')
-                ->whereIn('status', ['queued', 'running'])
-                ->whereRaw("payload->>'portfolio_id' = ?", [(string) $portfolio->id])
-                ->update([
-                    'status' => 'cancelled',
-                    'error_message' => __('Durch einen neuen Simulationslauf ersetzt.'),
-                    'finished_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            $account = DB::table('portfolio_cash_accounts')->where('portfolio_id', $portfolio->id)->lockForUpdate()->first();
-            abort_if($account === null, 422, __('Das Verrechnungskonto fehlt.'));
-            $initial = max(1000.0, (float) data_get($portfolio->meta, 'automation.initial_capital', 10000));
-            $transactionIds = DB::table('portfolio_transactions')->where('portfolio_id', $portfolio->id)->pluck('id');
-            DB::table('portfolio_cash_ledger')->where('portfolio_cash_account_id', $account->id)->delete();
-            DB::table('portfolio_automation_executions')->where('portfolio_id', $portfolio->id)->delete();
-            DB::table('portfolio_transactions')->whereIn('id', $transactionIds)->delete();
-            DB::table('portfolio_positions')->where('portfolio_id', $portfolio->id)->delete();
-            DB::table('portfolio_simulation_runs')->where('portfolio_id', $portfolio->id)->delete();
-            DB::table('portfolio_cash_accounts')->where('id', $account->id)->update(['balance' => $initial, 'reserved_balance' => 0, 'updated_at' => now()]);
-            DB::table('portfolio_cash_ledger')->insert([
-                'portfolio_cash_account_id' => $account->id, 'type' => 'initial_deposit',
-                'amount' => $initial, 'balance_after' => $initial, 'currency' => $account->currency,
-                'occurred_at' => now(), 'meta' => json_encode(['source' => 'portfolio_simulation_reset'], JSON_THROW_ON_ERROR),
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-            $sourceRunId = (int) DB::table('backtest_runs')->whereIn('status', ['completed', 'completed_with_errors'])
-                ->whereRaw("COALESCE(settings->>'run_type','system') <> 'user_filter'")
-                // Some maintenance runs are completed without any trades.
-                // They are not valid simulation sources and would yield an
-                // apparently successful but completely empty depot run.
-                ->where('trades_count', '>', 0)
-                ->latest('id')->value('id');
-            abort_if($sourceRunId < 1, 422, __('Kein Ausgangs-Backtest vorhanden.'));
-            $runId = DB::table('portfolio_simulation_runs')->insertGetId([
-                'public_id' => $publicId, 'user_id' => $request->user()->id,
-                'saved_prediction_filter_id' => $assignments->first()->saved_prediction_filter_id,
-                'portfolio_id' => $portfolio->id, 'backtest_run_id' => $sourceRunId,
-                'status' => 'queued', 'started_at' => now(), 'initial_capital' => $initial,
-                'settings' => json_encode(['strategy_ids' => $assignments->pluck('saved_prediction_filter_id')->map(fn ($id) => (int) $id)->all(), 'parallel' => true], JSON_THROW_ON_ERROR),
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-            DB::table('python_engine_jobs')->insert([
-                'public_id' => (string) Str::uuid(), 'user_id' => $request->user()->id,
-                'type' => 'portfolio_simulation', 'calculation_version' => 'portfolio-v2',
-                'status' => 'queued', 'progress' => 0,
-                'payload' => json_encode(['portfolio_id' => $portfolio->id, 'simulation_run_id' => $runId, 'source_run_id' => $sourceRunId, 'strategy_ids' => $assignments->pluck('saved_prediction_filter_id')->map(fn ($id) => (int) $id)->all()], JSON_THROW_ON_ERROR),
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-        });
-
-        return redirect()->route('depots.show', [$portfolio, 'simulation' => $publicId])->with('status', __('Depotsimulation gestartet.'));
+        return redirect()->route('depots.show', [$portfolio, 'simulation' => $publicId])->with(
+            'status',
+            match (true) {
+                $usesPreparedExitPolicy => __('Depotsimulation mit :exit wurde vollständig berechnet.', [
+                    'exit' => StockSpecificExitPortfolioSimulationService::selectablePolicies()[$exitPolicy],
+                ]),
+                $usesServingConfigurations => __('Serving-Depotsimulation wurde mit den exakten Modell-Trades berechnet.'),
+                default => __('Depotsimulation gestartet.'),
+            },
+        );
     }
 
     public function simulationStatus(Request $request, Portfolio $portfolio, string $publicId): \Illuminate\Http\JsonResponse
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id, 404);
+        abort_unless((int) $portfolio->user_id === (int) $request->user()->id || $portfolio->is_public_readonly, 404);
         $run = DB::table('portfolio_simulation_runs')->where('portfolio_id', $portfolio->id)->where('public_id', $publicId)->first();
         abort_if($run === null, 404);
         $job = DB::table('python_engine_jobs')->whereRaw("payload->>'simulation_run_id' = ?", [(string) $run->id])->latest('id')->first();
@@ -862,7 +1116,7 @@ final class DepotController extends Controller
 
     public function simulationReport(Request $request, Portfolio $portfolio, string $publicId): Response
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id, 404);
+        abort_unless((int) $portfolio->user_id === (int) $request->user()->id || $portfolio->is_public_readonly, 404);
         $run = DB::table('portfolio_simulation_runs')->where('portfolio_id', $portfolio->id)->where('public_id', $publicId)->where('status', 'completed')->first();
         abort_if($run === null, 404);
         $portfolio->loadMissing('strategies');
@@ -903,10 +1157,17 @@ final class DepotController extends Controller
             $trade = $backtestRows->get((int) ($meta['backtest_trade_id'] ?? 0));
             return [
                 'id' => (int) $transaction->id,
-                'ki_score' => $trade?->ki_score,
-                'confidence' => $trade?->confidence,
-                'risk' => $trade?->max_drawdown !== null ? (float) $trade->max_drawdown * 100 : ($meta['max_drawdown'] ?? null),
+                'ki_score' => $trade?->ki_score ?? ($meta['ki_score'] ?? null),
+                'confidence' => $trade?->confidence ?? ($meta['confidence'] ?? null),
+                'risk' => $trade?->max_drawdown !== null
+                    ? (float) $trade->max_drawdown * 100
+                    : (isset($meta['model_max_drawdown']) ? abs((float) $meta['model_max_drawdown']) * 100 : ($meta['max_drawdown'] ?? null)),
                 'pnl' => $transaction->type === 'sell' ? ($meta['realized_profit'] ?? null) : null,
+                'signal' => $meta['signal'] ?? null,
+                'horizon_days' => $meta['horizon_days'] ?? null,
+                'variant_label' => $meta['variant_label'] ?? null,
+                'model_name' => $meta['model_name'] ?? null,
+                'model_net_return' => isset($meta['model_net_return']) ? (float) $meta['model_net_return'] * 100 : null,
             ];
         })->keyBy('id')->all();
         $stockRows = $transactions->groupBy(fn ($transaction): string => (string) ($transaction->instrument?->symbol ?: '—'))
@@ -956,7 +1217,7 @@ final class DepotController extends Controller
 
     public function reset(Request $request, Portfolio $portfolio): RedirectResponse
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active && $portfolio->type === 'paper', 404);
+        $this->authorizePortfolioEdit($request, $portfolio, true);
         $request->validate(['confirm_reset' => ['accepted']]);
         DB::transaction(fn () => $this->clearPortfolioHistory($portfolio, 'manual_portfolio_reset'));
 
@@ -965,7 +1226,7 @@ final class DepotController extends Controller
 
     public function updateCapital(Request $request, Portfolio $portfolio): RedirectResponse
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active && $portfolio->type === 'paper', 404);
+        $this->authorizePortfolioEdit($request, $portfolio, true);
         $validated = $request->validate([
             'initial_capital' => ['required', 'numeric', 'between:1000,1000000'],
         ]);
@@ -1011,7 +1272,7 @@ final class DepotController extends Controller
 
     public function destroy(Request $request, Portfolio $portfolio): RedirectResponse
     {
-        abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active && $portfolio->type === 'paper', 404);
+        $this->authorizePortfolioEdit($request, $portfolio, true);
         $request->validate(['confirm_delete' => ['accepted']]);
         DB::transaction(function () use ($portfolio): void {
             DB::table('python_engine_jobs')
@@ -1028,6 +1289,42 @@ final class DepotController extends Controller
         });
 
         return redirect()->route('paper-depots.index')->with('status', __('Das Musterdepot wurde gelöscht.'));
+    }
+
+    public function updatePublicReadonly(Request $request, Portfolio $portfolio): RedirectResponse
+    {
+        abort_unless((bool) $request->user()->is_admin, 403);
+        abort_unless($portfolio->active && $portfolio->type === 'paper', 404);
+        $validated = $request->validate(['is_public_readonly' => ['required', 'boolean']]);
+        $portfolio->update(['is_public_readonly' => (bool) $validated['is_public_readonly']]);
+
+        return back()->with('status', (bool) $validated['is_public_readonly']
+            ? __('Das Musterdepot ist jetzt öffentlich und schreibgeschützt.')
+            : __('Das Musterdepot ist nicht mehr öffentlich.'));
+    }
+
+    public function updateFollowing(Request $request, Portfolio $portfolio): RedirectResponse
+    {
+        abort_unless($portfolio->active && $portfolio->type === 'paper' && $portfolio->is_public_readonly, 404);
+        $validated = $request->validate(['following' => ['required', 'boolean']]);
+        if ((bool) $validated['following']) {
+            DB::table('portfolio_followers')->updateOrInsert(
+                ['portfolio_id'=>$portfolio->id, 'user_id'=>$request->user()->id],
+                ['email_enabled'=>true, 'updated_at'=>now(), 'created_at'=>now()],
+            );
+        } else {
+            DB::table('portfolio_followers')->where('portfolio_id', $portfolio->id)->where('user_id', $request->user()->id)->delete();
+        }
+        return back()->with('status', (bool) $validated['following']
+            ? __('Du folgst diesem Musterdepot und erhältst E-Mails bei Käufen und Verkäufen.')
+            : __('Du folgst diesem Musterdepot nicht mehr.'));
+    }
+
+    private function authorizePortfolioEdit(Request $request, Portfolio $portfolio, bool $paperOnly = false): void
+    {
+        abort_unless((int) $portfolio->user_id === (int) $request->user()->id && $portfolio->active, 404);
+        abort_if($paperOnly && $portfolio->type !== 'paper', 404);
+        abort_if($portfolio->is_public_readonly && ! (bool) $request->user()->is_admin, 403, __('Dieses öffentliche Musterdepot ist schreibgeschützt.'));
     }
 
     private function clearPortfolioHistory(Portfolio $portfolio, string $source): float

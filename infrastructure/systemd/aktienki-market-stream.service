@@ -1,0 +1,18 @@
+[Unit]
+Description=AktienKI TwelveData realtime market stream
+After=network-online.target aktienki-reverb.service
+Wants=network-online.target aktienki-reverb.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/home/aktienki/AktienKI/laravel
+ExecStart=/usr/bin/php artisan market:stream
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

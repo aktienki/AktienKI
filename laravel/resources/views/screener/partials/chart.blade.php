@@ -38,9 +38,29 @@
     $predictionDate = filled($predictionAt) ? \Illuminate\Support\Carbon::parse($predictionAt)->format('d.m.Y') : null;
     $transitionDate = filled($transitionAt) ? \Illuminate\Support\Carbon::parse($transitionAt)->format('d.m.Y') : null;
     $gradientId = 'screener-serving-line-'.$instrumentId;
+    $areaGradientId = 'screener-serving-area-'.$instrumentId;
 @endphp
 
-<div data-chart-cache-hit="{{ !empty($chart['cache_hit']) ? 'true' : 'false' }}" data-chart-cached-at="{{ $chart['cached_at'] ?? '' }}">
+<div class="screener-chart-plus hidden lg:block" data-chart-plus data-chart-data-url="{{ route('stocks.chart-data', ['symbol' => $symbol]) }}" data-symbol="{{ $symbol }}" data-forecast-points='@json($forecastPoints)' data-forecast-at="{{ $predictionAt }}">
+    <div class="screener-chart-plus-toolbar">
+        <div><strong>{{ __('Chart+') }}</strong><small>{{ $symbol }} · {{ __('Technische Analyse') }}</small></div>
+        <span class="screener-chart-periods">
+            @foreach(['1m' => '1M', '3m' => '3M', '6m' => '6M', '1y' => '1J', 'all' => __('Max')] as $period => $label)
+                <button type="button" data-chart-plus-period="{{ $period }}" class="{{ $period === '1m' ? 'is-active' : '' }}">{{ $label }}</button>
+            @endforeach
+        </span>
+        <span class="screener-chart-indicators">
+            <button type="button" data-chart-plus-indicator="sma20">SMA 20</button>
+            <button type="button" data-chart-plus-indicator="sma50">SMA 50</button>
+            <button type="button" data-chart-plus-indicator="rsi">RSI 14</button>
+        </span>
+        <a href="{{ route('stocks.show', $symbol) }}#stock-chart-card">{{ __('Vollbild') }} ↗</a>
+    </div>
+    <div data-chart-plus-canvas class="screener-chart-plus-canvas"><span>{{ __('Chart wird geladen …') }}</span></div>
+    <div data-chart-plus-rsi class="screener-chart-plus-rsi" hidden></div>
+</div>
+
+<div class="lg:hidden" data-chart-cache-hit="{{ !empty($chart['cache_hit']) ? 'true' : 'false' }}" data-chart-cached-at="{{ $chart['cached_at'] ?? '' }}">
     <div class="mb-1 flex flex-wrap items-center justify-between gap-1 text-[9px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">
         <span>{{ __('Chart · 1 Jahr') }} · {{ $chart['currency'] ?? '—' }}</span>
         <span class="flex gap-2">
@@ -55,7 +75,14 @@
 
     @if ($chartPolyline !== '')
         <svg viewBox="0 0 600 128" class="h-24 w-full" role="img" aria-label="{{ __('Kursverlauf des letzten Jahres mit Prognose') }}" preserveAspectRatio="none">
-            <defs><linearGradient id="{{ $gradientId }}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs>
+            <defs>
+                <linearGradient id="{{ $gradientId }}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#0d9488"/></linearGradient>
+                <linearGradient id="{{ $areaGradientId }}" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0" stop-color="#0ea5e9" stop-opacity=".30"/>
+                    <stop offset=".48" stop-color="#0891b2" stop-opacity=".12"/>
+                    <stop offset="1" stop-color="#0f766e" stop-opacity="0"/>
+                </linearGradient>
+            </defs>
             <path d="M0 108H600" stroke="#0d9488" stroke-opacity=".28" stroke-width="1.4"/>
             @foreach([0, 125, 250, 375, 500] as $tickX)
                 <line x1="{{ $tickX }}" y1="108" x2="{{ $tickX }}" y2="112" stroke="#0d9488" stroke-opacity=".28" stroke-width="1"/>
@@ -68,6 +95,7 @@
                     <title>{{ __('Signalwechsel') }} {{ $transitionFrom }} → {{ $signal }} · {{ $transitionDate }}</title>
                 </line>
             @endif
+            <polygon points="{{ $chartPolyline }} 500,108 0,108" fill="url(#{{ $areaGradientId }})"/>
             <polyline points="{{ $chartPolyline }}" fill="none" stroke="url(#{{ $gradientId }})" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
             @if ($predictionY !== null && $latestY !== null)
                 <line x1="500" y1="4" x2="500" y2="108" stroke="#fbbf24" stroke-opacity=".85" stroke-width="1.5" stroke-dasharray="4 4"><title>{{ __('Signaldatum') }} {{ $predictionDate ?: '—' }}</title></line>

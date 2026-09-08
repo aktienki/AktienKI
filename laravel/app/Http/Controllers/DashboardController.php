@@ -8,10 +8,11 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use App\Enums\PlanLevel;
 use App\Services\PlanAccessService;
-use App\Services\ServingDashboardService;
+use App\Services\ServingMarketSnapshotService;
+use App\Services\ServingReadService;
+use App\Services\ServingScreenerService;
 use App\Services\StockRiskClassificationService;
 use App\Models\User;
 
@@ -23,7 +24,7 @@ class DashboardController extends Controller
 
         $allowed = [
             'paper-depots', 'watchlists', 'strategies', 'labels', 'reminders', 'best-buy', 'best-wait',
-            'watchlist-screener', 'predictions', 'smart-screener', 'market-report', 'stock-comparison', 'mobile-view',
+            'watchlist-screener', 'predictions', 'smart-screener', 'market-report', 'mobile-view',
             'news', 'chartview',
         ];
         $validated = $request->validate([
@@ -111,104 +112,120 @@ class DashboardController extends Controller
                 ->where('user_id', $user->id)
                 ->where('is_active', true)
                 ->count(),
-            'news' => \App\Models\News::query()->where('published_at', '>=', now()->subHours(24))->count(),
+            'news' => 0,
         ];
         $communityOverview = [
             'posts' => \App\Models\CommunityPost::query()->where('is_published', true)->count(),
             'members' => \App\Models\CommunityPost::query()->where('is_published', true)->distinct('user_id')->count('user_id'),
             'recent' => \App\Models\CommunityPost::query()->where('is_published', true)->where('created_at', '>=', now()->subDays(7))->count(),
-            'news' => \App\Models\News::query()->where('published_at', '>=', now()->subDays(7))->count(),
+            'news' => 0,
         ];
-        $marketSituation = Cache::remember('dashboard.personal.market-situation', now()->addMinutes(2), fn () =>
-            DB::table('daily_market_ai_analyses')
-                ->orderByDesc('analysis_date')
-                ->orderByDesc('id')
-                ->first([
-                    'analysis_date', 'headline', 'executive_summary', 'market_outlook',
-                    'confidence', 'risk_level',
-                ]));
-        $marketFactorSnapshot = Cache::remember('dashboard.personal.market-factors', now()->addMinutes(5), function () {
-            if (! Schema::hasTable('market_factor_snapshots')) {
-                return ['current' => collect(), 'history' => collect()];
-            }
-
-            $latestDate = DB::table('market_factor_snapshots')->max('trading_date');
-            if (! $latestDate) {
-                return ['current' => collect(), 'history' => collect()];
-            }
-
-            $current = DB::table('market_factor_snapshots')
-                ->whereDate('trading_date', $latestDate)
-                ->where(function ($query): void {
-                    $query->where('scope_type', 'market')
-                        ->orWhere(fn ($nested) => $nested->whereIn('scope_type', ['sector', 'index'])->where('scope_key', '__aggregate__'));
-                })
-                ->get()
-                ->keyBy('scope_type');
-
-            $history = DB::table('market_factor_snapshots')
-                ->where('scope_type', 'market')
-                ->where('scope_key', '__aggregate__')
-                ->whereDate('trading_date', '>=', now()->subDays(20)->toDateString())
-                ->orderByDesc('trading_date')
-                ->limit(14)
-                ->get(['trading_date', 'trend_score', 'timing_score'])
-                ->reverse()
-                ->values();
-
-            return ['current' => $current, 'history' => $history];
-        });
-        $continentPredictions = $this->servingContinentPredictions();
-        $recentSignalOverview = $this->servingRecentSignalOverview();
-        $signalCockpit = $this->servingSignalCockpit();
+        $servingMarketSnapshot = app(ServingMarketSnapshotService::class)->snapshot();
+        $servingMarketAnalysis = (array) ($servingMarketSnapshot['analysis'] ?? []);
+        $marketSituation = (object) [
+            'analysis_date' => $servingMarketSnapshot['calculation_date'] ?? null,
+            'headline' => $servingMarketAnalysis['headline'] ?? null,
+            'executive_summary' => $servingMarketAnalysis['summary'] ?? null,
+            'market_outlook' => $servingMarketAnalysis['outlook'] ?? null,
+            'confidence' => $servingMarketAnalysis['confidence'] ?? null,
+            'risk_level' => $servingMarketAnalysis['riskLevel'] ?? null,
+        ];
+        $marketFactorSnapshot = ['current' => collect(), 'history' => collect($servingMarketSnapshot['daily_scores'] ?? [])];
+        $continentPredictions = $this->continentPredictions();
+        $recentSignalOverview = $this->recentSignalOverview();
+        $signalCockpit = $this->signalCockpit();
         $profileUniverseStats = $this->profileUniverseStats($user);
-        $recentEarnings = Cache::remember('dashboard.personal.recent-earnings', now()->addMinutes(15), fn () =>
-            DB::table('instrument_earnings as earning')
-                ->join('instruments as instrument', 'instrument.id', '=', 'earning.instrument_id')
-                ->where('instrument.type', 'stock')->where('instrument.is_active', true)
-                ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
-                ->where('instrument.is_german_tradeable', true)->whereNull('instrument.deleted_at')
-                ->whereNotNull('earning.eps_actual')
-                ->where('earning.earnings_date', '>=', today()->subDays(120))
-                ->orderByDesc('earning.earnings_date')->orderByDesc('earning.id')->limit(2)
-                ->get(['instrument.symbol', 'instrument.name', 'earning.earnings_date', 'earning.period', 'earning.eps_estimate', 'earning.eps_actual', 'earning.surprise_percent'])
-        );
-        $servingDashboard = app(ServingDashboardService::class);
-        $servingStocks = $servingDashboard->latestStocks();
-        $topStockToday = $servingStocks->first(
-            fn (object $stock): bool => strtoupper((string) $stock->signal) === 'BUY'
-        );
-        $topWatchStock = $servingStocks->first(
-            fn (object $stock): bool => in_array(strtoupper((string) $stock->signal), ['WATCH', 'WAIT'], true)
-        );
-        $topRankedStocks = $servingStocks->take(1)->values();
-        // Technical tips from the legacy prediction database must not be mixed
-        // into the serving-model cards. A future serving-native technical
-        // signal table can populate this collection without a compatibility join.
+        // Earnings are hidden until they are published to a serving table.
+        // Local fundamentals must not silently leak into a remote-backed view.
+        $recentEarnings = collect();
+        $remoteDashboardRequest = Request::create('/screener', 'GET', ['limit' => 'all']);
+        $remoteDashboardRequest->setUserResolver(fn () => $user);
+        $remoteDashboardStocks = collect(app(ServingScreenerService::class)->data($remoteDashboardRequest)['stocks'])
+            ->each(function (object $stock): void {
+                $stock->prediction_id = null;
+                $stock->ai_score = $stock->ranking_score;
+                $stock->prediction_score = $stock->score_10;
+                $stock->dashboard_ranking_score = $stock->ranking_score;
+                $stock->confidence = $stock->confidence_percent;
+                $stock->display_price = $stock->current_price;
+                $stock->display_price_time = $stock->prediction_time;
+                $stock->display_price_live = false;
+                $stock->daily_change_percent = $stock->price_change_percent;
+                $stock->horizon_fusion_consensus_return = $stock->expected_return_20d;
+                $stock->market_return_20d = $stock->expected_return_20d;
+            });
+        $topStockToday = $remoteDashboardStocks->firstWhere('personalized_signal', 'BUY');
+        $topWatchStock = $remoteDashboardStocks->firstWhere('personalized_signal', 'WATCH');
+        $topRankedStocks = $remoteDashboardStocks->take(1)->values();
+        // There is deliberately no local market-data fallback. The former
+        // ChartView daily-tip query read local predictions and therefore could
+        // disagree with the serving-backed dashboard cards.
         $dailyTips = collect();
         $dashboardOpportunities = $canUsePro
-            ? $servingDashboard->opportunities(5)
+            ? $remoteDashboardStocks
+                ->filter(fn (object $stock): bool => is_numeric($stock->expected_return_10d)
+                    && (float) $stock->expected_return_10d < 0
+                    && ((is_numeric($stock->expected_return_20d) && (float) $stock->expected_return_20d > 0)
+                        || (is_numeric($stock->expected_return_40d) && (float) $stock->expected_return_40d > 0)))
+                ->sortByDesc(fn (object $stock): float => max(
+                    is_numeric($stock->expected_return_20d) ? (float) $stock->expected_return_20d : -999.0,
+                    is_numeric($stock->expected_return_40d) ? (float) $stock->expected_return_40d : -999.0,
+                ) * 1000 + (float) $stock->ranking_score)
+                ->take(5)
+                ->map(function (object $stock): object {
+                    $longHorizon = is_numeric($stock->expected_return_40d) && (float) $stock->expected_return_40d > 0
+                        && (! is_numeric($stock->expected_return_20d) || (float) $stock->expected_return_40d >= (float) $stock->expected_return_20d)
+                        ? 40 : 20;
+
+                    return (object) [
+                        'status' => 'open',
+                        'prediction_id' => null,
+                        'instrument' => (object) [
+                            'symbol' => $stock->symbol,
+                            'name' => $stock->name,
+                            'country' => $stock->country,
+                        ],
+                        'snapshot' => [
+                            'short_horizon' => 10,
+                            'long_horizon' => $longHorizon,
+                            'returns' => [
+                                10 => $stock->expected_return_10d,
+                                20 => $stock->expected_return_20d,
+                                40 => $stock->expected_return_40d,
+                            ],
+                            'score' => $stock->score_10,
+                            'confidence' => $stock->confidence_percent,
+                            'risk' => $stock->risk_percent,
+                        ],
+                    ];
+                })
+                ->values()
             : collect();
         $messageReminders = collect()
             ->merge(
                 DB::table('prediction_purchase_reminders as reminder')
                     ->join('instruments as instrument', 'instrument.id', '=', 'reminder.instrument_id')
                     ->where('reminder.user_id', $user->id)
-                    ->whereIn('reminder.status', ['active', 'disabled'])
-                    ->whereDate('reminder.remind_on', '>=', today())
+                    ->whereIn('reminder.status', ['active', 'disabled', 'sent'])
                     ->orderBy('reminder.remind_on')
                     ->get(['reminder.id', 'reminder.intent', 'reminder.horizon_days', 'reminder.remind_on', 'reminder.status', 'instrument.symbol', 'instrument.name'])
-                    ->map(fn (object $reminder): array => [
-                        'id' => $reminder->id,
-                        'type' => 'prediction',
-                        'symbol' => $reminder->symbol,
-                        'name' => $reminder->name,
-                        'label' => $reminder->intent === 'purchased' ? __('SELL-Überwachung') : __('Kauferinnerung'),
-                        'schedule' => __('E-Mail').' · '.\Illuminate\Support\Carbon::parse($reminder->remind_on)->format('d.m.Y'),
-                        'date' => \Illuminate\Support\Carbon::parse($reminder->remind_on)->format('Y-m-d'),
-                        'sort_at' => (string) $reminder->remind_on,
-                        'active' => $reminder->status === 'active',
-                    ])
+                    ->map(function (object $reminder): array {
+                        $remindOn = \Illuminate\Support\Carbon::parse($reminder->remind_on)->startOfDay();
+
+                        return [
+                            'id' => $reminder->id,
+                            'type' => 'prediction',
+                            'symbol' => $reminder->symbol,
+                            'name' => $reminder->name,
+                            'label' => $reminder->intent === 'purchased' ? __('SELL-Überwachung') : __('Kauferinnerung'),
+                            'schedule' => __('E-Mail').' · '.$remindOn->format('d.m.Y'),
+                            'date' => $remindOn->format('Y-m-d'),
+                            'sort_at' => (string) $reminder->remind_on,
+                            'status' => $reminder->status,
+                            'active' => $reminder->status === 'active',
+                            'expired' => $remindOn->isBefore(today()),
+                        ];
+                    })
             )
             ->merge(
                 DB::table('entry_signal_alerts as alert')
@@ -226,84 +243,28 @@ class DashboardController extends Controller
                         'schedule' => __('E-Mail').' · '.($alert->notification_mode === 'wait_or_buy' ? 'WAIT → BUY' : __('Nur BUY')),
                         'date' => null,
                         'sort_at' => '0000-00-00',
+                        'status' => $alert->status,
                         'active' => $alert->status === 'active',
+                        'expired' => false,
                     ])
             )
             ->sortBy(fn (array $reminder): string => $reminder['symbol'].'-'.$reminder['label'])
             ->values();
-        $corporateScheduleItems = $companyNewsEnabled
-            ? DB::table('corporate_events as event')
-                ->join('instruments as instrument', 'instrument.id', '=', 'event.instrument_id')
-                ->where('instrument.type', 'stock')->where('instrument.is_active', true)
-                ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
-                ->where('instrument.is_german_tradeable', true)->whereNull('instrument.deleted_at')
-                ->where('event.event_type', 'earnings')->whereBetween('event.event_date', [today(), today()->addDays(90)])
-                ->orderBy('event.event_date')
-                ->get(['event.id', 'event.event_date', 'event.event_time', 'event.eps_estimate', 'instrument.symbol', 'instrument.name'])
-                ->map(fn (object $event): array => [
-                    'type' => 'earnings', 'symbol' => $event->symbol, 'name' => $event->name,
-                    'label' => __('Quartalszahlen'),
-                    'schedule' => \Illuminate\Support\Carbon::parse($event->event_date)->format('d.m.Y').($event->event_time ? ' · '.__($event->event_time) : ''),
-                    'sort_at' => (string) $event->event_date,
-                ])
-            : collect();
+        $corporateScheduleItems = collect();
         $allScheduleItems = $messageReminders
             ->concat($corporateScheduleItems)
             ->sortBy(fn (array $item): string => ($item['sort_at'] === '0000-00-00' ? '9999-12-31' : $item['sort_at']).'-'.$item['symbol'])
             ->values();
         $activeMessageScheduleItems = $scheduleEmailsEnabled
-            ? $messageReminders->where('active', true)->sortBy('sort_at')->values()
+            ? $messageReminders->where('active', true)->where('expired', false)->sortBy('sort_at')->values()
             : collect();
         $dashboardScheduleItems = $activeMessageScheduleItems
             ->concat($corporateScheduleItems->take(max(0, 6 - $activeMessageScheduleItems->count())))
             ->take(6)
             ->values();
 
-        $watchlistInstrumentIds = DB::table('watchlist_items as item')
-            ->join('watchlists as watchlist', 'watchlist.id', '=', 'item.watchlist_id')
-            ->where('watchlist.user_id', $user->id)
-            ->where('watchlist.active', true)
-            ->pluck('item.instrument_id');
-        $portfolioInstrumentIds = DB::table('portfolio_positions as position')
-            ->join('portfolios as portfolio', 'portfolio.id', '=', 'position.portfolio_id')
-            ->where('portfolio.user_id', $user->id)
-            ->where('portfolio.active', true)
-            ->pluck('position.instrument_id');
-        $personalNewsInstrumentIds = $watchlistInstrumentIds
-            ->merge($portfolioInstrumentIds)
-            ->unique()
-            ->values();
-        $newsLocale = str_starts_with(strtolower(app()->getLocale()), 'en') ? 'en' : 'de';
-
-        $newsCenterItems = \App\Models\News::query()
-            ->with('instrument:id,symbol,name,country')
-            ->whereNotNull('published_at')
-            ->where('published_at', '>=', now()->subDays(7))
-            ->whereRaw('(LOWER(language) = ? OR LOWER(language) LIKE ?)', [$newsLocale, $newsLocale.'-%'])
-            ->whereIn('instrument_id', $personalNewsInstrumentIds)
-            ->orderByRaw('relevance_score DESC NULLS LAST')
-            ->orderByDesc('published_at')
-            ->limit(2)
-            ->get();
-        if ($newsCenterItems->count() < 2) {
-            $fallbackNews = \App\Models\News::query()
-                ->with('instrument:id,symbol,name,country')
-                ->whereNotNull('published_at')
-                ->where('published_at', '>=', now()->subDays(7))
-                ->whereRaw('(LOWER(language) = ? OR LOWER(language) LIKE ?)', [$newsLocale, $newsLocale.'-%'])
-                ->whereNotIn('id', $newsCenterItems->pluck('id'))
-                ->orderByRaw('relevance_score DESC NULLS LAST')
-                ->orderByDesc('published_at')
-                ->limit(2 - $newsCenterItems->count())
-                ->get();
-            $newsCenterItems = $newsCenterItems->concat($fallbackNews)->values();
-        }
-        $newsCenterItems->each(function (\App\Models\News $newsItem) use ($watchlistInstrumentIds, $portfolioInstrumentIds): void {
-            $newsItem->setAttribute('dashboard_sources', array_values(array_filter([
-                $watchlistInstrumentIds->contains($newsItem->instrument_id) ? 'watchlist' : null,
-                $portfolioInstrumentIds->contains($newsItem->instrument_id) ? 'portfolio' : null,
-            ])));
-        });
+        // News remain empty until a canonical serving-news source exists.
+        $newsCenterItems = collect();
 
         return view('dashboard', compact(
             'riskProfile', 'strategyPortfolio', 'overview', 'marketSituation', 'continentPredictions',
@@ -364,6 +325,43 @@ class DashboardController extends Controller
         return $portfolio;
     }
 
+    private function continentPredictions(): array
+    {
+        return Cache::remember('dashboard.personal.continent-predictions-serving-v1', now()->addMinutes(2), function (): array {
+            $rows = app(ServingReadService::class)->latestPredictions()
+                ->groupBy('instrument_id')
+                ->map(function ($predictions): object {
+                    $row = $predictions->firstWhere('horizon', 20) ?? $predictions->sortByDesc('as_of')->first();
+                    $row->country = $row->country_code;
+                    $row->prediction_time = $row->as_of;
+
+                    return $row;
+                });
+
+            $continents = [
+                'europe' => ['key' => 'europe', 'label' => __('Europa')],
+                'north-america' => ['key' => 'north-america', 'label' => __('Nordamerika')],
+                'asia-pacific' => ['key' => 'asia-pacific', 'label' => __('Asien-Pazifik')],
+                'africa' => ['key' => 'africa', 'label' => __('Afrika')],
+            ];
+
+            foreach ($continents as $key => $continent) {
+                $continentRows = $rows->filter(fn (object $row): bool => $this->continentFor($row->country) === $key);
+                $signals = $continentRows->countBy(fn (object $row): string => strtoupper((string) $row->signal));
+                $continents[$key] += [
+                    'count' => $continentRows->count(),
+                    'latest_at' => $continentRows->max('prediction_time'),
+                    'buy' => (int) $signals->get('BUY', 0),
+                    'watch' => (int) $signals->get('WATCH', 0),
+                    'hold' => (int) $signals->get('HOLD', 0),
+                    'sell' => (int) $signals->get('SELL', 0),
+                ];
+            }
+
+            return $continents;
+        });
+    }
+
     private function continentFor(?string $country): string
     {
         $country = strtoupper(trim((string) $country));
@@ -376,226 +374,119 @@ class DashboardController extends Controller
         };
     }
 
-    public function signalCockpit(): array
+    private function recentSignalOverview(): array
     {
-        return $this->servingSignalCockpit();
-    }
+        return Cache::remember('dashboard.personal.recent-signal-overview-serving-v1', now()->addMinutes(2), function (): array {
+            $recommendations = app(ServingReadService::class)->signalTransitions()
+                ->filter(fn (object $row): bool => \Illuminate\Support\Carbon::parse($row->changed_at)->gte(now()->subHours(48)))
+                ->map(function (object $row): object {
+                    $row->signal = $row->to_signal;
+                    $row->prediction_time = $row->changed_at;
 
-    private function servingContinentPredictions(): array
-    {
-        return Cache::remember('dashboard.serving.continent-predictions.v1', now()->addMinute(), function (): array {
-            $rows = app(ServingDashboardService::class)->latestStocks();
-            $continents = [
-                'europe' => ['key' => 'europe', 'label' => __('Europa')],
-                'north-america' => ['key' => 'north-america', 'label' => __('Nordamerika')],
-                'asia-pacific' => ['key' => 'asia-pacific', 'label' => __('Asien-Pazifik')],
-                'africa' => ['key' => 'africa', 'label' => __('Afrika')],
-            ];
-
-            foreach ($continents as $key => $continent) {
-                $continentRows = $rows->filter(
-                    fn (object $row): bool => $this->continentFor($row->country) === $key
-                );
-                $signals = $continentRows->countBy(
-                    fn (object $row): string => strtoupper((string) $row->signal)
-                );
-                $continents[$key] += [
-                    'count' => $continentRows->count(),
-                    'latest_at' => $continentRows->max('as_of'),
-                    'buy' => (int) $signals->get('BUY', 0),
-                    'watch' => (int) $signals->get('WATCH', 0) + (int) $signals->get('WAIT', 0),
-                    'hold' => (int) $signals->get('HOLD', 0),
-                    'sell' => (int) $signals->get('SELL', 0),
-                ];
-            }
-
-            return $continents;
-        });
-    }
-
-    private function servingRecentSignalOverview(): array
-    {
-        return Cache::remember('dashboard.serving.recent-signal-overview.v1', now()->addMinute(), function (): array {
-            $rows = app(ServingDashboardService::class)->latestStocks()
-                ->filter(fn (object $row): bool =>
-                    $row->as_of && \Illuminate\Support\Carbon::parse($row->as_of)->gte(now()->subHours(48))
-                );
-            $signals = $rows->groupBy(fn (object $row): string => strtoupper((string) $row->signal));
-            $waitRows = collect($signals->get('WATCH', collect()))
-                ->concat($signals->get('WAIT', collect()));
+                    return $row;
+                });
 
             return [
-                'buy_count' => collect($signals->get('BUY', collect()))->count(),
-                'wait_count' => $waitRows->count(),
-                'hold_count' => collect($signals->get('HOLD', collect()))->count(),
-                'sell_count' => collect($signals->get('SELL', collect()))->count(),
-                'buy_symbols' => collect($signals->get('BUY', collect()))->take(4)->pluck('symbol')->all(),
-                'wait_symbols' => $waitRows->take(4)->pluck('symbol')->all(),
-                'hold_symbols' => collect($signals->get('HOLD', collect()))->take(4)->pluck('symbol')->all(),
-                'sell_symbols' => collect($signals->get('SELL', collect()))->take(4)->pluck('symbol')->all(),
+                'buy_count' => $recommendations->where('signal', 'BUY')->count(),
+                'wait_count' => $recommendations->where('signal', 'WAIT')->count(),
+                'hold_count' => $recommendations->where('signal', 'HOLD')->count(),
+                'sell_count' => $recommendations->where('signal', 'SELL')->count(),
+                'buy_symbols' => $recommendations->where('signal', 'BUY')->take(4)->pluck('symbol')->all(),
+                'wait_symbols' => $recommendations->where('signal', 'WAIT')->take(4)->pluck('symbol')->all(),
+                'hold_symbols' => $recommendations->where('signal', 'HOLD')->take(4)->pluck('symbol')->all(),
+                'sell_symbols' => $recommendations->where('signal', 'SELL')->take(4)->pluck('symbol')->all(),
             ];
         });
     }
 
-    private function servingSignalCockpit(): array
+    public function signalCockpit(): array
     {
-        return Cache::remember('dashboard.serving.signal-cockpit.v2', now()->addMinute(), function (): array {
-            $service = app(ServingDashboardService::class);
-            $topScores = $service->latestStocks()->take(5)->map(fn (object $row): array => [
-                'symbol' => $row->symbol,
-                'name' => $row->name,
-                'prediction_id' => null,
-                'signal' => $row->signal,
-                'score' => $row->ai_score,
-                'horizon_signals' => collect($row->horizons)->map(fn (array $scope): array => [
-                    'return' => $scope['return'],
-                    'signal' => $scope['return'] === null
-                        ? null
-                        : ($scope['return'] > .15 ? 'UP' : ($scope['return'] < -.15 ? 'DOWN' : 'FLAT')),
-                ])->all(),
-            ])->values()->all();
-            $signalChanges = $service->signalChanges();
-            $indicatorSignals = [];
+        return Cache::remember('dashboard.personal.signal-cockpit-serving-v1', now()->addMinutes(2), function (): array {
+            $serving = app(ServingReadService::class);
+            $predictions = $serving->latestPredictions()->groupBy('instrument_id');
+            $signalChanges = $serving->signalTransitions()
+                ->filter(fn (object $row): bool => \Illuminate\Support\Carbon::parse($row->changed_at)->gte(now()->subDays(7)))
+                ->map(function (object $row) use ($predictions): array {
+                    $horizons = collect($predictions->get($row->instrument_id, collect()))
+                        ->mapWithKeys(fn (object $prediction): array => [
+                            (int) $prediction->horizon => $prediction->expected_return_percent,
+                        ]);
 
-            return compact('topScores', 'signalChanges', 'indicatorSignals');
+                    return [
+                        'symbol' => $row->symbol,
+                        'name' => $row->name,
+                        'country' => $row->country_code,
+                        'prediction_id' => null,
+                        'from' => $row->from_signal,
+                        'to' => $row->to_signal,
+                        'at' => $row->changed_at,
+                        'score' => is_numeric($row->score_at_change) ? \App\Support\AiScore::toTen($row->score_at_change) : null,
+                        'risk' => is_numeric($row->risk_at_change) ? min(100.0, max(0.0, (float) $row->risk_at_change * 20.0)) : null,
+                        'horizons' => [
+                            5 => null,
+                            10 => $horizons->get(10),
+                            15 => null,
+                            20 => $horizons->get(20),
+                            40 => $horizons->get(40),
+                        ],
+                    ];
+                })
+                ->filter(fn (array $change): bool => $change['to'] !== 'SELL' || ! is_numeric($change['horizons'][20]) || $change['horizons'][20] <= 0)
+                ->unique('symbol')
+                ->values()
+                ->all();
+
+            // Chart indicators are only displayed once a canonical serving
+            // table exists; local ChartView tables are never a fallback.
+            return ['signalChanges' => $signalChanges, 'indicatorSignals' => []];
         });
     }
 
     private function profileUniverseStats(User $user): array
     {
-        $riskService = app(StockRiskClassificationService::class);
-        $level = $riskService->userLevel($user);
+        $level = app(StockRiskClassificationService::class)->userLevel($user);
+        $snapshot = app(ServingMarketSnapshotService::class)->snapshot();
+        $transitionStats = (array) ($snapshot['transition_stats'] ?? []);
+        $distribution = (array) ($transitionStats['distribution'] ?? []);
+        $counts = [
+            'SELL' => (int) ($distribution['SELL'] ?? 0),
+            'WAIT' => (int) ($distribution['WAIT'] ?? 0),
+            'HOLD' => (int) ($distribution['HOLD'] ?? 0),
+            'WATCH' => (int) ($distribution['WATCH'] ?? 0),
+            'BUY' => (int) ($distribution['BUY'] ?? 0),
+        ];
+        $currentSignalCount = array_sum($counts);
+        $activeCount = app(ServingReadService::class)->activeTradeableStockCount();
+        $bins = collect([
+            ['label' => 'SELL', 'range' => 'Aktuelles Verkaufssignal', 'signal' => 'SELL'],
+            ['label' => 'HOLD', 'range' => 'Aktuelles Haltesignal', 'signal' => 'HOLD'],
+            ['label' => 'WATCH', 'range' => 'Aktuelles Beobachtungssignal', 'signal' => 'WATCH'],
+            ['label' => 'BUY', 'range' => 'Aktuelles Kaufsignal', 'signal' => 'BUY'],
+        ])->map(fn (array $bin): array => [
+            'label' => $bin['label'],
+            'range' => $bin['range'],
+            'count' => $counts[$bin['signal']],
+        ])->all();
 
-        return Cache::remember("dashboard.profile-universe.serving.{$level}.v3", now()->addMinutes(2), function () use ($level): array {
-            $definitions = [
-                ['key' => 'strong_sell', 'label' => 'Strong Sell', 'range' => __('Mindestens zwei SELL-Horizonte')],
-                ['key' => 'sell', 'label' => 'Sell', 'range' => __('Ein bestätigter SELL-Horizont')],
-                ['key' => 'hold', 'label' => 'Hold', 'range' => __('Kein eindeutiges Kauf- oder Verkaufssignal')],
-                ['key' => 'buy', 'label' => 'Buy', 'range' => __('Ein bestätigter BUY-Horizont')],
-                ['key' => 'strong_buy', 'label' => 'Strong Buy', 'range' => __('Mindestens zwei BUY-Horizonte')],
-            ];
-
-            try {
-                $connection = DB::connection('serving');
-                $rows = $connection
-                    ->table('serving_active_models as active_model')
-                    ->join('serving_instruments as instrument', 'instrument.id', '=', 'active_model.instrument_id')
-                    ->join('serving_releases as release', 'release.id', '=', 'active_model.release_id')
-                    ->where('instrument.is_active', true)
-                    ->get([
-                        'instrument.id as instrument_id', 'active_model.release_id',
-                        'release.compact_metrics',
-                    ]);
-                $selectedScopes = $connection
-                    ->table('serving_prediction_scopes')
-                    ->where('selected_for_prediction', true)
-                    ->where('prediction_enabled', true)
-                    ->get(['instrument_id', 'release_id', 'horizon', 'variant'])
-                    ->groupBy(fn (object $scope): string => $scope->instrument_id.'|'.$scope->release_id);
-                $rankedPredictions = $connection
-                    ->table('serving_predictions as prediction')
-                    ->join('serving_prediction_scopes as scope', function ($join): void {
-                        $join->on('scope.instrument_id', '=', 'prediction.instrument_id')
-                            ->on('scope.release_id', '=', 'prediction.release_id')
-                            ->on('scope.horizon', '=', 'prediction.horizon')
-                            ->on('scope.variant', '=', 'prediction.variant');
-                    })
-                    ->where('scope.selected_for_prediction', true)
-                    ->where('scope.prediction_enabled', true)
-                    ->select([
-                        'prediction.instrument_id', 'prediction.release_id',
-                        'prediction.horizon', 'prediction.variant', 'prediction.signal',
-                    ])
-                    ->selectRaw('ROW_NUMBER() OVER (PARTITION BY prediction.instrument_id, prediction.release_id, prediction.horizon, prediction.variant ORDER BY prediction.as_of DESC, prediction.id DESC) AS scope_rank');
-                $latestPredictions = $connection->query()
-                    ->fromSub($rankedPredictions, 'ranked_prediction')
-                    ->where('scope_rank', 1)
-                    ->get()
-                    ->keyBy(fn (object $prediction): string => $prediction->instrument_id.'|'.$prediction->release_id.'|'.$prediction->horizon.'|'.$prediction->variant);
-                $horizons = $connection
-                    ->table('serving_model_horizon_status')
-                    ->distinct()
-                    ->orderBy('horizon')
-                    ->pluck('horizon')
-                    ->map(fn ($horizon): int => (int) $horizon)
-                    ->values()
-                    ->all();
-                $eligibleConfigurations = $connection
-                    ->table('serving_prediction_scopes')
-                    ->count();
-            } catch (\Throwable $error) {
-                report($error);
-                $rows = collect();
-                $selectedScopes = collect();
-                $latestPredictions = collect();
-                $horizons = [];
-                $eligibleConfigurations = 0;
-            }
-
-            $signalCounts = $rows->countBy(function (object $row) use ($selectedScopes, $latestPredictions): string {
-                $releaseKey = $row->instrument_id.'|'.$row->release_id;
-                $compactMetrics = is_array($row->compact_metrics)
-                    ? $row->compact_metrics
-                    : (array) (json_decode((string) $row->compact_metrics, true) ?: []);
-                $signals = collect($selectedScopes->get($releaseKey, []))
-                    ->map(function (object $scope) use ($row, $latestPredictions, $compactMetrics): string {
-                        $predictionKey = $row->instrument_id.'|'.$row->release_id.'|'.$scope->horizon.'|'.$scope->variant;
-                        $storedSignal = strtoupper(trim((string) data_get($latestPredictions->get($predictionKey), 'signal', '')));
-
-                        if ($storedSignal !== '') {
-                            return match ($storedSignal) {
-                                'STRONG BUY', 'STRONG_BUY' => 'BUY',
-                                'STRONG SELL', 'STRONG_SELL' => 'SELL',
-                                'WATCH', 'WAIT', 'NEUTRAL' => 'HOLD',
-                                default => in_array($storedSignal, ['BUY', 'HOLD', 'SELL'], true) ? $storedSignal : 'HOLD',
-                            };
-                        }
-
-                        $buy = data_get($compactMetrics, "horizons.{$scope->horizon}.prediction.buy");
-                        $isBuy = $buy === true || $buy === 1 || $buy === '1' || strtolower((string) $buy) === 'true';
-
-                        return $isBuy ? 'BUY' : 'HOLD';
-                    });
-                $buyCount = $signals->filter(fn (string $signal): bool => $signal === 'BUY')->count();
-                $sellCount = $signals->filter(fn (string $signal): bool => $signal === 'SELL')->count();
-
-                if ($buyCount >= 2 && $buyCount > $sellCount) {
-                    return 'strong_buy';
-                }
-                if ($sellCount >= 2 && $sellCount > $buyCount) {
-                    return 'strong_sell';
-                }
-                if ($buyCount > 0 && $sellCount === 0) {
-                    return 'buy';
-                }
-                if ($sellCount > 0 && $buyCount === 0) {
-                    return 'sell';
-                }
-
-                return 'hold';
-            });
-            $bins = collect($definitions)->map(fn (array $definition): array => [
-                ...$definition,
-                'count' => (int) $signalCounts->get($definition['key'], 0),
-            ])->all();
-            $activeCount = $rows->count();
-
-            return [
-                'source' => 'serving',
-                'level' => $level,
-                'active_count' => $activeCount,
-                'total_active_count' => $activeCount,
-                'assigned_percent' => $activeCount > 0 ? 100.0 : 0.0,
-                'transition_candidates' => 0,
-                'transition_to_buy' => (int) ($signalCounts->get('buy', 0) + $signalCounts->get('strong_buy', 0)),
-                'transition_to_sell' => (int) ($signalCounts->get('sell', 0) + $signalCounts->get('strong_sell', 0)),
-                'average_score' => null,
-                'model_horizons' => $horizons,
-                'eligible_configuration_count' => (int) $eligibleConfigurations,
-                'max_bin' => max(1, ...array_column($bins, 'count')),
-                'bins' => $bins,
-            ];
-        });
+        return [
+            'source' => 'serving',
+            'batch_id' => $snapshot['batch_id'] ?? null,
+            'calculation_date' => $snapshot['calculation_date'] ?? null,
+            'level' => $level,
+            'active_count' => $activeCount,
+            'total_active_count' => $activeCount,
+            'current_signal_count' => $currentSignalCount,
+            'open_count' => max(0, $activeCount - $currentSignalCount),
+            'assigned_percent' => $activeCount > 0 ? round(($currentSignalCount / $activeCount) * 100, 1) : 0.0,
+            'transition_candidates' => (int) ($transitionStats['transition_count'] ?? 0),
+            'transition_to_buy' => (int) ($transitionStats['positive_count'] ?? 0),
+            'transition_to_sell' => (int) ($transitionStats['negative_count'] ?? 0),
+            'average_score' => is_numeric(data_get($snapshot, 'assessment.score'))
+                ? round((float) data_get($snapshot, 'assessment.score'), 1)
+                : null,
+            'max_bin' => max(1, ...array_column($bins, 'count')),
+            'bins' => $bins,
+        ];
     }
 
 }

@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekday schedule for complete AktienKI Serving predictions
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 23:15:00 Europe/Berlin
+Persistent=true
+AccuracySec=1min
+Unit=aktienki-serving-prediction.service
+
+[Install]
+WantedBy=timers.target

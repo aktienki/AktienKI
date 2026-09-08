@@ -1,0 +1,11 @@
+[Unit]
+Description=Prune compact AktienKI serving history
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=postgres
+ExecStart=/usr/bin/psql -v ON_ERROR_STOP=1 -d aktienki_serving_next -c "SELECT * FROM prune_serving_history(interval '90 days', interval '30 days');"
+
+[Install]
+WantedBy=multi-user.target

@@ -32,7 +32,7 @@
         $paperDepotLimitReached = $paperMode
             && isset($paperDepotLimit)
             && $paperDepotLimit !== null
-            && $portfolios->where('active', true)->count() >= $paperDepotLimit;
+            && $portfolios->where('active', true)->where('user_id', auth()->id())->count() >= $paperDepotLimit;
     @endphp
     <div x-data="depotExplorer(@js($depotExplorerData))" class="ak-detail-design flex min-h-[calc(100dvh-89px)] flex-col py-3 text-[var(--ak-text)]">
         <div class="ak-detail-hero mb-3 flex shrink-0 flex-col gap-2 rounded-2xl border border-[var(--ak-border)] px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
@@ -51,7 +51,7 @@
                 </div>
             </div>
             <button x-cloak x-show="phase === 'detail'" x-transition.opacity.duration.300ms type="button" @click="close()" class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 text-xs font-black text-teal-600 shadow-sm transition hover:border-teal-500/50 hover:bg-teal-500/15">
-                <x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Zurück zu allen Depots') }}
+                <x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Zurück') }}
             </button>
         </div>
 
@@ -91,6 +91,8 @@
                     };
                     $performance = (float) $portfolio->performance_percent;
                     $isStrategyAccount = $paperMode && (bool) data_get($portfolio->meta, 'automation.live_enabled', false);
+                    $canEditPortfolio = (int) $portfolio->user_id === (int) auth()->id()
+                        && (! $portfolio->is_public_readonly || (bool) auth()->user()->is_admin);
                 @endphp
                 <article x-data="{ strategyOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false, testPlanOpen: false }" x-show="!selected" x-transition.opacity.duration.1000ms class="ak-detail-panel relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--ak-card)] transition {{ $isStrategyAccount ? 'min-h-[29rem] border-orange-400/50 shadow-[0_0_0_1px_rgba(251,146,60,.08),0_18px_45px_rgba(251,146,60,.16)] xl:row-span-2' : 'min-h-52 border-[var(--ak-border)] shadow-[var(--ak-shadow)] hover:border-teal-500/35' }}" @if($isStrategyAccount) style="background:linear-gradient(155deg,rgba(251,146,60,.14) 0%,rgba(21,36,58,.96) 34%,rgba(21,36,58,1) 100%);" @endif>
                     @if($isStrategyAccount)<div class="h-1 w-full shrink-0 bg-gradient-to-r from-orange-400/25 via-orange-400 to-sky-400/25 shadow-[0_0_12px_rgba(251,146,60,.45)]"></div>@endif
@@ -114,6 +116,7 @@
                         <div class="flex items-center gap-1.5">
                             @if(data_get($portfolio->meta, 'automation.live_enabled', false))<span class="inline-flex items-center gap-1.5 rounded-md border border-orange-400/40 bg-orange-400/[.16] px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-orange-400 shadow-[0_0_12px_rgba(251,146,60,.12)]"><span class="h-1.5 w-1.5 rounded-full bg-orange-400 shadow-[0_0_6px_rgba(251,146,60,.9)]"></span>{{ __('Strategie') }}</span>@endif
                             @if ($portfolio->is_default)<span class="rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[9px] font-black uppercase text-amber-400">{{ __('Standard') }}</span>@endif
+                            @if ($portfolio->is_public_readonly)<span class="rounded-md border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-[9px] font-black uppercase text-cyan-300">{{ __('Öffentlich') }} · {{ __('Nur Lesen') }}</span>@endif
                         </div>
                     </div>
 
@@ -155,14 +158,21 @@
 
                     <div class="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ak-border)] {{ $isStrategyAccount ? 'px-4 py-3' : 'px-3 py-2' }}">
                         <div class="flex shrink-0 items-center gap-1.5">
-                        @if($portfolio->type === 'paper')
+                        @if($portfolio->type === 'paper' && $canEditPortfolio)
                             <button type="button" @click="strategyOpen=true" title="{{ __('Strategien verwalten') }}" aria-label="{{ __('Strategien verwalten') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-orange-400/20 bg-orange-400/[.07] text-orange-400"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" /></button>
                             <button type="button" @click="capitalOpen=true" title="{{ __('Kapital festlegen') }}" aria-label="{{ __('Kapital festlegen') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-teal-300/20 bg-teal-400/[.07] text-teal-300"><x-heroicon-o-banknotes class="h-4 w-4" /></button>
                             <button type="button" @click="resetOpen=true" title="{{ __('Depot zurücksetzen') }}" aria-label="{{ __('Depot zurücksetzen') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-300/20 bg-amber-400/[.07] text-amber-300"><x-heroicon-o-arrow-path class="h-4 w-4" /></button>
                             <button type="button" @click="deleteOpen=true" title="{{ __('Musterdepot löschen') }}" aria-label="{{ __('Musterdepot löschen') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-300/20 bg-rose-400/[.07] text-rose-300"><x-heroicon-o-trash class="h-4 w-4" /></button>
                         @endif
+                        @if(auth()->user()->is_admin && $portfolio->type === 'paper' && (int)$portfolio->user_id === (int)auth()->id())
+                            <form method="POST" action="{{ route('depots.public-readonly.update', $portfolio) }}">@csrf @method('PUT')<input type="hidden" name="is_public_readonly" value="{{ $portfolio->is_public_readonly ? 0 : 1 }}"><button title="{{ $portfolio->is_public_readonly ? __('Öffentlichkeit aufheben') : __('Als öffentliches Musterdepot freigeben') }}" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-400/25 bg-cyan-400/[.07] text-cyan-300"><x-heroicon-o-globe-alt class="h-4 w-4" /></button></form>
+                        @endif
                         </div>
                         <div class="ml-auto flex shrink-0 items-center gap-2">
+                        @if($portfolio->is_public_readonly && (int)$portfolio->user_id !== (int)auth()->id())
+                            @php $isFollowing = ($followedPortfolioIds ?? collect())->contains($portfolio->id); @endphp
+                            <form method="POST" action="{{ route('depots.following.update', $portfolio) }}">@csrf @method('PUT')<input type="hidden" name="following" value="{{ $isFollowing ? 0 : 1 }}"><button class="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-black {{ $isFollowing ? 'border-emerald-400/35 bg-emerald-400/10 text-emerald-300' : 'border-cyan-400/30 bg-cyan-400/[.08] text-cyan-300' }}"><x-heroicon-o-bell class="h-4 w-4" />{{ $isFollowing ? __('Folge ich') : __('Folgen') }}</button></form>
+                        @endif
                         @if($portfolio->type === 'paper')
                             @if($canTestPaperDepot)
                             <a href="{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => $paperMode ? 'paper' : 'depots', 'test' => 1]) }}" class="inline-flex h-9 items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/[.09] px-3 text-xs font-black text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,.08)] transition hover:border-cyan-300/45 hover:bg-cyan-400/[.15]">
@@ -269,6 +279,7 @@
                             <label class="grid gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Startkapital') }}<div class="relative"><input name="initial_capital" type="number" min="1000" max="1000000" step="100" value="{{ old('initial_capital', 10000) }}" required class="ak-input h-11 pr-10 text-sm normal-case tabular-nums"><span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-amber-400">&euro;</span></div></label>
                             <label class="grid gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kosten je Trade') }}<div class="relative"><input name="trade_cost" type="number" min="0" max="1000" step="0.01" value="{{ old('trade_cost', 10) }}" required class="ak-input h-11 pr-10 text-sm normal-case tabular-nums"><span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-amber-400">&euro;</span></div></label>
                             <label class="grid gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)] md:col-span-2">{{ __('Beschreibung') }}<textarea name="description" maxlength="500" rows="2" placeholder="{{ __('Ziel und Regeln dieses Musterdepots') }}" class="ak-input text-sm font-normal normal-case">{{ old('description') }}</textarea></label>
+                            @if(auth()->user()->is_admin)<label class="md:col-span-2 flex items-center gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/[.06] p-3 text-xs font-bold text-cyan-200"><input type="checkbox" name="is_public_readonly" value="1" @checked(old('is_public_readonly')) class="h-4 w-4 rounded"><span><b class="block">{{ __('Öffentliches Musterdepot') }}</b><small class="text-[var(--ak-muted)]">{{ __('Für alle Nutzer sichtbar, aber ausschließlich durch Administratoren editierbar.') }}</small></span></label>@endif
                             <div class="md:col-span-2 flex items-center justify-between gap-4 border-t border-[var(--ak-border)] pt-4"><p class="text-[10px] text-[var(--ak-muted)]">{{ __('Das Musterdepot verwendet ausschließlich virtuelles Kapital.') }}</p><button type="submit" class="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-700 px-5 text-xs font-black text-white hover:bg-teal-600"><x-heroicon-o-plus class="h-4 w-4" />{{ __('Musterdepot anlegen') }}</button></div>
                         </form>
                     </article>
@@ -317,6 +328,7 @@
                             </div>
                         @endif
                         <textarea name="description" maxlength="500" rows="3" placeholder="{{ __('Kurze Beschreibung') }}" class="ak-input text-sm"></textarea>
+                        @if($paperMode && auth()->user()->is_admin)<label class="flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[.06] p-2 text-[10px] font-bold text-cyan-200"><input type="checkbox" name="is_public_readonly" value="1" class="h-4 w-4 rounded">{{ __('Öffentlich und nur für Admin editierbar') }}</label>@endif
                         <div class="flex gap-2"><button type="button" @click="open = false" class="h-10 flex-1 rounded-xl border border-[var(--ak-border)] text-xs font-bold text-[var(--ak-muted)]">{{ __('Abbrechen') }}</button><button type="submit" class="h-10 flex-1 rounded-xl bg-teal-700 text-xs font-black text-white">{{ __('Anlegen') }}</button></div>
                     </form>
                 </div>

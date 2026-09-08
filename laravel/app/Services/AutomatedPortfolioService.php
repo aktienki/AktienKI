@@ -65,6 +65,7 @@ final class AutomatedPortfolioService
         $candidates = $candidates->reject(fn (object $candidate): bool => $reservedInstrumentIds->contains((int) $candidate->instrument_id))->values();
         $sectorRotation = (bool) data_get($strategy->filters, 'sector_score_rotation', false);
         $indexRotation = (bool) data_get($strategy->filters, 'index_score_rotation', false);
+        $combinedAreaPriority = (bool) data_get($strategy->filters, 'combined_area_forecast_priority', false);
         $sectorAverages = $candidates->groupBy(fn (object $row) => (string) ($row->sector ?: 'Other'))
             ->map(fn (Collection $rows): float => (float) $rows->avg('score_10'));
         $memberships = $indexRotation
@@ -95,8 +96,32 @@ final class AutomatedPortfolioService
                 }
             }
         }
+        if ($indexRotation && $memberships->isNotEmpty()) {
+            $marketIndices = DB::table('market_indices')->whereIn('id', $memberships->flatten(1)->pluck('market_index_id')->unique())
+                ->get(['id', 'symbol']);
+            $serviceSymbols = $marketIndices->pluck('symbol')->map(fn (string $symbol): string => $symbol === '^GDAXI' ? 'DAX' : $symbol);
+            $serviceForecasts = DB::connection('serving')->table('serving_predictions as prediction')
+                ->join('serving_instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+                ->join('serving_active_models as active', fn ($join) => $join->on('active.instrument_id', '=', 'prediction.instrument_id')->on('active.release_id', '=', 'prediction.release_id'))
+                ->where('instrument.instrument_type', 'index')->whereIn('instrument.symbol', $serviceSymbols)
+                ->where('prediction.horizon', 20)->where('prediction.variant', 'standard')
+                ->orderByDesc('prediction.as_of')->orderByDesc('prediction.id')
+                ->get(['instrument.symbol', 'prediction.expected_return'])->unique('symbol');
+            if ($serviceForecasts->isNotEmpty()) {
+                $minimum = (float) $serviceForecasts->min('expected_return');
+                $maximum = (float) $serviceForecasts->max('expected_return');
+                $range = max(0.000001, $maximum - $minimum);
+                $forecastBySymbol = $serviceForecasts->mapWithKeys(fn (object $row): array => [
+                    (string) $row->symbol => (((float) $row->expected_return - $minimum) / $range) * 10,
+                ]);
+                $indexAverages = $marketIndices->mapWithKeys(function (object $index) use ($forecastBySymbol): array {
+                    $symbol = $index->symbol === '^GDAXI' ? 'DAX' : (string) $index->symbol;
+                    return $forecastBySymbol->has($symbol) ? [(int) $index->id => (float) $forecastBySymbol->get($symbol)] : [];
+                });
+            }
+        }
 
-        $candidates = $candidates->sortByDesc(function (object $row) use ($sectorRotation, $indexRotation, $sectorAverages, $memberships, $indexAverages): string {
+        $candidates = $candidates->sortByDesc(function (object $row) use ($strategy, $combinedAreaPriority, $sectorRotation, $indexRotation, $sectorAverages, $memberships, $indexAverages): string|float {
             $sectorScore = $sectorRotation ? (float) $sectorAverages->get((string) ($row->sector ?: 'Other'), 0) : 0;
             $indexScore = $indexRotation
                 ? (float) collect($memberships->get($row->instrument_id, collect()))
@@ -107,6 +132,19 @@ final class AutomatedPortfolioService
                 $indexRotation ? $indexScore : null,
             ], fn ($score): bool => $score !== null);
             $rotationScore = $rotationScores === [] ? 0 : array_sum($rotationScores) / count($rotationScores);
+
+            if ($combinedAreaPriority) {
+                $stockWeight = (float) data_get($strategy->filters, 'stock_forecast_weight', .20);
+                $sectorWeight = (float) data_get($strategy->filters, 'sector_forecast_weight', .30);
+                $indexWeight = (float) data_get($strategy->filters, 'index_forecast_weight', .50);
+                $drawdownPenalty = (float) data_get($strategy->filters, 'drawdown_penalty_weight', .30);
+                $drawdown = max(0.0, min(100.0, (float) ($row->drawdown_percent ?? 0)));
+
+                return ($stockWeight * (float) $row->score_10)
+                    + ($sectorWeight * $sectorScore)
+                    + ($indexWeight * $indexScore)
+                    - ($drawdownPenalty * ($drawdown / 10));
+            }
 
             // The stock score remains primary. Rotation only resolves equal scores.
             return sprintf('%09.4f:%09.4f:%09.4f', (float) $row->score_10, $rotationScore, (float) $row->confidence_percent);
@@ -136,8 +174,9 @@ final class AutomatedPortfolioService
     {
         $filters = (array) $strategy->filters;
         $latestPredictionIds = DB::table('predictions')
-            ->selectRaw('instrument_id, MAX(id) AS prediction_id')
-            ->groupBy('instrument_id');
+            ->whereNotNull('trained_model_id')
+            ->selectRaw('trained_model_id, MAX(id) AS prediction_id')
+            ->groupBy('trained_model_id');
         $latestQuoteIds = DB::table('current_stock_quotes')
             ->where('status', 'ok')
             ->selectRaw('instrument_id, MAX(id) AS quote_id')
@@ -159,12 +198,15 @@ final class AutomatedPortfolioService
             ->value('id');
         $backtestStats = DB::table('backtest_trades')
             ->where('backtest_run_id', $backtestRunId)
-            ->select('instrument_id')
+            ->select('instrument_id', 'trained_model_id', 'model_definition_id', 'horizon_days')
             ->selectRaw('MAX(ABS(max_drawdown)) * 100 AS drawdown_percent')
             ->selectRaw('SUM(CASE WHEN net_return > 0 THEN net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN net_return < 0 THEN net_return ELSE 0 END)), 0) AS profit_factor')
             ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
             ->selectRaw('COUNT(*) AS historical_trades')
-            ->groupBy('instrument_id');
+            ->selectRaw('AVG(signal_quality_score) AS signal_quality')
+            ->selectRaw('AVG(net_return) * 100 AS average_net_return')
+            ->selectRaw('PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY net_return) * 100 AS median_net_return')
+            ->groupBy('instrument_id', 'trained_model_id', 'model_definition_id', 'horizon_days');
         $signalSql = $this->signals->sql('prediction', $strategy->user);
         $scoreSql = '(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END)';
         $confidenceSql = '(CASE WHEN prediction.confidence <= 1 THEN prediction.confidence * 100 ELSE prediction.confidence END)';
@@ -177,6 +219,12 @@ final class AutomatedPortfolioService
             'revenueGrowth' => "COALESCE(fundamental.revenue_growth, CASE WHEN NULLIF(fundamental.data::jsonb->>'revenueGrowth', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'revenueGrowth')::numeric END)",
         };
         $modelIds = collect((array) ($filters['model'] ?? []))->map(fn ($id) => (int) $id)->filter()->all();
+        $servingConfigurations = collect((array) ($filters['serving_model_configurations'] ?? []))
+            ->filter(fn (mixed $configuration): bool => is_array($configuration)
+                && filled($configuration['symbol'] ?? null)
+                && in_array((int) ($configuration['horizon_days'] ?? 0), [10, 20, 40], true)
+                && in_array((string) ($configuration['variant'] ?? ''), ['standard', 'pure_tcn'], true))
+            ->values();
         $minimumTiers = ['top' => ['strong'], 'strong' => ['strong'], 'solid' => ['strong', 'solid'], 'test' => ['strong', 'solid', 'test']];
         $tier = (string) ($filters['quality_tier'] ?? '');
         $profileLimits = match ($this->signals->riskLevel($strategy->user)) {
@@ -185,7 +233,7 @@ final class AutomatedPortfolioService
             default => ['risk' => 60.0, 'volatility' => 65.0, 'drawdown' => 40.0, 'confidence' => 55.0, 'trades' => 15],
         };
 
-        return DB::table('predictions as prediction')
+        $candidates = DB::table('predictions as prediction')
             ->joinSub($latestPredictionIds, 'latest_prediction', fn ($join) => $join->on('latest_prediction.prediction_id', '=', 'prediction.id'))
             ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
@@ -198,14 +246,50 @@ final class AutomatedPortfolioService
             ->leftJoin('technical_indicators as technical', 'technical.id', '=', 'latest_technical.technical_id')
             ->leftJoinSub($latestFundamentalIds, 'latest_fundamental', fn ($join) => $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
             ->leftJoin('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental.fundamental_id')
-            ->leftJoinSub($backtestStats, 'backtest_stat', fn ($join) => $join->on('backtest_stat.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($backtestStats, 'backtest_stat', fn ($join) => $join
+                ->on('backtest_stat.instrument_id', '=', 'instrument.id')
+                ->on('backtest_stat.trained_model_id', '=', 'prediction.trained_model_id'))
             ->leftJoinSub($latestQuoteIds, 'latest_quote', fn ($join) => $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
             ->leftJoin('current_stock_quotes as quote', 'quote.id', '=', 'latest_quote.quote_id')
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
             ->where('instrument.is_german_tradeable', true)
             ->whereNull('instrument.deleted_at')
+            // A strategy created from the model overview is tied to the exact
+            // stock/horizon/model variant selected there. It must never fall
+            // back to another model of the same stock.
+            ->when($servingConfigurations->isNotEmpty(), function ($query) use ($servingConfigurations): void {
+                $query->where(function ($configurations) use ($servingConfigurations): void {
+                    foreach ($servingConfigurations as $configuration) {
+                        $symbol = strtoupper(trim((string) $configuration['symbol']));
+                        $horizonMinutes = (int) $configuration['horizon_days'] * 1440;
+                        $variant = (string) $configuration['variant'];
+                        $modelName = mb_strtolower(trim((string) ($configuration['model_name'] ?? '')));
+
+                        $configurations->orWhere(function ($candidate) use ($symbol, $horizonMinutes, $variant, $modelName): void {
+                            $candidate->whereRaw('UPPER(instrument.symbol) = ?', [$symbol])
+                                ->where('prediction.prediction_horizon_minutes', $horizonMinutes);
+
+                            if ($variant === 'pure_tcn') {
+                                $candidate->where(function ($model): void {
+                                    $model->whereRaw("LOWER(COALESCE(model_definition.public_alias, '')) LIKE '%tcn%'")
+                                        ->orWhereRaw("LOWER(COALESCE(model_definition.name, '')) LIKE '%tcn%'");
+                                });
+                            } elseif ($modelName !== '') {
+                                $candidate->where(function ($model) use ($modelName): void {
+                                    $model->whereRaw('LOWER(COALESCE(model_definition.public_alias, model_definition.name, ?)) = ?', [$modelName, $modelName])
+                                        ->orWhereRaw('LOWER(COALESCE(model_definition.public_alias, ?)) LIKE ?', ['', '%'.$modelName.'%'])
+                                        ->orWhereRaw('LOWER(COALESCE(model_definition.name, ?)) LIKE ?', ['', '%'.$modelName.'%']);
+                                });
+                            }
+                        });
+                    }
+                });
+            })
             ->whereRaw("({$signalSql}) = 'BUY'")
+            // An automated model strategy reacts to the transition into BUY,
+            // not to every newly persisted prediction while BUY remains active.
+            ->whereRaw("COALESCE((SELECT UPPER(previous_prediction.signal) FROM predictions AS previous_prediction WHERE previous_prediction.trained_model_id = prediction.trained_model_id AND previous_prediction.id < prediction.id ORDER BY previous_prediction.prediction_time DESC, previous_prediction.id DESC LIMIT 1), 'NONE') <> 'BUY'")
             ->whereRaw('COALESCE(prediction.predicted_price_20d, prediction.current_price) >= prediction.current_price')
             // Hard pre-selection by the user's risk profile. Rotation and ranking only see this reduced universe.
             ->whereRaw("({$riskSql} IS NULL OR {$riskSql} <= ?)", [$profileLimits['risk']])
@@ -238,8 +322,14 @@ final class AutomatedPortfolioService
                 $query->whereRaw("{$riskSql} <= ?", [(float) $filters['risk_max']]))
             ->when((float) ($filters['drawdown_max'] ?? 50) < 50, fn ($query) =>
                 $query->where('backtest_stat.drawdown_percent', '<=', (float) $filters['drawdown_max']))
+            ->when((float) ($filters['profit_per_trade_min'] ?? 0) > 0, fn ($query) =>
+                $query->where('backtest_stat.average_net_return', '>=', (float) $filters['profit_per_trade_min']))
+            ->when(is_numeric($filters['median_return_min'] ?? null), fn ($query) =>
+                $query->where('backtest_stat.median_net_return', '>=', (float) $filters['median_return_min']))
             ->when((float) ($filters['profit_factor_min'] ?? 0) > 0, fn ($query) =>
                 $query->where('backtest_stat.profit_factor', '>=', (float) $filters['profit_factor_min']))
+            ->when((float) ($filters['model_quality_min'] ?? 0) > 0, fn ($query) =>
+                $query->whereRaw('COALESCE(quality_ranking.quality_score, 0) * 100 >= ?', [(float) $filters['model_quality_min']]))
             ->when((float) ($filters['hit_rate_min'] ?? 0) > 0, fn ($query) =>
                 $query->where('backtest_stat.hit_rate', '>=', (float) $filters['hit_rate_min']))
             ->when((float) ($filters['volatility_max'] ?? 100) < 100, fn ($query) =>
@@ -264,22 +354,73 @@ final class AutomatedPortfolioService
                 $query->whereRaw($fundamentalNumber('revenueGrowth').' >= ?', [(float) $filters['revenue_growth_min'] / 100]))
             ->select([
                 'prediction.id as prediction_id', 'prediction.instrument_id', 'prediction.prediction_time',
+                'prediction.trained_model_id', 'prediction.prediction_horizon_minutes',
                 'prediction.current_price', 'prediction.predicted_price_5d', 'prediction.predicted_price_10d',
                 'prediction.predicted_price_15d', 'prediction.predicted_price_20d', 'instrument.symbol', 'instrument.name',
                 'instrument.sector', 'instrument.currency', 'quote.price as quote_price',
+                'model_definition.id as model_definition_id', 'backtest_stat.horizon_days',
+                'backtest_stat.profit_factor', 'backtest_stat.hit_rate', 'backtest_stat.drawdown_percent',
+                'backtest_stat.historical_trades', 'backtest_stat.signal_quality', 'backtest_stat.average_net_return',
+                'backtest_stat.median_net_return',
+                'quality_ranking.quality_score as model_quality_score',
             ])
             ->selectRaw("{$scoreSql} AS score_10")
             ->selectRaw("{$confidenceSql} AS confidence_percent")
+            ->selectRaw('COALESCE(technical.volatility_20, 0) * 100 AS volatility_percent')
             ->get();
+
+        $selections = json_decode((string) ($filters['heatmap_selection'] ?? ''), true);
+        if (! is_array($selections) || collect($selections)->flatten()->isEmpty()) return $candidates;
+        $cellFor = static function (string $map, object $row): ?string {
+            [$x, $y, $xMin, $xMax, $xStep, $yMin, $yMax, $yStep] = match ($map) {
+                'profit_factor_hit_rate' => [$row->profit_factor, $row->hit_rate, 0, 3, .3, 0, 100, 10],
+                'signal_risk' => [$row->signal_quality, $row->drawdown_percent, 0, 100, 10, 0, 50, 5],
+                'volatility_drawdown' => [(float) $row->model_quality_score * 100, $row->drawdown_percent, 0, 100, 10, 0, 50, 5],
+                'trades_return' => [$row->confidence_percent, $row->average_net_return, 0, 100, 10, -5, 15, 2],
+                default => [null, null, 0, 1, 1, 0, 1, 1],
+            };
+            if (! is_numeric($x) || ! is_numeric($y)) return null;
+            $xb = (int) max(0, min(9, floor((max($xMin, min($xMax, (float) $x)) - $xMin) / $xStep)));
+            $yb = (int) max(0, min(9, floor((max($yMin, min($yMax, (float) $y)) - $yMin) / $yStep)));
+            return $xb.'-'.$yb;
+        };
+
+        return $candidates->filter(function (object $candidate) use ($selections, $cellFor): bool {
+            foreach ($selections as $map => $cells) {
+                if (is_array($cells) && $cells !== [] && in_array($cellFor((string) $map, $candidate), $cells, true)) return false;
+            }
+            return true;
+        })->unique('instrument_id')->values();
     }
 
     private function buyCandidate(SavedPredictionFilter $strategy, Portfolio $assignedPortfolio, object $candidate, float $sectorAverage, ?float $indexAverage = null, bool $reservationReleased = false): bool
     {
         if (DB::table('portfolio_automation_executions')->where('saved_prediction_filter_id', $strategy->id)->where('prediction_id', $candidate->prediction_id)->exists()) return false;
 
+        $indicator = app(IndicatorEntryGateService::class)->assessLegacyPrediction((int) $candidate->prediction_id);
+        if (($indicator['passed'] ?? false) !== true) {
+            \Illuminate\Support\Facades\Log::info('portfolio_indicator_entry_rejected', [
+                'prediction_id' => (int) $candidate->prediction_id,
+                'strategy_id' => (int) $strategy->id,
+                'assessment' => $indicator,
+            ]);
+            return false;
+        }
+
+
         /** @var Portfolio|null $portfolio */
         $portfolio = Portfolio::query()->lockForUpdate()->find($assignedPortfolio->id);
         if (! $portfolio || ! $portfolio->active || ! data_get($portfolio->meta, 'automation.live_enabled', false)) return false;
+
+        // A strategy may hold an instrument only once. Locking the portfolio
+        // above serializes concurrent automation runs for the same portfolio.
+        // A new BUY is permitted only after the existing position was sold.
+        $existingPosition = PortfolioPosition::query()
+            ->where('portfolio_id', $portfolio->id)
+            ->where('instrument_id', $candidate->instrument_id)
+            ->lockForUpdate()
+            ->first();
+        if ($existingPosition) return false;
 
         $meta = (array) $portfolio->meta;
         $initialCapital = max(1000.0, (float) data_get(
@@ -342,14 +483,12 @@ final class AutomatedPortfolioService
         if ($quantity < 1) return false;
         $allocated = $quantity * $price;
 
-        $position = PortfolioPosition::query()->firstOrNew([
+        $position = PortfolioPosition::query()->make([
             'portfolio_id' => $portfolio->id,
             'instrument_id' => $candidate->instrument_id,
         ]);
-        $oldQuantity = (float) ($position->quantity ?? 0);
-        $newQuantity = $oldQuantity + $quantity;
-        $positionMeta = (array) $position->meta;
-        data_set($positionMeta, 'automation.position_factor', max(1, (int) data_get($positionMeta, 'automation.position_factor', 0)) + ($position->exists ? $factor : $factor - 1));
+        $positionMeta = [];
+        data_set($positionMeta, 'automation.position_factor', $factor);
         data_set($positionMeta, 'automation.strategy_id', $strategy->id);
         data_set($positionMeta, 'automation.exit_strategy', 'variable_instrument_horizon');
         data_set($positionMeta, 'automation.exit_holding_days', $exitStrategy['holding_days']);
@@ -357,10 +496,8 @@ final class AutomatedPortfolioService
         data_set($positionMeta, 'automation.exit_model_signature', $exitStrategy['model_signature']);
         data_set($positionMeta, 'automation.exit_target_price', $exitStrategy['target_price'] ?? null);
         $position->fill([
-            'quantity' => $newQuantity,
-            'average_buy_price' => $newQuantity > 0
-                ? (($oldQuantity * (float) ($position->average_buy_price ?? 0)) + ($quantity * $price)) / $newQuantity
-                : $price,
+            'quantity' => $quantity,
+            'average_buy_price' => $price,
             'current_price' => $price,
             'opened_at_date' => $position->opened_at_date ?: now()->toDateString(),
             'meta' => $positionMeta,
@@ -389,6 +526,7 @@ final class AutomatedPortfolioService
                 'exit_profile_source' => $exitStrategy['source'],
             ],
         ]);
+        DB::afterCommit(fn () => app(PublicPortfolioFollowerNotifier::class)->send((int) $transaction->id));
 
         $balanceAfterPurchase = (float) $cashAccount->balance - $allocated;
         $balanceAfterFee = $balanceAfterPurchase - $tradeCost;
@@ -419,7 +557,7 @@ final class AutomatedPortfolioService
             'prediction_id' => $candidate->prediction_id,
             'instrument_id' => $candidate->instrument_id,
             'portfolio_transaction_id' => $transaction->id,
-            'action' => $position->wasRecentlyCreated ? 'buy' : 'increase',
+            'action' => 'buy',
             'sector_average_score' => $sectorAverage,
             'position_factor' => $factor,
             'allocated_capital' => $allocated,
@@ -448,8 +586,6 @@ final class AutomatedPortfolioService
         $resistanceExit = (bool) data_get($strategy->filters, 'resistance_trailing_stop_enabled', false);
         $forecastBelowPriceExit = (string) data_get($strategy->filters, 'exit_strategy', '') === 'forecast_below_price'
             || (bool) data_get($strategy->filters, 'forecast_below_price_exit_enabled', false);
-        if (! $fixed20dExit && ! $dynamicHorizonExit && ! $supportStop && ! $resistanceExit && ! $forecastBelowPriceExit) return;
-
         PortfolioPosition::query()->where('portfolio_id', $portfolio->id)->get()
             ->filter(fn (PortfolioPosition $position): bool => (int) data_get($position->meta, 'automation.strategy_id', 0) === (int) $strategy->id)
             ->each(function (PortfolioPosition $position) use ($strategy, $portfolio, $fixed20dExit, $dynamicHorizonExit, $supportStop, $resistanceExit, $forecastBelowPriceExit): void {
@@ -466,6 +602,11 @@ final class AutomatedPortfolioService
                 $fixedExitTrigger = $fixed20dExit && $tradingDaysHeld >= 20;
                 $dynamicExitDays = max(1, (int) data_get($position->meta, 'automation.exit_holding_days', 20));
                 $dynamicExitTrigger = $dynamicHorizonExit && $tradingDaysHeld >= $dynamicExitDays;
+                // Every automated entry stores the exit horizon resolved from
+                // its concrete serving model. A saved strategy therefore does
+                // not need (and must not override) a separate exit selection.
+                $modelExitTrigger = data_get($position->meta, 'automation.exit_strategy') === 'variable_instrument_horizon'
+                    && $tradingDaysHeld >= $dynamicExitDays;
                 $supportTrigger = $supportStop && is_numeric($levels['support']) && $price < (float) $levels['support'] * .99;
                 $latestForecast = $forecastBelowPriceExit
                     ? DB::table('predictions')->where('instrument_id', $position->instrument_id)
@@ -486,12 +627,13 @@ final class AutomatedPortfolioService
                     }
                 }
                 $trailingTrigger = is_numeric($trailingStop) && $price < (float) $trailingStop;
-                if (! $fixedExitTrigger && ! $dynamicExitTrigger && ! $supportTrigger && ! $trailingTrigger && ! $forecastBelowPriceTrigger) return;
+                if (! $modelExitTrigger && ! $fixedExitTrigger && ! $dynamicExitTrigger && ! $supportTrigger && ! $trailingTrigger && ! $forecastBelowPriceTrigger) return;
 
-                $reason = $fixedExitTrigger ? 'fixed_20_trading_days'
+                $reason = $modelExitTrigger ? 'model_prediction_horizon'
+                    : ($fixedExitTrigger ? 'fixed_20_trading_days'
                     : ($dynamicExitTrigger ? 'dynamic_prediction_horizon'
                     : ($supportTrigger ? 'support_stop_1_percent'
-                    : ($trailingTrigger ? 'resistance_trailing_stop' : 'forecast_below_current_price')));
+                    : ($trailingTrigger ? 'resistance_trailing_stop' : 'forecast_below_current_price'))));
                 DB::transaction(function () use ($strategy, $position, $portfolio, $price, $levels, $reason): void {
                     $locked = PortfolioPosition::query()->lockForUpdate()->find($position->id);
                     if (! $locked) return;
@@ -510,6 +652,7 @@ final class AutomatedPortfolioService
                             'realized_profit' => $proceeds - $costBasis], JSON_THROW_ON_ERROR),
                         'created_at' => now(), 'updated_at' => now(),
                     ]);
+                    DB::afterCommit(fn () => app(PublicPortfolioFollowerNotifier::class)->send((int) $transactionId));
                     $balance = (float) $account->balance + $proceeds;
                     DB::table('portfolio_cash_accounts')->where('id', $account->id)->update(['balance' => $balance, 'updated_at' => now()]);
                     DB::table('portfolio_cash_ledger')->insert([
@@ -540,6 +683,14 @@ final class AutomatedPortfolioService
             ->where('portfolio_id', $portfolio->id)->where('status', 'active')->orderBy('id')->get();
         $remaining = collect();
         foreach ($active as $reservation) {
+            $alreadyHeld = PortfolioPosition::query()
+                ->where('portfolio_id', $portfolio->id)
+                ->where('instrument_id', $reservation->instrument_id)
+                ->exists();
+            if ($alreadyHeld) {
+                $this->releaseReservation($reservation, 'already_held');
+                continue;
+            }
             $candidate = $candidates->firstWhere('instrument_id', $reservation->instrument_id);
             $expired = now()->greaterThanOrEqualTo($reservation->expires_at);
             if ($expired || ! $candidate) {

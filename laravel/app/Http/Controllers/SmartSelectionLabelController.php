@@ -29,7 +29,9 @@ final class SmartSelectionLabelController extends Controller
             'score_min' => ['nullable', 'numeric', 'between:0,10'],
             'confidence_min' => ['nullable', 'numeric', 'between:0,100'],
             'drawdown_max' => ['nullable', 'numeric', 'between:0,100'],
-            'profit_per_trade_min' => ['nullable', 'numeric', 'between:0,10'],
+            'profit_per_trade_min' => ['nullable', 'numeric', 'between:-5,15'],
+            'median_return_min' => ['nullable', 'numeric', 'between:-5,15'],
+            'profit_factor_min' => ['nullable', 'numeric', 'between:0,3'],
             'volatility_max' => ['nullable', 'numeric', 'between:0,1000000'],
             'predicted_return_min' => ['nullable', 'numeric', 'between:-50,100'],
             'hit_rate_min' => ['nullable', 'numeric', 'between:0,100'],
@@ -56,6 +58,7 @@ final class SmartSelectionLabelController extends Controller
             'confidence_min' => 0,
             'drawdown_max' => 50,
             'profit_per_trade_min' => 0,
+            'profit_factor_min' => 0,
             'volatility_max' => 100,
             'predicted_return_min' => -50,
             'hit_rate_min' => 0,
@@ -67,6 +70,9 @@ final class SmartSelectionLabelController extends Controller
         ])->mapWithKeys(fn ($default, string $key): array => [
             $key => (float) ($validated[$key] ?? $default),
         ])->all();
+        $numericCriteria['median_return_min'] = is_numeric($validated['median_return_min'] ?? null)
+            ? (float) $validated['median_return_min']
+            : null;
         $criteria = collect(SavedPredictionFilterController::FILTER_KEYS)
             ->reject(fn (string $key): bool => in_array($key, ['initial_capital', 'trade_cost'], true))
             ->mapWithKeys(function (string $key) use ($request): array {
@@ -75,9 +81,6 @@ final class SmartSelectionLabelController extends Controller
             })
             ->merge($numericCriteria)
             ->all();
-        // Existing labels used this legacy name. Keep it populated while all
-        // new selection logic uses the tester's canonical field name.
-        $criteria['profit_factor_min'] = $criteria['profit_per_trade_min'];
         $criteria['email_notification_enabled'] = (bool) ($validated['email_notification_enabled'] ?? false);
 
         $label = SmartSelectionLabel::query()->updateOrCreate(

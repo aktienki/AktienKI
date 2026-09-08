@@ -91,6 +91,8 @@ class SectorController extends Controller
                 ((prediction.predicted_price_20d - prediction.current_price)
                 / NULLIF(prediction.current_price, 0)) * 100
             ) AS average_expected_return_20d')
+            ->selectRaw('AVG(((prediction.predicted_price_10d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS average_expected_return_10d')
+            ->selectRaw('NULL::numeric AS average_expected_return_40d')
             ->selectRaw('AVG(prediction.confidence) AS average_confidence')
             ->selectRaw('AVG(walk_forward.hit_rate) AS average_hit_rate')
             ->selectRaw('AVG(walk_forward.profit_per_trade) AS average_profit_per_trade')
@@ -99,6 +101,7 @@ class SectorController extends Controller
             ->selectRaw('PERCENTILE_CONT(0.75) WITHIN GROUP (
                 ORDER BY COALESCE(prediction.risk_score, prediction.drawdown_risk_factor)
             ) AS risk_p75')
+            ->selectRaw('AVG(COALESCE(prediction.risk_score, prediction.drawdown_risk_factor)) AS average_risk')
             ->selectRaw('AVG(baseline_prediction.prediction_score) AS five_day_baseline_score')
             ->selectRaw('AVG(prediction.prediction_score) - AVG(baseline_prediction.prediction_score) AS five_day_score_change')
             ->selectRaw("COUNT(*) FILTER (WHERE ({$signalSql}) = 'BUY') AS buy_count")
@@ -112,6 +115,47 @@ class SectorController extends Controller
             ->selectRaw("AVG(NULLIF(fundamental.data->>'dividendYield', '')::numeric) AS average_dividend_yield")
             ->orderByRaw('AVG(prediction.prediction_score) DESC NULLS LAST')
             ->get();
+
+        // Use the released serving forecasts for all three horizons. The
+        // result is one latest standard prediction per contained stock and
+        // horizon, followed by the arithmetic sector average.
+        $servingSectorRows = DB::connection('serving')->table('serving_instruments as instrument')
+            ->join('serving_active_models as active', 'active.instrument_id', '=', 'instrument.id')
+            ->join('serving_predictions as prediction', function ($join): void {
+                $join->on('prediction.instrument_id', '=', 'instrument.id')
+                    ->on('prediction.release_id', '=', 'active.release_id');
+            })
+            ->where('instrument.instrument_type', 'stock')
+            ->where('instrument.is_active', true)
+            ->whereNotNull('instrument.sector_code')
+            ->whereIn('prediction.horizon', [10, 20, 40])
+            ->where('prediction.variant', 'standard')
+            ->whereNotNull('prediction.expected_return')
+            ->when($isFreeRegional, function ($query) use ($allowedInstrumentIds): void {
+                $allowedSymbols = DB::table('instruments')->whereIn('id', $allowedInstrumentIds)
+                    ->pluck('symbol')->map(fn ($symbol) => strtoupper((string) $symbol))->all();
+                $query->whereIn(DB::raw('UPPER(instrument.symbol)'), $allowedSymbols);
+            })
+            ->select([
+                'instrument.id as instrument_id', 'instrument.sector_code as sector',
+                'prediction.horizon', 'prediction.expected_return',
+            ])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY instrument.id, prediction.horizon ORDER BY prediction.as_of DESC, prediction.id DESC) AS prediction_rank');
+        $servingSectorForecasts = DB::connection('serving')->query()
+            ->fromSub($servingSectorRows, 'ranked_prediction')
+            ->where('prediction_rank', 1)
+            ->groupBy('sector', 'horizon')
+            ->get(['sector', 'horizon', DB::raw('AVG(expected_return) * 100 AS average_return')])
+            ->groupBy('sector');
+        $sectors->each(function (object $sector) use ($servingSectorForecasts): void {
+            $averages = collect($servingSectorForecasts->get($sector->sector, collect()))
+                ->mapWithKeys(fn (object $row): array => [(int) $row->horizon => (float) $row->average_return]);
+            foreach ([10, 20, 40] as $horizon) {
+                if ($averages->has($horizon)) {
+                    $sector->{"average_expected_return_{$horizon}d"} = $averages->get($horizon);
+                }
+            }
+        });
 
         $latestQuotes = DB::table('current_stock_quotes')
             ->where('status', 'current')

@@ -9,8 +9,8 @@ final class SavedFilterLimitService
 {
     public function limitFor(User $user): int
     {
-        if (($user->role ?? null) === 'admin') {
-            return 100;
+        if ((bool) $user->is_admin || strtolower((string) ($user->role ?? '')) === 'admin') {
+            return 50;
         }
 
         $plan = DB::table('tariff_plans')->where('id', $user->tariff_plan_id)->first(['code', 'limits']);

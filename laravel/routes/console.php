@@ -23,6 +23,13 @@ Schedule::command('signals:send-emails --since=30')
     ->withoutOverlapping(10)
     ->runInBackground();
 
+Schedule::command('predictions:send-purchase-reminders')
+    ->dailyAt('07:00')
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->runInBackground();
+
 Schedule::command('opportunities:purge')
     ->hourly()
     ->withoutOverlapping(10)
@@ -86,6 +93,14 @@ Schedule::command('markets:generate-index-infos')
     ->onOneServer()
     ->runInBackground();
 
+Schedule::command('markets:generate-daily-report')
+    ->weekdays()
+    ->dailyAt('08:00')
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->runInBackground();
+
 if (config('aktienki.portfolio_automation.enabled', false)) {
     Schedule::command('portfolios:send-trade-emails --limit=100')
         ->everyMinute()
@@ -97,6 +112,17 @@ if (config('aktienki.portfolio_automation.enabled', false)) {
     Schedule::command('portfolios:run-automation')
         ->everyMinute()
         ->withoutOverlapping(10)
+        ->runInBackground();
+}
+
+if (config('aktienki.final_entry_shadow.enabled', false)) {
+    Schedule::command('signals:shadow-final-entry')
+        ->everyFiveMinutes()
+        // One stock batch can fan out across every user strategy. Keep the
+        // mutex well beyond the expected batch runtime; the command itself is
+        // idempotent and advances only committed source events.
+        ->withoutOverlapping(180)
+        ->onOneServer()
         ->runInBackground();
 }
 

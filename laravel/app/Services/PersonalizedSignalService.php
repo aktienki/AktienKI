@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\PlanLevel;
 use App\Models\User;
 use InvalidArgumentException;
 
@@ -19,6 +18,11 @@ class PersonalizedSignalService
         }
 
         $thresholds = $this->thresholds($this->riskLevel($user));
+        $rawSignalValue = "UPPER(COALESCE(NULLIF(BTRIM({$predictionAlias}.signal), ''), 'HOLD'))";
+        $rawSignal = "(CASE WHEN {$rawSignalValue} IN ('BUY', 'SELL', 'WATCH', 'WAIT', 'HOLD')
+            THEN {$rawSignalValue}
+            ELSE 'HOLD'
+        END)";
         $rawScore = "COALESCE({$predictionAlias}.ai_score, {$predictionAlias}.prediction_score, 0)";
         $score = "(CASE WHEN {$rawScore} <= 1 THEN {$rawScore} * 100 WHEN {$rawScore} <= 10 THEN {$rawScore} * 10 ELSE {$rawScore} END)";
         $confidence = "(CASE WHEN {$predictionAlias}.confidence > 1 THEN {$predictionAlias}.confidence / 100 ELSE {$predictionAlias}.confidence END)";
@@ -29,10 +33,6 @@ class PersonalizedSignalService
         $return5d = "COALESCE(
             ({$predictionAlias}.predicted_price_5d - {$predictionAlias}.current_price) / NULLIF({$predictionAlias}.current_price, 0) * 100 - {$costPercent},
             NULLIF({$predictionAlias}.horizon_fusion_details->'points_return'->>'5', '')::numeric * 100 - {$costPercent}
-        )";
-        $return10d = "COALESCE(
-            ({$predictionAlias}.predicted_price_10d - {$predictionAlias}.current_price) / NULLIF({$predictionAlias}.current_price, 0) * 100 - {$costPercent},
-            NULLIF({$predictionAlias}.horizon_fusion_details->'points_return'->>'10', '')::numeric * 100 - {$costPercent}
         )";
         $return20d = "COALESCE(
             ({$predictionAlias}.predicted_price_20d - {$predictionAlias}.current_price) / NULLIF({$predictionAlias}.current_price, 0) * 100 - {$costPercent},
@@ -48,24 +48,11 @@ class PersonalizedSignalService
         )";
         $volatilityAccepted = "(COALESCE({$annualizedVolatility}, 0) <= {$thresholds['maximum_annualized_volatility']}
             AND COALESCE({$sectorVolatilityPercentile}, 0.5) <= {$thresholds['maximum_sector_volatility_percentile']})";
-        $waitBranch = $user && app(PlanAccessService::class)->allowsTariff($user, PlanLevel::Pro)
-            ? "WHEN {$score} >= {$thresholds['watch_score']}
-                    AND COALESCE({$confidence}, 0) >= {$thresholds['watch_confidence']}
-                    AND ({$risk} IS NULL OR {$risk} <= {$thresholds['watch_risk']})
-                    AND {$return20d} IS NOT NULL
-                    AND {$return20d} >= {$thresholds['buy_return_20d']}
-                    AND (({$return5d} IS NOT NULL AND {$return5d} < {$thresholds['watch_return']})
-                        OR ({$return10d} IS NOT NULL AND {$return10d} < {$thresholds['watch_return']}))
-                    THEN 'WAIT'"
-            : '';
 
         return <<<SQL
             CASE
                 WHEN {$predictionAlias}.id IS NULL THEN 'HOLD'
-                {$waitBranch}
-                WHEN {$score} < {$thresholds['sell_score']}
-                    OR ({$return5d} IS NOT NULL AND {$return5d} <= {$thresholds['sell_return']})
-                    THEN 'SELL'
+                WHEN {$rawSignal} <> 'BUY' THEN {$rawSignal}
                 WHEN {$score} >= {$thresholds['buy_score']}
                     AND {$hardQualityAccepted}
                     AND {$volatilityAccepted}

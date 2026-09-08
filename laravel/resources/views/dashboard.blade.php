@@ -19,7 +19,7 @@
         }
         $dashboardSelectedTiles = array_values(array_intersect(
             $dashboardStoredTiles,
-            ['paper-depots', 'watchlists', 'strategies', 'labels', 'reminders', 'chartview', 'community-posts', 'community-members', 'community-recent', 'best-buy', 'best-wait', 'watchlist-screener', 'predictions', 'smart-screener', 'market-report', 'stock-comparison', 'mobile-view', 'news']
+            ['paper-depots', 'watchlists', 'strategies', 'labels', 'reminders', 'chartview', 'community-posts', 'community-members', 'community-recent', 'best-buy', 'best-wait', 'watchlist-screener', 'predictions', 'smart-screener', 'market-report', 'mobile-view', 'news']
         ));
         $dashboardTileVisible = fn (string $id): bool => in_array($id, $dashboardSelectedTiles, true);
         $dashboardTileDescriptions = [
@@ -38,7 +38,6 @@
             'predictions' => __('Alle aktuellen Prognosen vergleichen.'),
             'smart-screener' => __('Aktien nach eigenen Kriterien finden.'),
             'market-report' => __('Die aktuelle Marktanalyse lesen.'),
-            'stock-comparison' => __('Mehrere Aktien direkt vergleichen.'),
             'mobile-view' => __('Lege fest, welche Karten auf dem Smartphone erscheinen.'),
             'news' => __('Anzahl neuer Unternehmensmeldungen der letzten 24 Stunden.'),
         ];
@@ -351,7 +350,7 @@
                                 ['paper-depots', __('Musterdepots'), $overview['paper_depots'], 'heroicon-o-beaker', route('paper-depots.index'), true, null],
                                 ['watchlists', __('Watchlists'), $overview['watchlists'], 'heroicon-o-star', route('watchlists.index'), true, null],
                                 ['strategies', __('Strategien'), $overview['strategies'], 'heroicon-o-adjustments-horizontal', route('setup.saved-filters.index'), $canUsePro, 'PRO'],
-                                ['labels', __('Labels'), $overview['labels'], 'heroicon-o-tag', route('setup.quality'), $canUsePlus, 'PLUS'],
+                                ['labels', __('Labels'), $overview['labels'], 'heroicon-o-tag', route('setup.labels.index'), $canUsePlus, 'PLUS'],
                                 ['community-posts', __('Beiträge'), $communityOverview['posts'], 'heroicon-o-document-text', route('community.index'), true, null],
                                 ['community-members', __('Mitglieder'), $communityOverview['members'], 'heroicon-o-user-group', route('community.index'), true, null],
                                 ['community-recent', __('Letzte 7 Tage'), $communityOverview['recent'], 'heroicon-o-clock', route('community.index'), true, null],
@@ -366,14 +365,14 @@
                                     <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $label }}</small>
                                 </a>
                             @endforeach
-                            <button type="button" data-dashboard-tile="reminders" data-dashboard-tile-label="{{ __('E-Mail-Erinnerungen') }}" @if($canManageMessages) data-message-settings-open @endif class="group relative min-w-0 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-3 text-left transition {{ $dashboardTileVisible('reminders') ? '' : 'hidden' }} {{ $canManageMessages ? 'hover:border-orange-300/45 hover:bg-orange-400/[.10]' : 'cursor-not-allowed opacity-60' }}" title="{{ $canManageMessages ? __('Nachrichten verwalten') : __('Ab Pro verfügbar') }}">
-                                @unless($canManageMessages)<span class="ak-plan-badge ak-plan-badge--pro absolute right-2 top-2">PRO</span>@endunless
+                            <a href="{{ $canManageMessages ? '#' : route('pricing') }}" data-dashboard-tile="reminders" data-dashboard-tile-label="{{ __('E-Mail-Erinnerungen') }}" @if($canManageMessages) data-message-settings-open @endif class="group relative min-w-0 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-3 transition {{ $dashboardTileVisible('reminders') ? '' : 'hidden' }} {{ $canManageMessages ? 'hover:border-orange-300/45 hover:bg-orange-400/[.10]' : 'dashboard-plan-locked' }}" title="{{ $canManageMessages ? __('Nachrichten verwalten') : __('Ab Pro verfügbar') }}">
+                                @unless($canManageMessages)<span class="dashboard-plan-mini-badge">PRO</span>@endunless
                                 <span class="flex items-center gap-2">
-                                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400"><x-heroicon-o-envelope class="h-4 w-4" /></span>
-                                    <b class="text-lg font-black tabular-nums text-[var(--ak-text)]">{{ $messageReminders->where('active', true)->count() }}</b>
+                                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400 group-hover:border-orange-200/45"><x-dynamic-component component="heroicon-o-envelope" class="h-4 w-4" /></span>
+                                    <b class="text-lg font-black tabular-nums text-[var(--ak-text)]">{{ $messageReminders->where('active', true)->where('expired', false)->count() }}</b>
                                 </span>
                                 <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('E-Mail-Erinnerungen') }}</small>
-                            </button>
+                            </a>
                             <a href="{{ route('profile.mobile-view') }}" data-dashboard-tile="mobile-view" data-dashboard-tile-label="{{ __('Mobile Ansicht') }}" class="group relative min-w-0 rounded-xl border border-cyan-400/20 bg-cyan-400/[.045] px-3 py-3 transition hover:border-cyan-300/45 hover:bg-cyan-400/[.10] {{ $dashboardTileVisible('mobile-view') ? '' : 'hidden' }}">
                                 <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/25 bg-cyan-400/10 text-cyan-300"><x-heroicon-o-device-phone-mobile class="h-4 w-4" /></span><x-heroicon-o-arrow-up-right class="ml-auto h-4 w-4 text-cyan-300" /></span>
                                 <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Mobile Ansicht') }}</small>
@@ -404,11 +403,10 @@
                             @endif
                             @foreach ([
                                 ['chartview', __('ChartView'), 'heroicon-o-chart-bar-square', route('predictions.chartview-signals')],
-                                ['watchlist-screener', __('Watchlist im Screener'), 'heroicon-o-funnel', route('screener.index', ['source' => 'watchlist'])],
+                                ['watchlist-screener', __('Watchlist im Screener'), 'heroicon-o-funnel', route('screener.index', ['bestand' => 'watchlists'])],
                                 ['predictions', __('Prognosetabelle'), 'heroicon-o-table-cells', route('predictions.index')],
                                 ['smart-screener', __('Smart Screener'), 'heroicon-o-magnifying-glass', route('screener.index')],
                                 ['market-report', __('Aktuelle Marktlage'), 'heroicon-o-globe-europe-africa', route('daily-market-analysis')],
-                                ['stock-comparison', __('Aktien vergleichen'), 'heroicon-o-scale', route('stocks.compare')],
                             ] as [$tileId, $label, $icon, $url])
                                 <a href="{{ $url }}" data-dashboard-tile="{{ $tileId }}" data-dashboard-tile-label="{{ $label }}" class="group min-w-0 rounded-xl border border-cyan-400/20 bg-cyan-400/[.045] px-3 py-3 transition hover:border-cyan-300/45 hover:bg-cyan-400/[.10] {{ $dashboardTileVisible($tileId) ? '' : 'hidden' }}">
                                     <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/25 bg-cyan-400/10 text-cyan-300"><x-dynamic-component :component="$icon" class="h-4 w-4" /></span><x-heroicon-o-arrow-up-right class="ml-auto h-4 w-4 text-cyan-300" /></span>
@@ -455,7 +453,6 @@
                     .dashboard-bento-personal [data-dashboard-tile="paper-depots"] { --personal-tile-accent: 16 185 129; }
                     .dashboard-bento-personal [data-dashboard-tile="market-report"] { --personal-tile-accent: 6 182 212; }
                     .dashboard-bento-personal [data-dashboard-tile="smart-screener"] { --personal-tile-accent: 20 184 166; }
-                    .dashboard-bento-personal [data-dashboard-tile="stock-comparison"] { --personal-tile-accent: 139 92 246; }
                     .dashboard-bento-personal [data-dashboard-tile="labels"] { --personal-tile-accent: 234 179 8; }
                     .dashboard-bento-personal [data-dashboard-tile="chartview"] { --personal-tile-accent: 244 114 182; }
                     .dashboard-bento-personal [data-dashboard-tile] > span:first-of-type > span:first-child {
@@ -473,9 +470,9 @@
                         <div class="aki-profile-universe-grid grid gap-3">
                             <div class="flex min-w-0 items-start justify-between gap-3">
                                 <div class="min-w-0">
-                                    <p id="profile-universe-title" class="text-[10px] font-black uppercase tracking-[.12em] text-cyan-400">{{ __('Aktuelle Aktien') }}</p>
+                                    <p id="profile-universe-title" class="text-[10px] font-black uppercase tracking-[.12em] text-cyan-400">{{ __('Aktuelle Remote-Aktien') }}</p>
                                     <div class="mt-1 flex items-end gap-1.5"><strong class="text-2xl font-black leading-none tabular-nums text-[var(--ak-text)]">{{ number_format((int) ($profileUniverseStats['active_count'] ?? 0), 0, ',', '.') }}</strong><span class="pb-0.5 text-[10px] font-bold text-[var(--ak-muted)]">{{ __('Aktien') }}</span></div>
-                                    <p class="mt-1 text-[8px] font-black uppercase tracking-wide text-cyan-400">{{ __('Neue Remote-Datenbank') }}@if(!empty($profileUniverseStats['model_horizons'])) · {{ collect($profileUniverseStats['model_horizons'])->map(fn ($horizon) => $horizon.'T')->implode(' / ') }}@endif</p>
+                                    <p class="mt-1 text-[8px] font-black uppercase tracking-wide text-cyan-400">{{ __('Remote-Serving') }} · {{ number_format((int) ($profileUniverseStats['current_signal_count'] ?? 0), 0, ',', '.') }} {{ __('mit aktueller Prediction') }} · {{ number_format((int) ($profileUniverseStats['open_count'] ?? 0), 0, ',', '.') }} {{ __('ausstehend') }}</p>
                                 </div>
                                 <div class="flex shrink-0 items-center gap-2">
                                     <span class="inline-flex h-10 min-w-[86px] items-center justify-between gap-2 rounded-lg border bg-transparent px-3 {{ $trendBadge[2] }}" title="{{ __('Trendwert') }}: {{ $trendBadge[1] }}"><small class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Trend') }}</small><b class="text-base leading-none">{{ $trendBadge[0] }}</b></span>
@@ -483,17 +480,16 @@
                                 </div>
                             </div>
                             <div class="aki-profile-universe-score min-w-0">
-                                <div class="flex items-center justify-between text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ __('Aktuelles Signal') }}</span><span>{{ __('Strong Sell bis Strong Buy') }}</span></div>
+                                <div class="flex items-center justify-between text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ __('Aktuelle Signale') }}</span><span>{{ __('Serving') }}</span></div>
                                 <div class="relative mx-1" style="height:64px">
-                                    <div class="absolute inset-x-0 h-2 rounded-full border border-white/10 bg-gradient-to-r from-rose-400 via-amber-300 to-emerald-400 shadow-inner" style="top:42px"></div>
+                                    <div class="absolute inset-x-0 h-2 rounded-full border border-white/10 bg-gradient-to-r from-slate-400 via-amber-300 to-emerald-400 shadow-inner" style="top:42px"></div>
                                     @foreach(($profileUniverseStats['bins'] ?? []) as $index => $bin)
-                                        @php $position = 10 + ($index * 20); $markerTone = ['border-rose-500 bg-rose-100 text-rose-700','border-orange-500 bg-orange-100 text-orange-700','border-amber-500 bg-amber-100 text-amber-800','border-lime-500 bg-lime-100 text-lime-800','border-emerald-500 bg-emerald-100 text-emerald-800'][$index] ?? 'border-cyan-500 bg-cyan-100 text-cyan-800'; @endphp
+                                        @php $position = 12.5 + ($index * 25); $markerTone = ['border-rose-500 bg-rose-100 text-rose-700','border-amber-500 bg-amber-100 text-amber-800','border-lime-500 bg-lime-100 text-lime-800','border-emerald-500 bg-emerald-100 text-emerald-800'][$index] ?? 'border-cyan-500 bg-cyan-100 text-cyan-800'; @endphp
                                         <span class="absolute top-0 -translate-x-1/2" style="left:{{ $position }}%" title="{{ $bin['range'] ?? $bin['label'] }}: {{ $bin['count'] }} {{ __('Aktien') }}"><span class="grid h-8 w-12 place-items-center rounded-md border px-1 text-[10px] font-black leading-none tabular-nums shadow-md {{ $markerTone }}">{{ $bin['count'] }}</span><span class="mx-auto block h-2.5 w-px bg-current opacity-60"></span></span>
                                     @endforeach
-                                    <div class="absolute inset-x-0 bottom-0 grid grid-cols-5 text-center text-[7px] font-black uppercase tracking-wide">
-                                        @foreach (($profileUniverseStats['bins'] ?? []) as $index => $bin)
-                                            @php $signalTone = ['text-rose-500','text-orange-500','text-amber-500','text-lime-600','text-emerald-500'][$index] ?? 'text-cyan-500'; @endphp
-                                            <span class="truncate {{ $signalTone }}" title="{{ $bin['range'] ?? $bin['label'] }}">{{ $bin['label'] }}</span>
+                                    <div class="absolute inset-x-0 bottom-0 grid grid-cols-4 text-center text-[7px] font-black uppercase tracking-wide">
+                                        @foreach ([[__('SELL'),'text-rose-500'],[__('HOLD'),'text-amber-500'],[__('WATCH'),'text-lime-600'],[__('BUY'),'text-emerald-500']] as [$signalLabel,$signalTone])
+                                            <span class="truncate {{ $signalTone }}">{{ $signalLabel }}</span>
                                         @endforeach
                                     </div>
                                 </div>
@@ -517,22 +513,24 @@
                                 @php
                                     $snapshot = $opportunity->snapshot ?: [];
                                     $opportunityReturns = data_get($snapshot, 'returns', []);
-                                    $opportunityReturn10 = $opportunityReturns[10] ?? $opportunityReturns['10'] ?? null;
-                                    $opportunityReturn20 = $opportunityReturns[20] ?? $opportunityReturns['20'] ?? null;
-                                    $opportunityReturn40 = $opportunityReturns[40] ?? $opportunityReturns['40'] ?? null;
+                                    $opportunityShortHorizon = (int) data_get($snapshot, 'short_horizon', 10);
+                                    $opportunityLongHorizon = (int) data_get($snapshot, 'long_horizon', 20);
+                                    $opportunityShortReturn = $opportunityReturns[$opportunityShortHorizon] ?? $opportunityReturns[(string) $opportunityShortHorizon] ?? null;
+                                    $opportunityLongReturn = $opportunityReturns[$opportunityLongHorizon] ?? $opportunityReturns[(string) $opportunityLongHorizon] ?? null;
                                     $opportunityScore = data_get($snapshot, 'score');
+                                    $opportunityConfidence = data_get($snapshot, 'confidence');
+                                    $opportunityRisk = data_get($snapshot, 'risk');
                                     $opportunityScorePercent = \App\Support\AiScore::toPercent($opportunityScore);
                                     $opportunityScoreGrade = \App\Support\QualityGrade::fromPercent($opportunityScorePercent);
-                                    $opportunityRiskLevel = is_numeric(data_get($snapshot, 'risk_level'))
-                                        ? max(2, min(5, (int) round((float) data_get($snapshot, 'risk_level'))))
-                                        : null;
+                                    $opportunityRiskPercent = is_numeric($opportunityRisk) ? (float) $opportunityRisk : null;
+                                    $opportunityRiskLevel = \App\Support\QualityGrade::riskLevel($opportunityRiskPercent);
                                     $opportunityFlag = $dashboardCountryFlags[strtoupper((string) $opportunity->instrument->country)] ?? '🌐';
                                 @endphp
                                 <a href="{{ route('stocks.show', ['symbol' => $opportunity->instrument->symbol, 'prediction' => $opportunity->prediction_id, 'return_to' => '/dashboard']) }}" class="group flex min-w-0 items-center gap-2.5 rounded-xl border border-amber-400/25 bg-amber-400/[.055] px-3 py-2 transition hover:border-amber-400/55 hover:bg-amber-400/[.09]" title="{{ $opportunity->instrument->name }} · {{ __('Handelschance') }}">
                                     <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-amber-400/35 bg-amber-400/10 text-amber-500">
                                         <x-heroicon-o-arrow-trending-up class="h-5 w-5" />
                                     </span>
-                                    <span class="min-w-0 flex-1"><span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $opportunity->instrument->name ?: $opportunity->instrument->symbol }}</b><em class="shrink-0 rounded-md border border-amber-400/30 px-1.5 py-0.5 text-[8px] font-black not-italic text-amber-500">{{ __($opportunity->status) }}</em></span><small class="mt-0.5 block truncate text-[9px] font-black text-amber-500">{{ __('Rücksetzer beobachten · Einstieg vorbereiten') }}</small><small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $opportunityFlag }} {{ $opportunity->instrument->symbol }}</span>@if($opportunityScoreGrade !== null)<span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ number_format(($opportunityScorePercent ?? 0) / 10, 1, ',', '.') }}/10">KI {{ $opportunityScoreGrade }}</span>@endif @if($opportunityRiskLevel !== null)<span class="text-amber-500" title="{{ __('Serving-Risikoklasse') }}: {{ $opportunityRiskLevel }}/5">{{ __('Risiko') }} {{ $opportunityRiskLevel }}</span>@endif @if(is_numeric($opportunityReturn10))<span class="text-cyan-400">10T {{ sprintf('%+.1f', $opportunityReturn10) }}%</span>@endif @if(is_numeric($opportunityReturn20))<span class="text-emerald-500">20T {{ sprintf('%+.1f', $opportunityReturn20) }}%</span>@endif @if(is_numeric($opportunityReturn40))<span class="text-lime-500">40T {{ sprintf('%+.1f', $opportunityReturn40) }}%</span>@endif</small></span>
+                                    <span class="min-w-0 flex-1"><span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $opportunity->instrument->name ?: $opportunity->instrument->symbol }}</b><em class="shrink-0 rounded-md border border-amber-400/30 px-1.5 py-0.5 text-[8px] font-black not-italic text-amber-500">{{ __($opportunity->status) }}</em></span><small class="mt-0.5 block truncate text-[9px] font-black text-amber-500">{{ __('Kurzfristiger Rücksetzer · längerfristig positiver Ausblick') }}</small><small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $opportunityFlag }} {{ $opportunity->instrument->symbol }}</span>@if($opportunityScoreGrade !== null)<span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ number_format(($opportunityScorePercent ?? 0) / 10, 1, ',', '.') }}/10">KI {{ $opportunityScoreGrade }}</span>@endif @if(is_numeric($opportunityConfidence))<span>{{ __('Konf.') }} {{ number_format((float)$opportunityConfidence, 0, ',', '.') }}%</span>@endif @if($opportunityRiskLevel !== null)<span class="text-amber-500" title="{{ __('Rohwert') }}: {{ number_format($opportunityRiskPercent ?? 0, 0, ',', '.') }} %">{{ __('Risiko') }} {{ $opportunityRiskLevel }}</span>@endif @if(is_numeric($opportunityShortReturn))<span class="text-rose-400">{{ $opportunityShortHorizon }}T {{ sprintf('%+.1f', $opportunityShortReturn) }}%</span>@endif @if(is_numeric($opportunityLongReturn))<span class="text-emerald-500">{{ $opportunityLongHorizon }}T {{ sprintf('%+.1f', $opportunityLongReturn) }}%</span>@endif</small></span>
                                 </a>
                             @empty
                                 <div class="col-span-2 rounded-xl border border-amber-400/15 p-3 text-center text-[10px] font-bold text-[var(--ak-muted)]">{{ $canUsePro ? __('Aktuell liegen keine persönlichen Handelschancen vor.') : __('Meine Handelschancen sind im Pro-Tarif verfügbar.') }}</div>
@@ -548,19 +546,28 @@
                             <span class="relative grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-amber-400/45 bg-amber-400/10 text-amber-400 shadow-[0_0_18px_rgba(251,191,36,.13)]"><x-heroicon-o-trophy class="h-7 w-7" /><span class="absolute -right-1 -top-1 rounded-full border border-amber-300/40 bg-[var(--ak-panel)] px-1 text-[8px] font-black text-amber-400">#1</span></span>
                             <span class="min-w-0"><span class="block text-[10px] font-black uppercase tracking-[.16em] text-amber-500">{{ __('Champion') }}</span><span id="dashboard-champion-title" class="mt-1 block truncate text-lg font-black text-[var(--ak-text)]">{{ __('Aktie des Tages') }}</span></span>
                         </span>
-                        @if($champion)<a href="{{ route('stocks.show', ['symbol' => $champion->symbol, 'prediction' => $champion->prediction_id, 'return_to' => '/dashboard']) }}" class="text-[9px] font-black text-amber-500">{{ __('Analyse') }} →</a>@endif
+                        @if($champion)<a href="{{ route('stocks.show', ['symbol' => $champion->symbol, 'return_to' => '/dashboard']) }}" class="text-[9px] font-black text-amber-500">{{ __('Analyse') }} →</a>@endif
                     </div>
                     <div class="grid min-h-0 flex-1 gap-1.5 overflow-hidden">
                         @forelse($topRankedStocks as $rankIndex => $rankedStock)
                             @php
                                 $rank = $rankIndex + 1;
                                 $rankFlag = $dashboardCountryFlags[strtoupper((string) ($rankedStock->country ?? ''))] ?? '🌐';
-                                $rankScore = \App\Support\AiScore::toTen(is_numeric($rankedStock->ai_score) ? $rankedStock->ai_score : $rankedStock->prediction_score);
-                                $rankRiskLevel = is_numeric($rankedStock->risk_level ?? null)
-                                    ? max(2, min(5, (int) round((float) $rankedStock->risk_level)))
-                                    : null;
-                                $rankRisk = $rankRiskLevel !== null ? $rankRiskLevel * 20.0 : 0.0;
-                                $rankRiskDisplay = $rankRiskLevel ?? '—';
+                                $rankScore = is_numeric($rankedStock->dashboard_ranking_score ?? null)
+                                    ? (float) $rankedStock->dashboard_ranking_score / 10
+                                    : \App\Support\AiScore::toTen(is_numeric($rankedStock->ai_score) ? $rankedStock->ai_score : $rankedStock->prediction_score);
+                                $rankRisk = \App\Support\RiskScore::toPercent(
+                                    $rankedStock->risk_score,
+                                    $rankedStock->drawdown_risk_factor,
+                                    $rankedStock->risk_max_drawdown,
+                                ) ?? match (strtolower((string) ($rankedStock->risk_status ?? ''))) {
+                                    'defensive' => 20.0,
+                                    'balanced' => 40.0,
+                                    'opportunity' => 60.0,
+                                    'risk' => 80.0,
+                                    'sleep' => 100.0,
+                                    default => 50.0,
+                                };
                                 $rankReturn = is_numeric($rankedStock->current_price) && (float) $rankedStock->current_price !== 0.0 && is_numeric($rankedStock->predicted_price_20d)
                                     ? (((float) $rankedStock->predicted_price_20d / (float) $rankedStock->current_price) - 1) * 100
                                     : (is_numeric($rankedStock->market_return_20d ?? null) ? (float) $rankedStock->market_return_20d : null);
@@ -569,6 +576,7 @@
                                 $rankQualityPercent = is_numeric($rankScore) ? max(0, min(100, (float) $rankScore * 10)) : 0;
                                 $rankQualityGrade = \App\Support\QualityGrade::fromPercent($rankQualityPercent) ?: '—';
                                 $rankQualityLevel = is_numeric(substr($rankQualityGrade, 0, 1)) ? 6 - (int) substr($rankQualityGrade, 0, 1) : 0;
+                                $rankRiskLevel = \App\Support\QualityGrade::riskLevel($rankRisk);
                                 $rankCurrency = strtoupper((string) ($rankedStock->currency ?: 'EUR'));
                                 $rankCurrencyLabel = match($rankCurrency) { 'EUR' => '€', 'USD' => '$', 'GBP' => '£', 'JPY' => '¥', default => $rankCurrency };
                                 $rankDailyChange = is_numeric($rankedStock->daily_change_percent ?? null) ? (float) $rankedStock->daily_change_percent : null;
@@ -581,9 +589,9 @@
                             @endphp
                             @if($rank === 1)
                                 <div class="dashboard-champion-entry group grid h-full min-h-0 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] content-center items-center gap-3 overflow-y-auto rounded-xl border border-cyan-400/25 bg-white/[.018] px-4 py-3 transition hover:border-cyan-400/45">
-                                    <a href="{{ route('stocks.show', ['symbol' => $rankedStock->symbol, 'prediction' => $rankedStock->prediction_id, 'return_to' => '/dashboard']) }}" class="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                                        <span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $rankFlag }} {{ $rankedStock->name ?: $rankedStock->symbol }}</b><small class="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $rankedStock->symbol }}</span><span class="{{ $rankSignalTone }}">{{ $rankSignal }}</span><span>{{ ($rankedStock->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($rankedStock->display_price ?? null) ? number_format((float) $rankedStock->display_price, 2, ',', '.').' '.$rankCurrencyLabel : '—' }}</span><span class="{{ $rankDailyChange === null ? '' : ($rankDailyChange >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ __('Tag') }} {{ $rankDailyChange !== null ? sprintf('%+.2f%%', $rankDailyChange) : '—' }}</span></small></span>
-                                        <span class="flex items-center gap-2"><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankQualityPercent" :display="$rankQualityGrade" :level="$rankQualityLevel" type="chance" :label="__('Signalqualität')" /></span><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankRisk" :display="$rankRiskDisplay" :level="$rankRiskLevel" type="risk" :label="__('Risiko')" /></span></span>
+                                    <a href="{{ route('stocks.show', ['symbol' => $rankedStock->symbol, 'return_to' => '/dashboard']) }}" class="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                                        <span class="min-w-0"><b class="flex min-w-0 items-center gap-2"><span class="truncate text-sm font-black text-[var(--ak-text)]">{{ $rankFlag }} {{ $rankedStock->name ?: $rankedStock->symbol }}</span>@if($rankedStock->external_review_ranking_downgraded ?? false)<span class="shrink-0 rounded-md border border-rose-400/35 bg-rose-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-rose-400" title="{{ __('Externer KI-Widerspruch: Ranking um einen Punkt reduziert') }}">KI −1</span>@endif</b><small class="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $rankedStock->symbol }}</span><span class="{{ $rankSignalTone }}">{{ $rankSignal }}</span><span>{{ ($rankedStock->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($rankedStock->display_price ?? null) ? number_format((float) $rankedStock->display_price, 2, ',', '.').' '.$rankCurrencyLabel : '—' }}</span><span class="{{ $rankDailyChange === null ? '' : ($rankDailyChange >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ __('Tag') }} {{ $rankDailyChange !== null ? sprintf('%+.2f%%', $rankDailyChange) : '—' }}</span></small></span>
+                                        <span class="flex items-center gap-2"><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankQualityPercent" :display="$rankQualityGrade" :level="$rankQualityLevel" type="chance" :label="__('Signalqualität')" /></span><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankRisk" :display="$rankRiskLevel" :level="$rankRiskLevel" type="risk" :label="__('Risiko')" /></span></span>
                                     </a>
                                     <details class="dashboard-champion-reason group col-span-2 min-w-0 border-t border-cyan-400/15 pt-2">
                                         <summary class="flex cursor-pointer list-none items-center gap-2 text-[9px] font-bold leading-4 text-[var(--ak-muted)] [&::-webkit-details-marker]:hidden">
@@ -594,7 +602,7 @@
                                     </details>
                                 </div>
                             @else
-                                <a href="{{ route('stocks.show', ['symbol' => $rankedStock->symbol, 'prediction' => $rankedStock->prediction_id, 'return_to' => '/dashboard']) }}" class="group grid min-h-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-xl border border-cyan-400/25 bg-white/[.018] px-4 py-3 transition hover:border-cyan-400/45">
+                                <a href="{{ route('stocks.show', ['symbol' => $rankedStock->symbol, 'return_to' => '/dashboard']) }}" class="group grid min-h-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-xl border border-cyan-400/25 bg-white/[.018] px-4 py-3 transition hover:border-cyan-400/45">
                                     <span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $rankFlag }} {{ $rankedStock->name ?: $rankedStock->symbol }}</b><small class="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $rankedStock->symbol }}</span><span class="{{ $rankSignalTone }}">{{ $rankSignal }}</span><span>{{ ($rankedStock->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($rankedStock->display_price ?? null) ? number_format((float) $rankedStock->display_price, 2, ',', '.').' '.$rankCurrencyLabel : '—' }}</span><span class="{{ $rankDailyChange === null ? '' : ($rankDailyChange >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ __('Tag') }} {{ $rankDailyChange !== null ? sprintf('%+.2f%%', $rankDailyChange) : '—' }}</span></small></span>
                                     <span class="flex items-center gap-1.5"><span class="rounded-md border border-cyan-400/20 px-1.5 py-1 text-[9px] font-black text-cyan-400">KI {{ is_numeric($rankScore) ? number_format($rankScore, 1, ',', '.') : '—' }}</span><span class="rounded-md border px-1.5 py-1 text-[9px] font-black {{ is_numeric($rankReturn) && $rankReturn < 0 ? 'border-rose-400/25 text-rose-400' : 'border-emerald-400/25 text-emerald-400' }}">20T {{ is_numeric($rankReturn) ? sprintf('%+.1f%%', $rankReturn) : '—' }}</span></span>
                                 </a>
@@ -643,11 +651,50 @@
                         ->map(fn (array $change): array => [...$change, '_cockpit_group' => 'sell'])->values();
                     $displaySignalChanges = $displayBuySignalChanges->concat($displaySellSignalChanges)->values();
                     $cockpitAverageScore = $displaySignalChanges->whereNotNull('score')->avg('score');
-                    $cockpitAverageRisk = $displaySignalChanges->whereNotNull('risk_level')->avg('risk_level');
+                    $cockpitAverageRisk = $displaySignalChanges->whereNotNull('risk')->avg('risk');
                     $cockpitAverageScoreGrade = \App\Support\QualityGrade::fromPercent(\App\Support\AiScore::toPercent($cockpitAverageScore)) ?? '—';
-                    $cockpitAverageRiskLevel = is_numeric($cockpitAverageRisk)
-                        ? max(2, min(5, (int) round((float) $cockpitAverageRisk)))
-                        : '—';
+                    $cockpitAverageRiskLevel = \App\Support\QualityGrade::riskLevel(is_numeric($cockpitAverageRisk) ? (float) $cockpitAverageRisk : null) ?? '—';
+
+                    // Cross-sectional panel model: 10 strongest stocks on the most recent
+                    // full cross-section (frozen research table, linked to instruments).
+                    $panelTopStocks = collect();
+                    $panelTopAsOf = null;
+                    try {
+                        $panelVersion = 'panel-price-risk-freeze-2026-09-07';
+                        // The last ~20 trading days carry a shrinking cross-section
+                        // (the 20d forward target is not yet observable), so pick the
+                        // latest date whose universe is close to the model's fullest.
+                        $panelPeakCount = (int) \Illuminate\Support\Facades\DB::table('panel_predictions')
+                            ->where('model_version', $panelVersion)
+                            ->groupBy('as_of_date')
+                            ->orderByDesc(\Illuminate\Support\Facades\DB::raw('count(*)'))
+                            ->value(\Illuminate\Support\Facades\DB::raw('count(*)'));
+                        $panelTopAsOf = \Illuminate\Support\Facades\DB::table('panel_predictions')
+                            ->where('model_version', $panelVersion)
+                            ->groupBy('as_of_date')
+                            ->havingRaw('count(*) >= ?', [max(50, (int) ($panelPeakCount * 0.85))])
+                            ->orderByDesc('as_of_date')
+                            ->value('as_of_date');
+                        if ($panelTopAsOf) {
+                            // Keep the list investable: tradable stocks with a
+                            // market cap floor, so micro-caps the low-vol tilt
+                            // favours do not crowd out the ranking.
+                            $panelTopStocks = \Illuminate\Support\Facades\DB::table('panel_predictions as p')
+                                ->join('instruments as i', 'i.id', '=', 'p.instrument_id')
+                                ->where('p.model_version', $panelVersion)
+                                ->where('p.as_of_date', $panelTopAsOf)
+                                ->where('i.type', 'stock')
+                                ->where('i.is_active', true)
+                                ->whereNull('i.deleted_at')
+                                ->where('i.market_cap', '>=', 1_000_000_000)
+                                ->orderByDesc('p.raw_score')
+                                ->limit(10)
+                                ->get(['i.symbol', 'i.name', 'i.country', 'p.raw_score', 'p.xsec_pctile', 'p.decile', 'p.ret_20', 'p.ret_120', 'p.beta_60']);
+                        }
+                    } catch (\Throwable $e) {
+                        $panelTopStocks = collect();
+                    }
+                    $panelFlag = fn (?string $c): string => ['DE' => '🇩🇪', 'US' => '🇺🇸', 'AT' => '🇦🇹', 'CH' => '🇨🇭', 'GB' => '🇬🇧', 'FR' => '🇫🇷', 'NL' => '🇳🇱', 'DK' => '🇩🇰', 'SE' => '🇸🇪', 'NO' => '🇳🇴', 'FI' => '🇫🇮', 'IT' => '🇮🇹', 'ES' => '🇪🇸'][strtoupper((string) $c)] ?? '🌐';
                 @endphp
                 <article x-data="{ cockpitOpen: window.innerWidth >= 768 }" data-dashboard-card="signal-cockpit" data-dashboard-width="1" data-dashboard-height="6" data-dashboard-size="6" style="--dashboard-card-order:{{ $dashboardCardOrder('signal-cockpit') }}" class="dashboard-bento-signal-cockpit ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-cyan-400/35 p-4 {{ $dashboardCardVisible('signal-cockpit') ? '' : 'hidden' }}">
                     <div class="dashboard-collapsible-header flex items-center justify-between gap-3" :class="cockpitOpen ? 'mb-3' : ''">
@@ -662,13 +709,13 @@
                                 <span class="mt-1 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[8px] font-black">
                                     <span class="inline-flex shrink-0 rounded border border-cyan-400/20 px-1 py-0.5 sm:hidden"><span class="text-emerald-500">Top 3 BUY</span><span class="mx-1 text-[var(--ak-muted)]">·</span><span class="text-rose-500">1 SELL</span></span>
                                     <span class="text-cyan-600" title="{{ __('Rohwert') }}: {{ is_numeric($cockpitAverageScore) ? number_format((float) $cockpitAverageScore, 1, ',', '.').'/10' : '—' }}">Ø KI {{ $cockpitAverageScoreGrade }}</span>
-                                    <span class="text-amber-600" title="{{ __('Ø Serving-Risikoklasse') }}: {{ is_numeric($cockpitAverageRisk) ? number_format((float) $cockpitAverageRisk, 1, ',', '.').'/5' : '—' }}">Ø {{ __('Risiko') }} {{ $cockpitAverageRiskLevel }}</span>
+                                    <span class="text-amber-600" title="{{ __('Rohwert') }}: {{ is_numeric($cockpitAverageRisk) ? number_format((float) $cockpitAverageRisk, 0, ',', '.').' %' : '—' }}">Ø {{ __('Risiko') }} {{ $cockpitAverageRiskLevel }}</span>
                                 </span>
                             </span>
                         </button>
                         <span class="flex shrink-0 items-center gap-2"><a href="{{ route('predictions.index') }}" class="hidden text-[9px] font-black text-cyan-600 sm:inline">{{ __('Alle') }} →</a><button type="button" @click="cockpitOpen = ! cockpitOpen" class="grid h-8 w-8 place-items-center rounded-lg border border-cyan-400/25 text-cyan-600" aria-label="{{ __('Signal-Cockpit aufklappen') }}"><x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="cockpitOpen && 'rotate-180'" /></button></span>
                     </div>
-                    <div x-show="cockpitOpen" x-cloak x-transition.opacity class="grid min-h-0 flex-1 gap-2" style="grid-template-rows:minmax(0,1fr)">
+                    <div x-show="cockpitOpen" x-cloak x-transition.opacity class="grid min-h-0 flex-1 gap-2" style="grid-template-rows:{{ $panelTopStocks->isNotEmpty() ? 'auto minmax(0,1fr)' : 'minmax(0,1fr)' }}">
                         @if(false)
                         @php
                             $profileUniverseLabel = match($profileUniverseStats['level'] ?? 'balanced') {
@@ -724,10 +771,9 @@
                                         $isSellCard = ($change['_cockpit_group'] ?? null) === 'sell';
                                         $cardTone = $isSellCard ? 'border-rose-400/25 hover:border-rose-400/45' : 'border-cyan-400/20 hover:border-cyan-400/45';
                                         $changeScore = is_numeric($change['score'] ?? null) ? (float) $change['score'] : null;
+                                        $changeRisk = is_numeric($change['risk'] ?? null) ? (float) $change['risk'] : null;
                                         $changeScoreGrade = \App\Support\QualityGrade::fromPercent(\App\Support\AiScore::toPercent($changeScore)) ?? '—';
-                                        $changeRiskLevel = is_numeric($change['risk_level'] ?? null)
-                                            ? max(2, min(5, (int) round((float) $change['risk_level'])))
-                                            : '—';
+                                        $changeRiskLevel = \App\Support\QualityGrade::riskLevel($changeRisk) ?? '—';
                                     @endphp
                                     <a href="{{ route('stocks.show', ['symbol' => $change['symbol'], 'prediction' => $change['prediction_id'], 'return_to' => '/dashboard']) }}" title="{{ $change['name'] ?: $change['symbol'] }}" class="aki-signal-compact-card group flex min-w-0 items-center gap-2 rounded-lg border bg-white/[.018] px-2 py-1.5 transition {{ $isSellCard ? 'border-rose-400/30 hover:border-rose-400/55' : 'border-amber-400/30 hover:border-amber-400/55' }}">
                                         <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border {{ $isSellCard ? 'border-rose-400/35 bg-rose-400/10 text-rose-400' : 'border-amber-400/35 bg-amber-400/10 text-amber-500' }}" aria-hidden="true">
@@ -736,8 +782,8 @@
                                         <span class="min-w-0 flex-1">
                                             <span class="flex min-w-0 items-center justify-between gap-2"><b class="truncate text-sm font-black text-[var(--ak-text)]">{{ $change['name'] ?: $change['symbol'] }}</b><time class="shrink-0 rounded-md border border-cyan-400/20 px-1.5 py-0.5 text-[8px] font-black tabular-nums text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($change['at'])->format(app()->getLocale() === 'en' ? 'm/d' : 'd.m.') }}</time></span>
                                             <small class="mt-0.5 block truncate text-[9px] font-black {{ $isSellCard ? 'text-rose-400' : 'text-amber-500' }}">{{ $change['from'] }} → {{ $change['to'] }}</small>
-                                            <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $changeFlag }} {{ $change['symbol'] }}</span><span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ $changeScore !== null ? number_format($changeScore, 1, ',', '.').'/10' : '—' }}">KI {{ $changeScoreGrade }}</span><span class="text-amber-500" title="{{ __('Serving-Risikoklasse') }}: {{ is_numeric($changeRiskLevel) ? $changeRiskLevel.'/5' : '—' }}">{{ __('Risiko') }} {{ $changeRiskLevel }}</span>
-                                        @foreach([10, 20, 40] as $days)
+                                            <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $changeFlag }} {{ $change['symbol'] }}</span><span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ $changeScore !== null ? number_format($changeScore, 1, ',', '.').'/10' : '—' }}">KI {{ $changeScoreGrade }}</span><span class="text-amber-500" title="{{ __('Rohwert') }}: {{ $changeRisk !== null ? number_format($changeRisk, 0, ',', '.').' %' : '—' }}">{{ __('Risiko') }} {{ $changeRiskLevel }}</span>
+                                        @foreach([5, 10, 15, 20] as $days)
                                             @php
                                                 $forecast = $change['horizons'][$days] ?? null;
                                                 $forecastDirection = $forecast === null ? 'empty' : (abs((float) $forecast) < .5 ? 'neutral' : ($forecast > 0 ? 'positive' : 'negative'));
@@ -758,6 +804,43 @@
                                 @empty <small class="text-[10px] text-[var(--ak-muted)]">{{ __('Keine Wechsel in den letzten 30 Handelstagen.') }}</small> @endforelse
                             </div>
                         </section>
+                        @if($panelTopStocks->isNotEmpty())
+                        <section class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--ak-border)] border-l-4 border-l-cyan-400 bg-transparent">
+                            <div class="flex items-center justify-between gap-2 border-b border-amber-400/35 bg-amber-400/10 px-3 py-1.5 text-amber-400">
+                                <span class="flex min-w-0 items-center gap-1.5 text-[9px] font-black uppercase tracking-[.16em]"><x-heroicon-o-arrow-trending-up class="h-3.5 w-3.5 shrink-0" />{{ __('Panel-Modell · 10 Stärkste') }}</span>
+                                <span class="shrink-0 text-[8px] font-black uppercase tracking-wide tabular-nums text-amber-500/80">{{ __('Stand') }} {{ \Illuminate\Support\Carbon::parse($panelTopAsOf)->format(app()->getLocale() === 'en' ? 'm/d' : 'd.m.') }}</span>
+                            </div>
+                            <div class="grid min-h-0 flex-1 content-start gap-1.5 overflow-y-auto p-1.5">
+                                @foreach($panelTopStocks as $panelIndex => $panelRow)
+                                    @php
+                                        $panelName = $panelRow->name ?: $panelRow->symbol;
+                                        $panelPctile = is_numeric($panelRow->xsec_pctile) ? (int) round($panelRow->xsec_pctile * 100) : null;
+                                        $panelBeta = is_numeric($panelRow->beta_60) ? (float) $panelRow->beta_60 : null;
+                                        $panelRet20 = is_numeric($panelRow->ret_20) ? (float) $panelRow->ret_20 : null;
+                                        $panelRet120 = is_numeric($panelRow->ret_120) ? (float) $panelRow->ret_120 : null;
+                                        $panelPct = fn (?float $v): string => $v === null ? '—' : (($v >= 0 ? '+' : '').number_format($v * 100, 0, ',', '.').'%');
+                                        $panelPctTone = fn (?float $v): string => $v === null ? 'text-[var(--ak-muted)]' : ($v >= 0 ? 'text-emerald-400' : 'text-rose-400');
+                                    @endphp
+                                    <a href="{{ route('stocks.show', ['symbol' => $panelRow->symbol, 'return_to' => '/dashboard']) }}" title="{{ $panelName }}" class="group flex min-w-0 items-center gap-2 rounded-lg border border-cyan-400/20 bg-white/[.018] px-2 py-1.5 transition hover:border-cyan-400/55">
+                                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-cyan-400/35 bg-cyan-400/10 text-xs font-black tabular-nums text-cyan-300" aria-hidden="true">{{ $panelIndex + 1 }}</span>
+                                        <span class="min-w-0 flex-1">
+                                            <span class="flex min-w-0 items-center justify-between gap-2">
+                                                <b class="truncate text-sm font-black text-[var(--ak-text)]">{{ $panelName }}</b>
+                                                <span class="shrink-0 rounded-md border border-cyan-400/20 px-1.5 py-0.5 text-[8px] font-black tabular-nums text-cyan-500" title="{{ __('Querschnitts-Perzentil') }}">P{{ $panelPctile ?? '—' }}</span>
+                                            </span>
+                                            <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                <span>{{ $panelFlag($panelRow->country) }} {{ $panelRow->symbol }}</span>
+                                                <span class="text-cyan-500" title="{{ __('Dezil') }} 1–10">{{ __('Dezil') }} {{ $panelRow->decile ?? '—' }}</span>
+                                                <span class="text-amber-500" title="60-{{ __('Tage-Beta') }}">β {{ $panelBeta === null ? '—' : number_format($panelBeta, 2, ',', '.') }}</span>
+                                                <span class="whitespace-nowrap tabular-nums {{ $panelPctTone($panelRet20) }}" title="{{ __('Kursänderung 20 Handelstage') }}">20T {{ $panelPct($panelRet20) }}</span>
+                                                <span class="whitespace-nowrap tabular-nums {{ $panelPctTone($panelRet120) }}" title="{{ __('Kursänderung 120 Handelstage') }}">120T {{ $panelPct($panelRet120) }}</span>
+                                            </small>
+                                        </span>
+                                    </a>
+                                @endforeach
+                            </div>
+                        </section>
+                        @endif
                     </div>
                 </article>
 
@@ -972,13 +1055,16 @@
                             </div>
                         </div>
                         <section class="mt-5 border-t border-cyan-400/20 pt-4">
-                            <div class="mb-3 flex items-center justify-between gap-3"><div><h3 class="text-sm font-black">{{ __('Anstehende Termine und Erinnerungen') }}</h3><p class="mt-1 text-[10px] text-[var(--ak-muted)]">{{ __('Persönliche Erinnerungen kannst du hier bearbeiten. Unternehmenstermine werden automatisch aktualisiert.') }}</p></div><span class="rounded-lg border border-cyan-400/20 bg-cyan-400/[.06] px-2.5 py-1 text-[10px] font-black text-cyan-300">{{ $allScheduleItems->count() }}</span></div>
+                            <div class="mb-3 flex items-center justify-between gap-3"><div><h3 class="text-sm font-black">{{ __('Termine und Erinnerungen') }}</h3><p class="mt-1 text-[10px] text-[var(--ak-muted)]">{{ __('Persönliche E-Mail-Erinnerungen bleiben auch nach Versand oder Ablauf sichtbar, damit du sie löschen oder neu terminieren kannst. Unternehmenstermine werden automatisch aktualisiert.') }}</p></div><span class="rounded-lg border border-cyan-400/20 bg-cyan-400/[.06] px-2.5 py-1 text-[10px] font-black text-cyan-300">{{ $allScheduleItems->count() }}</span></div>
                             <div class="grid gap-2">
                                 @forelse($allScheduleItems as $item)
                                     @php
                                         $isPredictionReminder = ($item['type'] ?? null) === 'prediction';
                                         $isSignalReminder = ($item['type'] ?? null) === 'signal';
+                                        $isCorporateEvent = ($item['type'] ?? null) === 'earnings';
                                         $isEditableReminder = $isPredictionReminder || $isSignalReminder;
+                                        $isExpiredReminder = $isPredictionReminder && ($item['expired'] ?? false);
+                                        $isSentReminder = $isPredictionReminder && ($item['status'] ?? null) === 'sent';
                                         $toggleRoute = $isPredictionReminder
                                             ? route(($item['active'] ?? false) ? 'notifications.purchase-reminders.disable' : 'notifications.purchase-reminders.enable', $item['id'])
                                             : ($isSignalReminder ? route(($item['active'] ?? false) ? 'notifications.entry-alerts.disable' : 'notifications.entry-alerts.enable', $item['id']) : null);
@@ -989,15 +1075,19 @@
                                     <article class="rounded-xl border border-cyan-400/15 bg-cyan-400/[.025] p-3">
                                         <div class="flex items-start gap-3">
                                             <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg {{ $isEditableReminder ? 'bg-cyan-400/10 text-cyan-300' : 'bg-amber-400/10 text-amber-300' }}">@if($isEditableReminder)<x-heroicon-o-envelope class="h-4 w-4" />@else<x-heroicon-o-calendar-days class="h-4 w-4" />@endif</span>
-                                            <div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><b class="text-xs text-[var(--ak-text)]">{{ $item['name'] ?: $item['symbol'] }}</b><span class="rounded-md border border-[var(--ak-border)] px-1.5 py-0.5 text-[8px] font-black text-[var(--ak-muted)]">{{ $item['symbol'] }}</span>@if($isEditableReminder)<span class="rounded-md border px-1.5 py-0.5 text-[8px] font-black {{ ($item['active'] ?? false) ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' : 'border-slate-500/25 bg-slate-500/10 text-slate-400' }}">{{ ($item['active'] ?? false) ? __('AKTIV') : __('DEAKTIVIERT') }}</span>@endif</div><p class="mt-1 text-[10px] font-bold text-cyan-300">{{ $item['label'] }}</p><p class="mt-1 text-[9px] text-[var(--ak-muted)]">{{ $item['schedule'] }}</p></div>
+                                            <div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><b class="text-xs text-[var(--ak-text)]">{{ $item['name'] ?: $item['symbol'] }}</b><span class="rounded-md border border-[var(--ak-border)] px-1.5 py-0.5 text-[8px] font-black text-[var(--ak-muted)]">{{ $item['symbol'] }}</span>@if($isEditableReminder)<span class="rounded-md border px-1.5 py-0.5 text-[8px] font-black {{ ($isExpiredReminder || $isSentReminder) ? 'border-amber-400/25 bg-amber-400/10 text-amber-300' : (($item['active'] ?? false) ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' : 'border-slate-500/25 bg-slate-500/10 text-slate-400') }}">{{ $isSentReminder ? __('VERSENDET') : ($isExpiredReminder ? __('ABGELAUFEN') : (($item['active'] ?? false) ? __('AKTIV') : __('DEAKTIVIERT'))) }}</span>@endif</div><p class="mt-1 text-[10px] font-bold text-cyan-300">{{ $item['label'] }}</p><p class="mt-1 text-[9px] text-[var(--ak-muted)]">{{ $item['schedule'] }}</p></div>
                                         </div>
                                         @if($isEditableReminder)
                                             <div class="mt-3 flex flex-wrap items-end gap-2 border-t border-cyan-400/10 pt-3">
-                                                @if($isPredictionReminder)
+                                                @if($isPredictionReminder && ! $isSentReminder)
                                                     <form method="POST" action="{{ route('notifications.purchase-reminders.reschedule', $item['id']) }}" class="flex min-w-[210px] flex-1 items-end gap-2">@csrf @method('PATCH')<label class="min-w-0 flex-1"><span class="mb-1 block text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Termin') }}</span><input type="date" name="remind_on" value="{{ $item['date'] }}" min="{{ now()->toDateString() }}" required class="ak-input h-9 w-full px-2 text-xs"></label><button type="submit" class="h-9 rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 text-[9px] font-black text-cyan-300">{{ __('Speichern') }}</button></form>
                                                 @endif
-                                                <form method="POST" action="{{ $toggleRoute }}">@csrf @method('PATCH')<button type="submit" class="h-9 rounded-lg border px-3 text-[9px] font-black {{ ($item['active'] ?? false) ? 'border-amber-400/25 text-amber-300' : 'border-emerald-400/25 text-emerald-300' }}">{{ ($item['active'] ?? false) ? __('Deaktivieren') : __('Aktivieren') }}</button></form>
+                                                @unless($isExpiredReminder || $isSentReminder)<form method="POST" action="{{ $toggleRoute }}">@csrf @method('PATCH')<button type="submit" class="h-9 rounded-lg border px-3 text-[9px] font-black {{ ($item['active'] ?? false) ? 'border-amber-400/25 text-amber-300' : 'border-emerald-400/25 text-emerald-300' }}">{{ ($item['active'] ?? false) ? __('Deaktivieren') : __('Aktivieren') }}</button></form>@endunless
                                                 <form method="POST" action="{{ $deleteRoute }}" onsubmit="return confirm('{{ __('Nur diese einzelne Erinnerung wird gelöscht. Deine übrigen E-Mail-Einstellungen bleiben unverändert. Möchtest du fortfahren?') }}')">@csrf @method('DELETE')<button type="submit" class="grid h-9 w-9 place-items-center rounded-lg border border-rose-400/25 text-rose-300" title="{{ __('Löschen') }}"><x-heroicon-o-trash class="h-4 w-4" /></button></form>
+                                            </div>
+                                        @elseif($isCorporateEvent)
+                                            <div class="mt-3 flex justify-end border-t border-cyan-400/10 pt-3">
+                                                <form method="POST" action="{{ route('profile.dashboard-schedule-events.destroy', $item['id']) }}" onsubmit="return confirm('{{ __('Diesen automatischen Unternehmenstermin nur aus deinem Dashboard entfernen?') }}')">@csrf @method('DELETE')<button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-400/25 px-3 text-[9px] font-black text-rose-300" title="{{ __('Entfernen') }}"><x-heroicon-o-trash class="h-4 w-4" />{{ __('Entfernen') }}</button></form>
                                             </div>
                                         @endif
                                     </article>
@@ -1279,7 +1369,7 @@
             if (!modal) return;
             const open = () => { modal.classList.remove('hidden'); modal.classList.add('grid'); };
             const close = () => { modal.classList.add('hidden'); modal.classList.remove('grid'); };
-            document.querySelectorAll('[data-message-settings-open]').forEach((button) => button.addEventListener('click', open));
+            document.querySelectorAll('[data-message-settings-open]').forEach((button) => button.addEventListener('click', (event) => { event.preventDefault(); open(); }));
             modal.querySelector('[data-message-settings-close]')?.addEventListener('click', close);
             modal.querySelectorAll('form input[name="_method"][value="DELETE"]').forEach((method) => method.form?.addEventListener('submit', () => {
                 if (method.form?.dataset.confirmApproved === '1') close();

@@ -1,6 +1,14 @@
 <x-app-layout>
     <x-detail-page-theme />
-    <div id="strategy-depot-page" x-data="{ simulationOpen: {{ request()->boolean('test') && !$liveSimulationEnabled ? 'true' : 'false' }}, simulationSubmitting: false, automationOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false }" class="ak-detail-design flex min-h-[calc(100dvh-89px)] flex-col py-4 text-[var(--ak-text)]">
+    @php
+        $simulationUsesLegacyFixedSizing = ($simulationSummary['source_type'] ?? null) === 'serving_model_configurations'
+            && empty($simulationSummary['allocation_mode'])
+            && is_numeric($simulationSummary['position_notional'] ?? null);
+        $singleModelReference = count($simulationSummary['model_references'] ?? []) === 1
+            ? $simulationSummary['model_references'][0]
+            : null;
+    @endphp
+    <div id="strategy-depot-page" x-data="{ simulationOpen: {{ request()->boolean('test') && !$errors->has('simulation') ? 'true' : 'false' }}, simulationSubmitting: false, automationOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false }" class="ak-detail-design flex min-h-[calc(100dvh-89px)] flex-col py-4 text-[var(--ak-text)]">
         <div class="ak-depot-detail-hero ak-detail-hero mb-4 flex shrink-0 flex-col gap-3 rounded-2xl border border-[var(--ak-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 items-center gap-3">
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300">
@@ -8,19 +16,22 @@
                 </div>
                 <div class="min-w-0">
                     <p class="text-[10px] font-black uppercase tracking-[.18em] text-teal-700">{{ __('Depot') }}</p>
-                    <div class="mt-1 flex items-center gap-2"><h1 class="truncate text-2xl font-black tracking-tight">{{ $portfolio->name }}</h1>@if($liveSimulationEnabled)<span class="inline-flex shrink-0 items-center gap-1 rounded-md border border-orange-400/25 bg-orange-400/[.09] px-2 py-1 text-[9px] font-black uppercase tracking-wide text-orange-400"><span class="h-1.5 w-1.5 rounded-full bg-orange-400"></span>{{ __('Strategie') }}</span>@endif</div>
+                    <div class="mt-1 flex items-center gap-2"><h1 class="truncate text-2xl font-black tracking-tight">{{ $portfolio->name }}</h1>@if($liveSimulationEnabled)<span class="inline-flex shrink-0 items-center gap-1 rounded-md border border-orange-400/25 bg-orange-400/[.09] px-2 py-1 text-[9px] font-black uppercase tracking-wide text-orange-400"><span class="h-1.5 w-1.5 rounded-full bg-orange-400"></span>{{ __('Strategie') }}</span>@endif @if($portfolio->is_public_readonly)<span class="rounded-md border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-[9px] font-black uppercase text-cyan-300">{{ __('Öffentlich') }} · {{ __('Nur Lesen') }}</span>@endif</div>
                     <p class="mt-1 truncate text-sm text-[var(--ak-muted)]">{{ $portfolio->description ?: __('Positionen und Entwicklung deines Depots.') }}</p>
                 </div>
             </div>
 
             <div class="flex flex-wrap items-center justify-end gap-2">
+            @if($portfolio->is_public_readonly && (int)$portfolio->user_id !== (int)auth()->id())<form method="POST" action="{{ route('depots.following.update', $portfolio) }}">@csrf @method('PUT')<input type="hidden" name="following" value="{{ $isFollowingPortfolio ? 0 : 1 }}"><button class="inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black {{ $isFollowingPortfolio ? 'border-emerald-400/35 bg-emerald-400/10 text-emerald-300' : 'border-cyan-400/30 bg-cyan-400/[.08] text-cyan-300' }}"><x-heroicon-o-bell class="h-4 w-4" />{{ $isFollowingPortfolio ? __('Folge ich · E-Mail aktiv') : __('Depot folgen') }}</button></form>@endif
+            @if($canEditPortfolio)
             @if($portfolio->type === 'paper')<button type="button" @if($canActivateStrategyAccount) @click="automationOpen=true" @endif @disabled(!$canActivateStrategyAccount) title="{{ $canActivateStrategyAccount ? '' : __('Ab Pro verfügbar') }}" class="inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40 {{ $liveSimulationEnabled ? 'border-orange-400/30 bg-orange-400/[.1] text-orange-400' : 'border-[var(--ak-border)] bg-[var(--ak-card)] text-[var(--ak-muted)]' }}"><x-heroicon-o-bolt class="h-4 w-4" />{{ $liveSimulationEnabled ? __('Mitlaufend aktiv') : __('Konto aktivieren') }}</button>@endif
-            @if($portfolio->type === 'paper')<button type="button" @if(!$liveSimulationEnabled) @click="simulationOpen=true" @endif @disabled($liveSimulationEnabled) title="{{ $liveSimulationEnabled ? __('Während das Strategiedepot mitläuft, ist keine historische Simulation möglich.') : __('Simulation starten') }}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/[.09] px-4 text-xs font-black text-amber-200 shadow-sm shadow-amber-950/15 disabled:cursor-not-allowed disabled:border-slate-500/20 disabled:bg-slate-500/[.06] disabled:text-slate-500 disabled:shadow-none"><x-heroicon-o-play class="h-4 w-4" />{{ __('Simulation') }}</button>@endif
+            @if($portfolio->type === 'paper')<button type="button" @click="simulationOpen=true" title="{{ $liveSimulationEnabled ? __('Simulation starten und mitlaufendes Strategiedepot deaktivieren') : __('Simulation starten') }}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/[.09] px-4 text-xs font-black text-amber-200 shadow-sm shadow-amber-950/15"><x-heroicon-o-play class="h-4 w-4" />{{ __('Simulation') }}</button>@endif
             @if($portfolio->type === 'paper')<button type="button" @click="capitalOpen=true" class="inline-flex h-10 items-center gap-2 rounded-xl border border-teal-300/20 bg-teal-400/[.07] px-3 text-xs font-black text-teal-200"><x-heroicon-o-banknotes class="h-4 w-4" />{{ __('Kapital') }}</button>@endif
             @if($portfolio->type === 'paper')<button type="button" @click="resetOpen=true" class="inline-flex h-10 items-center gap-2 rounded-xl border border-orange-400/20 bg-orange-400/[.07] px-3 text-xs font-black text-orange-400"><x-heroicon-o-arrow-path class="h-4 w-4" />{{ __('Zurücksetzen') }}</button>@endif
             @if($portfolio->type === 'paper')<button type="button" @click="deleteOpen=true" class="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-300/20 bg-rose-400/[.07] px-3 text-xs font-black text-rose-300"><x-heroicon-o-trash class="h-4 w-4" />{{ __('Löschen') }}</button>@endif
-            <a href="{{ $backUrl }}" class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:bg-teal-500/10 hover:text-teal-700">
-                <x-heroicon-o-arrow-left class="h-4 w-4" />{{ $backLabel }}
+            @endif
+            <a href="{{ $backUrl }}" data-back-link class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:bg-teal-500/10 hover:text-teal-700">
+                <x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Zurück') }}
             </a>
             </div>
         </div>
@@ -48,6 +59,14 @@
             </div>
         @endif
         @if($errors->any())<div class="mb-4 rounded-xl border border-rose-300/25 bg-rose-400/[.08] px-4 py-3 text-sm font-bold text-rose-200">{{ $errors->first() }}</div>@endif
+        @if(!empty($simulationSummary['skipped_configurations']))
+            <div class="mb-4 rounded-xl border border-amber-300/25 bg-amber-300/[.07] px-4 py-3 text-sm text-amber-100">
+                <p class="font-black">{{ __('Einige Modelle konnten nicht simuliert werden.') }}</p>
+                @foreach($simulationSummary['skipped_configurations'] as $skipped)
+                    <p class="mt-1 text-xs text-amber-200">{{ $skipped['symbol'] }} · {{ $skipped['horizon_days'] }}T · {{ $skipped['variant_label'] }} — {{ __('historische Service-Trades fehlen') }}</p>
+                @endforeach
+            </div>
+        @endif
 
         <section class="mb-1 grid items-stretch gap-3 xl:grid-cols-[minmax(380px,.8fr)_minmax(0,1.2fr)]">
             <div class="ak-depot-detail-card ak-detail-panel relative h-full overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
@@ -61,10 +80,10 @@
                         [__('Ø Kapitalauslastung'), number_format($averageCapitalUtilization, 1, ',', '.').' %', 'text-teal-300'],
                         [__('Performance'), ($performance > 0 ? '+' : '').number_format($performance, 2, ',', '.').' %', $performance > 0 ? 'text-emerald-400' : ($performance < 0 ? 'text-rose-400' : 'text-[var(--ak-muted)]')],
                         [__('Positionen'), $portfolio->positions->count(), 'text-teal-700'],
-                        [__('Trades'), $simulationRun?->trades_count ?? 0, 'text-[var(--ak-text)]'],
-                        [__('Trefferquote'), number_format((float) ($simulationSummary['hit_rate_percent'] ?? 0), 1, ',', '.').' %', 'text-orange-400'],
-                        [__('Profitfaktor'), number_format(\App\Support\ProfitFactor::cap($simulationSummary['profit_factor'] ?? 0) ?? 0, 2, ',', '.'), 'text-orange-400'],
-                        [__('Max. Drawdown'), number_format((float) ($simulationSummary['max_drawdown_percent'] ?? 0), 1, ',', '.').' %', 'text-rose-300'],
+                        [$singleModelReference ? __('Modell-Trades') : __('Trades'), $singleModelReference['trades'] ?? $simulationRun?->trades_count ?? 0, 'text-[var(--ak-text)]'],
+                        [$singleModelReference ? __('Modell-Trefferquote') : __('Trefferquote'), number_format((float) ($singleModelReference['hit_rate_percent'] ?? $simulationSummary['hit_rate_percent'] ?? 0), 1, ',', '.').' %', 'text-orange-400'],
+                        [$singleModelReference ? __('Modell-Profitfaktor') : __('Profitfaktor'), number_format(\App\Support\ProfitFactor::cap($singleModelReference['profit_factor'] ?? $simulationSummary['profit_factor'] ?? 0) ?? 0, 2, ',', '.'), 'text-orange-400'],
+                        [$singleModelReference ? __('Modell-Drawdown') : (($simulationSummary['source_type'] ?? null) === 'serving_model_configurations' ? __('Realisierter Depot-DD') : __('Max. Drawdown')), number_format((float) ($singleModelReference['max_drawdown_percent'] ?? $simulationSummary['max_drawdown_percent'] ?? 0), 1, ',', '.').' %', 'text-rose-300'],
                         [__('Verschiedene Aktien'), $distinctStocksCount, 'text-orange-400'],
                         [__('Höchster Gewinn'), $highestProfit !== null ? '+'.number_format($highestProfit, 2, ',', '.').' '.$portfolio->currency : '—', 'text-teal-300'],
                         [__('Höchster Verlust'), $highestLoss !== null ? number_format($highestLoss, 2, ',', '.').' '.$portfolio->currency : '—', 'text-rose-300'],
@@ -101,7 +120,7 @@
                         </div>
                     </div>
                 @endif
-                @if($portfolio->type === 'paper')
+                @if($portfolio->type === 'paper' && $canEditPortfolio)
                     <form id="portfolio-strategy-form" method="POST" action="{{ route('depots.strategies.update', $portfolio) }}" class="mt-3 rounded-xl border border-teal-500/20 bg-teal-500/[.045] p-3">
                         @csrf
                         @method('PUT')
@@ -118,7 +137,20 @@
             </div>
             <div class="ak-depot-detail-card ak-detail-panel relative flex h-full min-h-[420px] min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-4 shadow-[var(--ak-shadow)]">
                 <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400/35 via-cyan-400 to-teal-500/30"></div>
-                <div class="mb-1 flex items-center justify-between gap-3"><div><p class="text-[8px] font-black uppercase tracking-[.16em] text-orange-400">{{ __('Depotentwicklung') }}</p><h2 class="mt-0.5 text-sm font-black">{{ $simulationRun?->simulation_start_date && $simulationRun?->simulation_end_date ? $simulationRun->simulation_start_date.' – '.$simulationRun->simulation_end_date : __('Noch keine Simulation vorhanden') }}</h2></div>@if($simulationRun?->status === 'completed')<a href="{{ route('depots.simulation.report', [$portfolio, $simulationRun->public_id]) }}" title="{{ __('Bericht laden') }}" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-orange-400/25 bg-orange-400/10 px-2.5 text-[10px] font-black text-orange-400"><x-heroicon-o-arrow-down-tray class="h-4 w-4" />{{ __('Bericht') }}</a>@else<x-heroicon-o-chart-bar-square class="h-5 w-5 text-orange-400" />@endif</div>
+                <div class="mb-1 flex items-center justify-between gap-3">
+                    <div><p class="text-[8px] font-black uppercase tracking-[.16em] text-orange-400">{{ __('Depotentwicklung') }}</p><h2 class="mt-0.5 text-sm font-black">{{ $simulationRun?->simulation_start_date && $simulationRun?->simulation_end_date ? $simulationRun->simulation_start_date.' – '.$simulationRun->simulation_end_date : __('Noch keine Simulation vorhanden') }}</h2></div>
+                    <div class="flex items-center gap-3">
+                        @if($simulationRun?->status === 'completed')
+                            <div class="hidden items-center gap-3 text-[8px] font-bold text-[var(--ak-muted)] sm:flex" aria-label="{{ __('Kauf- und Verkaufsmarkierungen') }}">
+                                <span class="inline-flex items-center gap-1.5"><i class="ak-depot-trade-legend ak-depot-trade-legend-buy"></i>{{ __('Kauf') }}</span>
+                                <span class="inline-flex items-center gap-1.5"><i class="ak-depot-trade-legend ak-depot-trade-legend-sell"></i>{{ __('Verkauf') }}</span>
+                            </div>
+                            <a href="{{ route('depots.simulation.report', [$portfolio, $simulationRun->public_id]) }}" title="{{ __('Bericht laden') }}" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-orange-400/25 bg-orange-400/10 px-2.5 text-[10px] font-black text-orange-400"><x-heroicon-o-arrow-down-tray class="h-4 w-4" />{{ __('Bericht') }}</a>
+                        @else
+                            <x-heroicon-o-chart-bar-square class="h-5 w-5 text-orange-400" />
+                        @endif
+                    </div>
+                </div>
                 @if($simulationRun?->status === 'completed' && !empty($simulationSummary['equity_curve']))
                     <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-transparent"><div id="portfolio-simulation-chart" class="ak-portfolio-line-chart min-h-[260px] flex-1"></div><div id="portfolio-profit-bars" class="relative mx-10 h-24 shrink-0 border-t border-white/10 bg-transparent"></div></div>
                 @else
@@ -135,6 +167,53 @@
                 @endif
             </div>
         </section>
+
+        @if(($simulationSummary['source_type'] ?? null) === 'serving_model_configurations' && !empty($simulationSummary['model_references']))
+            <section class="mb-4 overflow-hidden rounded-2xl border border-violet-400/25 bg-violet-400/[.035] shadow-[var(--ak-shadow)]">
+                <div class="flex flex-col gap-3 border-b border-violet-400/15 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-[8px] font-black uppercase tracking-[.16em] text-violet-300">{{ __('Berechnungsabgleich') }}</p>
+                        <h2 class="mt-1 text-sm font-black">{{ __('Modellreferenz und tatsächliches Depot') }}</h2>
+                    </div>
+                    <div class="flex flex-wrap gap-2 text-[9px] font-black">
+                        <span class="rounded-md border border-teal-400/25 bg-teal-400/[.08] px-2 py-1 text-teal-300">{{ __('Depot') }} {{ (float)($simulationSummary['performance_percent'] ?? 0) >= 0 ? '+' : '' }}{{ number_format((float)($simulationSummary['performance_percent'] ?? 0), 2, ',', '.') }} %</span>
+                        <span class="rounded-md border border-amber-300/25 bg-amber-300/[.08] px-2 py-1 text-amber-200">{{ $simulationUsesLegacyFixedSizing ? __('Festbetrag') : __($simulationSummary['allocation_mode_label'] ?? 'Balancing') }}</span>
+                        <span class="rounded-md border border-amber-300/25 bg-amber-300/[.08] px-2 py-1 text-amber-200">{{ __('Maximal :count Aktien', ['count' => (int)($simulationSummary['maximum_positions'] ?? 5)]) }}</span>
+                        @if(!$simulationUsesLegacyFixedSizing && ($simulationSummary['allocation_mode'] ?? null) === 'equal_weight')<span class="rounded-md border border-amber-300/25 bg-amber-300/[.08] px-2 py-1 text-amber-200">{{ __('Max. :percent % je Aktie', ['percent' => number_format((float)($simulationSummary['max_stock_allocation_percent'] ?? 30), 0, ',', '.')]) }}</span>@endif
+                        <span class="rounded-md border border-violet-300/25 bg-violet-300/[.08] px-2 py-1 text-violet-200">{{ __('Ø :amount € je Kauf', ['amount' => number_format((float)($simulationSummary['average_position_notional'] ?? $simulationSummary['position_notional'] ?? 0), 0, ',', '.')]) }}</span>
+                        <span class="rounded-md border border-amber-300/25 bg-amber-300/[.08] px-2 py-1 text-amber-200">0,3 % · {{ __('mindestens') }} {{ number_format((float)($simulationSummary['minimum_fee'] ?? 10), 2, ',', '.') }} €</span>
+                    </div>
+                </div>
+                <div class="grid gap-3 p-4 lg:grid-cols-2">
+                    @foreach($simulationSummary['model_references'] as $reference)
+                        <article class="rounded-xl border border-violet-400/20 bg-[var(--ak-surface-muted)] p-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div><p class="text-xs font-black">{{ $reference['symbol'] }} · {{ $reference['horizon_days'] }}T · {{ $reference['variant_label'] }}</p><p class="mt-1 text-[9px] text-[var(--ak-muted)]">{{ $reference['start_date'] }} – {{ $reference['end_date'] }}</p></div>
+                                <span class="text-sm font-black tabular-nums text-violet-300">{{ (float)$reference['cumulative_return_percent'] >= 0 ? '+' : '' }}{{ number_format((float)$reference['cumulative_return_percent'], 2, ',', '.') }} %</span>
+                            </div>
+                            <div class="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-3 xl:grid-cols-6">
+                                @foreach([
+                                    [__('Trades'), $reference['trades'], 0],
+                                    [__('Treffer'), $reference['hit_rate_percent'].' %', null],
+                                    [__('Profitfaktor'), $reference['profit_factor'] ?? '—', 2],
+                                    [__('Drawdown'), $reference['max_drawdown_percent'].' %', null],
+                                    [__('Kapitalrate'), isset($reference['capital_rate_percent']) ? number_format((float)$reference['capital_rate_percent'], 1, ',', '.').' %' : '—', null],
+                                    [__('Kosten'), isset($reference['simulation_costs']) ? number_format((float)$reference['simulation_costs'], 2, ',', '.').' '.$portfolio->currency : '—', null],
+                                    [__('Gewinn je Aktie'), isset($reference['simulation_net_profit']) ? (((float)$reference['simulation_net_profit'] >= 0 ? '+' : '').number_format((float)$reference['simulation_net_profit'], 2, ',', '.').' '.$portfolio->currency) : '—', null],
+                                ] as [$label, $value, $decimals])
+                                    <div class="rounded-lg border border-[var(--ak-border)] px-2 py-2"><p class="text-[7px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $label }}</p><p class="mt-1 text-[10px] font-black tabular-nums">{{ $decimals !== null && is_numeric($value) ? number_format((float)$value, $decimals, ',', '.') : $value }}</p></div>
+                                @endforeach
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+                <p class="border-t border-violet-400/15 px-4 py-3 text-[10px] leading-5 text-[var(--ak-muted)]">{{ $simulationUsesLegacyFixedSizing
+                    ? __('Die Modellreferenz entspricht exakt der Modellseite: alle Modell-Trades werden mit dem dort gespeicherten Nettoertrag vollständig wiederangelegt. Das Depot verwendet dagegen je ausgeführtem Signal fest 3.000 € und berücksichtigt 0,3 % Kosten je Order, mindestens 10 €. Deshalb müssen Modellrendite und Depotrendite unterschiedlich sein; Trades und Modellkennzahlen müssen jedoch exakt übereinstimmen.')
+                    : (($simulationSummary['allocation_mode'] ?? null) === 'full_investment'
+                        ? __('Die Modellreferenz entspricht exakt der Modellseite und legt alle gespeicherten Nettoerträge vollständig wieder an. Im Vollinvestitionsmodus verwendet jedes ausgeführte Kaufsignal das gesamte freie Kapital abzüglich Orderkosten. Zusätzlich gelten 0,3 % Kosten je Order, mindestens 10 €. Deshalb können Modellrendite und Depotrendite unterschiedlich sein, obwohl dieselben Trades zugrunde liegen.')
+                        : __('Die Modellreferenz entspricht exakt der Modellseite und legt alle gespeicherten Nettoerträge vollständig wieder an. Beim Balancing wird der Depotwert auf die gewählte Aktienzahl verteilt und zusätzlich durch den Maximalanteil je Aktie begrenzt. Zusätzlich gelten 0,3 % Kosten je Order, mindestens 10 €. Deshalb können Modellrendite und Depotrendite unterschiedlich sein, obwohl dieselben Trades zugrunde liegen.')) }}</p>
+            </section>
+        @endif
 
         @if($simulationRun && !in_array($simulationRun->status, ['queued', 'running', 'completed'], true))
             <section class="mb-4 rounded-xl border border-rose-300/20 bg-rose-400/[.06] px-4 py-3 text-sm font-bold text-rose-300 shadow-[var(--ak-shadow)]">
@@ -220,7 +299,7 @@
                                     <td class="px-4 py-3 font-black tabular-nums">{{ number_format($value, 2, ',', '.') }} {{ $portfolio->currency }}</td>
                                     <td class="px-4 py-3 font-black tabular-nums {{ $positionPerformance > 0 ? 'text-emerald-400' : ($positionPerformance < 0 ? 'text-rose-400' : 'text-[var(--ak-muted)]') }}">{{ $positionPerformance > 0 ? '+' : '' }}{{ number_format($positionPerformance, 2, ',', '.') }} %</td>
                                     <td class="px-4 py-3">@if($series->count()>=2)<svg class="h-10 w-32" viewBox="0 0 {{ $cw }} {{ $ch }}"><polyline points="{{ $poly }}" fill="none" stroke="{{ $positionPerformance>=0?'#34d399':'#fb7185' }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>@else — @endif</td>
-                                    <td class="px-4 py-3"><form method="POST" action="{{ route('paper-depots.instruments.sell', [$portfolio, $position->instrument_id]) }}" class="flex items-center gap-1.5" onsubmit="return confirm(@js(__('Verkauf im Musterdepot ausführen?'))) ">@csrf<input name="quantity" type="number" min="0.0001" max="{{ $position->quantity }}" step="0.0001" value="{{ rtrim(rtrim(number_format((float)$position->quantity,4,'.',''),'0'),'.') }}" required class="ak-input h-8 w-20 px-2 text-[10px]"><button class="h-8 rounded-lg border border-rose-400/30 bg-rose-400/10 px-2.5 text-[9px] font-black text-rose-300">{{ __('Verkaufen') }}</button></form></td>
+                                    <td class="px-4 py-3">@if($canEditPortfolio)<form method="POST" action="{{ route('paper-depots.instruments.sell', [$portfolio, $position->instrument_id]) }}" class="flex items-center gap-1.5" onsubmit="return confirm(@js(__('Verkauf im Musterdepot ausführen?'))) ">@csrf<input name="quantity" type="number" min="0.0001" max="{{ $position->quantity }}" step="0.0001" value="{{ rtrim(rtrim(number_format((float)$position->quantity,4,'.',''),'0'),'.') }}" required class="ak-input h-8 w-20 px-2 text-[10px]"><button class="h-8 rounded-lg border border-rose-400/30 bg-rose-400/10 px-2.5 text-[9px] font-black text-rose-300">{{ __('Verkaufen') }}</button></form>@else<span class="text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Nur Lesen') }}</span>@endif</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -253,7 +332,7 @@
                                     $isSale = strtolower($transaction->type) === 'sell';
                                     $gross = (float)$transaction->quantity * (float)$transaction->price;
                                     $movement = $isSale ? $gross - (float)$transaction->fees : -($gross + (float)$transaction->fees);
-                                    $simulated = data_get($transaction->meta, 'source') === 'portfolio_backtest_simulation';
+                                    $simulated = in_array(data_get($transaction->meta, 'source'), ['portfolio_backtest_simulation', 'portfolio_serving_simulation'], true);
                                     $result = data_get($transaction->meta, 'realized_profit');
                                     $resultPercent = data_get($transaction->meta, 'performance_percent');
                                     $triggerStrategyIds = collect(data_get($transaction->meta, 'strategy_ids', [data_get($transaction->meta, 'strategy_id')]))->filter();
@@ -269,7 +348,7 @@
                                         @endif
                                         <p class="mt-0.5 text-[10px] text-[var(--ak-muted)]">{{ $transaction->instrument?->name }}</p>
                                     </td>
-                                    <td class="px-4 py-3 font-bold tabular-nums">{{ number_format(round($transaction->quantity),0,',','.') }}</td>
+                                    <td class="px-4 py-3 font-bold tabular-nums">{{ number_format((float)$transaction->quantity,4,',','.') }}</td>
                                     <td class="px-4 py-3 font-bold tabular-nums">{{ number_format($transaction->price,2,',','.') }} {{ $transaction->currency }}</td>
                                     <td class="px-4 py-3 tabular-nums text-[var(--ak-muted)]">{{ number_format($transaction->fees,2,',','.') }} {{ $portfolio->currency }}</td>
                                     <td class="px-4 py-3 font-black tabular-nums {{ $movement >= 0 ? 'text-teal-300' : 'text-rose-300' }}">{{ $movement >= 0 ? '+' : '' }}{{ number_format($movement,2,',','.') }} {{ $portfolio->currency }}</td>
@@ -282,12 +361,32 @@
             @endif
         </section>
 
-        <div x-show="simulationOpen" x-cloak class="fixed inset-0 z-[120] grid place-items-center bg-slate-950/80 p-4 backdrop-blur-sm" @keydown.escape.window="simulationOpen=false">
-            <form method="POST" action="{{ route('depots.simulation.start', $portfolio) }}" class="w-full max-w-lg rounded-2xl border border-amber-300/25 bg-[#16253a]/90 p-6 shadow-2xl" @click.outside="if(!simulationSubmitting) simulationOpen=false" @submit="simulationSubmitting=true">
+        <div x-show="simulationOpen" x-cloak class="fixed inset-0 z-[120] grid place-items-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm" @keydown.escape.window="simulationOpen=false">
+            <form method="POST" action="{{ route('depots.simulation.start', $portfolio) }}" class="my-4 w-full max-w-2xl rounded-2xl border border-amber-300/25 bg-[#16253a]/95 p-6 shadow-2xl" @click.outside="if(!simulationSubmitting) simulationOpen=false" @submit="simulationSubmitting=true">
                 @csrf
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300"><x-heroicon-o-exclamation-triangle class="h-7 w-7" /></div>
                 <h2 class="mt-4 text-xl font-black">{{ __('Simulation neu starten?') }}</h2>
                 <p class="mt-3 text-sm leading-6 text-slate-200">{{ __('Dabei werden alle bisherigen Positionen, Transaktionen, Kontobuchungen und Simulationshistorien dieses Musterdepots endgültig gelöscht. Das Verrechnungskonto wird auf das festgelegte Startkapital zurückgesetzt.') }}</p>
+                @if($liveSimulationEnabled)<p class="mt-3 rounded-xl border border-orange-400/25 bg-orange-400/[.08] px-4 py-3 text-xs font-bold leading-5 text-orange-300">{{ __('Beim Start wird das aktuell mitlaufende Strategiedepot automatisch deaktiviert.') }}</p>@endif
+                @php($selectedExitPolicy = old('exit_policy', \App\Services\StockSpecificExitPortfolioSimulationService::STOCK_SPECIFIC_FINAL_EXIT))
+                <fieldset class="mt-4 grid gap-2">
+                    <legend class="mb-2 text-[9px] font-black uppercase tracking-[.16em] text-slate-400">{{ __('Exit-Logik für diesen Test') }}</legend>
+                    <label class="flex cursor-pointer gap-3 rounded-xl border border-teal-300/25 bg-teal-400/[.07] p-3 text-sm text-teal-50">
+                        <input type="radio" name="exit_policy" value="stock_specific_final_exit" @checked($selectedExitPolicy === 'stock_specific_final_exit') class="mt-0.5 h-4 w-4 accent-teal-400">
+                        <span><strong class="block font-black text-teal-200">{{ __('Aktienspezifischer Exit') }}</strong><span class="mt-1 block text-xs leading-5 text-slate-300">{{ __('Elf vorbereitete Aktien; jeder Ausstieg folgt ihrem eigenen Short-/TCN-/Indikator-Signal. Einstiege sind ausschließlich die final gefilterten BUY-Übergänge.') }}</span></span>
+                    </label>
+                    <label class="flex cursor-pointer gap-3 rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm text-slate-100">
+                        <input type="radio" name="exit_policy" value="fixed_horizon_20t" @checked($selectedExitPolicy === 'fixed_horizon_20t') class="mt-0.5 h-4 w-4 accent-amber-400">
+                        <span><strong class="block font-black">{{ __('Fester Exit nach 20 Handelstagen') }}</strong><span class="mt-1 block text-xs leading-5 text-slate-400">{{ __('Direkter Vergleich mit denselben elf Aktien und exakt denselben gefilterten Einstiegen.') }}</span></span>
+                    </label>
+                    <label class="flex cursor-pointer gap-3 rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm text-slate-100">
+                        <input type="radio" name="exit_policy" value="strategy_default" @checked($selectedExitPolicy === 'strategy_default') class="mt-0.5 h-4 w-4 accent-slate-300">
+                        <span><strong class="block font-black">{{ __('Bisheriger Strategie-Exit') }}</strong><span class="mt-1 block text-xs leading-5 text-slate-400">{{ __('Behält den bisherigen Ablauf der zugeordneten Strategie unverändert bei.') }}</span></span>
+                    </label>
+                    <p class="rounded-lg border border-sky-300/15 bg-sky-400/[.05] px-3 py-2 text-[11px] leading-5 text-sky-100">{{ __('Die ersten beiden Varianten verwenden denselben eingefrorenen und geprüften Eintrittsdatensatz. Änderungen an aktuell zugeordneten Eintrittsfiltern werden ausschließlich im Modus „Bisheriger Strategie-Exit“ neu ausgewertet.') }}</p>
+                </fieldset>
+                <div class="mt-4 rounded-xl border border-teal-300/20 bg-teal-400/[.06] px-4 py-3 text-xs leading-5 text-teal-100"><strong class="block text-[9px] uppercase tracking-wide text-teal-300">{{ __('Kapitalverteilung aus Strategie') }}</strong>{{ __('Positionsanzahl, Positionsfaktor und dynamische Kapitalgewichtung werden unverändert aus den zugeordneten Strategien übernommen.') }}</div>
+                <div class="mt-4 grid grid-cols-3 gap-2 text-center"><div class="rounded-lg border border-amber-300/20 bg-amber-300/[.06] p-2"><p class="text-[8px] font-black uppercase tracking-wide text-slate-400">{{ __('Startkapital') }}</p><p class="mt-1 text-xs font-black text-amber-200">{{ number_format((float) data_get($portfolio->meta, 'automation.initial_capital', 10000), 0, ',', '.') }} €</p></div><div class="rounded-lg border border-amber-300/20 bg-amber-300/[.06] p-2"><p class="text-[8px] font-black uppercase tracking-wide text-slate-400">{{ __('Kosten') }}</p><p class="mt-1 text-xs font-black text-amber-200">0,3 %</p></div><div class="rounded-lg border border-amber-300/20 bg-amber-300/[.06] p-2"><p class="text-[8px] font-black uppercase tracking-wide text-slate-400">{{ __('Mindestgebühr') }}</p><p class="mt-1 text-xs font-black text-amber-200">10 €</p></div></div>
                 <div class="mt-5 flex justify-end gap-2"><button type="button" :disabled="simulationSubmitting" @click="simulationOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300 disabled:opacity-40">{{ __('Abbrechen') }}</button><button :disabled="simulationSubmitting" class="inline-flex h-10 min-w-40 items-center justify-center gap-2 rounded-lg border border-amber-300/25 bg-amber-300/[.1] px-4 text-xs font-black text-amber-100 shadow-sm shadow-amber-950/20 disabled:cursor-wait disabled:opacity-70"><svg x-show="simulationSubmitting" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M21 12a9 9 0 0 0-9-9v3a6 6 0 0 1 6 6h3Z"/></svg><span x-text="simulationSubmitting ? @js(__('Wird gestartet …')) : @js(__('Löschen und simulieren'))"></span></button></div>
             </form>
         </div>
@@ -388,13 +487,17 @@
 
     @if($portfolioValueCurve->count() >= 2)
     <script>
-    document.addEventListener('DOMContentLoaded',()=>{
+    const initializeManualPortfolioValueChart=()=>{
       const node=document.querySelector('#manual-portfolio-value-chart');
       const curve=@json($portfolioValueCurve);
-      if(!node||!window.ApexCharts||curve.length<2)return;
+      if(!node||!window.ApexCharts||curve.length<2||node.dataset.chartInitialized==='true')return;
+      node.dataset.chartInitialized='true';
       const light=document.documentElement.dataset.theme==='light';
-      new ApexCharts(node,{chart:{type:'area',height:224,toolbar:{show:false},zoom:{enabled:false},background:'transparent'},series:[{name:@json(__('Depotwert')),data:curve.map(p=>({x:new Date(p.x).getTime(),y:Number(p.y)}))}],colors:['#22d3ee'],stroke:{curve:'smooth',width:2.3},fill:{type:'gradient',gradient:{opacityFrom:.28,opacityTo:.02,stops:[0,100]}},dataLabels:{enabled:false},markers:{size:0},legend:{show:false},grid:{borderColor:light?'rgba(14,116,144,.12)':'rgba(148,163,184,.10)'},xaxis:{type:'datetime',labels:{style:{colors:'#7f93a8',fontSize:'9px'}},axisBorder:{show:false},axisTicks:{show:false}},yaxis:{labels:{style:{colors:'#7f93a8',fontSize:'9px'},formatter:v=>`${new Intl.NumberFormat(document.documentElement.lang||'de-DE',{maximumFractionDigits:0}).format(v)} {{ $portfolio->currency }}`}},tooltip:{x:{format:'dd.MM.yyyy'},y:{formatter:v=>`${new Intl.NumberFormat(document.documentElement.lang||'de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v)} {{ $portfolio->currency }}`}},theme:{mode:light?'light':'dark'}}).render();
-    });
+      new window.ApexCharts(node,{chart:{type:'area',height:224,toolbar:{show:false},zoom:{enabled:false},background:'transparent'},series:[{name:@json(__('Depotwert')),data:curve.map(p=>({x:new Date(p.x).getTime(),y:Number(p.y)}))}],colors:['#22d3ee'],stroke:{curve:'smooth',width:2.3},fill:{type:'gradient',gradient:{opacityFrom:.28,opacityTo:.02,stops:[0,100]}},dataLabels:{enabled:false},markers:{size:0},legend:{show:false},grid:{borderColor:light?'rgba(14,116,144,.12)':'rgba(148,163,184,.10)'},xaxis:{type:'datetime',labels:{style:{colors:'#7f93a8',fontSize:'9px'}},axisBorder:{show:false},axisTicks:{show:false}},yaxis:{labels:{style:{colors:'#7f93a8',fontSize:'9px'},formatter:v=>`${new Intl.NumberFormat(document.documentElement.lang||'de-DE',{maximumFractionDigits:0}).format(v)} {{ $portfolio->currency }}`}},tooltip:{x:{format:'dd.MM.yyyy'},y:{formatter:v=>`${new Intl.NumberFormat(document.documentElement.lang||'de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v)} {{ $portfolio->currency }}`}},theme:{mode:light?'light':'dark'}}).render();
+    };
+    document.addEventListener('DOMContentLoaded',initializeManualPortfolioValueChart,{once:true});
+    window.addEventListener('aktienki:charts-ready',initializeManualPortfolioValueChart,{once:true});
+    if(document.readyState!=='loading')initializeManualPortfolioValueChart();
     </script>
     @endif
 
@@ -406,18 +509,24 @@
       .ak-portfolio-line-chart{background:transparent !important}
       .ak-portfolio-line-chart .apexcharts-canvas,.ak-portfolio-line-chart svg{background:transparent !important}
       .ak-portfolio-line-chart path.apexcharts-line{stroke:#22d3ee !important;filter:drop-shadow(0 0 3px rgba(34,211,238,.22))}
+      .ak-depot-trade-legend{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;filter:drop-shadow(0 0 2px rgba(15,23,42,.55))}.ak-depot-trade-legend-buy{border-bottom:9px solid #34d399}.ak-depot-trade-legend-sell{border-top:9px solid #fb7185}
+      .ak-portfolio-line-chart .ak-depot-trade-marker{cursor:help;filter:drop-shadow(0 0 3px rgba(15,23,42,.7))}.ak-portfolio-line-chart .ak-depot-sell-marker{transform-box:fill-box;transform-origin:center;transform:rotate(180deg)}
       :root[data-theme="light"] .ak-portfolio-line-chart path.apexcharts-line{stroke:#0e7490 !important;filter:drop-shadow(0 0 2px rgba(14,116,144,.16))}
       @keyframes ak-depot-sim-spin{to{transform:rotate(360deg)}}@keyframes ak-depot-sim-dot{0%,65%,100%{opacity:.25;transform:translateY(0)}32%{opacity:1;transform:translateY(-2px)}}@keyframes ak-depot-sim-progress{from{transform:translateX(-110%)}to{transform:translateX(310%)}}
     </style>
     <script>
-    document.addEventListener('DOMContentLoaded',()=>{
+    const initializePortfolioSimulation=()=>{
       @if(in_array($simulationRun->status,['queued','running'],true))
+      const progressNode=document.querySelector('#portfolio-simulation-progress');
+      if(progressNode?.dataset.polling==='true')return;
+      if(progressNode)progressNode.dataset.polling='true';
       const poll=async()=>{try{const r=await fetch(@json(route('depots.simulation.status',[$portfolio,$simulationRun->public_id])),{headers:{Accept:'application/json'},cache:'no-store'});if(r.ok){const d=await r.json();const progress=Math.max(0,Math.min(100,Number(d.progress)||0));const bar=document.querySelector('#portfolio-simulation-bar');const track=document.querySelector('#portfolio-simulation-track');document.querySelector('#portfolio-simulation-progress').textContent=`${progress} %`;if(progress>0){bar.classList.add('is-determinate');bar.style.width=`${progress}%`;track?.setAttribute('aria-valuenow',String(progress))}if(d.finished){location.reload();return}}}catch(_){/* Temporäre Verbindungsfehler unterbrechen die Animation nicht. */}setTimeout(poll,1500)};setTimeout(poll,700);
       @elseif($simulationRun->status === 'completed')
       const curve=@json($simulationSummary['equity_curve']??[]);
       const trades=@json($chartTrades);
       const chartNode=document.querySelector('#portfolio-simulation-chart');
-      if(window.ApexCharts&&chartNode&&curve.length){
+      if(window.ApexCharts&&chartNode&&curve.length&&chartNode.dataset.chartInitialized!=='true'){
+        chartNode.dataset.chartInitialized='true';
         const isLightTheme=document.documentElement.dataset.theme==='light';
         const chartHeight=Math.max(260,Math.floor(chartNode.getBoundingClientRect().height));
         const escapeHtml=value=>String(value??'—').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
@@ -425,12 +534,16 @@
         const baseValue=Number(curve[0]?.equity)||1;
         const moneyLabel=value=>new Intl.NumberFormat(document.documentElement.lang||'de-DE',{notation:'compact',maximumFractionDigits:1}).format(Number(value));
         const depotData=curve.map(point=>({x:new Date(point.date).getTime(),y:Number(point.equity)}));
+        const modelData=@json($simulationSummary['model_reference_equity_curve']??[]).map(point=>({x:new Date(point.date).getTime(),y:Number(point.equity)}));
+        const homeIndexData=@json($homeIndexSeries).map(point=>({x:new Date(point.date).getTime(),y:Number(point.equity)}));
         const profitBars=trades.filter(trade=>trade.sell_date&&Number.isFinite(Number(trade.realized_profit))).map(trade=>({x:new Date(trade.sell_date).getTime(),y:Number(trade.realized_profit),trade,fillColor:Number(trade.realized_profit)>=0?'#22d3ee':'#fb7185'}));
         const profitSeriesName=@json(__('Gewinn / Verlust'));
         const series=[{name:@json(__('Depot gesamt')),data:depotData,type:'line'}];
+        if(modelData.length>1)series.push({name:@json(__('Modellreferenz')),data:modelData,type:'line'});
+        if(homeIndexData.length>1)series.push({name:@json($homeIndexLabel ?: __('Heimatindex')),data:homeIndexData,type:'line'});
         const chartMin=depotData[0].x;
         const chartMax=depotData[depotData.length-1].x;
-        const depotValues=depotData.map(point=>Number(point.y)||0);
+        const depotValues=[...depotData,...modelData,...homeIndexData].map(point=>Number(point.y)||0);
         const highestDepotValue=Math.max(...depotValues);
         const lowestDepotValue=Math.min(...depotValues);
         const depotValueRange=Math.max(1,highestDepotValue-lowestDepotValue);
@@ -471,7 +584,33 @@
             },
           };
         });
-        new ApexCharts(chartNode,{chart:{type:'line',height:chartHeight,toolbar:{show:false},animations:{enabled:false},zoom:{enabled:false},background:'transparent'},series,colors:[isLightTheme?'#0e7490':'#22d3ee'],stroke:{show:true,width:1.65,curve:'smooth',lineCap:'round'},fill:{type:'gradient',gradient:{shade:isLightTheme?'light':'dark',type:'vertical',shadeIntensity:.12,gradientToColors:[isLightTheme?'rgba(14,116,144,0)':'rgba(34,211,238,0)'],inverseColors:false,opacityFrom:.12,opacityTo:0,stops:[0,100]}},markers:{size:0,hover:{sizeOffset:0}},dataLabels:{enabled:false},legend:{show:false},annotations:{xaxis:[...yearBoundaries,...yearBadges]},xaxis:{type:'datetime',min:chartMin,max:chartMax+rightOffset,labels:{show:true,datetimeUTC:false,format:'dd.MM.yy',style:{colors:'#7f93a8',fontSize:'8px'},hideOverlappingLabels:true},axisBorder:{show:true,color:isLightTheme?'rgba(14, 116, 144,.25)':'rgba(255,255,255,.18)'},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{show:true,min:chartValueMin,max:chartValueMax,forceNiceScale:false,decimalsInFloat:0,labels:{show:true,minWidth:34,style:{colors:'#7f93a8',fontSize:'8px'},formatter:value=>`${moneyLabel(value)} {{ $portfolio->currency }}`},axisBorder:{show:false}},grid:{borderColor:isLightTheme?'rgba(14, 116, 144,.12)':'rgba(255,255,255,.12)',padding:{top:20,bottom:0,left:2,right:10}},theme:{mode:isLightTheme?'light':'dark'},tooltip:{shared:false,intersect:true,custom:({seriesIndex,dataPointIndex,w})=>{
+        const equityAtTimestamp=timestamp=>{
+          const exact=depotData.find(point=>point.x===timestamp);
+          if(exact)return exact.y;
+          const prior=depotData.filter(point=>point.x<timestamp).at(-1);
+          return prior?.y??baseValue;
+        };
+        const markerStroke=isLightTheme?'#f8fafc':'#071423';
+        const tradePointAnnotations=trades.flatMap((trade,index)=>{
+          const points=[];
+          if(trade.buy_date){
+            const x=new Date(trade.buy_date).getTime();
+            points.push({id:`portfolio-buy-${index}`,x,y:equityAtTimestamp(x),seriesIndex:0,marker:{size:6,fillColor:'#34d399',strokeColor:markerStroke,strokeWidth:1.5,shape:'triangle',offsetY:6,cssClass:'ak-depot-trade-marker ak-depot-buy-marker'},label:{text:''}});
+          }
+          if(trade.sell_date){
+            const x=new Date(trade.sell_date).getTime();
+            points.push({id:`portfolio-sell-${index}`,x,y:equityAtTimestamp(x),seriesIndex:0,marker:{size:6,fillColor:'#fb7185',strokeColor:markerStroke,strokeWidth:1.5,shape:'triangle',offsetY:-6,cssClass:'ak-depot-trade-marker ak-depot-sell-marker'},label:{text:''}});
+          }
+          return points;
+        });
+        const lastDaxPoint=homeIndexData.at(-1);
+        const daxReturn=lastDaxPoint&&baseValue>0?(lastDaxPoint.y/baseValue-1)*100:0;
+        const daxPointAnnotation=lastDaxPoint?[{
+          id:'portfolio-dax-value',x:lastDaxPoint.x,y:lastDaxPoint.y,
+          marker:{size:4,fillColor:'#f59e0b',strokeColor:markerStroke,strokeWidth:2},
+          label:{text:`${@js(__('DAX-Anlage'))} ${moneyLabel(lastDaxPoint.y)} {{ $portfolio->currency }} · ${daxReturn>=0?'+':''}${daxReturn.toFixed(1)} %`,borderColor:'#f59e0b',offsetX:8,style:{background:'#f59e0b',color:'#071423',fontSize:'9px',fontWeight:900,padding:{left:6,right:6,top:3,bottom:3}}}
+        }]:[];
+        new window.ApexCharts(chartNode,{chart:{type:'line',height:chartHeight,toolbar:{show:false},animations:{enabled:false},zoom:{enabled:false},background:'transparent'},series,colors:[isLightTheme?'#0e7490':'#22d3ee','#a78bfa','#f59e0b'],stroke:{show:true,width:[2.2,1.7,1.8],curve:'smooth',lineCap:'round',dashArray:[0,5,3]},fill:{type:'gradient',gradient:{shade:isLightTheme?'light':'dark',type:'vertical',shadeIntensity:.12,gradientToColors:[isLightTheme?'rgba(14,116,144,0)':'rgba(34,211,238,0)'],inverseColors:false,opacityFrom:.12,opacityTo:0,stops:[0,100]}},markers:{size:0,hover:{sizeOffset:0}},dataLabels:{enabled:false},legend:{show:series.length>1,position:'top',horizontalAlign:'right',fontSize:'9px',labels:{colors:'#7f93a8'}},annotations:{xaxis:[...yearBoundaries,...yearBadges],points:[...tradePointAnnotations,...daxPointAnnotation]},xaxis:{type:'datetime',min:chartMin,max:chartMax+rightOffset,labels:{show:true,datetimeUTC:false,format:'dd.MM.yy',style:{colors:'#7f93a8',fontSize:'8px'},hideOverlappingLabels:true},axisBorder:{show:true,color:isLightTheme?'rgba(14, 116, 144,.25)':'rgba(255,255,255,.18)'},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{show:true,min:chartValueMin,max:chartValueMax,forceNiceScale:false,decimalsInFloat:0,labels:{show:true,minWidth:34,style:{colors:'#7f93a8',fontSize:'8px'},formatter:value=>`${moneyLabel(value)} {{ $portfolio->currency }}`},axisBorder:{show:false}},grid:{borderColor:isLightTheme?'rgba(14, 116, 144,.12)':'rgba(255,255,255,.12)',padding:{top:20,bottom:0,left:2,right:10}},theme:{mode:isLightTheme?'light':'dark'},tooltip:{shared:false,intersect:true,custom:({seriesIndex,dataPointIndex,w})=>{
           const point=w.config.series[seriesIndex]?.data?.[dataPointIndex];
           if(!point?.trade){const value=Number(point?.y);const change=((value/baseValue)-1)*100;return `<div class="px-3 py-2 text-xs"><b>${escapeHtml(w.config.series[seriesIndex]?.name)}</b><div class="mt-1">${moneyLabel(value)} {{ $portfolio->currency }} · ${change>=0?'+':''}${change.toFixed(2)} %</div></div>`;}
           const trade=point.trade;const performance=Number(trade.performance);
@@ -492,7 +631,10 @@
         }
       }
       @endif
-    });
+    };
+    document.addEventListener('DOMContentLoaded',initializePortfolioSimulation,{once:true});
+    window.addEventListener('aktienki:charts-ready',initializePortfolioSimulation,{once:true});
+    if(document.readyState!=='loading')initializePortfolioSimulation();
     </script>
     @endif
 </x-app-layout>

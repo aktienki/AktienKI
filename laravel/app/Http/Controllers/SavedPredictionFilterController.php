@@ -16,31 +16,31 @@ use Illuminate\Support\Facades\Cache;
 final class SavedPredictionFilterController extends Controller
 {
     public const FILTER_KEYS = [
-        'q', 'country', 'exchange', 'sector', 'ai_type', 'model', 'quality_tier', 'signal',
-        'score_min', 'confidence_min', 'drawdown_max', 'profit_per_trade_min', 'volatility_max', 'minimum_trades', 'sector_score_min',
-        'predicted_return_min', 'noise_score_min',
+        'q', 'country', 'exchange', 'sector', 'ai_type', 'model', 'quality_tier',
+        'service_quality_gate', 'quality_horizons_present', 'quality_horizons', 'signal',
+        'score_min', 'confidence_min', 'drawdown_max', 'risk_max', 'profit_per_trade_min', 'median_return_min', 'volatility_max', 'minimum_trades', 'sector_score_min',
+        'predicted_return_min', 'noise_score_min', 'profit_factor_min', 'signal_quality_min', 'model_quality_min', 'heatmap_selection',
         'pe_max', 'dividend_yield_min', 'dividend_yield_operator', 'market_cap_min', 'market_cap_group', 'revenue_growth_min', 'hit_rate_min',
         'gate_mode', 'sector_score_rotation', 'index_score_rotation', 'entry_strategy', 'entry_risk_style', 'automatic_strategy_comparison', 'automatic_selected_strategy', 'forecast_score_rotation_5d_enabled', 'strategy_priority', 'initial_capital', 'trade_cost',
-        'max_positions', 'position_factor', 'exit_strategy',
-        'fixed_20d_exit_enabled', 'dynamic_horizon_exit_enabled', 'support_stop_enabled', 'resistance_trailing_stop_enabled',
-        'entry_wait_5d_enabled', 'signal_change_exit_enabled', 'forecast_below_price_exit_enabled',
+        'combined_area_forecast_priority', 'stock_forecast_weight', 'sector_forecast_weight', 'index_forecast_weight', 'drawdown_penalty_weight',
+        'max_positions', 'position_factor', 'dynamic_capital_weighting', 'entry_wait_5d_enabled',
         'automatic_optimization', 'optimization_goal',
     ];
 
     public const FILTER_DEFAULTS = [
         'q' => '', 'country' => '', 'exchange' => '', 'sector' => '', 'ai_type' => '',
-        'model' => '', 'quality_tier' => '', 'signal' => '',
-        'score_min' => 0, 'confidence_min' => 0, 'drawdown_max' => 50,
-        'profit_per_trade_min' => 0, 'volatility_max' => 100, 'minimum_trades' => 0, 'sector_score_min' => -1,
-        'predicted_return_min' => 0.5, 'noise_score_min' => 0,
+        'model' => '', 'quality_tier' => '', 'service_quality_gate' => '',
+        'quality_horizons_present' => 1, 'quality_horizons' => [10, 20, 40], 'signal' => '',
+        'score_min' => 0, 'confidence_min' => 0, 'drawdown_max' => 50, 'risk_max' => 100,
+        'profit_per_trade_min' => 0, 'median_return_min' => null, 'volatility_max' => 100, 'minimum_trades' => 0, 'sector_score_min' => -1,
+        'predicted_return_min' => 0.5, 'noise_score_min' => 0, 'profit_factor_min' => 0, 'signal_quality_min' => 0, 'model_quality_min' => 0, 'heatmap_selection' => '',
         'pe_max' => 100, 'dividend_yield_min' => 0, 'dividend_yield_operator' => 'gte', 'market_cap_min' => 0, 'market_cap_group' => 'all',
         'revenue_growth_min' => -50, 'hit_rate_min' => 0,
         'gate_mode' => 'system',
         'sector_score_rotation' => 0, 'index_score_rotation' => 0, 'entry_strategy' => 'direct_buy', 'entry_risk_style' => 'balanced', 'automatic_strategy_comparison' => 0, 'automatic_selected_strategy' => '', 'forecast_score_rotation_5d_enabled' => 0, 'strategy_priority' => 'rotation_first',
-        'initial_capital' => 10000, 'trade_cost' => 10, 'max_positions' => 5, 'position_factor' => 1,
-        'exit_strategy' => 'fixed_20d', 'fixed_20d_exit_enabled' => 0, 'dynamic_horizon_exit_enabled' => 0,
-        'support_stop_enabled' => 0, 'resistance_trailing_stop_enabled' => 0,
-        'entry_wait_5d_enabled' => 0, 'signal_change_exit_enabled' => 0, 'forecast_below_price_exit_enabled' => 0,
+        'combined_area_forecast_priority' => 0, 'stock_forecast_weight' => .20, 'sector_forecast_weight' => .30, 'index_forecast_weight' => .50, 'drawdown_penalty_weight' => .30,
+        'initial_capital' => 10000, 'trade_cost' => 10, 'max_positions' => 5, 'position_factor' => 1, 'dynamic_capital_weighting' => 0,
+        'entry_wait_5d_enabled' => 0,
         'automatic_optimization' => 0, 'optimization_goal' => '',
     ];
 
@@ -71,6 +71,9 @@ final class SavedPredictionFilterController extends Controller
                 return $runs;
             }, collect());
         $filterMetrics = $savedFilters->mapWithKeys(function (SavedPredictionFilter $savedFilter) use ($request, $runByFilterSignature): array {
+            if (collect(data_get($savedFilter->filters, 'serving_model_configurations', []))->isNotEmpty()) {
+                return [$savedFilter->id => null];
+            }
             $run = $runByFilterSignature->get($this->filterSignature((array) $savedFilter->filters));
             if ($run === null) return [$savedFilter->id => null];
 
@@ -110,8 +113,7 @@ final class SavedPredictionFilterController extends Controller
             'entry_strategy' => ['nullable', 'in:direct_buy,wait_5d,forecast_score_rotation_5d'],
             'entry_risk_style' => ['nullable', 'in:conservative,balanced,chance'],
             'automatic_strategy_comparison' => ['nullable', 'boolean'],
-            'automatic_selected_strategy' => ['nullable', 'in:selected_strategy,forecast_entry,sector_entry,index_entry,buy_and_hold,auto_exit_fixed_20d,auto_exit_dynamic_horizon,auto_exit_support_stop,auto_exit_resistance_trailing,auto_exit_signal_change,auto_exit_forecast_below_price,auto_entry_wait_5d'],
-            'exit_strategy' => ['required', 'in:fixed_20d,signal_change,forecast_below_price,buy_and_hold'],
+            'automatic_selected_strategy' => ['nullable', 'in:selected_strategy,forecast_entry,sector_entry,index_entry,auto_entry_wait_5d'],
             'visibility' => ['required', 'in:private,pro_public'],
             'description' => ['nullable', 'string', 'max:1000'],
             'display_icon' => ['nullable', 'in:chart-bar,bolt,shield-check,arrow-path,trophy,rocket-launch'],
@@ -122,6 +124,28 @@ final class SavedPredictionFilterController extends Controller
             'automation_trade_cost' => ['nullable', 'numeric', 'between:0,1000'],
             'transaction_email_enabled' => ['nullable', 'boolean'],
             'backtest_run' => ['nullable', 'uuid'],
+            'heatmap_selection' => ['nullable', 'string', 'max:4000'],
+            'score_min' => ['nullable', 'numeric', 'between:0,10'],
+            'confidence_min' => ['nullable', 'numeric', 'between:0,100'],
+            'drawdown_max' => ['nullable', 'numeric', 'between:0,100'],
+            'risk_max' => ['nullable', 'numeric', 'between:0,100'],
+            'profit_per_trade_min' => ['nullable', 'numeric', 'between:-5,15'],
+            'median_return_min' => ['nullable', 'numeric', 'between:-5,15'],
+            'profit_factor_min' => ['nullable', 'numeric', 'between:0,3'],
+            'signal_quality_min' => ['nullable', 'numeric', 'between:0,100'],
+            'model_quality_min' => ['nullable', 'numeric', 'between:0,100'],
+            'volatility_max' => ['nullable', 'numeric', 'between:0,1000000'],
+            'minimum_trades' => ['nullable', 'integer', 'between:0,10000'],
+            'sector_score_min' => ['nullable', 'numeric', 'between:-1,10'],
+            'predicted_return_min' => ['nullable', 'numeric', 'between:0.5,10'],
+            'noise_score_min' => ['nullable', 'numeric', 'between:0,100'],
+            'pe_max' => ['nullable', 'numeric', 'between:0,1000000'],
+            'dividend_yield_min' => ['nullable', 'numeric', 'between:0,5'],
+            'dividend_yield_operator' => ['nullable', 'in:gte,lte'],
+            'market_cap_min' => ['nullable', 'numeric', 'between:0,1000000000'],
+            'market_cap_group' => ['nullable', 'in:all,small,mid,large'],
+            'revenue_growth_min' => ['nullable', 'numeric', 'between:-1000000,1000000'],
+            'hit_rate_min' => ['nullable', 'numeric', 'between:0,100'],
         ]);
         $user = $request->user();
         $automationEnabled = $request->boolean('automation_enabled');
@@ -156,18 +180,33 @@ final class SavedPredictionFilterController extends Controller
             ->unique()
             ->values()
             ->all();
-        $filters['profit_per_trade_min'] = max(0, min(10, (float) ($filters['profit_per_trade_min'] ?? 0)));
+        $filters['profit_per_trade_min'] = max(-5, min(15, (float) ($filters['profit_per_trade_min'] ?? 0)));
+        $filters['median_return_min'] = is_numeric($filters['median_return_min'] ?? null)
+            ? max(-5, min(15, (float) $filters['median_return_min']))
+            : null;
+        $filters['score_min'] = max(0, min(10, (float) ($filters['score_min'] ?? 0)));
+        $filters['confidence_min'] = max(0, min(100, (float) ($filters['confidence_min'] ?? 0)));
+        $filters['drawdown_max'] = max(0, min(100, (float) ($filters['drawdown_max'] ?? 50)));
+        $filters['risk_max'] = max(0, min(100, (float) ($filters['risk_max'] ?? 100)));
+        $filters['profit_factor_min'] = max(0, min(3, (float) ($filters['profit_factor_min'] ?? 0)));
+        $filters['minimum_trades'] = max(0, min(10000, (int) ($filters['minimum_trades'] ?? 0)));
+        $filters['predicted_return_min'] = max(.5, min(10, (float) ($filters['predicted_return_min'] ?? .5)));
         $filters['display_icon'] = (string) ($validated['display_icon'] ?? data_get($editedFilter?->filters, 'display_icon', 'chart-bar'));
         $filters['display_color'] = strtoupper((string) ($validated['display_color'] ?? data_get($editedFilter?->filters, 'display_color', '#22D3EE')));
+        $servingModelConfigurations = data_get($editedFilter?->filters, 'serving_model_configurations', []);
+        if (is_array($servingModelConfigurations) && $servingModelConfigurations !== []) {
+            // Model configurations originate from the Serving release and are
+            // intentionally not editable in the legacy filter form. Preserve
+            // them while the user changes the surrounding strategy rules.
+            $filters['serving_model_configurations'] = $servingModelConfigurations;
+        }
         if (! empty($validated['backtest_run'])) {
             $optimizedRun = DB::table('backtest_runs')->where('public_id', $validated['backtest_run'])
                 ->whereRaw("(settings->>'initiated_by_user_id')::bigint = ?", [$user->id])
                 ->whereIn('status', ['completed', 'completed_with_errors'])->first(['settings']);
             $optimizedSettings = is_string($optimizedRun?->settings) ? (json_decode($optimizedRun->settings, true) ?: []) : [];
             if (data_get($optimizedSettings, 'selection_filters.automatic_optimization', false)) {
-                foreach (['fixed_20d_exit_enabled', 'dynamic_horizon_exit_enabled', 'support_stop_enabled', 'resistance_trailing_stop_enabled', 'entry_wait_5d_enabled', 'signal_change_exit_enabled', 'forecast_below_price_exit_enabled'] as $rule) {
-                    $filters[$rule] = (int) (bool) data_get($optimizedSettings, 'selection_filters.'.$rule, false);
-                }
+                $filters['entry_wait_5d_enabled'] = (int) (bool) data_get($optimizedSettings, 'selection_filters.entry_wait_5d_enabled', false);
                 $filters['optimized_backtest_run'] = $validated['backtest_run'];
             }
         }
@@ -178,29 +217,18 @@ final class SavedPredictionFilterController extends Controller
             ? $filters['entry_risk_style']
             : 'balanced';
         $filters['automatic_selected_strategy'] = in_array($filters['automatic_selected_strategy'] ?? null, [
-            'selected_strategy', 'forecast_entry', 'sector_entry', 'index_entry', 'buy_and_hold',
-            'auto_exit_fixed_20d', 'auto_exit_dynamic_horizon', 'auto_exit_support_stop',
-            'auto_exit_resistance_trailing', 'auto_exit_signal_change', 'auto_exit_forecast_below_price', 'auto_entry_wait_5d',
+            'selected_strategy', 'forecast_entry', 'sector_entry', 'index_entry', 'auto_entry_wait_5d',
         ], true) ? $filters['automatic_selected_strategy'] : '';
-        $filters['exit_strategy'] = in_array($filters['exit_strategy'] ?? null, ['fixed_20d', 'signal_change', 'forecast_below_price', 'buy_and_hold'], true)
-            ? $filters['exit_strategy']
-            : 'fixed_20d';
-        foreach (['sector_score_rotation', 'index_score_rotation', 'automatic_strategy_comparison', 'forecast_score_rotation_5d_enabled', 'fixed_20d_exit_enabled', 'dynamic_horizon_exit_enabled', 'support_stop_enabled', 'resistance_trailing_stop_enabled', 'entry_wait_5d_enabled', 'signal_change_exit_enabled', 'forecast_below_price_exit_enabled'] as $booleanFilter) {
+        foreach (['sector_score_rotation', 'index_score_rotation', 'automatic_strategy_comparison', 'forecast_score_rotation_5d_enabled', 'entry_wait_5d_enabled', 'dynamic_capital_weighting'] as $booleanFilter) {
             $filters[$booleanFilter] = $request->boolean($booleanFilter) ? 1 : 0;
         }
         $filters['forecast_score_rotation_5d_enabled'] = $filters['entry_strategy'] === 'forecast_score_rotation_5d' ? 1 : 0;
         $filters['entry_wait_5d_enabled'] = $filters['entry_strategy'] === 'wait_5d' ? 1 : 0;
-        $filters['signal_change_exit_enabled'] = $filters['exit_strategy'] === 'signal_change' ? 1 : 0;
-        $filters['forecast_below_price_exit_enabled'] = $filters['exit_strategy'] === 'forecast_below_price' ? 1 : 0;
-        foreach (['fixed_20d_exit_enabled', 'dynamic_horizon_exit_enabled', 'support_stop_enabled', 'resistance_trailing_stop_enabled'] as $disabledExitRule) {
-            $filters[$disabledExitRule] = 0;
-        }
         $filters['position_factor'] = max(1, (int) ($filters['position_factor'] ?? 1));
         $filters['max_positions'] = max(1, min(50, (int) ($filters['max_positions'] ?? 5)));
         $filters['position_factor'] = min($filters['position_factor'], $filters['max_positions']);
         $filters['initial_capital'] = round(max(1000, min(1000000, (float) ($filters['initial_capital'] ?? 10000))), 2);
         $filters['trade_cost'] = round(max(0, min(1000, (float) ($filters['trade_cost'] ?? 10))), 2);
-        if ($filters['exit_strategy'] === 'buy_and_hold') $filters['position_factor'] = 1;
         if ($editedFilter) {
             $editedFilter->update([
                 'name' => trim($validated['name']),
@@ -382,7 +410,9 @@ final class SavedPredictionFilterController extends Controller
             $value = $filters[$key] ?? $default;
             if ($key === 'model') {
                 $value = collect((array) $value)->map(fn ($id) => (int) $id)->filter()->sort()->values()->all();
-            } elseif (in_array($key, ['sector_score_rotation', 'index_score_rotation', 'max_positions', 'position_factor'], true)) {
+            } elseif (is_array($value)) {
+                $value = array_values($value);
+            } elseif (in_array($key, ['sector_score_rotation', 'index_score_rotation', 'max_positions', 'position_factor', 'dynamic_capital_weighting'], true)) {
                 $value = (int) $value;
             } else {
                 $value = (string) $value;

@@ -2,12 +2,20 @@
 
 namespace App\Notifications;
 
+use App\Models\ExternalBuyReview;
 use App\Models\Prediction;
 use App\Models\SmartSelectionLabel;
+use App\Models\User;
+use App\Enums\PlanLevel;
+use App\Services\PlanAccessService;
+use App\Services\SignalEmailDonutChart;
+use App\Services\SignalEmailMetrics;
+use App\Support\CountryFlag;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Symfony\Component\Mime\Email;
 
 final class SmartSelectionSignalNotification extends Notification implements ShouldQueue
 {
@@ -33,6 +41,13 @@ final class SmartSelectionSignalNotification extends Notification implements Sho
         $locale = data_get($notifiable->preferences, 'locale', app()->getLocale());
         app()->setLocale(in_array($locale, ['de', 'en'], true) ? $locale : 'de');
         $theme = data_get($notifiable->preferences, 'theme', data_get($notifiable->preferences, 'color_scheme', 'light'));
+        $emailTheme = in_array($theme, ['dark', 'light'], true) ? $theme : 'light';
+        $metrics = app(SignalEmailMetrics::class)->forPrediction($this->prediction);
+        $donutChart = app(SignalEmailDonutChart::class)->render($metrics, $emailTheme === 'dark');
+        $externalReview = $notifiable instanceof User
+            && app(PlanAccessService::class)->allowsTariff($notifiable, PlanLevel::Pro)
+                ? ExternalBuyReview::query()->where('prediction_id', $this->prediction->id)->first()
+                : null;
 
         return (new MailMessage)
             ->subject(__('Neues Kaufsignal für :symbol', ['symbol' => $instrument->symbol]))
@@ -43,15 +58,13 @@ final class SmartSelectionSignalNotification extends Notification implements Sho
                 'recipientName' => $notifiable->name ?? null,
                 'previousSignal' => strtoupper($this->previousSignal),
                 'signal' => $signal,
-                'expectedReturn' => $this->expectedReturn(),
-                'emailTheme' => in_array($theme, ['dark', 'light'], true) ? $theme : 'light',
-            ]);
-    }
-
-    private function expectedReturn(): ?float
-    {
-        $current = (float) ($this->prediction->current_price ?? 0);
-        $target = (float) ($this->prediction->predicted_price_20d ?? 0);
-        return $current > 0 && $target > 0 ? (($target / $current) - 1) * 100 : null;
+                'emailTheme' => $emailTheme,
+                'countryFlag' => CountryFlag::emoji($instrument->country),
+                'signalMetrics' => $metrics,
+                'externalReview' => $externalReview,
+            ])
+            ->withSymfonyMessage(function (Email $email) use ($donutChart): void {
+                $email->embed($donutChart, 'aki-signal-score-risk.png', 'image/png');
+            });
     }
 }

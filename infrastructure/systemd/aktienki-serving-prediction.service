@@ -1,0 +1,23 @@
+[Unit]
+Description=Run complete AktienKI Serving predictions and paper-depot journal
+After=network-online.target postgresql.service
+Wants=network-online.target
+StartLimitIntervalSec=7500
+StartLimitBurst=2
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/home/aktienki/AktienKI/model-runtime/scripts
+EnvironmentFile=/home/aktienki/AktienKI/laravel/.env
+ExecStart=/usr/bin/flock --nonblock /run/lock/aktienki-serving-prediction.lock /home/aktienki/AktienKI/model-runtime/venv/bin/python /home/aktienki/AktienKI/model-runtime/scripts/run_serving_predictions.py --refresh-market-data --publish
+Restart=on-failure
+RestartSec=1h
+TimeoutStartSec=2h
+Nice=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

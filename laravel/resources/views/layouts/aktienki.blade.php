@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @auth
         <meta name="authenticated-user" content="{{ auth()->id() }}">
+        <meta name="realtime-market-data" content="{{ app(\App\Services\PlanAccessService::class)->allowsTariff(auth()->user(), \App\Enums\PlanLevel::Pro) ? '1' : '0' }}">
     @endauth
     <title>{{ config('app.name', 'AktienKI') }}</title>
     <link rel="icon" href="{{ asset('brand/generated/bull-icon.png') }}" type="image/png">

@@ -24,13 +24,19 @@
             })->count();
         };
         $filterGroupResetUrl = static function (string $route, array $keys): string {
-            return route($route, request()->except($keys));
+            return route($route, request()->except(array_unique(array_merge($keys, [
+                'backtest_run', 'show_result', 'new_backtest',
+            ]))));
         };
-        $universeFilterDefaults = ['country' => '', 'exchange' => '', 'sector' => '', 'model' => [], 'quality_tier' => '', 'position_factor' => 1, 'gate_mode' => 'system'];
-        $performanceFilterDefaults = ['score_min' => 0, 'confidence_min' => 0, 'drawdown_max' => $rangeMaxima['drawdown'], 'profit_per_trade_min' => 0, 'volatility_max' => $rangeMaxima['volatility'], 'minimum_trades' => 0, 'sector_score_min' => -1, 'hit_rate_min' => 0, 'predicted_return_min' => 0.5];
+        $universeFilterDefaults = ['country' => '', 'exchange' => '', 'sector' => '', 'model' => [], 'position_factor' => 1];
+        $performanceFilterDefaults = ['quality_tier' => '', 'service_quality_gate' => '', 'quality_horizons' => [10, 20, 40], 'score_min' => 0, 'confidence_min' => 0, 'drawdown_max' => $rangeMaxima['drawdown'], 'risk_max' => 100, 'profit_per_trade_min' => 0, 'median_return_min' => null, 'profit_factor_min' => 0, 'volatility_max' => $rangeMaxima['volatility'], 'minimum_trades' => 0, 'sector_score_min' => -1, 'hit_rate_min' => 0, 'predicted_return_min' => 0.5];
+        $performanceResetKeys = array_merge(array_keys($performanceFilterDefaults), [
+            'quality_horizons_present', 'gate_mode', 'risk_max', 'profit_factor_min',
+            'positive_prediction_required', 'ensemble_veto_required',
+        ]);
         $fundamentalFilterDefaults = ['pe_max' => $rangeMaxima['pe'], 'dividend_yield_min' => 0, 'dividend_yield_operator' => 'gte', 'market_cap_group' => 'all', 'revenue_growth_min' => -50];
     @endphp
-    <div class="ak-strategy-page flex h-[calc(100dvh-89px)] min-h-0 flex-col py-4 text-[var(--ak-text)]"
+    <div class="ak-strategy-page flex min-h-[calc(100dvh-89px)] flex-col py-4 text-[var(--ak-text)]"
          x-data="{
              akiChatOpen: false,
              individualStatsOpen: false,
@@ -70,7 +76,7 @@
                 </div>
                 <div class="ak-strategy-heading-copy min-w-0">
                     <p class="text-[10px] font-black uppercase tracking-[.16em] {{ $shortMode ? 'text-rose-400' : ($qualitySetupMode ? 'text-amber-300' : 'text-teal-400') }}">{{ $qualitySetupMode ? __('Premium-Auswahlstatus') : ($shortMode ? __('Short-Strategietester') : ($setupMode ? __('Setup') : __('Historische Validierung'))) }}</p>
-                    <h1 class="truncate text-2xl font-black">{{ $qualitySetupMode ? __('Smart Selection') : ($shortMode ? __('SELL-Prognosen testen') : ($setupMode ? __('Filter') : __('Historische Qualität nach KI-Score und Konfidenz'))) }}</h1>
+                    <h1 class="truncate text-2xl font-black">{{ $qualitySetupMode ? __('Smart Selection') : ($shortMode ? __('SELL-Prognosen testen') : ($setupMode ? __('Filter') : __('Historische Qualität nach Modellscore und Konfidenz'))) }}</h1>
                     <p class="ak-strategy-heading-description mt-1 text-xs text-[var(--ak-muted)]">{{ $shortMode ? __('Ausschließlich echte SELL-Prognosen werden als Short-Einstieg berücksichtigt.') : __('Trefferquote, Profitfaktor, Drawdown und Volatilität; alle aktuellen Filter werden berücksichtigt.') }}</p>
                 </div>
             </div>
@@ -82,9 +88,9 @@
                     </button>
                 @endif
                 @unless ($setupMode)
-                    <a href="{{ route('predictions.index', request()->query()) }}" class="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:text-teal-400">
+                    <a href="{{ route('predictions.index', request()->query()) }}" data-back-link class="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:text-teal-400">
                         <x-heroicon-o-arrow-left class="h-4 w-4" />
-                        {{ __('Zurück zu Prognosen') }}
+                        {{ __('Zurück') }}
                     </a>
                 @endunless
             </div>
@@ -254,7 +260,7 @@
                 score: Number({{ $rangeValue('score_min', 0, 0, 'score') }}),
                 confidence: Number({{ $rangeValue('confidence_min', 0, 0, 'confidence') }}),
                 drawdown: Number({{ $rangeValue('drawdown_max', $rangeMaxima['drawdown'], 0, 'drawdown') }}),
-                profitPerTrade: Number({{ $rangeValue('profit_per_trade_min', 0, 0, 'profit_factor') }}),
+                profitPerTrade: Number({{ max(-5, min(15, (float) request('profit_per_trade_min', 0))) }}),
                 volatility: Number({{ $rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility') }}),
                 predictedReturn: Number({{ $rangeValue('predicted_return_min', 0.5, 0.5, 'predicted_return') }}),
                 pe: Number({{ $rangeValue('pe_max', $rangeMaxima['pe'], 0, 'pe') }}),
@@ -290,6 +296,9 @@
                 </div>
             </div>
             @if ($qualitySetupMode)<input type="hidden" name="quality_setup" value="1">@endif
+            <input type="hidden" name="heatmap_selection" value="{{ request('heatmap_selection', '') }}" data-heatmap-selection-input>
+            <input type="hidden" name="signal_quality_min" value="{{ request('signal_quality_min', 0) }}" data-heatmap-signal-quality-input>
+            <input type="hidden" name="model_quality_min" value="{{ request('model_quality_min', 0) }}" data-heatmap-model-quality-input>
             @if (request()->filled('backtest_run'))<input type="hidden" name="backtest_run" value="{{ request('backtest_run') }}">@endif
             @if ($shortMode)<input type="hidden" name="signal" value="SELL">@endif
             @if ($qualitySetupMode)
@@ -310,19 +319,20 @@
             @if ($setupMode)
             @php $universeChanged = $changedFilterCount($universeFilterDefaults); @endphp
             <div class="ak-filter-group-grid grid min-w-0 gap-1">
-            <details class="ak-filter-group rounded-lg border border-[var(--ak-border)] bg-white/[.02]" @if($universeChanged > 0) open @endif>
+            <details class="ak-filter-group rounded-lg border border-[var(--ak-border)] bg-white/[.02]">
                 <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2">
                     <span><strong class="block text-[11px] font-black uppercase tracking-[.12em] text-[var(--ak-text)]">{{ __('Portfolio & Modell') }}</strong><small class="text-[9px] text-[var(--ak-muted)]">{{ __('Markt, Modelle, Quality Gate und Positionslogik') }}</small></span>
                     <span class="flex items-center gap-2"><span class="rounded-full border border-cyan-300/25 bg-cyan-400/[.10] px-2 py-1 text-[9px] font-black text-cyan-300">{{ $universeChanged }} {{ __('geändert') }}</span><a href="{{ $filterGroupResetUrl($heatmapFilterRoute, array_keys($universeFilterDefaults)) }}" onclick="event.stopPropagation()" class="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--ak-border)] px-2 text-[8px] font-black uppercase text-[var(--ak-muted)]"><x-heroicon-o-arrow-path class="h-3 w-3" />{{ __('Reset') }}</a><x-heroicon-o-chevron-down class="h-4 w-4 text-cyan-300" /></span>
                 </summary>
-                <div class="border-t border-[var(--ak-border)] p-2">
+                <button type="button" class="ak-filter-modal-backdrop" aria-label="{{ __('Filter schließen') }}" onclick="this.closest('details').removeAttribute('open')"></button>
+                <div class="ak-filter-modal-panel border-t border-[var(--ak-border)] p-3">
             @endif
             <div class="flex min-w-0 items-center gap-1">
             <div
                 class="grid min-w-0 flex-1 gap-1"
                 style="grid-template-columns: {{ $setupMode
-                    ? 'repeat(6,minmax(82px,1fr))'
-                    : 'repeat(5,minmax(82px,1fr))' }};"
+                    ? 'repeat(5,minmax(82px,1fr))'
+                    : 'repeat(4,minmax(82px,1fr))' }};"
             >
             <select name="country" onchange="this.form.requestSubmit()" class="ak-input h-10 min-w-0 rounded-[5px] px-1.5 text-[11px]">
                 <option value="">{{ __('Land') }}</option>
@@ -341,6 +351,8 @@
                     ->map(fn ($id) => (int) $id)
                     ->filter()
                     ->unique();
+                $selectedQualityHorizons = collect((array) (request()->has('quality_horizons_present') ? request('quality_horizons', []) : [10, 20, 40]))
+                    ->map(fn ($horizon) => (int) $horizon);
             @endphp
             <div x-data="{ open: false }" class="relative min-w-0">
                 <button type="button" @click="open = !open" class="ak-input flex h-10 w-full min-w-0 items-center justify-between rounded-[5px] px-2 text-[11px]" title="{{ __('Modelle') }}">
@@ -354,15 +366,23 @@
                             <span class="truncate text-[10px] font-bold text-slate-200">{{ $model->public_alias }}</span>
                         </label>
                     @endforeach
+                    <fieldset class="mt-2 border-t border-white/10 pt-2">
+                        <legend class="mb-1.5 text-[9px] font-black uppercase tracking-wide text-cyan-200">{{ __('Horizont') }}</legend>
+                        <input type="hidden" name="quality_horizons_present" value="1">
+                        <div class="grid grid-cols-3 gap-1">
+                            @foreach ([10, 20, 40] as $qualityHorizon)
+                                <label class="cursor-pointer">
+                                    <input type="checkbox" name="quality_horizons[]" value="{{ $qualityHorizon }}" @checked($selectedQualityHorizons->contains($qualityHorizon)) class="peer sr-only">
+                                    <span class="flex h-8 items-center justify-center rounded-md border border-white/10 text-[10px] font-black text-slate-400 peer-checked:border-teal-300/45 peer-checked:bg-teal-400/15 peer-checked:text-teal-200">{{ $qualityHorizon }}T</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </fieldset>
                     <button type="submit" class="mt-2 w-full rounded-md bg-teal-500 px-2 py-1.5 text-[9px] font-black uppercase tracking-[.08em] text-slate-950 hover:bg-teal-400">
                         {{ __('Übernehmen') }}
                     </button>
                 </div>
             </div>
-            <select name="quality_tier" onchange="this.form.requestSubmit()" class="ak-input ak-quality-tier-select h-10 min-w-0 rounded-[5px] px-1.5 text-[11px]">
-                <option value="">{{ __('Modellstufe mindestens') }}</option>
-                @foreach ($qualityTiers as $qualityTier)<option value="{{ $qualityTier->code }}" @selected(request('quality_tier') === $qualityTier->code)>{{ __($qualityTier->name) }}</option>@endforeach
-            </select>
             @if ($setupMode)
                 <div class="ak-input flex h-10 min-w-0 items-center overflow-hidden rounded-[5px] p-0.5 {{ request('exit_strategy') === 'buy_and_hold' ? 'cursor-not-allowed opacity-45' : '' }}" title="{{ request('exit_strategy') === 'buy_and_hold' ? __('Money Manager ist bei Buy and Hold deaktiviert') : __('Maximaler Kapitalanteil je Aktie bei freiem Kapital') }}" role="radiogroup" aria-label="{{ __('Positionsanteil') }}">
                     <span class="shrink-0 px-1 text-[8px] font-bold text-slate-500">{{ __('Anteil') }}</span>
@@ -376,10 +396,6 @@
             @endif
             </div>
             @if ($setupMode)
-                <select name="gate_mode" onchange="this.form.requestSubmit()" class="ak-input h-10 w-32 shrink-0 rounded-[5px] px-1.5 text-[11px] {{ empty($hasPersonalQualityGate) ? 'cursor-not-allowed opacity-55' : '' }}" title="{{ __('Quality Gate für diesen Backtest') }}">
-                    <option value="system" @selected(request('gate_mode', 'system') === 'system')>{{ __('System-Gate') }}</option>
-                    <option value="personal" @selected(request('gate_mode') === 'personal') @disabled(empty($hasPersonalQualityGate))>{{ __('Mein Quality Gate') }}</option>
-                </select>
                 <div class="ak-filter-result-count inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[5px] border border-teal-300/25 bg-teal-400/[.10] px-2.5 text-[10px] font-black text-teal-100" title="{{ __('Treffer im gesamten geprüften Portfolio') }}">
                     <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0 text-teal-300" />
                     <span class="tabular-nums">{{ number_format((int) ($heatmapSummary->instruments ?? 0), 0, ',', '.') }}</span>
@@ -400,19 +416,22 @@
             @else
             @if ($setupMode)
             @php $performanceChanged = $changedFilterCount($performanceFilterDefaults); @endphp
-            <details class="ak-filter-group rounded-lg border border-[var(--ak-border)] bg-white/[.02]" @if($performanceChanged > 0) open @endif>
+            <details class="ak-filter-group rounded-lg border border-[var(--ak-border)] bg-white/[.02]">
                 <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2">
                     <span><strong class="block text-[11px] font-black uppercase tracking-[.12em] text-[var(--ak-text)]">{{ __('Performance & Risiko') }}</strong><small class="text-[9px] text-[var(--ak-muted)]">{{ __('Historische Robustheit, Profit Factor und Mindestanzahl an Trades') }}</small></span>
-                    <span class="flex items-center gap-2"><span class="rounded-full border border-amber-300/25 bg-amber-400/[.10] px-2 py-1 text-[9px] font-black text-amber-300">{{ $performanceChanged }} {{ __('geändert') }}</span><a href="{{ $filterGroupResetUrl($heatmapFilterRoute, array_keys($performanceFilterDefaults)) }}" onclick="event.stopPropagation()" class="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--ak-border)] px-2 text-[8px] font-black uppercase text-[var(--ak-muted)]"><x-heroicon-o-arrow-path class="h-3 w-3" />{{ __('Reset') }}</a><x-heroicon-o-chevron-down class="h-4 w-4 text-amber-300" /></span>
+                    <span class="flex items-center gap-2"><span class="rounded-full border border-amber-300/25 bg-amber-400/[.10] px-2 py-1 text-[9px] font-black text-amber-300">{{ $performanceChanged }} {{ __('geändert') }}</span><a href="{{ $filterGroupResetUrl($heatmapFilterRoute, $performanceResetKeys) }}" onclick="event.stopPropagation()" class="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--ak-border)] px-2 text-[8px] font-black uppercase text-[var(--ak-muted)]"><x-heroicon-o-arrow-path class="h-3 w-3" />{{ __('Reset') }}</a><x-heroicon-o-chevron-down class="h-4 w-4 text-amber-300" /></span>
                 </summary>
-                <div class="border-t border-[var(--ak-border)] p-2">
+                <button type="button" class="ak-filter-modal-backdrop" aria-label="{{ __('Filter schließen') }}" onclick="this.closest('details').removeAttribute('open')"></button>
+                <div class="ak-filter-modal-panel border-t border-[var(--ak-border)] p-3">
             @endif
-            <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
+            <div class="grid grid-cols-1 gap-2">
             @endif
                 <section class="rounded-lg border border-cyan-300/15 bg-cyan-400/[.035] p-2">
                     <h3 class="mb-2 text-[9px] font-black uppercase tracking-[.12em] text-cyan-300">{{ __('Modellqualität') }}</h3>
                     <div class="grid grid-cols-2 gap-1">
-                        <label class="ak-heatmap-range" title="{{ __('Die Note filtert weiterhin den exakten KI-Rohwert; 1+ ist die beste Stufe.') }}"><span>{{ __('KI-Score mindestens') }} <b x-text="scoreGrade(score)">{{ \App\Support\QualityGrade::fromPercent($rangeValue('score_min', 0, 0, 'score') * 10) }}</b></span><input name="score_min" type="range" min="0" max="9" step="1" value="{{ max(0, min(9, floor($rangeValue('score_min', 0, 0, 'score')))) }}" x-model.number="score" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
+                        <label class="ak-quality-select-card"><span>{{ __('Modellqualität') }}</span><select name="quality_tier" onchange="this.form.requestSubmit()" class="ak-input h-9 w-full rounded-[5px] px-2 text-[11px]"><option value="">{{ __('Alle Qualitätsklassen') }}</option><option value="strong" @selected(request('quality_tier') === 'strong')>{{ __('Quality Gate bestanden') }}</option><option value="top" @selected(request('quality_tier') === 'top')>{{ __('Top / Top+') }}</option><option value="solid" @selected(request('quality_tier') === 'solid')>{{ __('Mindestens Solid') }}</option><option value="test" @selected(request('quality_tier') === 'test')>{{ __('Mindestens Basic') }}</option><option value="unqualified" @selected(request('quality_tier') === 'unqualified')>{{ __('Underperform') }}</option></select></label>
+                        @if ($setupMode && ! $shortMode)<label class="ak-quality-select-card"><span>{{ __('Service Quality Gate') }}</span><select name="service_quality_gate" onchange="this.form.requestSubmit()" class="ak-input h-9 w-full rounded-[5px] px-2 text-[11px]"><option value="" @selected(request('service_quality_gate') === null || request('service_quality_gate') === '')>{{ __('Alle Gate-Status') }}</option><option value="passed" @selected(request('service_quality_gate') === 'passed')>{{ __('Bestanden') }}</option><option value="failed" @selected(request('service_quality_gate') === 'failed')>{{ __('Nicht bestanden') }}</option></select></label>@endif
+                        <label class="ak-heatmap-range" title="{{ __('Historische Walk-Forward-Richtungsgenauigkeit des Modells; der finale KI-Score wird hier nicht verwendet.') }}"><span>{{ __('Modellscore mindestens') }} <b x-text="scoreGrade(score)">{{ \App\Support\QualityGrade::fromPercent($rangeValue('score_min', 0, 0, 'score') * 10) }}</b></span><input name="score_min" type="range" min="0" max="9" step="1" value="{{ max(0, min(9, floor($rangeValue('score_min', 0, 0, 'score')))) }}" x-model.number="score" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
                         <label class="ak-heatmap-range"><span>{{ __('Konfidenz') }} ≥ <b x-text="`${confidence}%`">{{ number_format((float) request('confidence_min', 0), 0, ',', '.') }}%</b></span><input name="confidence_min" type="range" min="0" max="{{ $rangeMaxima['confidence'] }}" step="5" value="{{ $rangeValue('confidence_min', 0, 0, 'confidence') }}" x-model.number="confidence" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
                         @if ($setupMode && ! $shortMode)<label class="ak-heatmap-range"><span>{{ __('Hitrate') }} ≥ <b x-text="hitRate <= 0 ? '{{ __('Alle') }}' : `${hitRate.toFixed(0)} %`">{{ (float) request('hit_rate_min', 0) <= 0 ? __('Alle') : number_format((float) request('hit_rate_min'), 0, ',', '.').' %' }}</b></span><input name="hit_rate_min" type="range" min="0" max="{{ $rangeMaxima['hit_rate'] }}" step="5" value="{{ $rangeValue('hit_rate_min', 0, 0, 'hit_rate') }}" x-model.number="hitRate" onchange="this.form.requestSubmit()"></label>@endif
                         <label class="ak-heatmap-range"><span>{{ __('Historische Trades') }} ≥ <b x-text="minimumTrades <= 0 ? '{{ __('Alle') }}' : minimumTrades">{{ (int) request('minimum_trades', 0) <= 0 ? __('Alle') : number_format((int) request('minimum_trades'), 0, ',', '.') }}</b></span><input name="minimum_trades" type="range" min="0" max="{{ (int) $rangeMaxima['trades'] }}" step="5" value="{{ $rangeValue('minimum_trades', 0, 0, 'trades') }}" x-model.number="minimumTrades" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
@@ -421,7 +440,9 @@
                 <section class="rounded-lg border border-emerald-300/15 bg-emerald-400/[.035] p-2">
                     <h3 class="mb-2 text-[9px] font-black uppercase tracking-[.12em] text-emerald-300">{{ __('Performance') }}</h3>
                     <div class="grid grid-cols-2 gap-1">
-                        <label class="ak-heatmap-range"><span>{{ __('Profit je Trade') }} ≥ <b x-text="profitPerTrade <= 0 ? '{{ __('Alle') }}' : profitPerTrade.toFixed(1).replace('.', ',')">{{ (float) request('profit_per_trade_min', 0) <= 0 ? __('Alle') : number_format((float) request('profit_per_trade_min'), 1, ',', '.') }}</b></span><input name="profit_per_trade_min" type="range" min="0" max="{{ $rangeMaxima['profit_factor'] }}" step="0.1" value="{{ $rangeValue('profit_per_trade_min', 0, 0, 'profit_factor') }}" x-model.number="profitPerTrade" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
+                        <label class="ak-heatmap-range"><span>{{ __('Nettorendite je Trade') }} ≥ <b x-text="`${profitPerTrade.toFixed(1).replace('.', ',')} %`">{{ number_format((float) request('profit_per_trade_min', 0), 1, ',', '.') }} %</b></span><input name="profit_per_trade_min" type="range" min="-5" max="15" step="0.1" value="{{ max(-5, min(15, (float) request('profit_per_trade_min', 0))) }}" x-model.number="profitPerTrade" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
+                        <label class="ak-quality-select-card"><span>{{ __('Median-Nettorendite je Trade ≥ (%)') }}</span><input name="median_return_min" type="number" min="-5" max="15" step="0.1" value="{{ request('median_return_min') }}" placeholder="{{ __('Aus') }}" class="ak-input h-9 w-full rounded-[5px] px-2 text-[11px]" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
+                        <label class="ak-quality-select-card"><span>{{ __('Profitfaktor ≥') }}</span><input name="profit_factor_min" type="number" min="0" max="3" step="0.05" value="{{ request('profit_factor_min', 0) }}" data-heatmap-profit-factor-input class="ak-input h-9 w-full rounded-[5px] px-2 text-[11px]" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
                         @if ($qualitySetupMode || ($setupMode && ! $shortMode))<label class="ak-heatmap-range"><span>{{ __('Renditeerwartung · 20 Tage') }} ≥ <b x-text="predictedReturn >= 10 ? '10 % +' : `${predictedReturn.toFixed(1).replace('.', ',')} %`">{{ (float) request('predicted_return_min', 0.5) >= 10 ? '10 % +' : number_format(max(0.5, (float) request('predicted_return_min', 0.5)), 1, ',', '.').' %' }}</b></span><input name="predicted_return_min" type="range" min="0.5" max="10" step="0.5" value="{{ $rangeValue('predicted_return_min', 0.5, 0.5, 'predicted_return') }}" x-model.number="predictedReturn" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>@endif
                         @if ($setupMode && ! $shortMode)<label class="ak-heatmap-range"><span>{{ __('Sektor-Score') }} <b x-text="sectorScore < 0 ? '{{ __('Alle') }}' : `> ${sectorScore.toFixed(0)}`">{{ (float) request('sector_score_min', -1) < 0 ? __('Alle') : '> '.number_format((float) request('sector_score_min'), 0, ',', '.') }}</b></span><input name="sector_score_min" type="range" min="-1" max="10" step="1" value="{{ max(-1, min(10, (float) request('sector_score_min', -1))) }}" x-model.number="sectorScore" onchange="this.form.requestSubmit()"></label>@endif
                     </div>
@@ -430,9 +451,17 @@
                     <h3 class="mb-2 text-[9px] font-black uppercase tracking-[.12em] text-rose-300">{{ __('Risiko') }}</h3>
                     <div class="grid grid-cols-2 gap-1">
                         <label class="ak-heatmap-range"><span>{{ __('Drawdown') }} ≤ <b x-text="drawdown >= {{ $rangeMaxima['drawdown'] }} ? '{{ __('Alle') }}' : `${drawdown}%`">{{ $rangeValue('drawdown_max', $rangeMaxima['drawdown'], 0, 'drawdown') >= $rangeMaxima['drawdown'] ? __('Alle') : number_format($rangeValue('drawdown_max', $rangeMaxima['drawdown'], 0, 'drawdown'), 0, ',', '.').'%' }}</b></span><input name="drawdown_max" type="range" min="0" max="{{ $rangeMaxima['drawdown'] }}" step="5" value="{{ $rangeValue('drawdown_max', $rangeMaxima['drawdown'], 0, 'drawdown') }}" x-model.number="drawdown" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
+                        <label class="ak-quality-select-card"><span>{{ __('Aktuelles Modellrisiko ≤ (%)') }}</span><input name="risk_max" type="number" min="0" max="100" step="1" value="{{ request('risk_max', 100) }}" class="ak-input h-9 w-full rounded-[5px] px-2 text-[11px]" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
                         <label class="ak-heatmap-range"><span>{{ __('Volatilität') }} ≤ <b x-text="volatility >= {{ $rangeMaxima['volatility'] }} ? '{{ __('Alle') }}' : `${volatility}%`">{{ $rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility') >= $rangeMaxima['volatility'] ? __('Alle') : number_format($rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility'), 0, ',', '.').'%' }}</b></span><input name="volatility_max" type="range" min="0" max="{{ $rangeMaxima['volatility'] }}" step="5" value="{{ $rangeValue('volatility_max', $rangeMaxima['volatility'], 0, 'volatility') }}" x-model.number="volatility" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
                     </div>
                 </section>
+                @if ($setupMode && ! $qualitySetupMode)
+                    <div class="flex justify-end border-t border-white/[.07] pt-2">
+                        <button type="submit" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-cyan-300/35 bg-cyan-400/[.14] px-5 text-[10px] font-black uppercase tracking-[.08em] text-cyan-100 transition hover:bg-cyan-400/[.22]">
+                            <x-heroicon-o-check class="h-4 w-4" />{{ __('Übernehmen') }}
+                        </button>
+                    </div>
+                @endif
             @if ($qualitySetupMode)
                     </div>
                 </div>
@@ -478,14 +507,15 @@
 
         @if ($setupMode && ! $shortMode && ! $qualitySetupMode)
             @php $fundamentalChanged = $changedFilterCount($fundamentalFilterDefaults); @endphp
-            <details class="ak-filter-group rounded-lg border border-[var(--ak-border)] bg-white/[.02]" @if($fundamentalChanged > 0) open @endif>
+            <details class="ak-filter-group rounded-lg border border-[var(--ak-border)] bg-white/[.02]">
                 <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2">
                     <span><strong class="block text-[11px] font-black uppercase tracking-[.12em] text-[var(--ak-text)]">{{ __('Fundamentaldaten') }}</strong><small class="text-[9px] text-[var(--ak-muted)]">{{ __('Bewertung, Ausschüttung, Unternehmensgröße und Wachstum') }}</small></span>
                     <span class="flex items-center gap-2"><span class="rounded-full border border-emerald-300/25 bg-emerald-400/[.10] px-2 py-1 text-[9px] font-black text-emerald-300">{{ $fundamentalChanged }} {{ __('geändert') }}</span><a href="{{ $filterGroupResetUrl($heatmapFilterRoute, array_keys($fundamentalFilterDefaults)) }}" onclick="event.stopPropagation()" class="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--ak-border)] px-2 text-[8px] font-black uppercase text-[var(--ak-muted)]"><x-heroicon-o-arrow-path class="h-3 w-3" />{{ __('Reset') }}</a><x-heroicon-o-chevron-down class="h-4 w-4 text-emerald-300" /></span>
                 </summary>
+            <button type="button" class="ak-filter-modal-backdrop" aria-label="{{ __('Filter schließen') }}" onclick="this.closest('details').removeAttribute('open')"></button>
             <div
                 id="fundamental-heatmap-filters"
-                class="min-w-0 overflow-x-auto border-t border-[var(--ak-border)] p-2"
+                class="ak-filter-modal-panel min-w-0 overflow-x-auto border-t border-[var(--ak-border)] p-3"
             >
                 <label class="ak-fundamental-range">
                     <span>{{ __('KGV') }} ≤ <b x-text="pe >= {{ $rangeMaxima['pe'] }} ? '{{ __('Alle') }}' : pe.toFixed(0)">{{ $rangeValue('pe_max', $rangeMaxima['pe'], 0, 'pe') >= $rangeMaxima['pe'] ? __('Alle') : number_format($rangeValue('pe_max', $rangeMaxima['pe'], 0, 'pe'), 0, ',', '.') }}</b></span>
@@ -534,10 +564,7 @@
         @endif
 
         @if ($setupMode && ! $shortMode)
-            @php
-                $selectedExitStrategy = (string) request('exit_strategy', $editingSavedFilter?->filters['exit_strategy'] ?? 'fixed_20d');
-            @endphp
-            <section x-data="{ saveOpen: @js($qualitySetupMode && ($canSaveSmartLabel ?? false) && request()->boolean('open_label_modal')), exitStrategy: @js($selectedExitStrategy), visibility: @js(old('visibility', $editingSavedFilter?->visibility ?? 'private')), automationEnabled: @js(request()->boolean('automatic_optimization')) }" @open-save-filter.window="if (@js($qualitySetupMode ? ($canSaveSmartLabel ?? false) : ($canSaveStrategy ?? false))) { saveOpen = true } else { showPlanNotice(@js($qualitySetupMode ? __('Label speichern') : __('Strategie speichern')), @js($qualitySetupMode ? __('Speichere diese Smart Selection als persönliches Label.') : __('Das Speichern persönlicher Strategien ist im Pro-Tarif verfügbar.')), @js($qualitySetupMode ? 'PLUS' : 'PRO')) }" class="contents">
+            <section x-data="{ saveOpen: @js($qualitySetupMode && ($canSaveSmartLabel ?? false) && request()->boolean('open_label_modal')), visibility: @js(old('visibility', $editingSavedFilter?->visibility ?? 'private')), automationEnabled: @js(request()->boolean('automatic_optimization')) }" @open-save-filter.window="if (@js($qualitySetupMode ? ($canSaveSmartLabel ?? false) : ($canSaveStrategy ?? false))) { saveOpen = true } else { showPlanNotice(@js($qualitySetupMode ? __('Label speichern') : __('Strategie speichern')), @js($qualitySetupMode ? __('Speichere diese Smart Selection als persönliches Label.') : __('Das Speichern persönlicher Strategien ist im Pro-Tarif verfügbar.')), @js($qualitySetupMode ? 'PLUS' : 'PRO')) }" class="contents">
                 <div class="hidden">
                     <x-heroicon-o-bookmark class="h-4 w-4" />
                     {{ __('Gespeicherte Filter') }}
@@ -568,8 +595,7 @@
                         @if (request('backtest_run'))<input type="hidden" name="backtest_run" value="{{ request('backtest_run') }}">@endif
                         @if ($editingSavedFilter)<input type="hidden" name="saved_filter" value="{{ $editingSavedFilter->id }}">@endif
                         @foreach (\App\Http\Controllers\SavedPredictionFilterController::FILTER_KEYS as $filterKey)
-                            @continue($filterKey === 'exit_strategy')
-                            @continue($qualitySetupMode && in_array($filterKey, ['score_min', 'confidence_min', 'drawdown_max', 'profit_per_trade_min', 'volatility_max', 'predicted_return_min', 'hit_rate_min', 'minimum_trades', 'pe_max', 'dividend_yield_min', 'market_cap_min', 'revenue_growth_min'], true))
+                            @continue($qualitySetupMode && in_array($filterKey, ['score_min', 'confidence_min', 'drawdown_max', 'risk_max', 'profit_per_trade_min', 'median_return_min', 'profit_factor_min', 'volatility_max', 'predicted_return_min', 'hit_rate_min', 'minimum_trades', 'pe_max', 'dividend_yield_min', 'market_cap_min', 'revenue_growth_min'], true))
                             @php
                                 $filterValue = request(
                                     $filterKey,
@@ -583,7 +609,7 @@
                             @endif
                         @endforeach
                         <div class="flex items-start justify-between gap-4">
-                            <div><p class="text-[10px] font-black uppercase tracking-[.14em] text-teal-400">{{ $qualitySetupMode ? __('Als Label speichern') : __('Filter speichern') }}</p><h2 class="mt-1 text-xl font-black text-white">{{ $qualitySetupMode ? __('Label konfigurieren') : __('Exitstrategie und Filtername') }}</h2></div>
+                            <div><p class="text-[10px] font-black uppercase tracking-[.14em] text-teal-400">{{ $qualitySetupMode ? __('Als Label speichern') : __('Strategie speichern') }}</p><h2 class="mt-1 text-xl font-black text-white">{{ $qualitySetupMode ? __('Label konfigurieren') : __('Strategie benennen') }}</h2></div>
                             <button type="button" @click="saveOpen = false" class="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white"><x-heroicon-o-x-mark class="h-4 w-4" /></button>
                         </div>
                         @if ($qualitySetupMode)
@@ -593,10 +619,13 @@
                             </div>
                             @php
                                 $labelCriteriaFields = [
-                                    ['score_min', __('KI-Score mindestens'), 0, 10, .1],
+                                    ['score_min', __('Modellscore mindestens'), 0, 10, .1],
                                     ['confidence_min', __('Konfidenz mindestens (%)'), 0, 100, 1],
-                                    ['profit_per_trade_min', __('Profit-Faktor pro Aktie'), 0, 10, .1],
+                                    ['profit_per_trade_min', __('Nettorendite je Trade (%)'), -5, 15, .1],
+                                    ['median_return_min', __('Median-Nettorendite je Trade (%)'), -5, 15, .1],
+                                    ['profit_factor_min', __('Profitfaktor mindestens'), 0, 3, .05],
                                     ['hit_rate_min', __('Trefferquote mindestens (%)'), 0, 100, 1],
+                                    ['risk_max', __('Aktuelles Modellrisiko höchstens (%)'), 0, 100, 1],
                                     ['drawdown_max', __('Drawdown höchstens (%)'), 0, 100, 1],
                                     ['volatility_max', __('Volatilität höchstens'), 0, 1000000, .1],
                                     ['minimum_trades', __('Historische Trades mindestens'), 0, 10000, 1],
@@ -613,7 +642,7 @@
                                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                     @foreach ($labelCriteriaFields as [$field, $label, $min, $max, $step])
                                         <label class="text-[9px] font-black uppercase tracking-wide text-slate-400">{{ $label }}
-                                            <input name="{{ $field }}" type="number" min="{{ $min }}" @if($max !== null) max="{{ $max }}" @endif step="{{ $step }}" value="{{ request($field, \App\Http\Controllers\SavedPredictionFilterController::FILTER_DEFAULTS[$field] ?? 0) }}" class="ak-input mt-1.5 h-10 w-full rounded-lg px-3 text-xs font-bold normal-case text-white">
+                                            <input name="{{ $field }}" type="number" min="{{ $min }}" @if($max !== null) max="{{ $max }}" @endif step="{{ $step }}" value="{{ request($field, \App\Http\Controllers\SavedPredictionFilterController::FILTER_DEFAULTS[$field] ?? '') }}" @if($field === 'median_return_min') placeholder="{{ __('Aus') }}" @endif class="ak-input mt-1.5 h-10 w-full rounded-lg px-3 text-xs font-bold normal-case text-white">
                                         </label>
                                     @endforeach
                                 </div>
@@ -623,31 +652,6 @@
                                 <input type="checkbox" name="email_notification_enabled" value="1" class="mt-1 h-4 w-4 rounded border-amber-300/40 bg-slate-900 text-amber-400 focus:ring-amber-400">
                                 <span><strong class="block text-amber-200">{{ __('E-Mail bei Kaufsignal senden') }}</strong>{{ __('Soll ich dir eine E-Mail senden, sobald eine Aktie dieses Labels ein neues Kaufsignal erhält?') }}</span>
                             </label>
-                        @endif
-                        @if (! $qualitySetupMode)
-                        <div class="mt-5">
-                            <div class="flex items-end justify-between gap-3">
-                                <div><p class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Exitstrategie') }}</p><p class="mt-1 text-[10px] text-slate-500">{{ __('Wähle genau eine Ausstiegslogik für diesen Filter.') }}</p></div>
-                                <span class="rounded-md bg-teal-400/10 px-2 py-1 text-[9px] font-black text-teal-300">{{ __('Eine Auswahl') }}</span>
-                            </div>
-                            <div class="mt-2 grid grid-cols-2 gap-2">
-                                @foreach ([
-                                    ['fixed_20d', __('20 Tage'), __('Verkauf nach 20 Handelstagen'), 'save-exit-fixed'],
-                                    ['signal_change', __('Signal- oder Marktphasenwechsel'), __('Verkauf beim ersten Wechsel des BUY-Signals oder der MACD-/Stochastik-Marktphase'), 'save-exit-signal'],
-                                    ['forecast_below_price', __('Prognose unter Kurs'), __('Hält die Position, bis die neue 20-Tage-Prognose unter dem dann aktuellen Kurs liegt'), 'save-exit-forecast-price'],
-                                    ['buy_and_hold', __('Buy and Hold'), __('Gekaufte Aktien werden dauerhaft gehalten'), 'save-exit-buy-hold'],
-                                ] as [$exitValue, $exitLabel, $exitDescription, $exitMetricId])
-                                    <label class="cursor-pointer rounded-lg border p-2.5 transition" :class="exitStrategy === '{{ $exitValue }}' ? 'border-teal-300/35 bg-teal-400/[.10]' : 'border-white/[.08] bg-white/[.025]'">
-                                        <div class="flex items-start gap-2">
-                                            <input type="radio" name="exit_strategy" value="{{ $exitValue }}" x-model="exitStrategy" @checked($selectedExitStrategy === $exitValue) required class="mt-0.5 h-4 w-4 border-slate-500 bg-slate-900 text-teal-500 focus:ring-teal-500/30">
-                                            <span><b class="block text-[11px] text-white">{{ $exitLabel }}</b><small class="mt-1 block text-[9px] leading-4 text-slate-400">{{ $exitDescription }}</small></span>
-                                        </div>
-                                        <div id="{{ $exitMetricId }}" class="mt-2 border-t border-white/[.07] pt-2 text-[9px] font-bold text-slate-500">{{ __('Noch kein passendes Backtestergebnis') }}</div>
-                                        <p x-show="exitStrategy === 'buy_and_hold' && '{{ $exitValue }}' === 'buy_and_hold'" class="mt-2 rounded bg-amber-300/[.08] px-2 py-1 text-[8px] font-bold text-amber-200">{{ __('Money Manager deaktiviert · Positionsfaktor 1×') }}</p>
-                                    </label>
-                                @endforeach
-                            </div>
-                        </div>
                         @endif
                         <div class="mt-5 grid {{ $qualitySetupMode ? 'grid-cols-[1fr_140px]' : 'grid-cols-1' }} gap-3">
                             <label class="block text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Name') }}
@@ -708,12 +712,12 @@
                             <div class="mt-4 rounded-xl border border-cyan-300/25 bg-cyan-400/[.07] p-4">
                                 <label class="flex cursor-pointer items-start gap-3">
                                     <input type="checkbox" name="automation_enabled" value="1" x-model="automationEnabled" class="mt-1 h-4 w-4 rounded border-cyan-300/40 bg-slate-900 text-cyan-400 focus:ring-cyan-400">
-                                    <span><strong class="block text-xs text-cyan-200">{{ __('Strategie automatisch im Depot ausführen') }}</strong><small class="mt-1 block text-[10px] leading-4 text-slate-300">{{ __('Nach neuen Predictions wird geprüft, ob sich das Strategiedepot ändern muss.') }}</small></span>
+                                    <span><strong class="block text-xs text-cyan-200">{{ __('Modellstrategie automatisch im Depot ausführen') }}</strong><small class="mt-1 block text-[10px] leading-4 text-slate-300">{{ __('Die ausgewählten Modellkonfigurationen werden überwacht. Ein Kauf wird ausschließlich beim Wechsel des jeweiligen Modells auf BUY ausgelöst.') }}</small></span>
                                 </label>
                                 <div x-show="automationEnabled" x-cloak class="mt-4 border-t border-cyan-300/15 pt-4">
                                     <div class="flex items-start gap-3">
                                         <x-heroicon-o-arrow-path-rounded-square class="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" />
-                                        <div><p class="text-xs font-black text-cyan-200">{{ __('Automatisches Strategiedepot') }}</p><p class="mt-1 text-[10px] leading-4 text-slate-300">{{ __('Die optimierte Strategie wird nach jeder neuen Prediction auf das gewählte Depot angewendet. Käufe und spätere Depotänderungen werden protokolliert.') }}</p></div>
+                                        <div><p class="text-xs font-black text-cyan-200">{{ __('Automatisches Strategiedepot') }}</p><p class="mt-1 text-[10px] leading-4 text-slate-300">{{ __('Nach jeder neuen Prediction werden Modell, Horizont und BUY-Übergang geprüft. Ein fortbestehendes BUY löst keinen weiteren Kauf aus. Käufe und spätere Depotänderungen werden protokolliert.') }}</p></div>
                                     </div>
                                     <div class="mt-4 grid gap-3 md:grid-cols-3">
                                         <label class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Depot') }}
@@ -760,7 +764,6 @@
                             </div>
                         </div>
                         @endif
-                        @error('exit_strategy')<p class="mt-2 text-[10px] font-bold text-rose-300">{{ $message }}</p>@enderror
                         <p class="mt-3 text-[10px] text-slate-400">{{ $qualitySetupMode ? __('Die Kriterien werden als eigene Smart-Selection-Kategorie gespeichert. Strategien und das systemweite Quality Gate bleiben unverändert.') : __('Dein Tarif erlaubt :count gespeicherte Filter.', ['count' => $savedFilterLimit]) }}</p>
                         <div class="mt-5 flex justify-end gap-2"><button type="button" @click="saveOpen = false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-bold text-slate-300">{{ __('Abbrechen') }}</button><button type="submit" class="h-10 rounded-lg border border-teal-300/30 bg-teal-400/15 px-5 text-xs font-black text-teal-200 hover:bg-teal-400/20">{{ $qualitySetupMode ? __('Als Label speichern') : __('Speichern') }}</button></div>
                     </form>
@@ -772,8 +775,9 @@
                 $backtestIsActive = isset($activeBacktestRun) && in_array($activeBacktestRun?->status, ['queued', 'running'], true);
                 $backtestIsComplete = isset($activeBacktestRun) && in_array($activeBacktestRun?->status, ['completed', 'completed_with_errors'], true);
                 $backtestFilters = [
-                    'q', 'country', 'exchange', 'sector', 'ai_type', 'model', 'quality_tier', 'signal',
-                    'score_min', 'confidence_min', 'drawdown_max', 'profit_per_trade_min', 'volatility_max',
+                    'q', 'country', 'exchange', 'sector', 'ai_type', 'model', 'quality_tier',
+                    'service_quality_gate', 'quality_horizons_present', 'quality_horizons', 'signal',
+                    'score_min', 'confidence_min', 'drawdown_max', 'profit_per_trade_min', 'median_return_min', 'volatility_max',
                     'pe_max', 'dividend_yield_min', 'dividend_yield_operator', 'market_cap_min', 'market_cap_group', 'revenue_growth_min', 'hit_rate_min',
                     'risk_max', 'predicted_return_min', 'minimum_trades', 'sector_score_min', 'positive_prediction_required', 'ensemble_veto_required', 'quality_gate_profile',
                     'gate_mode', 'quality_setup',
@@ -782,11 +786,12 @@
                     'resistance_trailing_stop_enabled', 'entry_wait_5d_enabled', 'signal_change_exit_enabled', 'forecast_below_price_exit_enabled',
                     'indicator_matrix_usage', 'indicator_matrix_preset', 'indicator_matrix_macd_min', 'indicator_matrix_macd_max',
                     'indicator_matrix_stoch_min', 'indicator_matrix_stoch_max', 'indicator_matrix_macd_direction',
-                    'indicator_probability_min',
+                    'indicator_probability_min', 'heatmap_selection', 'profit_factor_min',
+                    'signal_quality_min', 'model_quality_min',
                 ];
             @endphp
             @if (! $qualitySetupMode)
-            <section x-data="{ capitalOpen: @js(request()->boolean('new_backtest')), wizardOpen: false, optimizeOpen: false, capital: 10000, positions: Number({{ max(1, min(50, (int) request('max_positions', 5))) }}), positionFactor: Number({{ request('exit_strategy') === 'buy_and_hold' ? 1 : max(1, (int) request('position_factor', 1)) }}), tradeCost: 10, moneyManagerEnabled: @js(request('exit_strategy') !== 'buy_and_hold') }" @close-capital-modal.window="capitalOpen = false" class="ak-backtest-strip relative mb-3 flex shrink-0 items-center justify-between gap-3 overflow-hidden rounded-xl border border-amber-300/20 bg-amber-300/[.055] px-3 py-2 {{ $backtestIsActive ? 'pb-4' : '' }}">
+            <section x-data="{ capitalOpen: @js(request()->boolean('new_backtest') || $errors->any()), wizardOpen: false, optimizeOpen: false, capital: 10000, positions: Number({{ max(1, min(50, (int) request('max_positions', 5))) }}), positionFactor: Number({{ request('exit_strategy') === 'buy_and_hold' ? 1 : max(1, (int) request('position_factor', 1)) }}), tradeCost: 10, moneyManagerEnabled: @js(request('exit_strategy') !== 'buy_and_hold') }" @close-capital-modal.window="capitalOpen = false" class="ak-backtest-strip relative mb-3 flex shrink-0 items-center justify-between gap-3 overflow-hidden rounded-xl border border-amber-300/20 bg-amber-300/[.055] px-3 py-2 {{ $backtestIsActive ? 'pb-4' : '' }}">
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">
                         @if ($backtestIsActive)
@@ -955,7 +960,7 @@
                         $modalEntryStrategy = (string) request('entry_strategy', request()->boolean('forecast_score_rotation_5d_enabled') ? 'forecast_score_rotation_5d' : (request()->boolean('entry_wait_5d_enabled') ? 'wait_5d' : 'direct_buy'));
                         $modalExitStrategy = (string) request('exit_strategy', 'fixed_20d');
                     @endphp
-                    <div data-backtest-capital-modal x-show="capitalOpen" @unless(request()->boolean('new_backtest')) x-cloak @endunless class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md" @keydown.escape.window="$dispatch('close-capital-modal')">
+                    <div data-backtest-capital-modal x-show="capitalOpen" @unless(request()->boolean('new_backtest') || $errors->any()) x-cloak @endunless class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md" @keydown.escape.window="$dispatch('close-capital-modal')">
                         <form method="POST" action="{{ route('setup.filter.backtest') }}" x-data="{ submitting: false, entryStrategy: @js($modalEntryStrategy), exitStrategy: @js($modalExitStrategy), automaticComparison: @js(request()->boolean('automatic_strategy_comparison')), matrixUsage: @js(request('indicator_matrix_usage', 'off')), matrixPreset: @js(request('indicator_matrix_preset', 'manual')) }" @submit="submitting = true" class="ak-backtest-config-dialog max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-teal-300/20 bg-[#15243a] p-5 shadow-2xl" style="background-color:#15243a !important; opacity:1 !important;" @click.outside="$dispatch('close-capital-modal')">
                             @csrf
                             @if ($errors->any())
@@ -1128,7 +1133,7 @@
                                 <div class="grid grid-cols-5 gap-1" role="radiogroup" aria-label="{{ __('Allocation je Aktie') }}">
                                     @for ($factor = 1; $factor <= 5; $factor++)
                                         <label class="cursor-pointer">
-                                            <input type="radio" name="position_factor" value="{{ $factor }}" x-model.number="positionFactor" class="peer sr-only">
+                                            <input type="radio" name="position_factor" value="{{ $factor }}" x-model.number="positionFactor" @checked($factor === (request('exit_strategy') === 'buy_and_hold' ? 1 : max(1, min(5, (int) request('position_factor', 1))))) class="peer sr-only">
                                             <span class="flex h-9 items-center justify-center rounded-md border border-white/10 text-xs font-black text-slate-400 transition peer-checked:border-amber-300/45 peer-checked:bg-amber-300/15 peer-checked:text-amber-200">{{ $factor }}×</span>
                                         </label>
                                     @endfor
@@ -1191,7 +1196,7 @@
                         document.documentElement.classList.add('overflow-hidden');
                     };
                     window.openBacktestCapitalModal = open;
-                    if (@js(request()->boolean('new_backtest'))) open();
+                    if (@js(request()->boolean('new_backtest') || $errors->any())) open();
                     document.addEventListener('click', event => {
                         if (event.target.closest('[data-close-backtest-capital]')) close();
                         if (event.target.closest('[data-open-backtest-capital]')) open();
@@ -1245,11 +1250,13 @@
         @php
             $heatmapScoreFilter = max(0, min(10, (float) request('score_min', 0)));
             $heatmapConfidenceFilter = max(0, min(100, (float) request('confidence_min', 0)));
+            $heatmapSelections = json_decode((string) request('heatmap_selection', '{}'), true);
+            $heatmapSelections = is_array($heatmapSelections) ? $heatmapSelections : [];
             $heatmapMetrics = [
-                ['key' => 'hit_rate', 'axis_key' => 'confidence', 'label' => __('KI-Score vs. Konfidenz'), 'axis_label' => __('Konfidenz'), 'axis_step' => 10.0, 'axis_suffix' => '%', 'suffix' => '%'],
-                ['key' => 'profit_factor', 'axis_key' => 'profit_factor', 'label' => __('KI-Score vs. Profitfaktor'), 'axis_label' => __('Profitfaktor'), 'axis_step' => .3, 'axis_suffix' => '', 'suffix' => ''],
-                ['key' => 'drawdown', 'axis_key' => 'hit_rate', 'label' => __('KI-Score vs. Hitrate'), 'axis_label' => __('Hitrate'), 'axis_step' => 10.0, 'axis_suffix' => '%', 'suffix' => '%'],
-                ['key' => 'volatility', 'axis_key' => 'volatility', 'label' => __('KI-Score vs. Volatilität'), 'axis_label' => __('Volatilität'), 'axis_step' => 10.0, 'axis_suffix' => '%', 'suffix' => '%'],
+                ['key' => 'hit_rate', 'cell_metric' => 'stocks', 'axis_key' => 'signal_risk', 'label' => __('Signal vs. Risiko · Anzahl Aktien'), 'axis_label' => __('Risiko'), 'axis_step' => 10.0, 'axis_suffix' => '%', 'suffix' => '', 'x_label' => __('Signal'), 'x_axis' => 'signal', 'risk_grades' => true],
+                ['key' => 'profit_factor', 'cell_metric' => 'average_net_return', 'axis_key' => 'profit_factor_hit_rate', 'label' => __('Ø Profitfaktor vs. Hitrate'), 'axis_label' => __('Hitrate'), 'axis_step' => 10.0, 'axis_suffix' => '%', 'suffix' => '%', 'x_label' => __('Ø Profitfaktor'), 'x_axis' => 'profit_factor'],
+                ['key' => 'drawdown', 'cell_metric' => 'average_net_return', 'axis_key' => 'volatility_drawdown', 'label' => __('Modellqualität vs. Drawdown'), 'axis_label' => __('Drawdown'), 'axis_step' => 5.0, 'axis_suffix' => '%', 'suffix' => '%', 'x_label' => __('Modellqualität'), 'x_axis' => 'quality'],
+                ['key' => 'volatility', 'cell_metric' => 'stocks', 'axis_key' => 'trades_return', 'label' => __('Konfidenz vs. Nettorendite je Trade'), 'axis_label' => __('Ø Nettorendite'), 'axis_step' => 2.0, 'axis_min' => -5.0, 'axis_suffix' => '%', 'suffix' => '', 'x_label' => __('Konfidenz'), 'x_axis' => 'confidence'],
             ];
             $averageBars = [
                 'hit_rate' => [
@@ -1322,7 +1329,7 @@
         <section class="ak-correlation-grid mb-3 grid shrink-0 gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]" style="grid-template-columns:minmax(240px,1fr) 120px 120px minmax(170px,220px) minmax(150px,190px);align-items:center;">
             <div class="min-w-0">
                 <p class="text-[9px] font-black uppercase tracking-[.14em] text-cyan-300">{{ __('Korrelationstest') }}</p>
-                <h2 class="mt-1 text-sm font-black">{{ __('Profitfaktor vs. KI-Score') }}</h2>
+                <h2 class="mt-1 text-sm font-black">{{ __('Profitfaktor vs. Modellscore') }}</h2>
                 <p class="mt-1 text-[9px] text-[var(--ak-muted)]">{{ $correlationScope === 'filtered' ? __('Aktuelle Filterauswahl') : __('Gesamtes aktuelles Testportfolio · Filterauswahl zu klein') }} · {{ __('mindestens 10 Trades je Aktie · Profitfaktor bei 3,0 gekappt') }}</p>
             </div>
             <div class="rounded-lg border px-3 py-2 text-center {{ $correlationTone }}">
@@ -1344,7 +1351,17 @@
                 <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-950/25"><span class="block h-full rounded-full bg-current" style="width: {{ $filterQualityScore }}%"></span></div>
             </div>
         </section>
-        <section class="ak-heatmap-metric-grid grid min-h-0 w-full flex-none grid-cols-1 items-start gap-3 overflow-visible pb-4 md:grid-cols-2 xl:grid-cols-4">
+        @if (collect($heatmapSelections)->flatten()->isNotEmpty())
+            <div class="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-cyan-300/15 bg-cyan-400/[.04] px-3 py-2 text-[9px]">
+                <strong class="mr-1 uppercase tracking-wide text-cyan-200">{{ __('Deaktivierte Zellen') }}</strong>
+                <span class="rounded-md border border-emerald-300/25 bg-emerald-400/[.09] px-2 py-1 font-black text-emerald-200">{{ number_format((int) ($selectedComparisonStocks ?? 0), 0, ',', '.') }} {{ __('Modelle') }}</span>
+                @foreach ($heatmapSelections as $map => $cells)
+                    @if (is_array($cells) && $cells !== [])<span class="rounded-md border border-cyan-300/20 bg-cyan-400/[.08] px-2 py-1 font-bold text-cyan-100">{{ __(match ($map) { 'profit_factor_hit_rate' => 'Qualität', 'signal_risk' => 'Signal', 'volatility_drawdown' => 'Stabilität', 'trades_return' => 'Häufigkeit', default => $map }) }} · {{ count($cells) }}</span>@endif
+                @endforeach
+                <button type="button" data-clear-heatmap-selection class="ml-auto rounded-md border border-white/10 px-2 py-1 font-black uppercase text-[var(--ak-muted)] hover:text-white">{{ __('Alle zurücksetzen') }}</button>
+            </div>
+        @endif
+        <section class="ak-heatmap-metric-grid grid w-full flex-none grid-cols-1 items-start gap-3 overflow-visible pb-4 md:grid-cols-2 xl:grid-cols-4">
             @foreach ($heatmapMetrics as $metric)
                 @php
                     $comparisonMap = (array) data_get($comparisonHeatmaps ?? [], $metric['axis_key'], []);
@@ -1353,31 +1370,50 @@
                     $minimumProfitFactor = is_numeric($comparisonMap['min_profit_factor'] ?? null)
                         ? (float) $comparisonMap['min_profit_factor']
                         : null;
-                    $bar['label'] = __('Niedrigster Profitfaktor je Aktie');
-                    $bar['display'] = $minimumProfitFactor === null
-                        ? '—'
-                        : number_format($minimumProfitFactor, 2, ',', '.');
-                    $bar['width'] = $minimumProfitFactor === null
-                        ? 0
-                        : min(100, max(0, $minimumProfitFactor / 3 * 100));
+                    $bar['label'] = $metric['axis_key'] === 'signal_risk'
+                        ? __('Aktien in der Auswertung')
+                        : __('Modelle in der Auswertung');
+                    $bar['display'] = number_format($comparisonStocks, 0, ',', '.');
+                    $bar['width'] = min(100, max(0, $comparisonStocks / max(1, (int) ($heatmapUniverseInstruments ?? $comparisonStocks)) * 100));
                     $bar['palette'] = ['#164e63', '#155e75', '#0e7490', '#0891b2', '#06b6d4', '#22d3ee', '#2dd4bf', '#34d399', '#6ee7b7', '#a7f3d0'];
-                    $axisFilterValue = match ($metric['axis_key']) {
+                    $xFilterValue = match ($metric['x_axis'] ?? null) {
+                        'profit_factor' => max(0, min(100, (float) request('profit_factor_min', 0) / 3 * 100)),
+                        'signal' => max(0, min(100, (float) request('signal_quality_min', 0))),
+                        'percent' => max(0, min(100, (float) request('volatility_max', 100))),
+                        'trades' => max(0, min(100, (float) request('minimum_trades', 0) / 3)),
+                        'quality' => max(0, min(100, (float) request('model_quality_min', 0))),
                         'confidence' => max(0, min(100, (float) request('confidence_min', 0))),
-                        'profit_factor' => max(0, min(3, (float) request('profit_per_trade_min', 0))) / 3 * 100,
+                        default => 0,
+                    };
+                    $axisFilterValue = match ($metric['axis_key']) {
+                        'profit_factor_hit_rate' => max(0, min(100, (float) request('hit_rate_min', 0))),
+                        'signal_risk', 'volatility_drawdown' => max(0, min(100, (float) request('drawdown_max', $rangeMaxima['drawdown']) / 50 * 100)),
+                        'trades_return' => max(0, min(100, (((float) request('profit_per_trade_min', -5)) + 5) / 20 * 100)),
+                        'risk' => max(0, min(100, (float) request('drawdown_max', $rangeMaxima['drawdown']) / 50 * 100)),
+                        'confidence' => max(0, min(100, (float) request('confidence_min', 0))),
+                        'profit_factor' => max(0, min(3, (float) request('profit_factor_min', 0))) / 3 * 100,
                         'hit_rate' => max(0, min(100, (float) request('hit_rate_min', 0))),
                         'volatility' => max(0, min(100, (float) request('volatility_max', 100))),
                     };
                     $axisFilterDisplay = match ($metric['axis_key']) {
+                        'profit_factor_hit_rate' => number_format($axisFilterValue, 0, ',', '.').'%',
+                        'signal_risk', 'volatility_drawdown' => number_format($axisFilterValue / 100 * 50, 0, ',', '.').'%',
+                        'trades_return' => number_format($axisFilterValue / 100 * 20 - 5, 1, ',', '.').'%',
+                        'risk' => number_format($axisFilterValue / 100 * 50, 0, ',', '.').'%',
                         'profit_factor' => number_format($axisFilterValue / 100 * 3, 1, ',', '.'),
                         default => number_format($axisFilterValue, 0, ',', '.').$metric['axis_suffix'],
                     };
+                    if ($metric['risk_grades'] ?? false) {
+                        $riskGrades = ['1+', '1−', '2+', '2−', '3+', '3−', '4+', '4−', '5+', '5'];
+                        $axisFilterDisplay = $riskGrades[(int) max(0, min(9, floor($axisFilterValue / 10)))] ?? '—';
+                    }
                 @endphp
-                <details open data-mobile-heatmap-details class="flex h-auto min-h-0 min-w-0 flex-col overflow-visible rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-5 shadow-[var(--ak-shadow)]">
-                    <summary class="ak-mobile-heatmap-summary mb-2 flex shrink-0 cursor-pointer list-none items-center justify-between gap-2">
+                <details open data-mobile-heatmap-details class="ak-heatmap-card flex h-auto min-w-0 flex-col overflow-visible rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-8 shadow-[var(--ak-shadow)]">
+                    <summary class="ak-mobile-heatmap-summary mb-2 grid min-h-12 shrink-0 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                         <h2 class="text-sm font-black">{{ $metric['label'] }}</h2>
                         <div class="flex items-center gap-2 text-[7px] font-bold uppercase tracking-wide text-amber-300/60">
-                            <span>{{ __('KI') }} ≥ <b data-heatmap-score-label>{{ number_format($heatmapScoreFilter, 1, ',', '.') }}</b></span>
-                            <span>{{ $metric['axis_label'] }} {{ $metric['axis_key'] === 'volatility' ? '≤' : '≥' }} <b data-heatmap-axis-label="{{ $metric['axis_key'] }}">{{ $axisFilterDisplay }}</b></span>
+                            <span>{{ $metric['x_label'] ?? __('KI') }}</span>
+                            <span>{{ $metric['axis_label'] }} {{ in_array($metric['axis_key'], ['volatility', 'risk'], true) ? '≤' : '≥' }} <b data-heatmap-axis-label="{{ $metric['axis_key'] }}" data-risk-grades="{{ ($metric['risk_grades'] ?? false) ? '1' : '0' }}">{{ $axisFilterDisplay }}</b></span>
                             <strong class="ak-mobile-heatmap-current hidden text-xs text-[var(--ak-text)]">{{ $bar['display'] }}</strong>
                             <x-heroicon-o-chevron-down class="ak-mobile-heatmap-chevron hidden h-5 w-5 text-cyan-300" />
                         </div>
@@ -1400,30 +1436,35 @@
                             @endfor
                         </div>
                     </div>
-                    <div class="grid aspect-square h-auto min-h-0 w-full flex-none grid-cols-[34px_repeat(10,minmax(0,1fr))] grid-rows-[repeat(10,minmax(0,1fr))_14px] gap-1" style="position: relative;">
+                    <div class="ak-heatmap-plot grid aspect-square h-auto min-h-0 w-full flex-none grid-cols-[34px_repeat(10,minmax(0,1fr))] grid-rows-[repeat(10,minmax(0,1fr))_14px] gap-1" style="position: relative;">
+                        <span class="pointer-events-none absolute top-1/2 z-30 whitespace-nowrap text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]" style="left:-24px;transform:translateY(-50%) rotate(-90deg);transform-origin:center;">{{ $metric['axis_label'] }}</span>
                         <div
                             aria-hidden="true"
-                            style="position: absolute; inset: 0 0 18px 38px; z-index: 20; overflow: hidden; pointer-events: none;"
+                            style="position: absolute; inset: 0 0 18px 38px; z-index: 20; overflow: visible; pointer-events: none;"
                         >
                             <span
                                 data-heatmap-score-line
-                                data-heatmap-drag="score"
-                                style="position: absolute; top: 0; bottom: 0; left: {{ max(1, min(99, $heatmapScoreFilter * 10)) }}%; display: block; width: 2px; transform: translateX(-1px); background: repeating-linear-gradient(to bottom, rgba(34, 211, 238, .72) 0 4px, transparent 4px 8px);"
-                            ></span>
+                                data-heatmap-x-axis="{{ $metric['x_axis'] }}"
+                                data-heatmap-drag="x_{{ $metric['x_axis'] }}"
+                                style="position:absolute;top:0;bottom:0;left:{{ max(0, min(100, $xFilterValue)) }}%;z-index:26;display:block;width:24px;transform:translateX(-12px);background:transparent;pointer-events:auto;cursor:ew-resize;touch-action:none;"
+                            ><b aria-hidden="true" class="ak-heatmap-filter-stroke ak-heatmap-filter-stroke--vertical"></b><i aria-hidden="true" class="ak-heatmap-filter-handle"></i></span>
                             <span
                                 data-heatmap-axis-line="{{ $metric['axis_key'] }}"
-                                data-heatmap-drag="{{ $metric['axis_key'] }}"
-                                style="position: absolute; right: 0; bottom: {{ max(1, min(99, $axisFilterValue)) }}%; left: 0; display: block; height: 2px; transform: translateY(1px); background: repeating-linear-gradient(to right, rgba(34, 211, 238, .72) 0 4px, transparent 4px 8px);"
-                            ></span>
+                                data-heatmap-drag="{{ match ($metric['axis_key']) { 'profit_factor_hit_rate' => 'hit_rate', 'signal_risk', 'volatility_drawdown' => 'risk', 'trades_return' => 'net_return', default => $metric['axis_key'] } }}"
+                                style="position:absolute;right:0;bottom:{{ max(0, min(100, $axisFilterValue)) }}%;left:0;z-index:25;display:block;height:36px;transform:translateY(18px);background:transparent;pointer-events:auto;cursor:ns-resize;touch-action:none;"
+                            ><b aria-hidden="true" class="ak-heatmap-filter-stroke ak-heatmap-filter-stroke--horizontal"></b></span>
                         </div>
                         @for ($confidenceBucket = 9; $confidenceBucket >= 0; $confidenceBucket--)
                             <div class="flex items-center justify-end pr-0.5 text-[7px] font-bold tabular-nums text-[var(--ak-muted)]">
                                 @php
                                     $axisFrom = $confidenceBucket * $metric['axis_step'];
-                                    $axisTo = ($confidenceBucket + 1) * $metric['axis_step'];
+                                    $axisFrom += $metric['axis_min'] ?? 0;
+                                    $axisTo = ($confidenceBucket + 1) * $metric['axis_step'] + ($metric['axis_min'] ?? 0);
                                     $axisDecimals = $metric['axis_step'] < 1 ? 1 : 0;
                                 @endphp
-                                {{ number_format($axisFrom, $axisDecimals, ',', '.') }}–{{ number_format($axisTo, $axisDecimals, ',', '.') }}{{ $metric['axis_suffix'] }}
+                                {{ ($metric['risk_grades'] ?? false)
+                                    ? (['1+', '1−', '2+', '2−', '3+', '3−', '4+', '4−', '5+', '5'][$confidenceBucket] ?? '—')
+                                    : number_format($axisFrom, $axisDecimals, ',', '.').'–'.number_format($axisTo, $axisDecimals, ',', '.').$metric['axis_suffix'] }}
                             </div>
                             @for ($scoreBucket = 0; $scoreBucket <= 9; $scoreBucket++)
                                 @php
@@ -1537,7 +1578,7 @@
                                     $displayValue = ! $hasValue
                                         ? ($samples ?: '—')
                                         : ($metric['key'] === 'profit_factor'
-                                            ? number_format($rawValue, 2, ',', '.')
+                                            ? number_format($rawValue, 1, ',', '.')
                                             : number_format($rawValue, 0, ',', '.').$metric['suffix']);
 
                                     // Conservative stock-level comparison: the
@@ -1547,48 +1588,98 @@
                                     $minimumCellProfitFactor = is_numeric($comparisonCell['min_profit_factor'] ?? null)
                                         ? (float) $comparisonCell['min_profit_factor']
                                         : null;
-                                    $hasValue = $samples > 0 && $minimumCellProfitFactor !== null;
+                                    $averageNetReturn = is_numeric($comparisonCell['average_net_return'] ?? null)
+                                        ? (float) $comparisonCell['average_net_return']
+                                        : null;
+                                    $averageCellProfitFactor = is_numeric($comparisonCell['average_profit_factor'] ?? null)
+                                        ? (float) $comparisonCell['average_profit_factor']
+                                        : null;
+                                    $averageCellDrawdown = is_numeric($comparisonCell['average_drawdown'] ?? null)
+                                        ? (float) $comparisonCell['average_drawdown']
+                                        : null;
+                                    $averageCellHitRate = is_numeric($comparisonCell['average_hit_rate'] ?? null)
+                                        ? (float) $comparisonCell['average_hit_rate']
+                                        : null;
+                                    $visibleCellValue = match ($metric['cell_metric'] ?? 'average_net_return') {
+                                        'stocks' => $samples,
+                                        'average_profit_factor' => $averageCellProfitFactor,
+                                        'average_drawdown' => $averageCellDrawdown,
+                                        'average_hit_rate' => $averageCellHitRate,
+                                        default => $averageNetReturn,
+                                    };
+                                    $hasValue = $samples > 0 && $visibleCellValue !== null;
                                     $densityIndex = $hasValue
-                                        ? (int) max(0, min(9, floor($minimumCellProfitFactor / .3)))
+                                        ? (int) max(0, min(9, ceil(($samples / max(1, (int) ($comparisonMap['max_cell'] ?? 1))) * 10) - 1))
                                         : 0;
-                                    $metricCellHex = $bar['palette'][$densityIndex];
+                                    $metricCellHex = match ($metric['cell_metric'] ?? 'average_net_return') {
+                                        'stocks' => '#22d3ee',
+                                        'average_profit_factor' => $visibleCellValue >= 1.05 ? '#10b981' : '#f43f5e',
+                                        'average_drawdown' => $visibleCellValue <= 20 ? '#10b981' : ($visibleCellValue <= 35 ? '#f59e0b' : '#f43f5e'),
+                                        'average_hit_rate' => $visibleCellValue >= 50 ? '#10b981' : '#f43f5e',
+                                        default => $visibleCellValue >= 0 ? '#10b981' : '#f43f5e',
+                                    };
                                     $scoreCellSelected = (($scoreBucket + 1) * 10) > ($heatmapScoreFilter * 10);
                                     $axisCellFromPercent = $confidenceBucket * 10;
                                     $axisCellToPercent = ($confidenceBucket + 1) * 10;
-                                    $axisCellSelected = $metric['axis_key'] === 'volatility'
+                                    $axisCellSelected = in_array($metric['axis_key'], ['volatility', 'risk'], true)
                                         ? $axisCellFromPercent < $axisFilterValue
                                         : $axisCellToPercent > $axisFilterValue;
-                                    $outsideSelectedArea = ! ($scoreCellSelected && $axisCellSelected);
+                                    // Only cells that still contain candidates
+                                    // after *all* active filters may expose a
+                                    // value. Previously this was overwritten by
+                                    // a visual score/axis boundary, so excluded
+                                    // universe counts remained visible.
+                                    $outsideSelectedArea = false;
                                     $cellClass = $hasValue
                                         ? 'border-teal-400/15 text-white'
                                         : 'border-white/[.05] bg-slate-500/[.035] text-slate-600';
-                                    $displayValue = $hasValue ? number_format($minimumCellProfitFactor, 2, ',', '.') : '—';
+                                    $displayValue = ! $hasValue || $outsideSelectedArea
+                                        ? '—'
+                                        : match ($metric['cell_metric'] ?? 'average_net_return') {
+                                            'stocks' => number_format($visibleCellValue, 0, ',', '.'),
+                                            'average_profit_factor' => number_format($visibleCellValue, 1, ',', '.'),
+                                            'average_drawdown', 'average_hit_rate' => number_format($visibleCellValue, 1, ',', '.').' %',
+                                            default => ($visibleCellValue > 0 ? '+' : '').number_format($visibleCellValue, 1, ',', '.').' %',
+                                        };
                                 @endphp
-                                <div class="ak-heatmap-cell relative flex aspect-square min-h-0 min-w-0 cursor-default items-center justify-center self-center rounded-[4px] border {{ $outsideSelectedArea ? 'border-white/[.08]' : $cellClass.($hasValue && $metric['key'] !== 'drawdown' ? ' !border-teal-400/10' : '') }}"
+                                <button type="button" data-strategy-heatmap-cell data-heatmap-map="{{ $metric['axis_key'] }}" data-heatmap-cell="{{ $cellKey }}" aria-pressed="{{ in_array($cellKey, (array) ($heatmapSelections[$metric['axis_key']] ?? []), true) ? 'true' : 'false' }}" class="ak-heatmap-cell relative flex aspect-square min-h-0 min-w-0 cursor-pointer items-center justify-center self-center rounded-[4px] border {{ in_array($cellKey, (array) ($heatmapSelections[$metric['axis_key']] ?? []), true) ? 'grayscale ring-1 ring-rose-300/45' : '' }} {{ $outsideSelectedArea ? 'border-white/[.08]' : $cellClass.($hasValue && $metric['key'] !== 'drawdown' ? ' !border-teal-400/10' : '') }}"
                                      style="{{ $outsideSelectedArea
-                                         ? 'background-color: transparent !important; color: #f8fafc !important; opacity: 1 !important;'
+                                         ? 'background-color: transparent !important; color: '.($hasValue ? '#f8fafc' : 'rgba(100,116,139,.42)').' !important; opacity: 1 !important;'
                                          : ($hasValue ? 'background-color: color-mix(in srgb, '.$metricCellHex.' 24%, transparent); color: color-mix(in srgb, '.$metricCellHex.' 42%, white); border-color: rgba(34, 211, 238, .10);' : '') }}"
-                                     title="{{ __('KI-Score :scoreFrom–:scoreTo · :axis :axisFrom–:axisTo · Mindest-PF :profitFactor · :samples Aktien', [
-                                         'scoreFrom' => $scoreBucket,
-                                         'scoreTo' => $scoreBucket + 1,
+                                     title="{{ __(':scoreLabel :scoreFrom–:scoreTo · :axis :axisFrom–:axisTo · Ø Nettorendite :return · Ø Profitfaktor :profitFactor · Ø Drawdown :drawdown · Ø Hitrate :hitRate · :samples :unit', [
+                                         'scoreLabel' => $metric['x_label'] ?? __('Modellscore'),
+                                         'scoreFrom' => ($metric['x_axis'] ?? null) === 'profit_factor' ? number_format($scoreBucket * .3, 1, ',', '.') : $scoreBucket,
+                                         'scoreTo' => ($metric['x_axis'] ?? null) === 'profit_factor' ? number_format(($scoreBucket + 1) * .3, 1, ',', '.') : $scoreBucket + 1,
                                          'axis' => $metric['axis_label'],
                                          'axisFrom' => number_format($axisFrom, $axisDecimals, ',', '.').$metric['axis_suffix'],
                                          'axisTo' => number_format($axisTo, $axisDecimals, ',', '.').$metric['axis_suffix'],
-                                         'profitFactor' => $minimumCellProfitFactor === null ? '—' : number_format($minimumCellProfitFactor, 2, ',', '.'),
+                                         'return' => $averageNetReturn === null ? '—' : (($averageNetReturn > 0 ? '+' : '').number_format($averageNetReturn, 2, ',', '.').' %'),
+                                         'profitFactor' => $averageCellProfitFactor === null ? '—' : number_format($averageCellProfitFactor, 2, ',', '.'),
+                                         'drawdown' => $averageCellDrawdown === null ? '—' : number_format($averageCellDrawdown, 1, ',', '.').' %',
+                                         'hitRate' => $averageCellHitRate === null ? '—' : number_format($averageCellHitRate, 1, ',', '.').' %',
                                          'samples' => $samples,
+                                         'unit' => $metric['axis_key'] === 'signal_risk' ? __('Aktien') : __('Modelle'),
                                     ]) }}">
                                     <span class="absolute inset-0 z-10 grid place-items-center text-[7px] font-black tabular-nums sm:text-[8px]"
-                                          style="visibility:visible !important; opacity:1 !important; color:{{ $outsideSelectedArea ? '#f8fafc' : 'inherit' }} !important; background:transparent !important;">
+                                          style="visibility:visible !important; opacity:{{ $hasValue && ! $outsideSelectedArea ? '1' : '.28' }} !important; color:{{ $outsideSelectedArea ? 'rgb(100 116 139)' : 'inherit' }} !important; background:transparent !important;">
                                         {{ $displayValue }}
                                     </span>
-                                </div>
+                                </button>
                             @endfor
                         @endfor
                         <div></div>
                         @for ($scoreBucket = 0; $scoreBucket <= 9; $scoreBucket++)
-                            <div class="text-center text-[7px] font-bold tabular-nums text-[var(--ak-muted)]">{{ $scoreBucket }}–{{ $scoreBucket + 1 }}</div>
+                            <div class="text-center text-[7px] font-bold tabular-nums text-[var(--ak-muted)]">{{ match ($metric['x_axis'] ?? null) {
+                                'profit_factor' => number_format($scoreBucket * .3, 1, ',', '.').'–'.number_format(($scoreBucket + 1) * .3, 1, ','),
+                                'signal' => \App\Support\QualityGrade::fromPercent($scoreBucket * 10 + 5) ?? '—',
+                                'percent' => ($scoreBucket * 10).'–'.(($scoreBucket + 1) * 10).'%',
+                                'trades' => ($scoreBucket * 10).'–'.(($scoreBucket + 1) * 10),
+                                'quality', 'confidence' => ($scoreBucket * 10).'–'.(($scoreBucket + 1) * 10).'%',
+                                default => $scoreBucket.'–'.($scoreBucket + 1),
+                            } }}</div>
                         @endfor
                     </div>
+                    <div class="ml-[38px] mt-2 text-center text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ $metric['x_label'] ?? __('Signal') }}</div>
                 </details>
             @endforeach
         </section>
@@ -1596,6 +1687,38 @@
         <script>
             (() => {
                 const filterForm = document.getElementById('prediction-heatmap-filters');
+                const selectionInput = filterForm?.querySelector('[data-heatmap-selection-input]');
+                const readHeatmapSelection = () => {
+                    try { return JSON.parse(selectionInput?.value || '{}') || {}; } catch (_) { return {}; }
+                };
+                document.querySelectorAll('[data-strategy-heatmap-cell]').forEach(cell => {
+                    cell.addEventListener('click', () => {
+                        if (!selectionInput) return;
+                        const selections = readHeatmapSelection();
+                        const map = cell.dataset.heatmapMap;
+                        const key = cell.dataset.heatmapCell;
+                        const cells = new Set(Array.isArray(selections[map]) ? selections[map] : []);
+                        cells.has(key) ? cells.delete(key) : cells.add(key);
+                        if (cells.size) selections[map] = [...cells].sort(); else delete selections[map];
+                        selectionInput.value = Object.keys(selections).length ? JSON.stringify(selections) : '';
+                        sessionStorage.setItem('aktienki-strategy-filter-scroll', String(window.scrollY));
+                        filterForm.requestSubmit();
+                    });
+                });
+                document.querySelector('[data-clear-heatmap-selection]')?.addEventListener('click', () => {
+                    if (!selectionInput) return;
+                    selectionInput.value = '';
+                    sessionStorage.setItem('aktienki-strategy-filter-scroll', String(window.scrollY));
+                    filterForm.requestSubmit();
+                });
+                document.querySelectorAll('.ak-filter-group-grid > .ak-filter-group').forEach(group => {
+                    group.addEventListener('toggle', () => {
+                        if (!group.open) return;
+                        document.querySelectorAll('.ak-filter-group-grid > .ak-filter-group[open]').forEach(other => {
+                            if (other !== group) other.removeAttribute('open');
+                        });
+                    });
+                });
                 if (window.matchMedia('(max-width: 767px)').matches) {
                     document.querySelectorAll('[data-mobile-heatmap-details]').forEach(card => {
                         card.removeAttribute('open');
@@ -1608,9 +1731,14 @@
                 }
                 const scoreInput = filterForm?.querySelector('input[name="score_min"]');
                 const confidenceInput = filterForm?.querySelector('input[name="confidence_min"]');
-                const profitFactorInput = filterForm?.querySelector('input[name="profit_per_trade_min"]');
+                const netReturnInput = filterForm?.querySelector('input[name="profit_per_trade_min"]');
                 const hitRateInput = filterForm?.querySelector('input[name="hit_rate_min"]');
                 const volatilityInput = filterForm?.querySelector('input[name="volatility_max"]');
+                const drawdownInput = filterForm?.querySelector('input[name="drawdown_max"]');
+                const signalQualityInput = filterForm?.querySelector('[data-heatmap-signal-quality-input]');
+                const minimumTradesInput = filterForm?.querySelector('input[name="minimum_trades"]');
+                const minimumProfitFactorInput = filterForm?.querySelector('[data-heatmap-profit-factor-input]');
+                const modelQualityInput = filterForm?.querySelector('[data-heatmap-model-quality-input]');
 
                 const updateHeatmapFilterLines = () => {
                     const score = Math.max(0, Math.min(10, Number(scoreInput?.value ?? 0)));
@@ -1618,29 +1746,55 @@
                     const scorePosition = Math.max(1, Math.min(99, score * 10));
                     const confidencePosition = Math.max(1, Math.min(99, confidence));
                     const axisPositions = {
+                        profit_factor_hit_rate: Math.max(0, Math.min(100, Number(hitRateInput?.value ?? 0))),
+                        signal_risk: Math.max(0, Math.min(50, Number(drawdownInput?.value ?? 50))) / 50 * 100,
+                        volatility_drawdown: Math.max(0, Math.min(50, Number(drawdownInput?.value ?? 50))) / 50 * 100,
+                        trades_return: Math.max(0, Math.min(100, ((Number(netReturnInput?.value ?? -5) + 5) / 20) * 100)),
                         confidence: confidence,
-                        profit_factor: Math.max(0, Math.min(3, Number(profitFactorInput?.value ?? 0))) / 3 * 100,
+                        profit_factor: Math.max(0, Math.min(3, Number(minimumProfitFactorInput?.value ?? 0))) / 3 * 100,
                         hit_rate: Math.max(0, Math.min(100, Number(hitRateInput?.value ?? 0))),
                         volatility: Math.max(0, Math.min(100, Number(volatilityInput?.value ?? 100))),
+                        risk: Math.max(0, Math.min(50, Number(drawdownInput?.value ?? 50))) / 50 * 100,
                     };
 
                     document.querySelectorAll('[data-heatmap-score-line]').forEach(line => {
-                        line.style.left = `${scorePosition}%`;
+                        const xAxis = line.dataset.heatmapXAxis;
+                        const positions = {
+                            profit_factor: Math.max(0, Math.min(100, Number(minimumProfitFactorInput?.value ?? 0) / 3 * 100)),
+                            signal: Math.max(0, Math.min(100, Number(signalQualityInput?.value ?? 0))),
+                            percent: Math.max(0, Math.min(100, Number(volatilityInput?.value ?? 100))),
+                            trades: Math.max(0, Math.min(100, Number(minimumTradesInput?.value ?? 0) / 3)),
+                            quality: Math.max(0, Math.min(100, Number(modelQualityInput?.value ?? 0))),
+                            confidence: Math.max(0, Math.min(100, Number(confidenceInput?.value ?? 0))),
+                        };
+                        if (positions[xAxis] !== undefined) line.style.left = `${Math.max(0, Math.min(100, positions[xAxis]))}%`;
                     });
                     document.querySelectorAll('[data-heatmap-axis-line]').forEach(line => {
                         const position = axisPositions[line.dataset.heatmapAxisLine] ?? confidencePosition;
-                        line.style.bottom = `${Math.max(1, Math.min(99, position))}%`;
+                        line.style.bottom = `${Math.max(0, Math.min(100, position))}%`;
                     });
                     document.querySelectorAll('[data-heatmap-score-label]').forEach(label => {
-                        label.textContent = score.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                        const signalGrades = ['5−', '5+', '4−', '4+', '3−', '3+', '2−', '2+', '1−', '1+'];
+                        label.textContent = signalGrades[Math.max(0, Math.min(9, Math.floor(score)))] || '—';
                     });
                     document.querySelectorAll('[data-heatmap-axis-label]').forEach(label => {
                         const axis = label.dataset.heatmapAxisLabel;
+                        if (label.dataset.riskGrades === '1') {
+                            const riskPercent = Math.max(0, Math.min(100, Number(drawdownInput?.value ?? 50) / 50 * 100));
+                            const riskDecile = Math.max(0, Math.min(9, Math.floor(riskPercent / 10)));
+                            label.textContent = ['1+', '1−', '2+', '2−', '3+', '3−', '4+', '4−', '5+', '5'][riskDecile];
+                            return;
+                        }
                         const values = {
+                            profit_factor_hit_rate: `${Math.round(Math.max(0, Math.min(100, Number(hitRateInput?.value ?? 0)))).toLocaleString('de-DE')}%`,
+                            signal_risk: `${Math.round(Math.max(0, Math.min(50, Number(drawdownInput?.value ?? 50)))).toLocaleString('de-DE')}%`,
+                            volatility_drawdown: `${Math.round(Math.max(0, Math.min(50, Number(drawdownInput?.value ?? 50)))).toLocaleString('de-DE')}%`,
+                            trades_return: `${Number(netReturnInput?.value ?? 0).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
                             confidence: `${Math.round(confidence).toLocaleString('de-DE')}%`,
-                            profit_factor: Math.max(0, Math.min(3, Number(profitFactorInput?.value ?? 0))).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+                            profit_factor: Math.max(0, Math.min(3, Number(minimumProfitFactorInput?.value ?? 0))).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
                             hit_rate: `${Math.round(Math.max(0, Math.min(100, Number(hitRateInput?.value ?? 0)))).toLocaleString('de-DE')}%`,
                             volatility: `${Math.round(Math.max(0, Math.min(100, Number(volatilityInput?.value ?? 100)))).toLocaleString('de-DE')}%`,
+                            risk: `${Math.round(Math.max(0, Math.min(50, Number(drawdownInput?.value ?? 50)))).toLocaleString('de-DE')}%`,
                         };
                         label.textContent = values[axis] ?? '—';
                     });
@@ -1648,9 +1802,14 @@
 
                 scoreInput?.addEventListener('input', updateHeatmapFilterLines);
                 confidenceInput?.addEventListener('input', updateHeatmapFilterLines);
-                profitFactorInput?.addEventListener('input', updateHeatmapFilterLines);
+                netReturnInput?.addEventListener('input', updateHeatmapFilterLines);
                 hitRateInput?.addEventListener('input', updateHeatmapFilterLines);
                 volatilityInput?.addEventListener('input', updateHeatmapFilterLines);
+                drawdownInput?.addEventListener('input', updateHeatmapFilterLines);
+                signalQualityInput?.addEventListener('input', updateHeatmapFilterLines);
+                minimumTradesInput?.addEventListener('input', updateHeatmapFilterLines);
+                minimumProfitFactorInput?.addEventListener('input', updateHeatmapFilterLines);
+                modelQualityInput?.addEventListener('input', updateHeatmapFilterLines);
 
                 let activeHeatmapDrag = null;
                 let heatmapDragChanged = false;
@@ -1660,6 +1819,33 @@
                     const surface = activeHeatmapDrag.parentElement;
                     const bounds = surface?.getBoundingClientRect();
                     if (!bounds?.width || !bounds?.height) return;
+
+                    const dragType = activeHeatmapDrag.dataset.heatmapDrag;
+                    const rawXPercent = Math.max(0, Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100));
+                    if (dragType === 'x_profit_factor' && minimumProfitFactorInput) {
+                        minimumProfitFactorInput.value = String(Math.round((rawXPercent / 100 * 3) * 10) / 10);
+                        minimumProfitFactorInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    if (dragType === 'x_signal' && signalQualityInput) {
+                        signalQualityInput.value = String(Math.round(rawXPercent / 10) * 10);
+                        signalQualityInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    if (dragType === 'x_percent' && volatilityInput) {
+                        volatilityInput.value = String(Math.round(rawXPercent / 5) * 5);
+                        volatilityInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    if (dragType === 'x_trades' && minimumTradesInput) {
+                        minimumTradesInput.value = String(Math.round((rawXPercent * 3) / 5) * 5);
+                        minimumTradesInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    if (dragType === 'x_quality' && modelQualityInput) {
+                        modelQualityInput.value = String(Math.round(rawXPercent / 5) * 5);
+                        modelQualityInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    if (dragType === 'x_confidence' && confidenceInput) {
+                        confidenceInput.value = String(Math.round(rawXPercent / 5) * 5);
+                        confidenceInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
 
                     if (activeHeatmapDrag.dataset.heatmapDrag === 'score' && scoreInput) {
                         const rawScore = ((event.clientX - bounds.left) / bounds.width) * 10;
@@ -1676,10 +1862,15 @@
                     }
 
                     const rawAxisPercent = Math.max(0, Math.min(100, ((bounds.bottom - event.clientY) / bounds.height) * 100));
-                    if (activeHeatmapDrag.dataset.heatmapDrag === 'profit_factor' && profitFactorInput) {
+                    if (activeHeatmapDrag.dataset.heatmapDrag === 'profit_factor' && minimumProfitFactorInput) {
                         const profitFactor = Math.round((rawAxisPercent / 100 * 3) * 10) / 10;
-                        profitFactorInput.value = String(profitFactor);
-                        profitFactorInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        minimumProfitFactorInput.value = String(profitFactor);
+                        minimumProfitFactorInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    if (activeHeatmapDrag.dataset.heatmapDrag === 'net_return' && netReturnInput) {
+                        const netReturn = Math.round((-5 + (rawAxisPercent / 100 * 20)) * 10) / 10;
+                        netReturnInput.value = String(netReturn);
+                        netReturnInput.dispatchEvent(new Event('input', { bubbles: true }));
                     }
                     if (activeHeatmapDrag.dataset.heatmapDrag === 'hit_rate' && hitRateInput) {
                         const hitRate = Math.round(rawAxisPercent / 5) * 5;
@@ -1691,9 +1882,13 @@
                         volatilityInput.value = String(volatility);
                         volatilityInput.dispatchEvent(new Event('input', { bubbles: true }));
                     }
+                    if (activeHeatmapDrag.dataset.heatmapDrag === 'risk' && drawdownInput) {
+                        const drawdown = Math.round((rawAxisPercent / 100 * 50) / 5) * 5;
+                        drawdownInput.value = String(Math.min(Number(drawdownInput.max || 50), drawdown));
+                        drawdownInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
 
                     heatmapDragChanged = true;
-                    updateHeatmapFilterLines();
                 };
 
                 document.querySelectorAll('[data-heatmap-drag]').forEach(line => {
@@ -1874,9 +2069,6 @@
         <script>
             document.addEventListener('DOMContentLoaded', async () => {
                 const target = document.querySelector('#filtered-backtest-result-chart');
-                @if (! $qualitySetupMode)
-                if (!target || !window.ApexCharts) return;
-                @endif
                 const loading = document.querySelector('#filtered-backtest-result-loading');
                 const loadingText = document.querySelector('#filtered-backtest-result-loading-text');
                 const resultRequestController = new AbortController();
@@ -1890,7 +2082,16 @@
                     });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     result = await response.json();
-                    loading?.classList.add('hidden');
+                    if (Number(result.executed_trades || 0) === 0) {
+                        loading?.classList.remove('border-cyan-300/20', 'bg-cyan-400/[.06]');
+                        loading?.classList.add('border-amber-300/25', 'bg-amber-400/[.07]');
+                        const spinner = loading?.querySelector('.animate-spin');
+                        spinner?.classList.remove('animate-spin', 'border-cyan-300/20', 'border-t-cyan-300');
+                        spinner?.classList.add('border-amber-300/40');
+                        if (loadingText) loadingText.textContent = '{{ __('Berechnung abgeschlossen: Für diese Filterkombination wurden keine passenden Aktien gefunden. Bitte lockere mindestens einen Grenzwert.') }}';
+                    } else {
+                        loading?.classList.add('hidden');
+                    }
                 } catch (error) {
                     if (error?.name === 'AbortError') return;
                     if (loading) {
@@ -1976,6 +2177,18 @@
                     });
                 }
                 @if (! $qualitySetupMode)
+                if (!target) return;
+                // The result request must not depend on the chart bundle being
+                // ready. On fast reloads ApexCharts can arrive after this
+                // inline script, which previously left the modal spinning
+                // forever without even requesting the completed result.
+                for (let attempt = 0; !window.ApexCharts && attempt < 100; attempt += 1) {
+                    await new Promise(resolve => window.setTimeout(resolve, 100));
+                }
+                if (!window.ApexCharts) {
+                    target.innerHTML = '<p class="flex h-full items-center justify-center text-xs font-bold text-rose-300">{{ __('Das Diagramm konnte nicht geladen werden. Die Backtest-Ergebnisse stehen oben weiterhin zur Verfügung.') }}</p>';
+                    return;
+                }
                 updateExitMetric('save-exit-fixed', result.strategy_performance, result.trades_per_month, result.portfolio_max_drawdown);
                 if (benchmarkPerformance && result.benchmark_performance !== null) {
                     const benchmarkProfit = Number(result.benchmark_profit || 0);
@@ -2020,6 +2233,19 @@
                         comparisonWidths.push(2); comparisonDashes.push(4 + index);
                     });
                 }
+                const buyMarkers = (result.trade_markers || [])
+                    .filter(marker => marker.type === 'buy')
+                    .map(marker => ({ x: marker.x, y: marker.y, count: marker.count, symbols: marker.symbols || [] }));
+                const sellMarkers = (result.trade_markers || [])
+                    .filter(marker => marker.type === 'sell')
+                    .map(marker => ({ x: marker.x, y: marker.y, count: marker.count, symbols: marker.symbols || [] }));
+                comparisonSeries.push(
+                    { name: '{{ __('Kauf') }}', type: 'scatter', data: buyMarkers },
+                    { name: '{{ __('Verkauf') }}', type: 'scatter', data: sellMarkers },
+                );
+                comparisonColors.push('#34d399', '#fb7185');
+                comparisonWidths.push(0, 0);
+                comparisonDashes.push(0, 0);
                 comparisonSeries.push(
                     { name: `S&P 500 Buy & Hold (${Number(result.benchmark_performance) >= 0 ? '+' : ''}${Number(result.benchmark_performance).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %)`, data: result.benchmark_chart },
                     { name: `DAX (${Number(result.dax_performance) >= 0 ? '+' : ''}${Number(result.dax_performance || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %)`, data: result.dax_chart || [] },
@@ -2046,7 +2272,13 @@
                     grid: { borderColor: chartGridColor, strokeDashArray: 3, padding: { top: 4, right: 12, bottom: 0, left: 4 }, xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
                     annotations: { yaxis: [{ y: 0, borderColor: isLightTheme ? 'rgba(15,118,110,.35)' : 'rgba(94,234,212,.28)', strokeDashArray: 0 }] },
                     legend: { position: 'top', horizontalAlign: 'left', offsetY: -2, fontSize: '11px', fontWeight: 700, itemMargin: { horizontal: 12, vertical: 4 }, labels: { colors: isLightTheme ? '#334155' : '#cbd5e1' }, markers: { size: 5, strokeWidth: 0 }, onItemHover: { highlightDataSeries: true } },
-                    markers: { size: 0, hover: { size: 5, sizeOffset: 2 } },
+                    markers: {
+                        size: comparisonSeries.map(series => series.type === 'scatter' ? 7 : 0),
+                        shape: comparisonSeries.map(series => series.type === 'scatter' ? 'triangle' : 'circle'),
+                        strokeWidth: comparisonSeries.map(series => series.type === 'scatter' ? 2 : 0),
+                        strokeColors: comparisonSeries.map(series => series.name === '{{ __('Kauf') }}' ? '#d1fae5' : (series.name === '{{ __('Verkauf') }}' ? '#ffe4e6' : 'transparent')),
+                        hover: { size: 8, sizeOffset: 2 },
+                    },
                     tooltip: { theme: isLightTheme ? 'light' : 'dark', x: { format: 'dd.MM.yyyy' }, y: { formatter: value => `${value >= 0 ? '+' : ''}${value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %` } },
                     dataLabels: { enabled: false },
                     noData: { text: '{{ __('Keine Vergleichsdaten verfügbar') }}', style: { color: chartLabelColor } },
@@ -2059,6 +2291,12 @@
     @endif
 
     <style>
+        #filtered-backtest-result-chart .apexcharts-series[seriesName="{{ __('Verkauf') }}"] .apexcharts-marker {
+            transform-box: fill-box;
+            transform-origin: center;
+            transform: rotate(180deg) !important;
+        }
+
         @media (max-width: 767px) {
             .ak-correlation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
             .ak-correlation-grid > :first-child { grid-column: 1 / -1; }
@@ -2306,6 +2544,56 @@
             border-radius: 5px;
             padding: 2px 7px 3px;
             background: #102b35;
+        }
+
+        #prediction-heatmap-filters .ak-quality-select-card,
+        #prediction-heatmap-filters .ak-quality-horizon-card {
+            min-width: 0;
+            border: 1px solid var(--ak-border);
+            border-radius: 7px;
+            padding: 7px;
+            background: #102b35;
+        }
+
+        #prediction-heatmap-filters .ak-quality-select-card > span,
+        #prediction-heatmap-filters .ak-quality-horizon-card > legend {
+            display: block;
+            margin-bottom: 6px;
+            padding: 0;
+            color: #a5f3fc;
+            font-size: 9px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        #prediction-heatmap-filters .ak-quality-horizon-card label {
+            cursor: pointer;
+        }
+
+        #prediction-heatmap-filters .ak-quality-horizon-card input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #prediction-heatmap-filters .ak-quality-horizon-card label span {
+            display: flex;
+            height: 30px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgb(103 232 249 / 18%);
+            border-radius: 5px;
+            color: #94a3b8;
+            font-size: 10px;
+            font-weight: 900;
+            transition: 150ms ease;
+        }
+
+        #prediction-heatmap-filters .ak-quality-horizon-card input:checked + span {
+            border-color: rgb(45 212 191 / 55%);
+            background: rgb(45 212 191 / 14%);
+            color: #99f6e4;
+            box-shadow: inset 0 0 0 1px rgb(45 212 191 / 12%);
         }
 
         #prediction-heatmap-filters .ak-heatmap-range span {
@@ -2589,6 +2877,45 @@
             box-shadow: inset 0 0 0 1px rgb(15 23 42 / 12%), 0 1px 3px rgb(15 23 42 / 18%);
         }
 
+        /* Strategy tester controls should support the content, not dominate it. */
+        .ak-strategy-page #prediction-heatmap-filters .ak-heatmap-range input::-webkit-slider-runnable-track {
+            height: 3px;
+            opacity: .42;
+            box-shadow: none;
+        }
+
+        .ak-strategy-page #prediction-heatmap-filters .ak-heatmap-range input::-moz-range-track,
+        .ak-strategy-page #prediction-heatmap-filters .ak-heatmap-range input::-moz-range-progress {
+            height: 3px;
+            opacity: .42;
+            box-shadow: none;
+        }
+
+        .ak-strategy-page #prediction-heatmap-filters .ak-heatmap-range input::-webkit-slider-thumb {
+            width: 4px;
+            height: 12px;
+            margin-top: -4.5px;
+            border-width: 1px;
+            border-color: rgb(203 213 225 / 72%);
+            background: rgb(30 41 59 / 92%);
+            box-shadow: none;
+        }
+
+        .ak-strategy-page #prediction-heatmap-filters .ak-heatmap-range input::-moz-range-thumb {
+            width: 4px;
+            height: 12px;
+            border-width: 1px;
+            border-color: rgb(203 213 225 / 72%);
+            background: rgb(30 41 59 / 92%);
+            box-shadow: none;
+        }
+
+        :root[data-theme="light"] .ak-strategy-page #prediction-heatmap-filters .ak-heatmap-range input::-webkit-slider-thumb,
+        :root[data-theme="light"] .ak-strategy-page #prediction-heatmap-filters .ak-heatmap-range input::-moz-range-thumb {
+            border-color: rgb(100 116 139 / 58%);
+            background: rgb(248 250 252 / 94%);
+        }
+
         /* Backtest dialogs follow the active theme without losing chart contrast. */
         :root[data-theme="light"] .ak-backtest-config-dialog,
         :root[data-theme="light"] .ak-backtest-result-dialog {
@@ -2827,6 +3154,7 @@
 
         .ak-filter-group-grid > .ak-filter-group {
             min-width: 0;
+            position: relative;
         }
 
         .ak-filter-group-grid > .ak-filter-group:not([open]) > summary small {
@@ -2844,17 +3172,79 @@
                 grid-template-columns: repeat(3, minmax(0, 1fr));
             }
 
-            .ak-filter-group-grid:has(> .ak-filter-group[open]) {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+            .ak-filter-group-grid > .ak-filter-group {
+                align-self: start;
             }
 
-            .ak-filter-group-grid > .ak-filter-group:not([open]) {
-                order: 1;
+            .ak-filter-group-grid > .ak-filter-group[open] > .ak-filter-modal-panel {
+                position: absolute;
+                top: calc(100% + .3rem);
+                right: 0;
+                left: 0;
+                z-index: 110;
+                max-height: min(70vh, 620px);
+                overflow: auto;
+                border: 1px solid rgb(34 211 238 / 48%);
+                border-radius: .65rem;
+                background: #0b2131 !important;
+                box-shadow: 0 0 0 1px rgb(34 211 238 / 12%), 0 24px 64px rgb(0 0 0 / 72%);
             }
 
-            .ak-filter-group-grid > .ak-filter-group[open] {
-                order: 2;
-                grid-column: 1 / -1;
+            .ak-filter-group-grid > .ak-filter-group[open] > .ak-filter-modal-backdrop {
+                position: fixed;
+                inset: 0;
+                z-index: 90;
+                display: block;
+                width: 100vw;
+                height: 100vh;
+                padding: 0;
+                border: 0;
+                background: rgb(2 10 20 / 54%);
+                backdrop-filter: blur(2px);
+            }
+
+            .ak-filter-group-grid > .ak-filter-group[open]::after {
+                content: '';
+                position: absolute;
+                top: calc(100% + .3rem);
+                right: .65rem;
+                left: .65rem;
+                z-index: 111;
+                height: 2px;
+                border-radius: 999px;
+                pointer-events: none;
+                background: linear-gradient(90deg, transparent, rgb(34 211 238 / 88%), transparent);
+                box-shadow: 0 0 12px rgb(34 211 238 / 42%);
+            }
+
+            .ak-filter-group-grid > .ak-filter-group:first-child[open] > div > .flex,
+            .ak-filter-group-grid > .ak-filter-group:first-child[open] > div > .flex > .grid {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) !important;
+                width: 100%;
+            }
+
+            .ak-filter-group-grid > .ak-filter-group:first-child[open] select,
+            .ak-filter-group-grid > .ak-filter-group:first-child[open] .ak-input,
+            .ak-filter-group-grid > .ak-filter-group:first-child[open] .ak-filter-result-count {
+                width: 100%;
+            }
+
+            .ak-filter-group-grid #fundamental-heatmap-filters {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr);
+                gap: .4rem;
+                overflow-x: hidden;
+            }
+
+            :root[data-theme="light"] .ak-filter-group-grid > .ak-filter-group[open] > .ak-filter-modal-panel {
+                background: #f8fdfd !important;
+                border-color: rgb(14 116 144 / 48%);
+                box-shadow: 0 0 0 1px rgb(14 116 144 / 10%), 0 20px 52px rgb(15 23 42 / 24%);
+            }
+
+            :root[data-theme="light"] .ak-filter-group-grid > .ak-filter-group[open] > .ak-filter-modal-backdrop {
+                background: rgb(226 232 240 / 48%);
             }
         }
 
@@ -2873,6 +3263,74 @@
             background-color: transparent !important;
             background-image: none !important;
             backdrop-filter: none !important;
+        }
+
+        .ak-strategy-page .ak-heatmap-metric-grid > :is(article, details) {
+            border-left-width: 2px !important;
+            border-left-color: rgb(34 211 238 / 30%) !important;
+            box-shadow: 0 8px 20px rgb(2 8 23 / 8%) !important;
+        }
+
+        /* Equal header geometry keeps every 10x10 matrix at the same vertical
+           start without shrinking the square plot itself. */
+        @media (min-width: 1280px) {
+            .ak-strategy-page .ak-heatmap-card > .ak-mobile-heatmap-summary {
+                height: 3rem;
+                min-height: 3rem;
+                overflow: hidden;
+            }
+        }
+
+        /* Both draggable threshold lines share the same narrow visual stroke;
+           their transparent 20px hit areas remain easy to drag. */
+        .ak-strategy-page .ak-heatmap-filter-stroke {
+            position: absolute;
+            display: block;
+            pointer-events: none;
+            filter: drop-shadow(0 0 2px rgb(34 211 238 / 45%));
+        }
+
+        .ak-strategy-page .ak-heatmap-filter-stroke--vertical {
+            inset: 0 auto 0 50%;
+            width: 2px;
+            transform: translateX(-50%);
+            background: repeating-linear-gradient(to bottom, rgb(34 211 238 / 88%) 0 5px, transparent 5px 9px);
+        }
+
+        .ak-strategy-page .ak-heatmap-filter-stroke--horizontal {
+            inset: 50% 0 auto;
+            height: 2px;
+            transform: translateY(-50%);
+            background: repeating-linear-gradient(to right, rgb(34 211 238 / 88%) 0 5px, transparent 5px 9px);
+        }
+
+        .ak-strategy-page .ak-heatmap-filter-handle {
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            display: block;
+            width: 9px;
+            height: 9px;
+            transform: translateX(-50%) rotate(45deg);
+            border: 1px solid rgb(103 232 249 / 85%);
+            border-radius: 2px;
+            background: #0b2131;
+            box-shadow: 0 0 3px rgb(34 211 238 / 45%);
+            pointer-events: none;
+        }
+
+        .ak-strategy-page .ak-heatmap-cell[aria-pressed="true"] {
+            background: transparent !important;
+            opacity: 1 !important;
+        }
+
+        .ak-strategy-page .ak-heatmap-cell[aria-pressed="true"] > span {
+            color: rgb(203 213 225) !important;
+            opacity: .82 !important;
+        }
+
+        :root[data-theme="light"] .ak-strategy-page .ak-heatmap-metric-grid > :is(article, details) {
+            border-left-color: rgb(14 116 144 / 24%) !important;
         }
 
         :root[data-theme="light"] .ak-strategy-page :is(

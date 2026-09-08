@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily retention for the compact AktienKI serving database
+
+[Timer]
+OnCalendar=*-*-* 03:35:00 Europe/Berlin
+Persistent=true
+RandomizedDelaySec=300
+Unit=aktienki-serving-retention.service
+
+[Install]
+WantedBy=timers.target

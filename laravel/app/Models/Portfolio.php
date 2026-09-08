@@ -15,6 +15,7 @@ class Portfolio extends Model
     protected $casts = [
         'is_default' => 'boolean',
         'active' => 'boolean',
+        'is_public_readonly' => 'boolean',
         'meta' => 'array',
     ];
 

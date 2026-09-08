@@ -10,7 +10,7 @@ final class ServingDatabaseDoctor extends Command
 {
     protected $signature = 'serving:doctor {--json : Ergebnis als JSON ausgeben}';
 
-    protected $description = 'Prüft die getrennte, kompakte Serving-Datenbank ohne Daten zu verändern.';
+    protected $description = 'Prüft die getrennte, kompakte Service Datenbank ohne Daten zu verändern.';
 
     private const REQUIRED_TABLES = [
         'serving_active_models',
@@ -69,12 +69,12 @@ final class ServingDatabaseDoctor extends Command
         if ($this->option('json')) {
             $this->line(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         } elseif ($result['ok']) {
-            $this->info("Serving-Datenbank {$result['database']} ist strukturell bereit (Schema {$result['schema_version']}).");
+            $this->info("Service Datenbank {$result['database']} ist strukturell bereit (Schema {$result['schema_version']}).");
             $this->table(['Bereich', 'Datensätze'], collect($result['counts'])->map(
                 static fn ($count, string $table): array => [$table, $count]
             )->values()->all());
         } else {
-            $this->error('Serving-Datenbank ist nicht bereit.');
+            $this->error('Service Datenbank ist nicht bereit.');
             $this->line(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         }
 

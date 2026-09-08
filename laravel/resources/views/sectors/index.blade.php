@@ -1,93 +1,27 @@
 <x-app-layout>
-<div id="aggregate-screener" class="sector-screener screener-page mx-auto max-w-7xl px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
+<div id="aggregate-screener" class="index-screener sector-screener screener-page mx-auto max-w-7xl px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
     <header class="mb-3 flex items-center justify-between gap-3"><h1 class="text-3xl font-black tracking-tight">{{ __('Sektorenscreener') }}</h1><span class="rounded-[10px] border border-cyan-400/30 bg-cyan-400/[.08] px-3 py-2 text-xs font-bold text-[var(--ak-muted)]">{{ $sectors->count() }} {{ __('Sektoren') }}</span></header>
-    @if($isFreeRegional)<div class="mb-4 flex items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[.06] px-4 py-3"><p class="text-xs text-[var(--ak-muted)]"><b class="mr-2 text-[9px] uppercase tracking-[.12em] text-amber-400">FREE</b>{{ __('Sektorwerte aus deinem regionalen Top-100-Portfolio (:country).', ['country'=>$regionalCountry]) }}</p><a href="{{ route('pricing') }}" class="shrink-0 text-[9px] font-black text-amber-300">{{ __('Global ab Plus') }} →</a></div>@endif
-    <section x-data="{ filtersOpen: false }" class="screener-filter-shell mb-5 shrink-0">
-        <button type="button" @click="filtersOpen = ! filtersOpen" :aria-expanded="filtersOpen" class="flex h-10 w-full items-center justify-between rounded-xl border border-cyan-400/30 bg-[var(--ak-card)] px-4 text-xs font-black text-cyan-300 shadow-[var(--ak-shadow)]"><span class="inline-flex items-center gap-2"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" />{{ __('Filter anzeigen') }}</span><x-heroicon-o-chevron-down class="h-4 w-4 transition" x-bind:class="filtersOpen && 'rotate-180'" /></button>
-        <form x-cloak x-show="filtersOpen" method="GET" class="screener-filter-bar mt-2 flex flex-nowrap gap-2 overflow-x-auto rounded-lg border border-cyan-400/30 bg-[var(--ak-card)] p-3 shadow-[var(--ak-shadow)]"><input name="q" value="{{ request('q') }}" oninput="clearTimeout(this._filterTimer);this._filterTimer=setTimeout(()=>this.form.requestSubmit(),500)" placeholder="{{ __('Sektor suchen') }}" class="ak-input h-10 min-w-[220px] flex-1 text-sm"><a href="{{ route('sectors.index') }}" class="screener-filter-reset inline-flex h-10 shrink-0 items-center justify-center border border-amber-400/40 bg-amber-400/[.10] px-4 text-xs font-black text-amber-300">{{ __('Reset') }}</a></form>
-    </section>
-    <div class="mb-3 flex justify-between text-xs text-[var(--ak-muted)]"><span>{{ $sectors->count() }} {{ __('Sektoren mit Mitgliedern') }}</span><span>{{ __('Höchster KI-Score zuerst') }}</span></div>
-    <div class="aggregate-results"><section class="grid grid-cols-1 gap-4">
-    @foreach($sectors as $position=>$sector)
+    @if($isFreeRegional)<div class="mb-4 rounded-xl border border-amber-400/25 bg-amber-400/[.06] px-4 py-3 text-xs text-[var(--ak-muted)]"><b class="mr-2 text-amber-400">FREE</b>{{ __('Sektorwerte aus deinem regionalen Top-100-Portfolio (:country).',['country'=>$regionalCountry]) }}</div>@endif
+    <section x-data="{filtersOpen:false}" class="screener-filter-shell mb-5"><button type="button" @click="filtersOpen=!filtersOpen" class="flex h-10 w-full items-center justify-between rounded-xl border border-cyan-400/30 bg-[var(--ak-card)] px-4 text-xs font-black text-cyan-300"><span class="inline-flex items-center gap-2"><x-heroicon-o-adjustments-horizontal class="h-4 w-4"/>{{ __('Filter anzeigen') }}</span><x-heroicon-o-chevron-down class="h-4 w-4 transition" x-bind:class="filtersOpen&&'rotate-180'"/></button><form x-cloak x-show="filtersOpen" method="GET" class="mt-2 flex gap-2 rounded-lg border border-cyan-400/30 bg-[var(--ak-card)] p-3"><input name="q" value="{{ request('q') }}" oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.requestSubmit(),500)" placeholder="{{ __('Sektor suchen') }}" class="ak-input h-10 flex-1 text-sm"><a href="{{ route('sectors.index') }}" class="inline-flex h-10 items-center border border-amber-400/40 px-4 text-xs font-black text-amber-300">{{ __('Reset') }}</a></form></section>
+    <section class="grid gap-3">
+    @forelse($sectors as $position=>$sector)
         @php
-            $score=is_numeric($sector->average_score)?\App\Support\AiScore::toTen($sector->average_score):(is_numeric($sector->stored_rating)?(float)$sector->stored_rating:null);
-            $confidence=is_numeric($sector->average_confidence)?max(0,min(100,(float)$sector->average_confidence<=1?(float)$sector->average_confidence*100:(float)$sector->average_confidence)):null;
-            $hitRate=is_numeric($sector->average_hit_rate)?max(0,min(100,(float)$sector->average_hit_rate)):null;
-            $profitPerTrade=is_numeric($sector->average_profit_per_trade)?(float)$sector->average_profit_per_trade:null;
-            $stability=is_numeric($sector->average_stability)?max(0,min(100,(float)$sector->average_stability<=1?(float)$sector->average_stability*100:(float)$sector->average_stability)):null;
-            $risk=is_numeric($sector->risk_p75)?max(0,min(100,(float)$sector->risk_p75<=1?(float)$sector->risk_p75*100:(float)$sector->risk_p75)):null;
-            $return=is_numeric($sector->average_expected_return_20d)?(float)$sector->average_expected_return_20d:null;
-            $comment=$sectorComments->first(fn($item)=>mb_strtolower(trim((string)($item['sector']??'')))===mb_strtolower(trim((string)$sector->sector)));
-            $description=$sector->description?:__('Die Beschreibung wird noch ergänzt.');
-            $assessment=$sector->assessment?:($comment['summary']??($score!==null?__('Die Bewertung basiert auf :count aktuell analysierten Aktien.',['count'=>$sector->analyzed_count]):__('Die Bewertung wird mit den nächsten Analysedaten ergänzt.')));
+            $forecasts=collect([10=>$sector->average_expected_return_10d,20=>$sector->average_expected_return_20d,40=>$sector->average_expected_return_40d])->map(fn($v)=>is_numeric($v)?(float)$v:null);
+            $scoreTen=is_numeric($sector->average_score)?\App\Support\AiScore::toTen($sector->average_score):null;$scorePct=$scoreTen===null?0:max(0,min(100,$scoreTen*10));
+            $riskRaw=is_numeric($sector->average_risk)?(float)$sector->average_risk:null;$riskPct=$riskRaw===null?null:max(0,min(100,$riskRaw<=1?$riskRaw*100:($riskRaw<=10?$riskRaw*10:$riskRaw)));
+            $scoreLabel=\App\Support\QualityGrade::fromPercent($scorePct)??'—';$riskLabel=\App\Support\QualityGrade::riskLevel($riskPct)??'—';
+            $scoreColor=$scorePct>=75?'#34d399':($scorePct>=50?'#fbbf24':'#fb7185');$riskColor=$riskPct===null?'#64748b':($riskPct<=30?'#34d399':($riskPct<=60?'#fbbf24':'#fb7185'));
+            $signal=$forecasts[20]===null?'WATCH':($forecasts[20]>=2?'BUY':($forecasts[20]<0?'SELL':'WATCH'));
+            $points=collect($sector->etf_chart_points??[])->filter(fn($p)=>is_numeric(data_get($p,'close')))->values();$min=$points->min(fn($p)=>(float)data_get($p,'close'));$max=$points->max(fn($p)=>(float)data_get($p,'close'));$range=max(.000001,(float)$max-(float)$min);$line=$points->count()>1?$points->map(fn($p,$i)=>sprintf('%.1f,%.1f',$i*600/($points->count()-1),100-(((float)data_get($p,'close')-(float)$min)/$range)*82))->implode(' '):'';
+            $comment=$sectorComments->first(fn($item)=>mb_strtolower(trim((string)($item['sector']??'')))===mb_strtolower(trim((string)$sector->sector)));$info=$comment['summary']??$sector->assessment??$sector->description;
         @endphp
-        <x-screener.aggregate-card :rank="$position+1" :eyebrow="__('Sektor-Ranking')" :name="__($sector->sector)" :meta="$sector->stocks_count.' '.__('analysierte Aktien')" :secondary-meta="__('Globaler Sektor')" :members="(int)$sector->stocks_count" :analyzed="(int)$sector->analyzed_count" :score="$score" :confidence="$confidence" :hit-rate="$hitRate" :profit-per-trade="$profitPerTrade" :stability="$stability" :risk="$risk" :expected-return="$return" :description="$description" :assessment="$assessment" :chart-points="$sector->etf_chart_points" :chart-label="__('ETF-Kurs · 1 Jahr')" :top-stocks="$sector->top_stocks" :score-trend="$sector->score_trend" :realtime-quotes="$realtimeQuotes" :target="route('stocks.index',['sector'=>$sector->sector])" mobile-compact><x-slot:icon><x-sector-icon :sector="$sector->sector" class="h-5 w-5" /></x-slot:icon></x-screener.aggregate-card>
-    @endforeach
-    </section></div>
+        <article class="screener-stock-card index-screener-card ak-card ak-dashboard-card overflow-hidden p-3" x-data="{expanded:false}">
+            <button type="button" class="screener-desktop-summary hidden w-full items-center gap-4 text-left md:grid" @click="expanded=!expanded"><span class="screener-desktop-stock"><b>#{{ $position+1 }}</b><i><x-sector-icon :sector="$sector->sector" class="h-5 w-5"/></i><span><strong>{{ __($sector->sector) }}</strong><small>{{ (int)$sector->stocks_count }} {{ __('Aktien') }}</small></span></span><span class="screener-desktop-signal" data-signal="{{ strtolower($signal) }}"><strong>{{ $signal }}</strong><small>{{ __('Signal') }}</small></span><span class="screener-desktop-grade"><strong>{{ $scoreLabel }}</strong><small>{{ __('Signalqualität') }}</small></span><span class="screener-desktop-grade"><strong>{{ $riskLabel }}</strong><small>{{ __('Risiko') }}</small></span><span class="screener-desktop-forecasts">@foreach($forecasts as $days=>$value)<i><small>{{ $days }}T</small><strong class="{{ $value===null?'text-slate-400':($value>=0?'text-emerald-400':'text-rose-400') }}">{{ $value===null?'—':sprintf('%+.1f %%',$value) }}</strong></i>@endforeach</span><x-heroicon-o-chevron-down class="h-5 w-5 text-cyan-300 transition" x-bind:class="expanded&&'rotate-180'"/></button>
+            <button type="button" class="screener-mobile-summary screener-mobile-summary-v2 md:hidden" @click="expanded=!expanded"><span class="sms-v2-head"><b>#{{ $position+1 }}</b><i><x-sector-icon :sector="$sector->sector" class="h-5 w-5"/></i><span><strong>{{ __($sector->sector) }}</strong><small>{{ __('Sektordurchschnitt') }}</small></span><em>{{ (int)$sector->stocks_count }}</em><x-heroicon-o-chevron-down class="h-4 w-4 text-cyan-300 transition" x-bind:class="expanded&&'rotate-180'"/></span><span class="sms-v2-forecast"><strong data-signal="{{ strtolower($signal) }}">{{ $signal }}</strong>@foreach($forecasts as $days=>$value)<i><small>{{ $days }}T</small><b class="{{ $value===null?'text-slate-400':($value>=0?'text-emerald-400':'text-rose-400') }}">{{ $value===null?'—':sprintf('%+.1f %%',$value) }}</b></i>@endforeach</span><span class="sms-v2-scales"><i><small>{{ __('Signalqualität') }} · {{ $scoreLabel }} · Ø {{ number_format($scorePct,0,',','.') }}</small><span class="sms-v2-scale signal" style="--position:{{ $scorePct }}%;--marker:{{ $scoreColor }}"><em></em></span></i><i><small>{{ __('Risiko') }} · {{ $riskLabel }} · Ø {{ $riskPct===null?'—':number_format($riskPct,0,',','.') }}</small><span class="sms-v2-scale risk" style="--position:{{ 100-($riskPct??0) }}%;--marker:{{ $riskColor }}"><em></em></span></i></span></button>
+            <div x-cloak x-show="expanded" x-collapse class="index-card-details"><section class="index-card-chart"><header><span>{{ __('Chart · 1 Jahr') }}</span><b>{{ __($sector->sector) }}</b></header>@if($line)<svg viewBox="0 0 600 118" preserveAspectRatio="none"><polyline points="{{ $line }}" fill="none" stroke="#14b8a6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>@else<p>{{ __('Der Kurschart ist momentan nicht verfügbar.') }}</p>@endif</section><section class="index-card-copy"><h3>{{ __('Marktausblick') }}</h3><p>{{ $info?:__('Für diesen Sektor liegt derzeit keine zusätzliche Marktanalyse vor.') }}</p><dl><div><dt>{{ __('Ø Konfidenz') }}</dt><dd>{{ is_numeric($sector->average_confidence)?number_format((float)$sector->average_confidence,0,',','.').' %':'—' }}</dd></div><div><dt>{{ __('Ø Hit-Rate') }}</dt><dd>{{ is_numeric($sector->average_hit_rate)?number_format((float)$sector->average_hit_rate,1,',','.').' %':'—' }}</dd></div><div><dt>{{ __('Aktien') }}</dt><dd>{{ (int)$sector->stocks_count }}</dd></div></dl></section><section class="index-card-members"><h3>{{ __('Führende Aktien') }}</h3>@forelse(collect($sector->top_stocks??[])->take(3) as $member)<a href="{{ route('stocks.show',['symbol'=>$member->symbol]) }}"><span>{{ \App\Support\CountryFlag::emoji($member->country) }} {{ $member->name?:$member->symbol }}</span><b>{{ $member->personalized_signal??'—' }}</b></a>@empty<p>{{ __('Keine Aktien verfügbar.') }}</p>@endforelse<a class="index-card-all" href="{{ route('stocks.index',['sector'=>$sector->sector]) }}">{{ __('Alle Sektoraktien') }} →</a></section></div>
+        </article>
+    @empty<div class="ak-card p-8 text-center text-sm text-[var(--ak-muted)]">{{ __('Keine Sektoren gefunden.') }}</div>@endforelse
+    </section>
 </div>
-<style>#aggregate-screener{height:calc(100dvh - 73px);display:flex;min-height:0;flex-direction:column;overflow:hidden}#aggregate-screener>header,#aggregate-screener>.screener-filter-shell,#aggregate-screener>div.mb-3{flex:0 0 auto}.aggregate-results{min-height:0;flex:1 1 auto;overflow:auto;overscroll-behavior:contain;padding-right:3px}@media(min-width:1536px){.sector-screener .screener-stock-card{height:20rem}}@media(min-width:1024px) and (max-width:1535px){.sector-screener .screener-stock-card{height:auto;min-height:38rem}}@media(max-width:1023px){#aggregate-screener{height:auto;overflow:visible}.aggregate-results{overflow:visible}}</style>
-@if($realtimeQuotes)
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const endpoint = @js(route('recommendations.live-quotes'));
-    const cards = [...document.querySelectorAll('[data-sector-live-symbol]')];
-    const visible = new Set();
-    const observer = new IntersectionObserver(entries => entries.forEach(entry => {
-        entry.isIntersecting ? visible.add(entry.target) : visible.delete(entry.target);
-    }), { root: document.querySelector('.aggregate-results'), threshold: 0.1 });
-    cards.forEach(card => observer.observe(card));
-
-    const update = async () => {
-        if (document.visibilityState !== 'visible') return;
-        const active = [...visible].slice(0, 3);
-        const symbols = [...new Set(active.map(card => card.dataset.sectorLiveSymbol).filter(Boolean))];
-        if (!symbols.length) return;
-        try {
-            const url = new URL(endpoint, window.location.origin);
-            url.searchParams.set('symbols', symbols.join(','));
-            const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
-            if (!response.ok) return;
-            const { quotes = {} } = await response.json();
-            active.forEach(card => {
-                const quote = quotes[card.dataset.sectorLiveSymbol];
-                const price = Number(quote?.price);
-                if (!Number.isFinite(price) || price <= 0) return;
-                const currency = quote.currency || card.querySelector('[data-sector-live-price]')?.dataset.liveCurrency || '';
-                const priceEl = card.querySelector('[data-sector-live-price]');
-                const changeEl = card.querySelector('[data-sector-live-change]');
-                const timeEl = card.querySelector('[data-sector-live-time]');
-                if (priceEl) priceEl.textContent = `${price.toLocaleString(document.documentElement.lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ''}`;
-                const change = Number(quote.change_percent);
-                if (changeEl && Number.isFinite(change)) {
-                    changeEl.textContent = `${change > 0 ? '+' : ''}${change.toLocaleString(document.documentElement.lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %`;
-                    changeEl.className = `block text-[8px] ${change > 0 ? 'text-emerald-300' : (change < 0 ? 'text-rose-300' : 'text-[var(--ak-muted)]')}`;
-                }
-                if (timeEl) {
-                    const timestamp = Number(quote.timestamp);
-                    const date = Number.isFinite(timestamp) ? new Date(timestamp * 1000) : new Date();
-                    const clock = date.toLocaleTimeString(document.documentElement.lang, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Europe/Berlin' });
-                    const ageSeconds = Number(quote.age_seconds);
-                    const isRealtime = quote.realtime === true && Number.isFinite(ageSeconds) && ageSeconds < 120;
-                    if (isRealtime) {
-                        timeEl.textContent = `Live · ${clock}`;
-                        timeEl.className = 'block text-[7px] text-emerald-300';
-                    } else {
-                        const ageMinutes = Number.isFinite(ageSeconds) ? Math.max(1, Math.floor(ageSeconds / 60)) : null;
-                        const ageLabel = ageMinutes === null ? 'veraltet' : (ageMinutes < 1440 ? `vor ${ageMinutes} Min.` : `vor ${Math.floor(ageMinutes / 1440)} Tag(en)`);
-                        timeEl.textContent = `${ageLabel} · ${clock}`;
-                        timeEl.className = 'block text-[7px] text-amber-300';
-                    }
-                }
-            });
-        } catch (_) {
-            // Der letzte verifizierte Kurs bleibt bei einem kurzzeitigen Providerfehler sichtbar.
-        }
-    };
-    window.setTimeout(update, 100);
-    const timer = window.setInterval(update, 15_000);
-    document.querySelector('.aggregate-results')?.addEventListener('scroll', () => window.setTimeout(update, 150), { passive: true });
-    window.addEventListener('pagehide', () => { window.clearInterval(timer); observer.disconnect(); }, { once: true });
-});
-</script>
-@endif
+<style>#aggregate-screener{min-height:calc(100dvh - 73px)}.index-screener-card{height:auto!important}.index-card-details{display:grid;grid-template-columns:1.35fr 1fr .9fr;gap:.7rem;margin-top:.8rem;padding-top:.8rem;border-top:1px solid rgba(34,211,238,.14)}.index-card-details>section{min-width:0;border:1px solid rgba(34,211,238,.14);border-radius:.75rem;padding:.8rem}.index-card-details h3,.index-card-chart header{display:flex;justify-content:space-between;color:#67e8f9;font-size:.66rem;font-weight:900;text-transform:uppercase}.index-card-chart svg{width:100%;height:9rem;margin-top:.5rem}.index-card-chart p,.index-card-copy p,.index-card-members p{margin-top:.6rem;color:var(--ak-muted);font-size:.72rem;line-height:1.55}.index-card-copy dl{display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;margin-top:.7rem}.index-card-copy dl div{border:1px solid rgba(148,163,184,.13);border-radius:.45rem;padding:.45rem}.index-card-copy dt{font-size:.48rem;color:var(--ak-muted)}.index-card-copy dd{font-size:.72rem;font-weight:900}.index-card-members>a:not(.index-card-all){display:flex;justify-content:space-between;gap:.5rem;margin-top:.45rem;border-bottom:1px solid rgba(148,163,184,.11);padding:.35rem 0;font-size:.65rem;font-weight:800}.index-card-members a b,.index-card-all{color:#34d399}.index-card-all{display:inline-flex;margin-top:.65rem;font-size:.62rem;font-weight:900}.sector-screener .screener-desktop-stock>i{display:grid;place-items:center;color:#67e8f9}@media(max-width:767px){.sector-screener{padding-inline:.45rem}.index-card-details{grid-template-columns:1fr}.index-screener-card{padding:.45rem!important}}</style>
 </x-app-layout>

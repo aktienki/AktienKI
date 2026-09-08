@@ -8,7 +8,7 @@ use Throwable;
 
 final class ServingChartCacheService
 {
-    private const MAX_POINTS = 64;
+    private const MAX_POINTS = 320;
 
     private const TRADING_DAYS = 280;
 
@@ -87,7 +87,11 @@ final class ServingChartCacheService
                     'currency' => $currency,
                     'points' => $bars->map(fn (array $bar): array => [
                         'timestamp' => (int) $bar['timestamp'],
+                        'open' => (float) ($bar['open'] ?? $bar['close']),
+                        'high' => (float) ($bar['high'] ?? $bar['close']),
+                        'low' => (float) ($bar['low'] ?? $bar['close']),
                         'close' => (float) $bar['close'],
+                        'volume' => is_numeric($bar['volume'] ?? null) ? (float) $bar['volume'] : null,
                     ])->all(),
                     'cached_at' => now()->toIso8601String(),
                     'cache_hit' => false,
@@ -122,7 +126,7 @@ final class ServingChartCacheService
 
     private function key(int $instrumentId, string $providerSymbol): string
     {
-        return 'serving.screener.chart.v1.'.$instrumentId.'.'.sha1(strtoupper($providerSymbol));
+        return 'serving.screener.chart.v2.'.$instrumentId.'.'.sha1(strtoupper($providerSymbol));
     }
 
     private function cached(int $instrumentId, string $providerSymbol): ?array

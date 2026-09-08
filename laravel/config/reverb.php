@@ -27,12 +27,14 @@ return [
                 'scheme' => env('REVERB_SCHEME', 'http'),
                 'useTLS' => env('REVERB_SCHEME', 'http') === 'https',
             ],
+            // Reverb matches these against the *host* of the browser Origin
+            // header (parse_url(..., PHP_URL_HOST)), so entries must be bare
+            // hosts - a scheme like "https://" makes every match fail and every
+            // websocket is rejected with 4009 "Origin not allowed".
             'allowed_origins' => array_values(array_unique(array_filter([
-                env('APP_URL', 'http://localhost:8000'),
-                'http://localhost',
-                'http://localhost:8000',
-                'http://127.0.0.1',
-                'http://127.0.0.1:8000',
+                parse_url((string) env('APP_URL', 'http://localhost:8000'), PHP_URL_HOST),
+                'localhost',
+                '127.0.0.1',
             ]))),
             'ping_interval' => 60,
             'activity_timeout' => 30,

@@ -6,7 +6,12 @@ use App\Enums\PlanLevel;
 use App\Services\PlanAccessService;
 use App\Services\MarketDataEntitlementService;
 use App\Services\PersonalizedSignalService;
+use App\Services\LeveragedProductRiskService;
 use App\Services\TwelveDataService;
+use App\Services\TechnicalPriceLevelService;
+use App\Services\ServingReadService;
+use App\Services\ServingChartCacheService;
+use App\Services\ServingStockLegacyViewService;
 use App\Support\ProfitFactor;
 use Carbon\CarbonImmutable;
 use Dompdf\Dompdf;
@@ -17,12 +22,131 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Throwable;
 
 class StockController extends Controller
 {
+    public function certificates(Request $request, string $symbol, TwelveDataService $marketData, LeveragedProductRiskService $leveragedRisk): JsonResponse
+    {
+        $instrument = $this->instrument($symbol);
+        $items = $marketData->structuredProducts(
+            (string) $instrument->symbol,
+            (string) $instrument->name,
+            $instrument->isin ? (string) $instrument->isin : null,
+        );
+        $canViewLeveragedProducts = (string) data_get($request->user()?->meta, 'risk_profile.level', 'normal') === 'risk';
+        if (! $canViewLeveragedProducts) {
+            $items = array_values(array_filter($items, static function (array $item): bool {
+                $type = mb_strtolower((string) ($item['instrument_type'] ?? ''));
+
+                return ! str_contains($type, 'warrant')
+                    && ! str_contains($type, 'option')
+                    && ! str_contains($type, 'knock');
+            }));
+        }
+
+        return response()->json([
+            'data' => $items,
+            'count' => count($items),
+            'provider' => 'Twelve Data',
+            'reference_only' => true,
+            'risk_analysis' => $canViewLeveragedProducts
+                ? $leveragedRisk->currentProfile((int) $instrument->id, 20)
+                : null,
+            'message' => $items === []
+                ? __('Twelve Data liefert für diesen Basiswert derzeit keine zuordenbaren Zertifikate oder Warrants.')
+                : null,
+        ]);
+    }
+
+    public function leveragedRisk(Request $request, string $symbol, LeveragedProductRiskService $leveragedRisk, TechnicalPriceLevelService $priceLevels): View
+    {
+        abort_unless(app()->environment('local'), 404);
+        abort_unless((string) data_get($request->user()?->meta, 'risk_profile.level', 'normal') === 'risk', 403);
+
+        $instrument = $this->instrument($symbol);
+        $profile = $leveragedRisk->currentProfile((int) $instrument->id, 20);
+        abort_unless($profile, 404, __('Für diese Aktie liegt noch keine 20T-Risikomatrix vor.'));
+
+        $underlyingCodes = ['DBK.DE' => 514000];
+        $underlyingCode = $underlyingCodes[mb_strtoupper((string) $instrument->symbol)] ?? null;
+        $productCounts = $underlyingCode
+            ? DB::table('deutsche_boerse_certificates')->where('underlying_code', $underlyingCode)
+                ->whereIn('warrant_type', ['CALL', 'PUT', 'RANGE', 'OTHER'])
+                ->selectRaw('warrant_type, count(*) AS total')->groupBy('warrant_type')->pluck('total', 'warrant_type')
+            : collect();
+
+        $historyBars = DB::table('price_bars')->where('instrument_id', $instrument->id)
+            ->where('interval', '1d')->orderByDesc('bar_time')->limit(756)
+            ->get(['bar_time', 'open', 'high', 'low', 'close'])->reverse()->values()->map(fn ($bar) => [
+                'date' => CarbonImmutable::parse($bar->bar_time)->toDateString(),
+                'open' => (float) $bar->open,
+                'high' => (float) $bar->high,
+                'low' => (float) $bar->low,
+                'close' => (float) $bar->close,
+            ]);
+        $chartBars = $historyBars->take(-120)->values();
+        $technicalLevels = $priceLevels->levels((int) $instrument->id, 180);
+        $forecastTargetDistance = abs((float) $profile['predicted_return_percent']);
+        $monteCarlo = Cache::remember(
+            "leveraged-risk:monte-carlo:v4:{$instrument->id}:20:10000:".number_format($forecastTargetDistance, 2, '.', ''),
+            now()->addHours(6),
+            fn () => $leveragedRisk->simulateHistoricalPaths($historyBars->pluck('close')->all(), 20, 10000, 20260825, $forecastTargetDistance),
+        );
+
+        return view('stocks.leveraged-risk', compact('instrument', 'profile', 'productCounts', 'chartBars', 'monteCarlo', 'technicalLevels'));
+    }
+
+    public function leveragedRiskCertificates(Request $request, string $symbol): JsonResponse
+    {
+        abort_unless(app()->environment('local'), 404);
+        abort_unless((string) data_get($request->user()?->meta, 'risk_profile.level', 'normal') === 'risk', 403);
+
+        $validated = $request->validate([
+            'side' => ['required', 'in:long,short'],
+            'leverage' => ['required', 'integer', 'in:2,5,10,15,20'],
+            'loss_threshold' => ['required', 'integer', 'min:10', 'max:100', 'multiple_of:10'],
+        ]);
+        $instrument = $this->instrument($symbol);
+        $underlyingCode = ['DBK.DE' => 514000][mb_strtoupper((string) $instrument->symbol)] ?? null;
+        if (! $underlyingCode) {
+            return response()->json(['data' => [], 'count' => 0, 'message' => __('Für diesen Basiswert ist noch kein Produktkatalog zugeordnet.')]);
+        }
+
+        $warrantType = $validated['side'] === 'long' ? 'CALL' : 'PUT';
+        $base = DB::table('deutsche_boerse_certificates')
+            ->where('underlying_code', $underlyingCode)
+            ->where('warrant_type', $warrantType)
+            ->where(fn ($query) => $query->whereNull('last_trading_date')->orWhereDate('last_trading_date', '>=', today()))
+            ->where(fn ($query) => $query->whereNull('maturity_date')->orWhereDate('maturity_date', '>=', today()));
+        $count = (clone $base)->count();
+        $items = $base->orderByRaw('maturity_date IS NULL')->orderBy('maturity_date')->orderBy('instrument_name')->limit(60)
+            ->get(['instrument_name', 'isin', 'wkn', 'warrant_type', 'currency', 'maturity_date', 'mic_code', 'specialist'])
+            ->map(fn ($item): array => [
+                'name' => (string) $item->instrument_name,
+                'isin' => (string) $item->isin,
+                'wkn' => (string) ($item->wkn ?? ''),
+                'type' => (string) $item->warrant_type,
+                'currency' => (string) ($item->currency ?? 'EUR'),
+                'maturity' => $item->maturity_date ? CarbonImmutable::parse($item->maturity_date)->format('d.m.Y') : null,
+                'exchange' => (string) ($item->mic_code ?? 'XFRA'),
+                'issuer' => (string) ($item->specialist ?? ''),
+                'url' => 'https://www.boerse-frankfurt.de/suche?search_terms='.rawurlencode((string) $item->isin),
+            ])->values();
+
+        return response()->json([
+            'data' => $items,
+            'count' => $count,
+            'shown' => $items->count(),
+            'selection' => $validated,
+            'reference_only' => true,
+            'message' => __('Vorauswahl nach Produktrichtung. Der exakte Produkthebel kann erst nach Ergänzung von Produktkurs, Bezugsverhältnis und Finanzierungsschwelle verifiziert werden.'),
+        ]);
+    }
+
     public function emailReport(Request $request, string $symbol)
     {
         abort_unless($request->user()?->email, 422, __('Keine E-Mail-Adresse im Profil hinterlegt.'));
@@ -41,6 +165,153 @@ class StockController extends Controller
     }
 
     public function report(Request $request, string $symbol): Response
+    {
+        $locale = in_array($request->query('locale'), ['de', 'en'], true)
+            ? (string) $request->query('locale')
+            : app()->getLocale();
+        app()->setLocale($locale);
+
+        $stock = app(ServingReadService::class)->stock($symbol);
+        abort_unless($stock, 404, __('Für diese Aktie liegen keine aktiven Remote-Daten vor.'));
+
+        $logoPath = public_path('brand/generated/bull-logo-dark-padded.jpg');
+        $logoData = is_file($logoPath) ? 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($logoPath)) : null;
+        $horizons = collect($stock->horizons ?? [])->sortKeys();
+        $latestPrediction = $stock->latest_prediction ?? $horizons->pluck('prediction')->filter()->sortByDesc('as_of')->first();
+        $chartCache = app(ServingChartCacheService::class);
+        $providerSymbol = $chartCache->providerSymbol($stock);
+        $chartPayload = $chartCache->peek((int) $stock->instrument_id, $providerSymbol)
+            ?? $chartCache->load((int) $stock->instrument_id, $providerSymbol, (string) $stock->currency);
+        $chartForecasts = $horizons->mapWithKeys(fn (object $horizon, int|string $days): array => [
+            (int) $days => is_numeric($horizon->prediction?->target_price) ? (float) $horizon->prediction->target_price : null,
+        ])->filter(fn ($price): bool => $price !== null)->all();
+        $chartData = $this->servingReportChart((array) ($chartPayload['points'] ?? []), $chartForecasts);
+        $detail = app(ServingStockLegacyViewService::class)->data($request, $stock);
+        $indicators = collect($detail['indicatorCards'] ?? []);
+        $indicatorMatrices = $this->stockReportIndicatorMatrices($indicators);
+        $patterns = collect($detail['chartPatternStats'] ?? [])->filter(
+            fn (array $pattern): bool => filled($pattern['latest_at'] ?? null)
+                && CarbonImmutable::parse($pattern['latest_at'])->gte(now()->subDays(5)->startOfDay())
+        )->map(function (array $pattern): array {
+            $pattern['chart'] = $this->stockReportPatternChart($pattern['example'] ?? []);
+
+            return $pattern;
+        })->values()->all();
+        $opportunities = $this->servingReportOpportunities($stock, $horizons, $indicators);
+        $risks = $this->servingReportRisks($stock, $horizons, $indicators);
+
+        $options = new Options();
+        $options->set('isRemoteEnabled', false);
+        $pdf = new Dompdf($options);
+        $pdf->loadHtml(view('stocks.serving-report', compact(
+            'stock', 'horizons', 'latestPrediction', 'logoData', 'chartData',
+            'indicators', 'indicatorMatrices', 'patterns', 'opportunities', 'risks'
+        ))->render(), 'UTF-8');
+        $pdf->setPaper('a4', 'portrait');
+        $pdf->render();
+        $filename = ($locale === 'en' ? 'Stock-report-' : 'Aktienbericht-')
+            .preg_replace('/[^A-Za-z0-9._-]/', '-', (string) $stock->symbol)
+            .'-'.$locale.'-'.now()->format('Y-m-d').'.pdf';
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+            'X-Stock-Symbol' => (string) $stock->symbol,
+            'X-Data-Source' => 'serving',
+        ]);
+    }
+
+    private function servingReportOpportunities(object $stock, $horizons, $indicators): array
+    {
+        $items = collect();
+        $positive = collect($horizons)->filter(fn ($horizon): bool => is_numeric($horizon->prediction?->expected_return_percent)
+            && (float) $horizon->prediction->expected_return_percent > 0);
+        if ($positive->isNotEmpty()) $items->push(__(':count von :total Prognosehorizonten erwarten steigende Kurse.', ['count' => $positive->count(), 'total' => collect($horizons)->count()]));
+        $bestReturn = $positive->max(fn ($horizon) => (float) $horizon->prediction->expected_return_percent);
+        if (is_numeric($bestReturn)) $items->push(__('Die höchste freigegebene Prognose liegt bei :value %.', ['value' => number_format((float) $bestReturn, 1, ',', '.')]));
+        $bestProfitFactor = collect($horizons)->max(fn ($horizon) => is_numeric($horizon->metrics?->profit_factor ?? null) ? (float) $horizon->metrics->profit_factor : null);
+        if (is_numeric($bestProfitFactor) && $bestProfitFactor > 1) $items->push(__('Der beste historische Profitfaktor beträgt :value.', ['value' => number_format((float) $bestProfitFactor, 2, ',', '.')]));
+        $indicatorProbability = collect($indicators)->pluck('currentProbability')->filter(fn ($value) => is_numeric($value))->avg();
+        if (is_numeric($indicatorProbability) && $indicatorProbability >= 50) $items->push(__('Die technischen Indikatoren ergeben im Mittel eine 20-Tage-Steigwahrscheinlichkeit von :value %.', ['value' => number_format((float) $indicatorProbability, 1, ',', '.')]));
+        if (is_numeric($stock->revenue_growth ?? null) && (float) $stock->revenue_growth > 0) $items->push(__('Positives Umsatzwachstum von :value %.', ['value' => number_format((float) $stock->revenue_growth * 100, 1, ',', '.')]));
+
+        return $items->take(5)->values()->all();
+    }
+
+    private function servingReportRisks(object $stock, $horizons, $indicators): array
+    {
+        $items = collect();
+        $negative = collect($horizons)->filter(fn ($horizon): bool => is_numeric($horizon->prediction?->expected_return_percent)
+            && (float) $horizon->prediction->expected_return_percent < 0);
+        if ($negative->isNotEmpty()) $items->push(__(':count Prognosehorizonte erwarten fallende Kurse.', ['count' => $negative->count()]));
+        $maximumDrawdown = collect($horizons)->max(function ($horizon): ?float {
+            if (! is_numeric($horizon->metrics?->max_drawdown ?? null)) return null;
+            $drawdown = abs((float) $horizon->metrics->max_drawdown);
+
+            return $drawdown <= 1 ? $drawdown * 100 : $drawdown;
+        });
+        if (is_numeric($maximumDrawdown)) $items->push(__('Der höchste historische Modelldrawdown beträgt :value %.', ['value' => number_format((float) $maximumDrawdown, 1, ',', '.')]));
+        $failedGates = collect($horizons)->filter(fn ($horizon): bool => ! (bool) ($horizon->quality_gate_passed ?? false))->count();
+        if ($failedGates > 0) $items->push(__(':count Modell-/Horizont-Kombinationen bestehen das Quality Gate nicht.', ['count' => $failedGates]));
+        $indicatorProbability = collect($indicators)->pluck('currentProbability')->filter(fn ($value) => is_numeric($value))->avg();
+        if (is_numeric($indicatorProbability) && $indicatorProbability < 50) $items->push(__('Die technische 20-Tage-Auswertung liegt mit :value % unter der neutralen Schwelle.', ['value' => number_format((float) $indicatorProbability, 1, ',', '.')]));
+        if (is_numeric($stock->trailing_pe ?? null) && (float) $stock->trailing_pe > 30) $items->push(__('Das KGV von :value weist auf eine erhöhte Bewertung hin.', ['value' => number_format((float) $stock->trailing_pe, 1, ',', '.')]));
+        if ($items->isEmpty()) $items->push(__('Keine zusätzlichen kompakten Warnsignale in den verfügbaren Service-Daten.'));
+
+        return $items->take(5)->values()->all();
+    }
+
+    private function servingReportChart(array $points, array $forecasts): string
+    {
+        $history = collect($points)->filter(fn (array $point): bool => is_numeric($point['close'] ?? null))->take(-66)->values();
+        if ($history->isEmpty()) {
+            return 'data:image/svg+xml;base64,'.base64_encode('<svg xmlns="http://www.w3.org/2000/svg" width="720" height="260"><rect width="100%" height="100%" fill="#122034"/><text x="360" y="135" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="14">Keine Kursdaten verfügbar</text></svg>');
+        }
+
+        $forecastValues = collect($forecasts)->filter(fn ($value): bool => is_numeric($value));
+        $prices = $history->pluck('close')->map(fn ($value): float => (float) $value)->concat($forecastValues)->values();
+        $min = (float) $prices->min();
+        $max = (float) $prices->max();
+        $padding = max(($max - $min) * .12, max(abs($max), 1) * .015);
+        $min -= $padding;
+        $max += $padding;
+        $range = max(.00001, $max - $min);
+        $width = 720;
+        $height = 260;
+        $left = 42;
+        $right = 26;
+        $top = 20;
+        $bottom = 34;
+        $plotHeight = $height - $top - $bottom;
+        $historyRight = 465;
+        $toY = fn (float $price): float => $top + (($max - $price) / $range) * $plotHeight;
+        $toX = fn (int $index): float => $left + ($index / max(1, $history->count() - 1)) * ($historyRight - $left);
+        $line = $history->map(fn (array $point, int $index): string => number_format($toX($index), 1, '.', '').','.number_format($toY((float) $point['close']), 1, '.', ''))->implode(' ');
+        $grid = '';
+        for ($index = 0; $index <= 4; $index++) {
+            $y = $top + ($index / 4) * $plotHeight;
+            $value = $max - ($index / 4) * $range;
+            $grid .= '<line x1="'.$left.'" y1="'.$y.'" x2="'.($width - $right).'" y2="'.$y.'" stroke="#365069" stroke-width="0.7"/><text x="'.($left - 5).'" y="'.($y + 3).'" text-anchor="end" fill="#94a3b8" font-size="8">'.number_format($value, 0, ',', '.').'</text>';
+        }
+        $current = (float) $history->last()['close'];
+        $forecastLine = number_format($historyRight, 1, '.', '').','.number_format($toY($current), 1, '.', '');
+        $labels = '';
+        $maxDays = max(40, (int) ($forecastValues->keys()->max() ?? 40));
+        foreach ($forecastValues->sortKeys() as $days => $target) {
+            $x = $historyRight + (($width - $right - $historyRight) * ((int) $days / $maxDays));
+            $y = $toY((float) $target);
+            $forecastLine .= ' '.number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+            $labels .= '<circle cx="'.$x.'" cy="'.$y.'" r="4" fill="#22d3ee"/><text x="'.$x.'" y="'.($y - 9).'" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold">'.(int) $days.'T</text>';
+        }
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'.$width.'" height="'.$height.'" viewBox="0 0 '.$width.' '.$height.'"><rect width="100%" height="100%" rx="10" fill="#122034"/>'.$grid.'<polyline points="'.$line.'" fill="none" stroke="#22d3ee" stroke-width="2"/><line x1="'.$historyRight.'" y1="'.$top.'" x2="'.$historyRight.'" y2="'.($height - $bottom).'" stroke="#f59e0b" stroke-dasharray="5 4"/><polyline points="'.$forecastLine.'" fill="none" stroke="#34d399" stroke-width="2.3" stroke-dasharray="7 4"/>'.$labels.'<text x="'.$left.'" y="'.($height - 10).'" fill="#94a3b8" font-size="9">3 Monate Kursverlauf</text><text x="'.($width - $right).'" y="'.($height - 10).'" text-anchor="end" fill="#34d399" font-size="9">Remote-Prognose</text></svg>';
+
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
+    }
+
+    private function legacyReport(Request $request, string $symbol): Response
     {
         $locale = in_array($request->query('locale'), ['de', 'en'], true)
             ? (string) $request->query('locale')
@@ -252,7 +523,9 @@ class StockController extends Controller
             $xl=$limits($points->pluck('x')); $yl=$limits($points->pluck('y')); $bin=fn($v,$ls)=>collect($ls)->search(fn($l)=>$v<=$l)===false?4:(int)collect($ls)->search(fn($l)=>$v<=$l);
             $cells=array_fill(0,5,array_fill(0,5,['n'=>0,'up'=>0])); foreach($points as $p){$x=$bin($p['x'],$xl);$y=$bin($p['y'],$yl);$cells[$y][$x]['n']++;if($p['up'])$cells[$y][$x]['up']++;}
             foreach($cells as $y=>$row)foreach($row as $x=>$c)$cells[$y][$x]['p']=$c['n']?($c['up']/$c['n'])*100:null;
-            return ['x'=>$a['label'],'y'=>$b['label'],'cells'=>$cells,'samples'=>$points->count()];
+            $currentX=is_numeric($a['currentValue']??null)?$bin((float)$a['currentValue'],$xl):null;
+            $currentY=is_numeric($b['currentValue']??null)?$bin((float)$b['currentValue'],$yl):null;
+            return ['x'=>$a['label'],'y'=>$b['label'],'cells'=>$cells,'samples'=>$points->count(),'currentX'=>$currentX,'currentY'=>$currentY];
         })->filter()->values()->all();
     }
 
@@ -530,6 +803,17 @@ class StockController extends Controller
         $aiAssessmentOpportunities = $this->decodeJson($aiAssessment?->opportunities);
         $aiAssessmentRisks = $this->decodeJson($aiAssessment?->risks);
         $aiAssessmentFactors = $this->decodeJson($aiAssessment?->key_factors);
+        $externalBuyReview = null;
+        if ($canViewRealtime && $prediction?->id && Schema::hasTable('external_buy_reviews')) {
+            $externalBuyReview = DB::table('external_buy_reviews')
+                ->where('prediction_id', $prediction->id)
+                ->first();
+        }
+        $externalBuyReviewPositiveFactors = $this->decodeJson($externalBuyReview?->positive_factors);
+        $externalBuyReviewRiskFactors = $this->decodeJson($externalBuyReview?->risk_factors);
+        $externalBuyReviewFindings = $this->decodeJson($externalBuyReview?->key_findings);
+        $externalBuyReviewLimitations = $this->decodeJson($externalBuyReview?->research_limitations);
+        $externalBuyReviewSources = $this->decodeJson($externalBuyReview?->sources);
         $topStockAnalysis = DB::table('daily_top_stock_selections')
             ->where('instrument_id', $instrument->id)
             ->when($requestedPredictionId > 0, fn ($query) => $query->where('prediction_id', $requestedPredictionId))
@@ -629,7 +913,7 @@ class StockController extends Controller
         $sectorRankings = $this->sectorRankings($instrument, $fundamentalData);
 
         ['candles' => $chartCandles, 'source' => $chartSource] = $historicalChartAllowed
-            ? $this->chartSeries($instrument, $yahooFinance, $chartFocusAt, false)
+            ? $this->chartSeries($instrument, $yahooFinance, $chartFocusAt)
             : ['candles' => collect(), 'source' => 'license_restricted'];
         $chartPatterns = $this->recentChartPatterns($chartCandles);
         $chartPatternStats = $historicalChartAllowed
@@ -831,6 +1115,12 @@ class StockController extends Controller
             'aiAssessmentOpportunities',
             'aiAssessmentRisks',
             'aiAssessmentFactors',
+            'externalBuyReview',
+            'externalBuyReviewPositiveFactors',
+            'externalBuyReviewRiskFactors',
+            'externalBuyReviewFindings',
+            'externalBuyReviewLimitations',
+            'externalBuyReviewSources',
             'topStockAnalysis',
             'topStockAnalysisDetails',
             'topStockFactorRatings',
@@ -965,24 +1255,15 @@ class StockController extends Controller
 
         $series = $this->chartSeries($instrument, $yahooFinance, $chartFocusAt);
 
-        $latestCandleAt = data_get($series['candles']->last(), 'x');
-        $updatedAt = is_numeric($latestCandleAt)
-            ? CarbonImmutable::createFromTimestampMs((int) $latestCandleAt)->toIso8601String()
-            : now()->startOfMinute()->toIso8601String();
-        $response = response()->json([
+        return response()->json([
             'symbol' => $instrument->symbol,
             'candles' => $series['candles']->values(),
             'source' => $series['source'],
             'currency' => $this->usesEuroDisplay($instrument) ? 'EUR' : (string) ($instrument->currency ?: ''),
             'chart_patterns' => $this->recentChartPatterns($series['candles']),
             'watchlist_entry' => $this->watchlistEntry($instrument->id),
-            'updated_at' => $updatedAt,
+            'updated_at' => now()->toIso8601String(),
         ]);
-        $response->headers->set('Cache-Control', 'private, max-age=300, stale-while-revalidate=86400');
-        $response->setEtag(hash('sha256', (string) $response->getContent()));
-        $response->isNotModified($request);
-
-        return $response;
     }
 
     /** Detect the latest occurrence of every supported formation in the loaded chart range. */
@@ -1275,22 +1556,15 @@ class StockController extends Controller
         object $instrument,
         TwelveDataService $yahooFinance,
         ?CarbonImmutable $focusAt = null,
-        bool $allowProviderFetch = true,
     ): array
     {
-        if ($allowProviderFetch) {
+        if ($this->usesEuroDisplay($instrument)) {
             try {
-                $usesEuroDisplay = $this->usesEuroDisplay($instrument);
-                if ($usesEuroDisplay) {
-                    $providerSymbol = (string) $instrument->german_listing_symbol;
-                    if (filled($instrument->german_listing_exchange)) {
-                        $providerSymbol .= ':'.trim((string) $instrument->german_listing_exchange);
-                    }
-                } else {
-                    $providerSymbol = (string) ($instrument->provider_symbol ?: $instrument->symbol);
+                $providerSymbol = (string) $instrument->german_listing_symbol;
+                if (filled($instrument->german_listing_exchange)) {
+                    $providerSymbol .= ':'.trim((string) $instrument->german_listing_exchange);
                 }
-
-                $downloaded = $yahooFinance->chartHistory($providerSymbol, 300, $focusAt);
+                $downloaded = $yahooFinance->dailyCandles($providerSymbol, $focusAt ? 140 : 300);
                 if ($downloaded) {
                     return [
                         'candles' => collect($downloaded)->map(fn (array $bar): array => [
@@ -1298,7 +1572,7 @@ class StockController extends Controller
                             'y' => [(float) $bar['open'], (float) $bar['high'], (float) $bar['low'], (float) $bar['close']],
                             'volume' => is_numeric($bar['volume'] ?? null) ? (float) $bar['volume'] : null,
                         ]),
-                        'source' => $usesEuroDisplay ? 'twelve_data_eur_listing_file_cache' : 'twelve_data_file_cache',
+                        'source' => 'twelve_data_eur_listing',
                     ];
                 }
             } catch (Throwable $exception) {
@@ -1307,6 +1581,42 @@ class StockController extends Controller
         }
 
         $bars = $this->dailyBars((int) $instrument->id, $focusAt);
+
+        if ($bars->count() < ($focusAt ? 50 : 252)) {
+            try {
+                $downloaded = $yahooFinance->dailyCandles(
+                    $instrument->provider_symbol ?: $instrument->symbol,
+                    $focusAt ? 140 : 300,
+                );
+
+                if ($downloaded) {
+                    $now = now();
+                    $rows = collect($downloaded)->map(fn (array $bar) => [
+                        'instrument_id' => (int) $instrument->id,
+                        'interval' => '1d',
+                        'bar_time' => CarbonImmutable::createFromTimestampUTC($bar['timestamp']),
+                        'open' => $bar['open'],
+                        'high' => $bar['high'],
+                        'low' => $bar['low'],
+                        'close' => $bar['close'],
+                        'adjusted_close' => $bar['adjusted_close'],
+                        'volume' => $bar['volume'],
+                        'source' => 'twelve_data',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ])->all();
+
+                    DB::table('price_bars')->upsert(
+                        $rows,
+                        ['instrument_id', 'interval', 'bar_time'],
+                        ['open', 'high', 'low', 'close', 'adjusted_close', 'volume', 'source', 'updated_at'],
+                    );
+                    $bars = $this->dailyBars((int) $instrument->id, $focusAt);
+                }
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
 
         return [
             'candles' => $bars->map(fn ($bar) => [
@@ -1319,7 +1629,7 @@ class StockController extends Controller
                 ],
                 'volume' => is_numeric($bar->volume) ? (float) $bar->volume : null,
             ]),
-            'source' => $bars->isEmpty() ? 'unavailable' : 'legacy_price_bars_fallback',
+            'source' => $bars->isEmpty() ? 'unavailable' : ($bars->every(fn ($bar) => $bar->source === 'twelve_data') ? 'twelve_data' : 'price_bars'),
         ];
     }
 

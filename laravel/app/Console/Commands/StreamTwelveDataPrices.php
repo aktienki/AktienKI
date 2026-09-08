@@ -149,7 +149,7 @@ class StreamTwelveDataPrices extends Command
             ->map(fn ($id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->unique()
-            ->take(8)
+            ->take(100)
             ->values();
 
         return $ids->isEmpty()

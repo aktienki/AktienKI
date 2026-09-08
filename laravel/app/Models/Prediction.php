@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Models\Instrument;
 
 class Prediction extends Model
@@ -63,6 +64,11 @@ class Prediction extends Model
     public function instrument(): BelongsTo
     {
         return $this->belongsTo(Instrument::class);
+    }
+
+    public function externalBuyReview(): HasOne
+    {
+        return $this->hasOne(ExternalBuyReview::class);
     }
 
     public function getExpectedGainAttribute(): ?float

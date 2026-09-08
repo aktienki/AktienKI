@@ -2,24 +2,26 @@
 
 namespace App\Services;
 
+use App\Jobs\SendSignalEmailAfterReview;
+use App\Models\EasyAccessSubscriber;
 use App\Models\Prediction;
 use App\Models\SavedPredictionFilter;
 use App\Models\SmartSelectionLabel;
 use App\Models\SignalEmailDelivery;
-use App\Models\EasyAccessSubscriber;
-use App\Notifications\SignalChangedNotification;
-use App\Notifications\SmartSelectionSignalNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 final class SignalEmailService
 {
-    public function __construct(private readonly UserQualityGateService $qualityGates) {}
+    public function __construct(
+        private readonly UserQualityGateService $qualityGates,
+        private readonly ExternalBuyReviewTrigger $externalBuyReviews,
+    ) {}
 
     public function scan(int $minutes = 1440): array
     {
-        $stats = ['checked' => 0, 'changes' => 0, 'queued' => 0, 'skipped' => 0];
+        $stats = ['checked' => 0, 'changes' => 0, 'queued' => 0, 'external_reviews' => 0, 'skipped' => 0];
 
         Prediction::query()
             ->with('instrument')
@@ -40,6 +42,9 @@ final class SignalEmailService
                         continue;
                     }
                     $stats['changes']++;
+                    if ($this->externalBuyReviews->queueForTransition($prediction, $previous)) {
+                        $stats['external_reviews']++;
+                    }
 
                     SavedPredictionFilter::query()
                         ->with('user')
@@ -76,9 +81,13 @@ final class SignalEmailService
                                     throw $exception;
                                 }
 
-                                $strategy->user->notify(new SignalChangedNotification(
-                                    $prediction, $strategy, (string) $previous->signal, $delivery->id
-                                ));
+                                SendSignalEmailAfterReview::dispatch(
+                                    $strategy->user,
+                                    $prediction,
+                                    $strategy,
+                                    (string) $previous->signal,
+                                    $delivery->id,
+                                );
                                 $stats['queued']++;
 
                                 // Easy Access subscriptions are intentionally limited to
@@ -88,9 +97,12 @@ final class SignalEmailService
                                         ->where('saved_prediction_filter_id', $strategy->id)
                                         ->where('is_active', true)
                                         ->each(function (EasyAccessSubscriber $subscriber) use ($prediction, $previous, $strategy, &$stats): void {
-                                            $subscriber->notify(new SignalChangedNotification(
-                                                $prediction, $strategy, (string) $previous->signal, 0
-                                            ));
+                                            SendSignalEmailAfterReview::dispatch(
+                                                $subscriber,
+                                                $prediction,
+                                                $strategy,
+                                                (string) $previous->signal,
+                                            );
                                             $stats['queued']++;
                                         });
                                 }
@@ -109,9 +121,12 @@ final class SignalEmailService
                                         || ! $this->matchesSmartLabel($label, $prediction)) {
                                         continue;
                                     }
-                                    $label->user->notify(new SmartSelectionSignalNotification(
-                                        $prediction, $label, (string) $previous->signal
-                                    ));
+                                    SendSignalEmailAfterReview::dispatch(
+                                        $label->user,
+                                        $prediction,
+                                        $label,
+                                        (string) $previous->signal,
+                                    );
                                     $stats['queued']++;
                                 }
                             });

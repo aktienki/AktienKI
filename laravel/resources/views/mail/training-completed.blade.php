@@ -24,27 +24,32 @@
 @forelse($horizons as $horizon)
 @php($standard = $horizon['standard'] ?? [])
 @php($pureTcn = $horizon['pureTcn'] ?? [])
-@php($standardPrediction = $horizon['standardPredictionStatus'] ?? [])
-@php($pureTcnPrediction = $horizon['pureTcnPredictionStatus'] ?? [])
 <div style="border-top:1px solid #355167;padding:12px 0 8px">
 <div style="font-size:14px;font-weight:900;color:#48d9ef">{{ $horizon['days'] }}T <span style="color:#ffffff;font-size:11px;margin-left:8px">AKTIV: {{ $horizon['activeVariantLabel'] ?? 'Standard' }} · {{ $horizon['activeModel'] ?? '–' }}</span></div>
-<div style="font-size:10px;font-weight:800;color:{{ ($horizon['activePredictionEnabled'] ?? false) ? '#48d6b3' : '#f0bd4f' }};margin-top:4px">{{ $horizon['activePredictionStatus'] ?? 'Prediction-Status noch nicht bewertet' }}</div>
 <table class="aki-horizon-table" role="presentation" width="100%" cellpadding="6" cellspacing="0" style="font-size:11px;color:#ffffff;margin-top:6px">
-<thead><tr><th align="left" style="color:#ffffff">Modell</th><th align="right" style="color:#ffffff">Trades</th><th align="right" style="color:#ffffff">Treffer</th><th align="right" style="color:#ffffff">PF</th><th align="right" style="color:#ffffff">Ø Rendite</th></tr></thead>
+<thead><tr><th align="left" style="color:#ffffff">Modell</th><th align="right" style="color:#ffffff">Trades</th><th align="right" style="color:#ffffff">Treffer</th><th align="right" style="color:#ffffff">PF</th><th align="right" style="color:#ffffff">Ø Rendite</th><th align="right" style="color:#ffffff">Median</th><th align="right" style="color:#ffffff">StdAbw</th><th align="right" style="color:#ffffff">Gesamt</th><th align="right" style="color:#ffffff">Max. DD</th></tr></thead>
 <tbody>
 <tr>
-<td data-label="Modell" style="font-weight:800;color:#ffffff">Standard<div style="font-size:9px;color:{{ ($standardPrediction['enabled'] ?? false) ? '#48d6b3' : '#f0bd4f' }};margin-top:3px">{{ $standardPrediction['label'] ?? 'Noch nicht bewertet' }} · Schwelle {{ $horizon['standardThreshold'] ?? '–' }}</div></td>
+<td data-label="Modell" style="font-weight:800;color:#ffffff">Standard · {{ $horizon['standardQuality'] ?? '–' }}</td>
 <td data-label="Trades" align="right" style="color:#ffffff">{{ $standard['trades'] ?? 0 }}</td>
 <td data-label="Treffer" align="right" style="color:#ffffff">{{ $standard['hitRate'] ?? '–' }}</td>
 <td data-label="PF" align="right" style="color:#ffffff">{{ $standard['profitFactor'] ?? '–' }}</td>
 <td data-label="Ø Rendite" align="right" style="color:#ffffff">{{ $standard['averageReturn'] ?? '–' }}</td>
+<td data-label="Median" align="right" style="color:#ffffff">{{ $standard['medianReturn'] ?? '–' }}</td>
+<td data-label="StdAbw" align="right" style="color:#ffffff">{{ $standard['standardDeviation'] ?? '–' }}</td>
+<td data-label="Gesamt" align="right" style="color:#ffffff">{{ $standard['cumulativeReturn'] ?? '–' }}</td>
+<td data-label="Max. DD" align="right" style="color:#ffffff">{{ $standard['maxDrawdown'] ?? '–' }}</td>
 </tr>
 <tr>
-<td data-label="Modell" style="font-weight:800;color:#ffffff">Reines TCN<div style="font-size:9px;color:{{ ($pureTcnPrediction['enabled'] ?? false) ? '#48d6b3' : '#f0bd4f' }};margin-top:3px">{{ $pureTcnPrediction['label'] ?? 'Noch nicht bewertet' }} · Schwelle {{ $horizon['pureTcnThreshold'] ?? '–' }}</div></td>
+<td data-label="Modell" style="font-weight:800;color:#ffffff">Reines TCN · {{ $horizon['pureTcnQuality'] ?? '–' }}</td>
 <td data-label="Trades" align="right" style="color:#ffffff">{{ $pureTcn['trades'] ?? 0 }}</td>
 <td data-label="Treffer" align="right" style="color:#ffffff">{{ $pureTcn['hitRate'] ?? '–' }}</td>
 <td data-label="PF" align="right" style="color:#ffffff">{{ $pureTcn['profitFactor'] ?? '–' }}</td>
 <td data-label="Ø Rendite" align="right" style="color:#ffffff">{{ $pureTcn['averageReturn'] ?? '–' }}</td>
+<td data-label="Median" align="right" style="color:#ffffff">{{ $pureTcn['medianReturn'] ?? '–' }}</td>
+<td data-label="StdAbw" align="right" style="color:#ffffff">{{ $pureTcn['standardDeviation'] ?? '–' }}</td>
+<td data-label="Gesamt" align="right" style="color:#ffffff">{{ $pureTcn['cumulativeReturn'] ?? '–' }}</td>
+<td data-label="Max. DD" align="right" style="color:#ffffff">{{ $pureTcn['maxDrawdown'] ?? '–' }}</td>
 </tr>
 </tbody>
 </table>

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -15,7 +16,7 @@ final class ServingMarketSnapshotService
     {
         $scope = $instrumentIds === null ? 'global' : sha1(implode(',', collect($instrumentIds)->sort()->values()->all()));
 
-        return Cache::remember('serving.market-snapshot.v1.'.$scope.'.'.app()->getLocale(), now()->addMinutes(2), function () use ($instrumentIds, $scope): array {
+        return $this->cache()->remember('serving.market-snapshot.v1.'.$scope.'.'.app()->getLocale(), now()->addMinutes(2), function () use ($instrumentIds, $scope): array {
             try {
                 $rows = DB::connection('serving')
                     ->table('serving_current_stock_signals as signal')
@@ -186,7 +187,7 @@ final class ServingMarketSnapshotService
             'outlook' => strtoupper($tone === 'positive' ? 'BULLISH' : ($tone === 'cautious' ? 'BEARISH' : 'NEUTRAL')),
             'confidence' => (int) round($qualityRate),
             'riskLevel' => $averageRisk >= 4.25 ? 'HIGH' : ($averageRisk >= 3.25 ? 'MEDIUM' : 'LOW'),
-            'headline' => __('Aktuelles Lagebild aus der neuen Serving-Datenbank'),
+            'headline' => __('Aktuelles Lagebild aus der Service Datenbank'),
             'summary' => __('Der aktuelle vollständige Serving-Lauf umfasst :count Aktien. :buy davon sind als BUY eingestuft; der mittlere KI-Score beträgt :score von 10. Die durchschnittliche kalibrierte Prognose des bevorzugten Horizonts liegt bei :return %.', [
                 'count' => $count,
                 'buy' => $buyCount,
@@ -229,11 +230,12 @@ final class ServingMarketSnapshotService
     /** @return list<array{x:string,y:float}> */
     private function dailyScores(string $scope, string $date, float $score): array
     {
-        Cache::put("serving.market-score.{$scope}.{$date}", $score, now()->addDays(45));
+        $cache = $this->cache();
+        $cache->put("serving.market-score.{$scope}.{$date}", $score, now()->addDays(45));
 
-        return collect(range(19, 1))->map(function (int $days) use ($scope, $date): ?array {
+        return collect(range(19, 1))->map(function (int $days) use ($cache, $scope, $date): ?array {
             $day = Carbon::parse($date)->subDays($days)->toDateString();
-            $value = Cache::get("serving.market-score.{$scope}.{$day}");
+            $value = $cache->get("serving.market-score.{$scope}.{$day}");
 
             return is_numeric($value) ? ['x' => $day, 'y' => round((float) $value, 2)] : null;
         })->push(['x' => $date, 'y' => $score])->filter()->values()->all();
@@ -242,16 +244,17 @@ final class ServingMarketSnapshotService
     /** @param array<string, int> $distribution @return array<string, int> */
     private function distributionChanges(string $scope, string $date, array $distribution): array
     {
+        $cache = $this->cache();
         $previous = null;
         foreach (range(1, 20) as $days) {
             $previousDate = Carbon::parse($date)->subDays($days)->toDateString();
-            $candidate = Cache::get("serving.market-distribution.{$scope}.{$previousDate}");
+            $candidate = $cache->get("serving.market-distribution.{$scope}.{$previousDate}");
             if (is_array($candidate)) {
                 $previous = $candidate;
                 break;
             }
         }
-        Cache::put("serving.market-distribution.{$scope}.{$date}", $distribution, now()->addDays(45));
+        $cache->put("serving.market-distribution.{$scope}.{$date}", $distribution, now()->addDays(45));
 
         return collect($distribution)->mapWithKeys(fn (int $count, string $signal): array => [
             $signal => $previous === null ? 0 : $count - (int) ($previous[$signal] ?? 0),
@@ -319,6 +322,11 @@ final class ServingMarketSnapshotService
         $decoded = is_string($value) ? json_decode($value, true) : null;
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function cache(): Repository
+    {
+        return Cache::store((string) config('aktienki.serving.read_cache_store', 'file'));
     }
 
     /** @return array<string, mixed> */

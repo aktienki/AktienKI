@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -16,9 +17,23 @@ use Illuminate\Support\Facades\DB;
  */
 final class ServingReadService
 {
+    public function activeTradeableStockCount(): int
+    {
+        return (int) $this->cache()->remember(
+            'serving.read.active-tradeable-stock-count.v1',
+            now()->addMinute(),
+            fn (): int => DB::connection('serving')
+                ->table('serving_instruments')
+                ->where('instrument_type', 'stock')
+                ->where('is_active', true)
+                ->where('is_tradeable', true)
+                ->count(),
+        );
+    }
+
     public function activeStocks(): Collection
     {
-        return Cache::remember('serving.read.active-stocks.v2', now()->addMinute(), function (): Collection {
+        return $this->cache()->remember('serving.read.active-stocks.v3', now()->addMinute(), function (): Collection {
             $predictions = $this->latestPredictions()->groupBy('instrument_id');
 
             return DB::connection('serving')
@@ -27,6 +42,8 @@ final class ServingReadService
                 ->join('serving_instruments as instrument', 'instrument.id', '=', 'active_model.instrument_id')
                 ->leftJoin('serving_instrument_fundamentals as fundamental', 'fundamental.instrument_id', '=', 'instrument.id')
                 ->where('instrument.is_active', true)
+                ->where('instrument.is_tradeable', true)
+                ->where('instrument.instrument_type', 'stock')
                 ->orderBy('instrument.name')
                 ->get([
                     'instrument.id as instrument_id', 'instrument.symbol', 'instrument.provider_symbol',
@@ -34,6 +51,8 @@ final class ServingReadService
                     'instrument.country_code', 'instrument.sector_code', 'instrument.industry',
                     'instrument.instrument_type', 'instrument.is_tradeable', 'instrument.is_german_tradeable',
                     'instrument.isin', 'instrument.display_metadata', 'instrument.risk_status',
+                    'instrument.german_listing_symbol', 'instrument.german_listing_exchange',
+                    'instrument.german_listing_currency',
                     'instrument.risk_profit_factor', 'instrument.risk_confidence',
                     'instrument.risk_max_drawdown', 'instrument.risk_profit_per_trade',
                     'release.id as release_id', 'release.pipeline_version', 'release.dataset_cutoff',
@@ -73,19 +92,21 @@ final class ServingReadService
 
     public function latestPredictions(): Collection
     {
-        return Cache::remember('serving.read.latest-predictions.v2', now()->addMinute(), function (): Collection {
+        return $this->cache()->remember('serving.read.latest-predictions.v3', now()->addMinute(), function (): Collection {
             $connection = DB::connection('serving');
             $ranked = $connection->table('serving_predictions as prediction')
                 ->join('serving_prediction_scopes as scope', function ($join): void {
                     $join->on('scope.instrument_id', '=', 'prediction.instrument_id')
                         ->on('scope.release_id', '=', 'prediction.release_id')
-                        ->on('scope.horizon', '=', 'prediction.horizon');
+                        ->on('scope.horizon', '=', 'prediction.horizon')
+                        ->on('scope.variant', '=', 'prediction.variant');
                 })
                 ->join('serving_instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
                 ->where('instrument.is_active', true)
                 ->select([
                     'prediction.id', 'prediction.batch_id', 'prediction.instrument_id',
                     'prediction.release_id', 'prediction.as_of', 'prediction.horizon',
+                    'prediction.variant',
                     'prediction.expected_return', 'prediction.target_price',
                     'prediction.calibrated_score', 'prediction.risk_score',
                     'prediction.signal', 'prediction.confidence', 'prediction.compact_context',
@@ -119,31 +140,30 @@ final class ServingReadService
 
     public function signalTransitions(): Collection
     {
-        return Cache::remember('serving.read.signal-transitions.v2', now()->addMinute(), fn (): Collection =>
-            DB::connection('serving')
-                ->table('serving_signal_transitions as transition')
-                ->join('serving_active_models as active_model', function ($join): void {
-                    $join->on('active_model.instrument_id', '=', 'transition.instrument_id')
-                        ->on('active_model.release_id', '=', 'transition.release_id');
-                })
-                ->join('serving_instruments as instrument', 'instrument.id', '=', 'transition.instrument_id')
-                ->where('instrument.is_active', true)
-                ->orderByDesc('transition.changed_at')
-                ->get([
-                    'transition.id', 'transition.instrument_id', 'transition.release_id',
-                    'transition.from_signal', 'transition.to_signal', 'transition.changed_at',
-                    'transition.price_at_change', 'transition.score_at_change',
-                    'transition.risk_at_change', 'instrument.symbol', 'instrument.name',
-                    'instrument.country_code', 'instrument.currency',
-                ])
-                ->map(function (object $row): object {
-                    $row->from_signal = strtoupper((string) $row->from_signal);
-                    $row->to_signal = strtoupper((string) $row->to_signal);
-                    $row->price_at_change = is_numeric($row->price_at_change) ? (float) $row->price_at_change : null;
-                    $row->risk_at_change = is_numeric($row->risk_at_change) ? (int) $row->risk_at_change : null;
+        return $this->cache()->remember('serving.read.signal-transitions.v2', now()->addMinute(), fn (): Collection => DB::connection('serving')
+            ->table('serving_signal_transitions as transition')
+            ->join('serving_active_models as active_model', function ($join): void {
+                $join->on('active_model.instrument_id', '=', 'transition.instrument_id')
+                    ->on('active_model.release_id', '=', 'transition.release_id');
+            })
+            ->join('serving_instruments as instrument', 'instrument.id', '=', 'transition.instrument_id')
+            ->where('instrument.is_active', true)
+            ->orderByDesc('transition.changed_at')
+            ->get([
+                'transition.id', 'transition.instrument_id', 'transition.release_id',
+                'transition.from_signal', 'transition.to_signal', 'transition.changed_at',
+                'transition.price_at_change', 'transition.score_at_change',
+                'transition.risk_at_change', 'instrument.symbol', 'instrument.name',
+                'instrument.country_code', 'instrument.currency',
+            ])
+            ->map(function (object $row): object {
+                $row->from_signal = strtoupper((string) $row->from_signal);
+                $row->to_signal = strtoupper((string) $row->to_signal);
+                $row->price_at_change = is_numeric($row->price_at_change) ? (float) $row->price_at_change : null;
+                $row->risk_at_change = is_numeric($row->risk_at_change) ? (int) $row->risk_at_change : null;
 
-                    return $row;
-                })
+                return $row;
+            })
         );
     }
 
@@ -194,7 +214,10 @@ final class ServingReadService
                 ?? ($predictionStatusPayload['status'] ?? 'not_evaluated'));
             $enabled = (bool) ($activeConfig['prediction_enabled']
                 ?? ($predictionStatusPayload['prediction_enabled'] ?? false));
-            $prediction = $predictionByHorizon->get($horizon);
+            // A previously published row may still exist after the active
+            // model's quality gate has been closed. It must no longer be
+            // exposed as a current signal for that blocked model.
+            $prediction = $enabled ? $predictionByHorizon->get($horizon) : null;
 
             return [$horizon => (object) [
                 'horizon' => $horizon,
@@ -218,7 +241,8 @@ final class ServingReadService
             ]];
         });
 
-        $latestPrediction = $predictionByHorizon->sortByDesc('as_of')->first();
+        $eligiblePredictions = $horizons->pluck('prediction')->filter();
+        $latestPrediction = $eligiblePredictions->sortByDesc('as_of')->first();
         $row->display_metadata = $this->json($row->display_metadata);
         $row->compact_metrics = $compact;
         $row->filter_summary = $filters;
@@ -230,7 +254,7 @@ final class ServingReadService
         $row->recommended_signal = strtoupper(trim((string) ($row->recommended_signal ?: 'WATCH')));
         $row->horizons = $horizons;
         $row->latest_prediction = $latestPrediction;
-        $row->prediction_count = $predictionByHorizon->count();
+        $row->prediction_count = $eligiblePredictions->count();
         $row->eligible_horizon_count = $horizons->where('prediction_enabled', true)->count();
         $row->has_eligible_prediction = $latestPrediction !== null;
 
@@ -295,5 +319,10 @@ final class ServingReadService
         }
 
         return array_values(array_filter(str_getcsv(trim($value, '{}'), ',', '"', '')));
+    }
+
+    private function cache(): Repository
+    {
+        return Cache::store((string) config('aktienki.serving.read_cache_store', 'file'));
     }
 }

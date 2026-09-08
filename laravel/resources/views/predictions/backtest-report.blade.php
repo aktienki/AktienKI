@@ -55,8 +55,10 @@
     $filterLabels = [
         'country' => 'Land', 'exchange' => 'Börse', 'sector' => 'Sektor',
         'model' => 'Modell', 'quality_tier' => 'Modellstufe mindestens', 'signal' => 'Signal',
-        'score_min' => 'KI-Score mindestens', 'confidence_min' => 'Konfidenz mindestens',
-        'drawdown_max' => 'Drawdown maximal', 'profit_per_trade_min' => 'Ø Netto-Profit je Trade mindestens',
+        'score_min' => 'Modellscore mindestens', 'confidence_min' => 'Konfidenz mindestens',
+        'drawdown_max' => 'Drawdown maximal', 'risk_max' => 'Aktuelles Modellrisiko maximal', 'profit_per_trade_min' => 'Ø Netto-Profit je Trade mindestens',
+        'median_return_min' => 'Median Netto-Profit je Trade mindestens',
+        'profit_factor_min' => 'Profitfaktor mindestens',
         'volatility_max' => 'Volatilität maximal', 'pe_max' => 'KGV maximal',
         'dividend_yield_min' => 'Dividendenrendite mindestens', 'market_cap_min' => 'Marktkapitalisierung mindestens',
         'revenue_growth_min' => 'Umsatzwachstum mindestens', 'hit_rate_min' => 'Hitrate mindestens',
@@ -68,6 +70,44 @@
     ];
     $formatMoney = fn ($value) => number_format((float) $value, 2, ',', '.').' €';
     $formatPercent = fn ($value) => number_format((float) $value, 2, ',', '.').' %';
+    $selectedExitStrategy = (string) ($filters['exit_strategy'] ?? 'fixed_20d');
+    $executionHorizon = (int) ($run->horizon_days ?? 20);
+    $exitStrategyLabels = [
+        'fixed_20d' => $executionHorizon.' Tage',
+        'signal_change' => 'Signal- oder Marktphasenwechsel',
+        'forecast_below_price' => 'Prognose unter aktuellem Kurs',
+        'buy_and_hold' => 'Buy and Hold',
+    ];
+    $formatFilterValue = function (string $key, mixed $value) use ($exitStrategyLabels): string {
+        if ($key === 'serving_model_configurations' && is_array($value)) {
+            return number_format(count($value), 0, ',', '.').' Modellkonfigurationen';
+        }
+        if ($key === 'serving_quality_symbols' && is_array($value)) {
+            return number_format(count($value), 0, ',', '.').' Aktien';
+        }
+        if ($key === 'exit_strategy' && is_scalar($value)) {
+            return (string) (($exitStrategyLabels[(string) $value] ?? null) ?: $value);
+        }
+        if (is_bool($value)) {
+            return $value ? 'Ja' : 'Nein';
+        }
+        if (is_array($value)) {
+            return collect($value)
+                ->map(function ($item): string {
+                    if (is_array($item) || is_object($item)) {
+                        return json_encode($item, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '—';
+                    }
+
+                    return is_bool($item) ? ($item ? 'Ja' : 'Nein') : (string) $item;
+                })
+                ->implode(', ');
+        }
+        if (is_object($value)) {
+            return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '—';
+        }
+
+        return (string) $value;
+    };
     $formatFactorUsage = function ($usage, int $totalTrades): string {
         $increasedTrades = (int) collect((array) $usage)
             ->filter(fn ($count, $factor) => (float) $factor > 1 && (int) $count > 0)
@@ -79,14 +119,6 @@
             .number_format($share, 2, ',', '.').' %';
     };
     $spPerformance = (float) ($result['benchmark_performance'] ?? 0);
-    $selectedExitStrategy = (string) ($filters['exit_strategy'] ?? 'fixed_20d');
-    $executionHorizon = (int) ($run->horizon_days ?? 20);
-    $exitStrategyLabels = [
-        'fixed_20d' => $executionHorizon.' Tage',
-        'signal_change' => 'Signal- oder Marktphasenwechsel',
-        'forecast_below_price' => 'Prognose unter aktuellem Kurs',
-        'buy_and_hold' => 'Buy and Hold',
-    ];
     $selectedExitStrategyLabel = $exitStrategyLabels[$selectedExitStrategy] ?? $selectedExitStrategy;
     $moneyManagerEnabled = $selectedExitStrategy !== 'buy_and_hold';
     $showAdaptive = (bool) data_get($settings, 'selection_filters.adaptive_rotation_enabled', false);
@@ -292,7 +324,7 @@
         @foreach (collect($filters)->filter(fn ($value) => $value !== null && $value !== '')->chunk(4) as $row)
             <tr>
                 @foreach ($row as $key => $value)
-                    <td><span class="filter-name">{{ $filterLabels[$key] ?? $key }}</span><span class="filter-value">{{ $key === 'exit_strategy' ? ($exitStrategyLabels[$value] ?? $value) : (is_array($value) ? implode(', ', $value) : $value) }}</span></td>
+                    <td><span class="filter-name">{{ $filterLabels[$key] ?? $key }}</span><span class="filter-value">{{ $formatFilterValue((string) $key, $value) }}</span></td>
                 @endforeach
                 @for ($empty = $row->count(); $empty < 4; $empty++)<td></td>@endfor
             </tr>

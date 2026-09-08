@@ -1,0 +1,116 @@
+<x-app-layout>
+@php
+    $numeric = fn ($value) => is_numeric($value) ? (float) $value : null;
+    $totalMembers = (int) $indices->sum('members_count');
+    $totalAnalyzed = (int) $indices->sum('analyzed_count');
+    $coverage = $totalMembers > 0 ? ($totalAnalyzed / $totalMembers) * 100 : 0;
+    $marketReturn = $indices->pluck('expected_return')->filter(fn ($value) => is_numeric($value))->median();
+    $marketScore = $indices->pluck('rating_value')->filter(fn ($value) => is_numeric($value))->avg();
+    $leader = $indices->sortByDesc(fn ($index) => $numeric($index->expected_return) ?? -INF)->first();
+    $tone = fn ($value) => ($value ?? 0) > .05 ? 'positive' : (($value ?? 0) < -.05 ? 'negative' : 'neutral');
+    $quantileExtremes = collect([5, 10, 15, 20])->mapWithKeys(function (int $days) use ($indices): array {
+        return collect(['q25', 'median', 'q75'])->mapWithKeys(function (string $quantile) use ($indices, $days): array {
+            $values = $indices->map(fn ($index) => data_get($index->analysis_card, "forecast_band.horizons.{$days}.{$quantile}"))
+                ->filter(fn ($value) => is_numeric($value))->map(fn ($value) => (float) $value);
+            return ["{$days}.{$quantile}" => ['min' => $values->min(), 'max' => $values->max()]];
+        })->all();
+    });
+@endphp
+<main id="index-intelligence" class="mx-auto max-w-[1680px] px-3 py-4 text-[var(--ak-text)] sm:px-5 lg:px-7">
+    <header class="index-intel-hero">
+        <div>
+            <p class="index-intel-kicker">{{ __('MARKET INTELLIGENCE · INDIZES') }}</p>
+            <h1>{{ __('Globale Märkte klar einordnen.') }}</h1>
+            <p>{{ __('Kursdynamik, technische Lage, KI-Prognosen und die stärksten Indexmitglieder in einer gemeinsamen Analyse.') }}</p>
+        </div>
+        <div class="index-intel-status"><span class="index-intel-live-dot"></span><b>{{ __('Aktueller Datenstand') }}</b><small>{{ now()->format('d.m.Y · H:i') }}</small></div>
+    </header>
+
+    @if($isFreeRegional)
+        <div class="index-intel-notice"><b>FREE</b><span>{{ __('Indexwerte aus deinem regionalen Portfolio (:country).', ['country' => $regionalCountry]) }}</span><a href="{{ route('pricing') }}">{{ __('Global ab Plus') }} →</a></div>
+    @endif
+
+    <section class="index-intel-overview" aria-label="{{ __('Marktüberblick') }}">
+        <article><small>{{ __('Analysierte Indizes') }}</small><strong>{{ $indices->count() }}</strong><span>{{ __('wichtigste Märkte') }}</span></article>
+        <article><small>{{ __('Datenabdeckung') }}</small><strong>{{ number_format($coverage, 0, ',', '.') }} %</strong><span>{{ number_format($totalAnalyzed, 0, ',', '.') }}/{{ number_format($totalMembers, 0, ',', '.') }} {{ __('Mitglieder') }}</span></article>
+        <article data-tone="{{ $tone($marketScore - 5) }}"><small>{{ __('Ø KI-Score') }}</small><strong>{{ $marketScore !== null ? number_format($marketScore, 1, ',', '.').' /10' : '—' }}</strong><span>{{ __('marktübergreifend') }}</span></article>
+        <article data-tone="{{ $tone($marketReturn) }}"><small>{{ __('Median-Prognose 20T') }}</small><strong>{{ $marketReturn !== null ? (($marketReturn > 0 ? '+' : '').number_format($marketReturn, 1, ',', '.').' %') : '—' }}</strong><span>{{ __('über alle Indizes') }}</span></article>
+        <article data-tone="positive"><small>{{ __('Stärkster Ausblick') }}</small><strong>{{ $leader?->name ?: '—' }}</strong><span>{{ $numeric($leader?->expected_return) !== null ? (($leader->expected_return > 0 ? '+' : '').number_format($leader->expected_return, 1, ',', '.').' % · 20T') : '—' }}</span></article>
+    </section>
+
+    <section x-data="{ open: false }" class="index-intel-toolbar">
+        <div class="index-intel-toolbar-title"><div><small>{{ __('VERGLEICH') }}</small><h2>{{ __('Index-Ranking') }}</h2></div><span>{{ $indices->count() }} {{ __('Märkte') }}</span></div>
+        <button type="button" @click="open = !open"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" />{{ __('Filter') }}<x-heroicon-o-chevron-down class="h-4 w-4" x-bind:class="open && 'rotate-180'" /></button>
+        <form x-cloak x-show="open" method="GET" class="index-intel-filters">
+            <input name="q" value="{{ request('q') }}" placeholder="{{ __('Index oder Symbol suchen') }}">
+            <select name="region"><option value="">{{ __('Alle Regionen') }}</option>@foreach($regions as $region)<option value="{{ $region }}" @selected(request('region') === $region)>{{ $region }}</option>@endforeach</select>
+            <button type="submit">{{ __('Anwenden') }}</button><a href="{{ route('indices.redesign') }}">{{ __('Zurücksetzen') }}</a>
+        </form>
+    </section>
+
+    <section class="index-intel-table-shell">
+        <div class="index-quantile-table" role="table">
+            <div class="index-quantile-head index-quantile-head-groups" role="row"><span>{{ __('INDEX') }}</span>@foreach([5,10,15,20] as $days)<span>{{ $days }} {{ __('TAGE') }}</span>@endforeach</div>
+            <div class="index-quantile-head index-quantile-head-labels" role="row"><span></span>@foreach([5,10,15,20] as $days)<span>Q25</span><span>{{ __('MEDIAN') }}</span><span>Q75</span>@endforeach</div>
+            @foreach($indices as $index)
+                @php
+                    $horizons = data_get($index->analysis_card, 'forecast_band.horizons', []);
+                @endphp
+                <a href="#index-{{ $index->id }}" class="index-quantile-row" role="row">
+                    <span><b>{{ $index->name }}</b><small>#{{ $index->global_rank }} · {{ $index->symbol }}</small></span>
+                    @foreach([5,10,15,20] as $days)
+                        @foreach(['q25','median','q75'] as $quantile)
+                            @php
+                                $value = data_get($horizons, "{$days}.{$quantile}");
+                                $extreme = $quantileExtremes->get("{$days}.{$quantile}", []);
+                                $cellClass = is_numeric($value) && count($extreme)
+                                    ? ((float)$value === (float)($extreme['max'] ?? INF) ? 'is-best' : ((float)$value === (float)($extreme['min'] ?? -INF) ? 'is-worst' : ''))
+                                    : '';
+                            @endphp
+                            <span class="{{ $cellClass }}">{{ is_numeric($value) ? (((float)$value > 0 ? '+' : '').number_format((float)$value, 2, ',', '.').' %') : '—' }}</span>
+                        @endforeach
+                    @endforeach
+                </a>
+            @endforeach
+        </div>
+        <p class="index-quantile-note">{{ __('Je Quantil und Horizont ist der höchste Wert grün und der niedrigste Wert rot markiert.') }}</p>
+    </section>
+
+    <div class="index-intel-section-title"><div><small>{{ __('DEEP DIVE') }}</small><h2>{{ __('Einzelne Märkte') }}</h2></div><p>{{ __('Technik, Prognose und Marktbreite je Index') }}</p></div>
+    <section class="index-intel-cards">
+    @foreach($indices as $index)
+        @php
+            $points = collect($index->chart_points)->filter(fn ($point) => is_numeric($point['close'] ?? null))->values();
+            $values = $points->pluck('close')->map(fn ($value) => (float)$value); $min = $values->min(); $range = max(.0001, (float)$values->max() - (float)$min);
+            $polyline = $values->count() > 1 ? $values->map(fn ($value, $i) => sprintf('%.1f,%.1f', $i * 600 / ($values->count()-1), 112-(($value-$min)/$range)*96))->implode(' ') : '';
+            $last = $values->last(); $first = $values->first(); $yearChange = $last && $first ? (($last/$first)-1)*100 : null;
+            $confidence = $numeric($index->average_confidence); if ($confidence !== null && $confidence <= 1) $confidence *= 100;
+            $hitRate = $numeric($index->average_hit_rate); $stability = $numeric($index->context_adjusted_stability ?? $index->average_stability); if ($stability !== null && $stability <= 1) $stability *= 100;
+            $risk = $numeric($index->average_risk); if ($risk !== null && $risk <= 1) $risk *= 100;
+            $dailyInfo = $index->daily_market_info ?? null;
+            $marketInfo = $dailyInfo ? (app()->getLocale() === 'en' && filled($dailyInfo->market_info_en) ? $dailyInfo->market_info_en : $dailyInfo->market_info_de) : ($index->assessment ?: $index->description);
+        @endphp
+        <article id="index-{{ $index->id }}" class="index-intel-card">
+            <header><div class="index-intel-rank">#{{ $index->global_rank }}</div><div><small>{{ $index->region }} · {{ $index->country }}</small><h3>{{ $index->name }}</h3><span>{{ $index->symbol }} · {{ $index->currency }}</span></div><a href="{{ route('stocks.index',['index'=>$index->symbol]) }}">{{ __('Aktien ansehen') }} <x-heroicon-o-arrow-up-right class="h-3.5 w-3.5" /></a></header>
+            <div class="index-intel-card-body">
+                <section class="index-intel-chart"><div class="index-intel-chart-head"><span><small>{{ __('INDEXVERLAUF · 1 JAHR') }}</small><b>{{ $last !== null ? number_format($last, 2, ',', '.') : '—' }}</b></span><strong data-tone="{{ $tone($yearChange) }}">{{ $yearChange !== null ? (($yearChange > 0 ? '+' : '').number_format($yearChange, 1, ',', '.').' %') : '—' }}</strong></div><svg viewBox="0 0 600 120" preserveAspectRatio="none"><path d="M0 24H600M0 58H600M0 92H600"/><polygon points="0,118 {{ $polyline }} 600,118"/><polyline points="{{ $polyline }}"/></svg></section>
+                <section class="index-intel-score"><div><small>{{ __('KI-SCORE') }}</small><strong>{{ $index->rating_value !== null ? number_format($index->rating_value, 1, ',', '.') : '—' }}</strong><span>/10</span></div><dl><div><dt>{{ __('Konfidenz') }}</dt><dd>{{ $confidence !== null ? number_format($confidence, 0, ',', '.').' %' : '—' }}</dd></div><div><dt>{{ __('Hit-Rate') }}</dt><dd>{{ $hitRate !== null ? number_format($hitRate, 0, ',', '.').' %' : '—' }}</dd></div><div><dt>{{ __('Stabilität') }}</dt><dd>{{ $stability !== null ? number_format($stability, 0, ',', '.').' %' : '—' }}</dd></div><div><dt>{{ __('Risiko') }}</dt><dd>{{ $risk !== null ? number_format($risk, 0, ',', '.').' %' : '—' }}</dd></div></dl></section>
+                <section class="index-intel-forecast"><small>{{ __('ERWARTETE RENDITE') }}</small><div>@foreach([5=>'expected_return_5d',10=>'expected_return_10d',15=>'expected_return_15d',20=>'expected_return'] as $days=>$field)<span data-tone="{{ $tone($numeric($index->{$field})) }}"><small>{{ $days }}T</small><b>{{ $numeric($index->{$field}) !== null ? (($index->{$field}>0?'+':'').number_format($index->{$field},1,',','.').' %') : '—' }}</b></span>@endforeach @if($index->pytorch_60t_probability !== null)<span data-tone="{{ $index->pytorch_60t_probability >= .55 ? 'positive' : ($index->pytorch_60t_probability <= .45 ? 'negative' : 'neutral') }}" title="{{ __('PyTorch-Sektorkontext; kein eigenständiges Handelssignal') }}"><small>{{ __('60T TREND') }}</small><b>{{ number_format($index->pytorch_60t_probability * 100, 0, ',', '.') }} %</b></span>@endif</div></section>
+                <section class="index-intel-top"><div class="index-intel-panel-head"><small>{{ __('TOP-AKTIEN') }}</small><span>{{ $realtimeQuotes ? __('Twelve Data · aktuell') : __('Letzter Kurs') }}</span></div>@forelse(collect($index->top_stocks)->take(3) as $stock)<a href="{{ route('stocks.show',$stock->symbol) }}"><span><b>{{ $stock->symbol }}</b><small>{{ $stock->name }}</small></span><strong>{{ is_numeric($stock->ai_score) ? number_format(App\Support\AiScore::toTen($stock->ai_score),1,',','.') : '—' }}</strong></a>@empty<p>{{ __('Noch keine Aktien verfügbar.') }}</p>@endforelse</section>
+                <section class="index-intel-comment"><div class="index-intel-panel-head"><small>{{ $dailyInfo ? __('TÄGLICHE KI-MARKTEINSCHÄTZUNG') : __('MARKTEINSCHÄTZUNG') }}</small>@if($dailyInfo)<span>{{ \Illuminate\Support\Carbon::parse($dailyInfo->analysis_date)->format('d.m.Y') }} · {{ $dailyInfo->model }}</span>@endif</div><p>{{ $marketInfo ?: __('Die Markteinschätzung wird mit den nächsten vollständigen Daten ergänzt.') }}</p></section>
+            </div>
+        </article>
+    @endforeach
+    </section>
+</main>
+<style>
+#index-intelligence{--ii-border:color-mix(in srgb,var(--ak-muted) 20%,transparent);--ii-soft:color-mix(in srgb,var(--ak-card) 86%,var(--ak-bg) 14%)}
+.index-intel-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;padding:1.5rem;border:1px solid rgba(34,211,238,.26);border-radius:1.25rem;background:linear-gradient(120deg,rgba(8,145,178,.16),var(--ak-card) 48%,rgba(245,158,11,.08));box-shadow:var(--ak-shadow)}.index-intel-kicker,.index-intel-section-title small,.index-intel-toolbar-title small{font-size:.62rem;font-weight:900;letter-spacing:.18em;color:#22d3ee}.index-intel-hero h1{margin-top:.3rem;font-size:clamp(1.7rem,3vw,2.65rem);font-weight:950;letter-spacing:-.04em}.index-intel-hero p:not(.index-intel-kicker){margin-top:.35rem;color:var(--ak-muted);font-size:.9rem}.index-intel-status{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:.15rem .5rem;min-width:13rem;padding:.75rem 1rem;border:1px solid var(--ii-border);border-radius:.9rem;background:rgba(2,132,199,.06);font-size:.7rem}.index-intel-status small{grid-column:2;color:var(--ak-muted)}.index-intel-live-dot{grid-row:1/3;width:.55rem;height:.55rem;border-radius:50%;background:#34d399;box-shadow:0 0 12px #34d399}.index-intel-notice{display:flex;gap:.8rem;align-items:center;margin-top:.8rem;padding:.65rem 1rem;border:1px solid rgba(245,158,11,.25);border-radius:.8rem;font-size:.75rem}.index-intel-notice b,.index-intel-notice a{color:#f59e0b}.index-intel-notice a{margin-left:auto;font-weight:900}
+.index-intel-overview{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.7rem;margin-top:.8rem}.index-intel-overview article{display:flex;min-height:6.5rem;flex-direction:column;justify-content:center;padding:1rem;border:1px solid var(--ii-border);border-radius:1rem;background:var(--ak-card);box-shadow:var(--ak-shadow)}.index-intel-overview small{font-size:.58rem;font-weight:900;letter-spacing:.12em;color:var(--ak-muted);text-transform:uppercase}.index-intel-overview strong{overflow:hidden;margin-top:.3rem;font-size:1.35rem;font-weight:950;text-overflow:ellipsis;white-space:nowrap}.index-intel-overview span{margin-top:.15rem;font-size:.67rem;color:var(--ak-muted)}[data-tone=positive]{color:#10b981!important}[data-tone=negative]{color:#f43f5e!important}[data-tone=neutral]{color:#f59e0b!important}
+.index-intel-toolbar{position:relative;display:flex;align-items:center;justify-content:space-between;margin-top:1.3rem;padding:.8rem 1rem;border:1px solid var(--ii-border);border-radius:1rem 1rem 0 0;background:var(--ak-card)}.index-intel-toolbar-title{display:flex;align-items:center;gap:1rem}.index-intel-toolbar-title h2,.index-intel-section-title h2{font-size:1.15rem;font-weight:950}.index-intel-toolbar-title>span{padding:.25rem .55rem;border-radius:999px;background:rgba(34,211,238,.09);font-size:.65rem;color:#22d3ee}.index-intel-toolbar>button{display:flex;align-items:center;gap:.4rem;padding:.5rem .7rem;border:1px solid var(--ii-border);border-radius:.65rem;font-size:.7rem;font-weight:900}.index-intel-filters{position:absolute;z-index:30;top:calc(100% + .4rem);right:0;display:flex;gap:.45rem;padding:.7rem;border:1px solid var(--ii-border);border-radius:.8rem;background:var(--ak-card);box-shadow:var(--ak-shadow)}.index-intel-filters input,.index-intel-filters select{min-width:12rem;padding:.55rem .7rem;border:1px solid var(--ii-border);border-radius:.55rem;background:var(--ak-bg);font-size:.75rem}.index-intel-filters button,.index-intel-filters a{padding:.55rem .7rem;border-radius:.55rem;background:#0891b2;color:white;font-size:.7rem;font-weight:900}
+.index-intel-table-shell{overflow-x:auto;border:1px solid var(--ii-border);border-top:0;border-radius:0 0 1rem 1rem;background:var(--ak-card)}.index-quantile-table{min-width:1180px}.index-quantile-head,.index-quantile-row{display:grid;grid-template-columns:10rem repeat(12,minmax(4.8rem,1fr));align-items:stretch}.index-quantile-head{font-size:.52rem;font-weight:900;letter-spacing:.1em;color:var(--ak-muted);text-transform:uppercase}.index-quantile-head>span,.index-quantile-row>span{display:flex;align-items:center;justify-content:flex-end;min-width:0;padding:.55rem .7rem;border-left:1px solid var(--ii-border)}.index-quantile-head>span:first-child,.index-quantile-row>span:first-child{justify-content:flex-start;border-left:0}.index-quantile-head-groups>span:first-child{grid-row:1/3}.index-quantile-head-groups>span:not(:first-child){grid-column:span 3;justify-content:center;border-bottom:1px solid var(--ii-border);background:rgba(100,116,139,.055)}.index-quantile-head-groups>span:nth-child(3),.index-quantile-head-groups>span:nth-child(5){background:transparent}.index-quantile-head-labels>span{justify-content:flex-end;padding-block:.42rem}.index-quantile-head-labels>span:nth-child(3n){color:#f59e0b}.index-quantile-row{min-height:3.4rem;border-top:1px solid var(--ii-border);font-size:.73rem;font-weight:850}.index-quantile-row:nth-child(even){background:#fff}.index-quantile-row:nth-child(odd){background:#f8fafc}.index-quantile-row:hover{filter:brightness(.985)}.index-quantile-row>span:first-child{flex-direction:column;align-items:flex-start}.index-quantile-row>span:first-child b{font-weight:950}.index-quantile-row small{font-size:.52rem;color:var(--ak-muted)}.index-quantile-row .is-best{background:rgba(34,197,94,.13);color:#047857}.index-quantile-row .is-worst{color:#be123c}.index-quantile-note{padding:.55rem .8rem;border-top:1px solid var(--ii-border);font-size:.55rem;color:var(--ak-muted)}
+.index-intel-section-title{display:flex;align-items:flex-end;justify-content:space-between;margin:1.6rem .2rem .7rem}.index-intel-section-title p{font-size:.7rem;color:var(--ak-muted)}.index-intel-cards{display:grid;gap:1rem}.index-intel-card{scroll-margin-top:5rem;overflow:hidden;border:1px solid var(--ii-border);border-radius:1.15rem;background:var(--ak-card);box-shadow:var(--ak-shadow)}.index-intel-card>header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.8rem;padding:.8rem 1rem;border-bottom:1px solid var(--ii-border);background:linear-gradient(90deg,rgba(34,211,238,.08),transparent 45%,rgba(245,158,11,.035))}.index-intel-rank{display:grid;width:2.35rem;height:2.35rem;place-items:center;border:1px solid rgba(34,211,238,.25);border-radius:.7rem;background:rgba(34,211,238,.08);font-size:.7rem;font-weight:950;color:#0891b2}.index-intel-card>header small{font-size:.52rem;font-weight:850;letter-spacing:.1em;color:var(--ak-muted);text-transform:uppercase}.index-intel-card>header h3{font-size:1.05rem;font-weight:950}.index-intel-card>header span{font-size:.63rem;color:var(--ak-muted)}.index-intel-card>header a{display:flex;align-items:center;gap:.35rem;padding:.45rem .65rem;border:1px solid rgba(34,211,238,.25);border-radius:.6rem;font-size:.62rem;font-weight:900;color:#0891b2}.index-intel-card-body{display:grid;grid-template-columns:1.55fr .75fr 1.15fr;grid-template-areas:'chart score forecast' 'comment comment top';gap:.7rem;padding:.7rem}.index-intel-card-body>section{min-width:0;padding:.8rem;border:1px solid var(--ii-border);border-radius:.85rem;background:var(--ii-soft)}.index-intel-chart{grid-area:chart}.index-intel-score{grid-area:score}.index-intel-forecast{grid-area:forecast}.index-intel-top{grid-area:top}.index-intel-comment{grid-area:comment}.index-intel-chart-head{display:flex;align-items:flex-end;justify-content:space-between}.index-intel-chart-head span{display:flex;flex-direction:column}.index-intel-chart-head small,.index-intel-forecast>small,.index-intel-score small,.index-intel-panel-head small{font-size:.52rem;font-weight:900;letter-spacing:.1em;color:var(--ak-muted)}.index-intel-chart-head b{font-size:.9rem}.index-intel-chart-head strong{font-size:.8rem}.index-intel-chart svg{width:100%;height:6.1rem;margin-top:.35rem}.index-intel-chart svg path{stroke:currentColor;stroke-opacity:.08;stroke-dasharray:4 6}.index-intel-chart svg polygon{fill:#22d3ee;fill-opacity:.08}.index-intel-chart svg polyline{fill:none;stroke:#06b6d4;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}.index-intel-score{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:.7rem}.index-intel-score>div{display:grid;width:4.4rem;height:4.4rem;place-items:center;align-content:center;border:5px solid rgba(34,211,238,.28);border-radius:50%}.index-intel-score strong{font-size:1.25rem}.index-intel-score>div span{font-size:.5rem;color:var(--ak-muted)}.index-intel-score dl{display:grid;gap:.35rem}.index-intel-score dl div{display:flex;justify-content:space-between;gap:.5rem;border-bottom:1px solid var(--ii-border);font-size:.58rem}.index-intel-score dt{color:var(--ak-muted)}.index-intel-score dd{font-weight:900}.index-intel-forecast>div{display:grid;grid-template-columns:repeat(4,1fr);gap:.35rem;margin-top:.6rem}.index-intel-forecast span{display:grid;min-height:4.2rem;place-items:center;align-content:center;border:1px solid var(--ii-border);border-radius:.65rem;background:var(--ak-card)}.index-intel-forecast b{font-size:.75rem}.index-intel-panel-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.5rem}.index-intel-panel-head span{font-size:.5rem;color:var(--ak-muted)}.index-intel-top>a{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.38rem 0;border-top:1px solid var(--ii-border)}.index-intel-top>a span{display:flex;min-width:0;flex-direction:column}.index-intel-top>a b{font-size:.65rem}.index-intel-top>a small{overflow:hidden;font-size:.5rem;color:var(--ak-muted);text-overflow:ellipsis;white-space:nowrap}.index-intel-top>a strong{font-size:.7rem;color:#0891b2}.index-intel-comment p{display:-webkit-box;overflow:hidden;color:var(--ak-muted);font-size:.7rem;line-height:1.5;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+@media(max-width:1100px){.index-intel-overview{grid-template-columns:repeat(3,1fr)}.index-intel-card-body{grid-template-columns:1.4fr 1fr;grid-template-areas:'chart score' 'forecast forecast' 'comment top'}}@media(max-width:700px){.index-intel-hero{align-items:flex-start;flex-direction:column}.index-intel-status{width:100%}.index-intel-overview{grid-template-columns:repeat(2,1fr)}.index-intel-overview article:last-child{grid-column:1/-1}.index-intel-card-body{grid-template-columns:1fr;grid-template-areas:'chart' 'score' 'forecast' 'comment' 'top'}.index-intel-card>header{grid-template-columns:auto 1fr}.index-intel-card>header a{grid-column:1/-1;justify-content:center}.index-intel-filters{left:0;flex-direction:column}.index-intel-section-title p{display:none}}
+:root[data-theme=light] #index-intelligence{--ii-border:rgba(15,95,110,.15);--ii-soft:#f8fafb}:root[data-theme=light] .index-intel-hero{background:linear-gradient(120deg,#eaf9fb,#fff 48%,#fff9ec)}:root[data-theme=light] .index-intel-overview article,:root[data-theme=light] .index-intel-toolbar,:root[data-theme=light] .index-intel-table-shell,:root[data-theme=light] .index-intel-card{background:#fff}
+</style>
+</x-app-layout>

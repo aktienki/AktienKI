@@ -9,9 +9,12 @@
 
 <div class="header">
     @if ($logoData)<img class="logo" src="{{ $logoData }}" alt="aktienKI">@endif
-    <div class="brand">{{ $eyebrow }}</div>
-    <h1 class="title">{{ $title }} @if($symbol)<span class="symbol">{{ $symbol }}</span>@endif</h1>
-    @if($meta)<p class="meta">{{ $meta }}</p>@endif
+    <div class="header-side"><strong>{{ __('AKTIENANALYSE') }}</strong><span>{{ __('Machine Learning · Klare Signale') }}</span></div>
+    <div class="header-copy">
+        <div class="brand">{{ $eyebrow }}</div>
+        <h1 class="title">{{ $title }} @if($symbol)<span class="symbol">{{ $symbol }}</span>@endif</h1>
+        @if($meta)<p class="meta">{{ $meta }}</p>@endif
+    </div>
     @if(count($donuts))
         <table class="header-donuts" role="presentation"><tr>
             @foreach($donuts as $donut)

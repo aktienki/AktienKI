@@ -8,6 +8,93 @@ import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
 
+// Remember the last distinct in-app location so page-level back links retain
+// the real origin, including filters and query parameters. A reload does not
+// overwrite that origin.
+const navigationCurrentKey = 'aktienki.navigation.current';
+const navigationPreviousKey = 'aktienki.navigation.previous';
+const currentLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+try {
+    const rememberedCurrent = window.sessionStorage.getItem(navigationCurrentKey);
+    if (rememberedCurrent && rememberedCurrent !== currentLocation) {
+        window.sessionStorage.setItem(navigationPreviousKey, rememberedCurrent);
+    }
+    window.sessionStorage.setItem(navigationCurrentKey, currentLocation);
+} catch (_) {
+    // The server-rendered fallback URL remains usable without session storage.
+}
+
+document.addEventListener('click', (event) => {
+    const backLink = event.target.closest('a[data-back-link]');
+    if (!backLink || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+    try {
+        const rememberedPrevious = window.sessionStorage.getItem(navigationPreviousKey);
+        if (!rememberedPrevious || rememberedPrevious === currentLocation) return;
+
+        const destination = new URL(rememberedPrevious, window.location.origin);
+        if (destination.origin !== window.location.origin) return;
+
+        event.preventDefault();
+        window.location.assign(`${destination.pathname}${destination.search}${destination.hash}`);
+    } catch (_) {
+        // Fall through to the link's explicit fallback URL.
+    }
+});
+
+const enhanceScreenerFilterSelects = () => {
+    document.querySelectorAll('.screener-filter-bar select:not([data-custom-select])').forEach((select) => {
+        select.dataset.customSelect = 'true';
+        const shell = document.createElement('div');
+        shell.className = 'screener-custom-select';
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'screener-custom-select-trigger';
+        const value = document.createElement('span');
+        const arrow = document.createElement('i');
+        arrow.textContent = '⌄';
+        trigger.append(value, arrow);
+        const menu = document.createElement('div');
+        menu.className = 'screener-custom-select-menu';
+
+        [...select.options].forEach((option) => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'screener-custom-select-option';
+            item.textContent = option.textContent;
+            item.dataset.value = option.value;
+            item.addEventListener('click', () => {
+                select.value = option.value;
+                value.textContent = option.textContent;
+                menu.classList.remove('is-open');
+                shell.classList.remove('is-open');
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            menu.append(item);
+        });
+
+        value.textContent = select.selectedOptions[0]?.textContent || '';
+        trigger.addEventListener('click', () => {
+            document.querySelectorAll('.screener-custom-select-menu.is-open').forEach((openMenu) => {
+                if (openMenu !== menu) openMenu.classList.remove('is-open');
+            });
+            menu.classList.toggle('is-open');
+            shell.classList.toggle('is-open', menu.classList.contains('is-open'));
+        });
+        select.parentNode.insertBefore(shell, select);
+        shell.append(select, trigger, menu);
+    });
+};
+
+document.addEventListener('DOMContentLoaded', enhanceScreenerFilterSelects);
+document.addEventListener('click', (event) => {
+    if (!event.target.closest?.('.screener-custom-select')) {
+        document.querySelectorAll('.screener-custom-select-menu.is-open').forEach((menu) => menu.classList.remove('is-open'));
+        document.querySelectorAll('.screener-custom-select.is-open').forEach((shell) => shell.classList.remove('is-open'));
+    }
+});
+
 // ApexCharts and its chart factories are by far the largest frontend module.
 // Load them only on pages that actually contain a chart target. Likewise, do
 // not initialise the realtime stack on pages without live-price elements.
@@ -21,12 +108,21 @@ const chartTargetSelector = [
     '#filtered-backtest-result-chart',
     '.ak-top3-chart',
     '.aki-indicator-card__chart',
+    '[data-screener-chart]',
     '.ak-portfolio-line-chart',
 ].join(',');
 
+let chartModulePromise;
+window.loadAktienKiCharts = () => {
+    chartModulePromise ??= import('./charts').then(() => {
+        window.dispatchEvent(new CustomEvent('aktienki:charts-ready'));
+    });
+
+    return chartModulePromise;
+};
+
 if (document.querySelector(chartTargetSelector)) {
-    await import('./charts');
-    window.dispatchEvent(new CustomEvent('aktienki:charts-ready'));
+    await window.loadAktienKiCharts();
 }
 
 if (document.querySelector('meta[name="authenticated-user"]') && document.querySelector('[data-live-symbol]')) {

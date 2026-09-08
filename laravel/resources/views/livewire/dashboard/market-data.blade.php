@@ -161,67 +161,45 @@
                 <span>{{ $marketAnalysis['breadth'] }}</span>
             </div>
         @endif
+        <div class="mt-4 grid gap-3 lg:grid-cols-2">
+            @foreach ([
+                [__('Chancen'), $opportunities, 'text-emerald-500', '↗'],
+                [__('Risiken'), $risks, 'text-rose-500', '!'],
+            ] as [$title, $items, $titleClass, $symbol])
+                <section class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <h3 class="flex items-center gap-2 text-sm font-black {{ $titleClass }}"><span aria-hidden="true">{{ $symbol }}</span>{{ $title }}</h3>
+                        <span class="text-[10px] font-black tabular-nums text-[var(--ak-muted)]">{{ $items->count() }}</span>
+                    </div>
+                    <ul class="mt-3 grid gap-2">
+                        @forelse ($items as $key => $item)
+                            <li class="flex min-w-0 gap-2 text-xs leading-[1.5] text-[var(--ak-muted)]">
+                                <span class="shrink-0 font-black {{ $titleClass }}">{{ $loop->iteration }}.</span>
+                                <span class="min-w-0 break-words [overflow-wrap:anywhere]">@if (!is_numeric($key))<strong class="text-[var(--ak-text)]">{{ __((string) $key) }}: </strong>@endif{{ $analysisItemText($item) }}</span>
+                            </li>
+                        @empty
+                            <li class="text-xs text-[var(--ak-muted)]">{{ __('Für diesen Bericht liegen keine Einträge vor.') }}</li>
+                        @endforelse
+                    </ul>
+                </section>
+            @endforeach
+        </div>
+        @if ($watchlist->isNotEmpty())
+            <div class="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.04] px-4 py-3">
+                <p class="text-[9px] font-black uppercase tracking-[.14em] text-amber-500">{{ __('Beobachtungsliste') }}</p>
+                <ul class="mt-2 grid gap-1.5 text-xs text-[var(--ak-muted)] md:grid-cols-2">
+                    @foreach ($watchlist as $key => $item)
+                        <li>• @if (!is_numeric($key))<strong class="text-[var(--ak-text)]">{{ __((string) $key) }}: </strong>@endif{{ $analysisItemText($item) }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
         <footer class="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ak-border)] pt-3 text-[9px] font-semibold uppercase tracking-[.1em] text-[var(--ak-muted)]">
             <span>{{ $isExternalAiReport ? __('Markteinschätzung mit aktuellen externen Quellen · keine Anlageberatung') : __('Regelbasierte Auswertung aktueller Marktdaten · keine Anlageberatung') }}</span>
             @if (!empty($marketAnalysis['date']))<span>{{ __('Analyse vom') }} {{ \Illuminate\Support\Carbon::parse($marketAnalysis['date'])->format('d.m.Y') }}</span>@endif
         </footer>
         </div>
     </article>
-
-    <section x-data="{ opportunitiesRisksOpen: window.innerWidth >= 768 }" class="mt-4" aria-labelledby="market-opportunities-risks-title">
-        <div class="flex items-center justify-between gap-3" :class="opportunitiesRisksOpen ? 'mb-3' : ''">
-            <button type="button" @click="opportunitiesRisksOpen = ! opportunitiesRisksOpen" :aria-expanded="opportunitiesRisksOpen.toString()" class="min-w-0 flex-1 text-left">
-                <p class="ak-market-eyebrow">{{ __('Bericht') }}</p>
-                <h2 id="market-opportunities-risks-title" class="mt-1 truncate text-xl font-black text-[var(--ak-text)]">{{ __('Chancen & Risiken') }}</h2>
-                <span class="mt-1 block text-[9px] font-bold uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ $opportunities->count() }} {{ __('Chancen') }} · {{ $risks->count() }} {{ __('Risiken') }}</span>
-            </button>
-            <span class="flex shrink-0 items-center gap-2">@if (!empty($marketAnalysis['date']))<span class="hidden text-[9px] font-bold uppercase tracking-[.1em] text-[var(--ak-muted)] sm:inline">{{ __('Analyse vom') }} {{ \Illuminate\Support\Carbon::parse($marketAnalysis['date'])->format('d.m.Y') }}</span>@endif<button type="button" @click="opportunitiesRisksOpen = ! opportunitiesRisksOpen" class="grid h-9 w-9 place-items-center rounded-lg border border-cyan-400/25 text-cyan-500" aria-label="{{ __('Chancen und Risiken aufklappen') }}"><x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="opportunitiesRisksOpen && 'rotate-180'" /></button></span>
-        </div>
-        <div x-show="opportunitiesRisksOpen" x-cloak x-transition.opacity>
-        @if($isRegionalFreeView)
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[.06] px-4 py-3">
-                <div>
-                    <p class="text-[9px] font-black uppercase tracking-[.15em] text-amber-400">{{ __('Free · Regionales Portfolio') }}</p>
-                    <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Chancen und Risiken basieren auf den 100 wichtigsten Aktien deiner Region (:country).', ['country' => $regionalCountry]) }}</p>
-                </div>
-                <a href="{{ route('pricing') }}" class="inline-flex h-9 items-center rounded-lg border border-amber-400/30 bg-amber-400/[.08] px-3 text-[9px] font-black text-amber-300 transition hover:bg-amber-400/[.15]">{{ __('Internationale Auswahl ab Plus') }} →</a>
-            </div>
-        @endif
-        <div class="grid gap-4">
-            @foreach ([
-                [__('Chancen'), $opportunities, 'opportunity', 'text-emerald-500', '↗'],
-                [__('Risiken'), $risks, 'risk', 'text-rose-500', '!'],
-                [__('Beobachtungsliste'), $watchlist, 'watch', 'text-amber-500', '◉'],
-            ] as [$title, $items, $tone, $titleClass, $symbol])
-                <article class="ak-analysis-panel ak-analysis-panel-{{ $tone }} ak-detail-panel ak-standard-card ak-card ak-card-static overflow-hidden p-5">
-                    <div class="ak-analysis-card-head ak-detail-card-head -mx-5 -mt-5 flex items-center justify-between gap-3 px-5 py-4">
-                        <div class="flex items-center gap-3">
-                            <span class="ak-analysis-icon grid h-9 w-9 place-items-center rounded-xl border text-lg font-black {{ $titleClass }}">{{ $symbol }}</span>
-                            <div>
-                                <p class="text-[9px] font-black uppercase tracking-[.18em] text-[var(--ak-muted)]">{{ __('Markteinschätzung') }}</p>
-                                <h3 class="mt-0.5 text-lg font-black {{ $titleClass }}">{{ $title }}</h3>
-                            </div>
-                        </div>
-                        <span class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-1 text-[10px] font-black tabular-nums text-[var(--ak-muted)]">{{ $items->count() }}</span>
-                    </div>
-                    <ul class="mt-4 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-                        @forelse ($items as $key => $item)
-                            <li class="ak-analysis-copy min-w-0 flex gap-3 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3 text-xs leading-[1.45]">
-                                <span class="ak-analysis-number grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[10px] font-black {{ $titleClass }}">{{ $loop->iteration }}</span>
-                                <span class="min-w-0 break-words pt-0.5 [overflow-wrap:anywhere]">
-                                    @if (!is_numeric($key))<strong class="text-[var(--ak-text)]">{{ __((string) $key) }}: </strong>@endif
-                                    {{ $analysisItemText($item) }}
-                                </span>
-                            </li>
-                        @empty
-                            <li class="text-xs text-[var(--ak-muted)]">—</li>
-                        @endforelse
-                    </ul>
-                </article>
-            @endforeach
-        </div>
-        </div>
-    </section>
 
     @if ($reportSources->isNotEmpty())
         <section class="mt-4" aria-labelledby="report-sources-title">

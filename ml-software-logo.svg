@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="title desc">
+  <title id="title">ML Software UG</title>
+  <desc id="desc">Geometrisches ML-Zeichen mit violettfarbenem Schaltkreis- und Netzwerk-Motiv.</desc>
+  <defs>
+    <linearGradient id="ml-gradient" x1="60" y1="50" x2="550" y2="250" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b563ff"/>
+      <stop offset=".48" stop-color="#7b35dc"/>
+      <stop offset="1" stop-color="#322174"/>
+    </linearGradient>
+    <linearGradient id="circuit-gradient" x1="535" y1="230" x2="1115" y2="75" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#172b50"/>
+      <stop offset=".42" stop-color="#5230a5"/>
+      <stop offset="1" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="rule-gradient" x1="270" y1="0" x2="930" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#132743" stop-opacity=".12"/>
+      <stop offset=".32" stop-color="#5630aa"/>
+      <stop offset=".68" stop-color="#8b42e5"/>
+      <stop offset="1" stop-color="#132743" stop-opacity=".12"/>
+    </linearGradient>
+  </defs>
+
+  <g fill="none" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M82 230V67l108 131L298 67v163M371 67v163h169" stroke="#0b1d38" stroke-width="74"/>
+    <path d="M82 230V67l108 131L298 67v163M371 67v163h169" stroke="url(#ml-gradient)" stroke-width="54"/>
+  </g>
+
+  <g fill="none" stroke="url(#circuit-gradient)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M540 230h92l74 23h78"/>
+    <path d="M540 204h72l62-48h106"/>
+    <path d="M540 176h60l74-50h108"/>
+    <path d="M540 146h54l56-57h78"/>
+    <path d="M540 116h46l42-50h91"/>
+    <path d="M719 66l67 42 92-36 74 38 91-30"/>
+    <path d="M728 89l58 19 8 107 98-13 58-55 90 24"/>
+    <path d="M674 126l112-18 94 31 72-29 88 61"/>
+    <path d="M674 156l120 59 86-76 70 8 93-67"/>
+    <path d="M706 253l88-38 98-13 61 43 108-35"/>
+    <path d="M878 72l2 67 12 63"/>
+    <path d="M952 110l-2 37 3 98"/>
+    <path d="M1043 80l-3 91 21 39"/>
+  </g>
+
+  <g fill="#0d203d" stroke="url(#circuit-gradient)" stroke-width="7">
+    <circle cx="628" cy="66" r="12"/>
+    <circle cx="650" cy="89" r="12"/>
+    <circle cx="674" cy="126" r="12"/>
+    <circle cx="674" cy="156" r="12"/>
+    <circle cx="706" cy="253" r="12"/>
+    <circle cx="719" cy="66" r="12"/>
+    <circle cx="728" cy="89" r="12"/>
+    <circle cx="786" cy="108" r="13"/>
+    <circle cx="794" cy="215" r="13"/>
+    <circle cx="878" cy="72" r="13"/>
+    <circle cx="880" cy="139" r="13"/>
+    <circle cx="892" cy="202" r="13"/>
+    <circle cx="952" cy="110" r="13"/>
+    <circle cx="950" cy="147" r="13"/>
+    <circle cx="953" cy="245" r="13"/>
+    <circle cx="1043" cy="80" r="14"/>
+    <circle cx="1040" cy="171" r="14"/>
+    <circle cx="1061" cy="210" r="14"/>
+  </g>
+  <g fill="#a855f7">
+    <circle cx="628" cy="66" r="3.5"/>
+    <circle cx="650" cy="89" r="3.5"/>
+    <circle cx="674" cy="126" r="3.5"/>
+    <circle cx="674" cy="156" r="3.5"/>
+    <circle cx="706" cy="253" r="3.5"/>
+    <circle cx="719" cy="66" r="3.5"/>
+    <circle cx="728" cy="89" r="3.5"/>
+    <circle cx="786" cy="108" r="4"/>
+    <circle cx="794" cy="215" r="4"/>
+    <circle cx="878" cy="72" r="4"/>
+    <circle cx="880" cy="139" r="4"/>
+    <circle cx="892" cy="202" r="4"/>
+    <circle cx="952" cy="110" r="4"/>
+    <circle cx="950" cy="147" r="4"/>
+    <circle cx="953" cy="245" r="4"/>
+    <circle cx="1043" cy="80" r="4.5"/>
+    <circle cx="1040" cy="171" r="4.5"/>
+    <circle cx="1061" cy="210" r="4.5"/>
+  </g>
+
+  <g transform="translate(220 337) scale(.045 -.045)">
+    <path fill="url(#ml-gradient)" d="M145 0V1466H588L854 466L1117 1466H1561V0H1286V1154L995 0H710L420 1154V0ZM2023 0V1454H2319V247H3055V0Z"/>
+    <path fill="#102440" d="M4051 477 4339 505Q4365 360 4444.5 292Q4524 224 4659 224Q4802 224 4874.5 284.5Q4947 345 4947 426Q4947 478 4916.5 514.5Q4886 551 4810 578Q4758 596 4573 642Q4335 701 4239 787Q4104 908 4104 1082Q4104 1194 4167.5 1291.5Q4231 1389 4350.5 1440Q4470 1491 4639 1491Q4915 1491 5054.5 1370Q5194 1249 5201 1047L4905 1034Q4886 1147 4823.5 1196.5Q4761 1246 4636 1246Q4507 1246 4434 1193Q4387 1159 4387 1102Q4387 1050 4431 1013Q4487 966 4703 915Q4919 864 5022.5 809.5Q5126 755 5184.5 660.5Q5243 566 5243 427Q5243 301 5173 191Q5103 81 4975 27.5Q4847-26 4656-26Q4378-26 4229 102.5Q4080 231 4051 477ZM5592 724Q5592 948 5659 1100Q5709 1212 5795.5 1301Q5882 1390 5985 1433Q6122 1491 6301 1491Q6625 1491 6819.5 1290Q7014 1089 7014 731Q7014 376 6821 175.5Q6628-25 6305-25Q5978-25 5785 174.5Q5592 374 5592 724ZM5897 734Q5897 485 6012 356.5Q6127 228 6304 228Q6481 228 6594.5 355.5Q6708 483 6708 738Q6708 990 6597.5 1114Q6487 1238 6304 1238Q6121 1238 6009 1112.5Q5897 987 5897 734ZM7407 0V1466H8412V1218H7703V871H8315V623H7703V0ZM9146 0V1218H8711V1466H9876V1218H9442V0ZM10435 0 10085 1466H10388L10609 459L10877 1466H11229L11486 442L11711 1466H12009L11653 0H11339L11047 1096L10756 0ZM13642 0H13320L13192 333H12606L12485 0H12171L12742 1466H13055ZM13097 580 12895 1124 12697 580ZM13960 0V1466H14583Q14818 1466 14924.5 1426.5Q15031 1387 15095 1286Q15159 1185 15159 1055Q15159 890 15062 782.5Q14965 675 14772 647Q14868 591 14930.5 524Q14993 457 15099 286L15278 0H14924L14710 319Q14596 490 14554 534.5Q14512 579 14465 595.5Q14418 612 14316 612H14256V0ZM14256 846H14475Q14688 846 14741 864Q14794 882 14824 926Q14854 970 14854 1036Q14854 1110 14814.5 1155.5Q14775 1201 14703 1213Q14667 1218 14487 1218H14256ZM15598 0V1466H16685V1218H15894V893H16630V646H15894V247H16713V0Z"/>
+  </g>
+
+  <path d="M270 380H510M690 380H930" fill="none" stroke="url(#rule-gradient)" stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(544 405) scale(.035 -.035)">
+    <path fill="#102440" d="M147 1466H443V672Q443 483 454 427Q473 337 544.5 282.5Q616 228 740 228Q866 228 930 279.5Q994 331 1007 406Q1020 481 1020 655V1466H1316V696Q1316 432 1292 323Q1268 214 1203.5 139Q1139 64 1031 19.5Q923-25 749-25Q539-25 430.5 23.5Q322 72 259 149.5Q196 227 176 312Q147 438 147 684ZM2430 539V786H3068V202Q2975 112 2798.5 43.5Q2622-25 2441-25Q2211-25 2040 71.5Q1869 168 1783 347.5Q1697 527 1697 738Q1697 967 1793 1145Q1889 1323 2074 1418Q2215 1491 2425 1491Q2698 1491 2851.5 1376.5Q3005 1262 3049 1060L2755 1005Q2724 1113 2638.5 1175.5Q2553 1238 2425 1238Q2231 1238 2116.5 1115Q2002 992 2002 750Q2002 489 2118 358.5Q2234 228 2422 228Q2515 228 2608.5 264.5Q2702 301 2769 353V539Z"/>
+  </g>
+</svg>

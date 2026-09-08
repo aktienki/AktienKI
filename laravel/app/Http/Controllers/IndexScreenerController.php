@@ -8,6 +8,7 @@ use App\Services\FreeRegionalStockUniverseService;
 use App\Services\PersonalizedSignalService;
 use App\Services\PlanAccessService;
 use App\Support\AiScore;
+use App\Support\DirectionalSignalRating;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -18,12 +19,7 @@ class IndexScreenerController extends Controller
 {
     public function __invoke(Request $request, PersonalizedSignalService $personalizedSignals, PlanAccessService $planAccess): View
     {
-        $mainIndexSymbols = [
-            '^GSPC', '^IXIC', '^DJI', '^RUT', '^GSPTSE', '^BVSP',
-            '^FTSE', '^GDAXI', '^FCHI', '^STOXX50E', '^STOXX',
-            '^N225', '^HSI', '000001.SS', '^KS11', '^NSEI', '^AXJO',
-        ];
-        $isFreeRegional = $planAccess->level($request->user()) === PlanLevel::Free;
+        $isFreeRegional = ! $planAccess->allows($request->user(), PlanLevel::Plus);
         $regionalUniverse = app(FreeRegionalStockUniverseService::class);
         $allowedInstrumentIds = $isFreeRegional ? $regionalUniverse->instrumentIds($request->user())->all() : [];
         $regionalCountry = $regionalUniverse->country($request->user());
@@ -61,7 +57,6 @@ class IndexScreenerController extends Controller
             ->join('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
             ->leftJoinSub($walkForwardStats, 'walk_forward', fn ($join) => $join->on('walk_forward.instrument_id', '=', 'membership.instrument_id'))
             ->where('market_index.is_active', true)
-            ->whereIn('market_index.symbol', $mainIndexSymbols)
             ->whereNotNull('prediction.prediction_score')
             ->when($isFreeRegional, fn ($query) => $query->whereIn('membership.instrument_id', $allowedInstrumentIds))
             ->when($request->filled('q'), function ($query) use ($request) {
@@ -85,7 +80,23 @@ class IndexScreenerController extends Controller
             ->selectRaw('AVG(((prediction.predicted_price_15d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return_15d')
             ->selectRaw('AVG(((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100) AS expected_return');
 
-        $aggregateCacheKey = 'index_screener_aggregate_v6_'.sha1(json_encode([
+        // Direct index releases must not depend on legacy stock predictions or
+        // populated member lists. Serving predictions decide visibility below.
+        $query = DB::table('market_indices as market_index')
+            ->where('market_index.is_active', true)
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $term = '%'.mb_strtolower(trim((string) $request->query('q'))).'%';
+                $query->where(fn ($nested) => $nested
+                    ->whereRaw('LOWER(market_index.name) LIKE ?', [$term])
+                    ->orWhereRaw('LOWER(market_index.symbol) LIKE ?', [$term]));
+            })
+            ->when($request->filled('region'), fn ($query) => $query->where('market_index.region', $request->query('region')))
+            ->select('market_index.*')
+            ->selectSub(fn ($members) => $members->from('index_memberships')
+                ->whereColumn('market_index_id', 'market_index.id')->whereNull('removed_at')->selectRaw('COUNT(*)'), 'members_count')
+            ->selectRaw('0 AS analyzed_count, NULL::numeric AS calculated_rating, NULL::numeric AS average_confidence, NULL::numeric AS average_hit_rate, NULL::numeric AS average_profit_per_trade, NULL::numeric AS average_stability, NULL::numeric AS average_risk, 0 AS historical_trades, NULL::numeric AS expected_return_5d, NULL::numeric AS expected_return_10d, NULL::numeric AS expected_return_15d, NULL::numeric AS expected_return');
+
+        $aggregateCacheKey = 'index_screener_aggregate_v7_'.sha1(json_encode([
             'q' => trim((string) $request->query('q')),
             'region' => trim((string) $request->query('region')),
             'universe' => $isFreeRegional ? $allowedInstrumentIds : 'all',
@@ -96,6 +107,11 @@ class IndexScreenerController extends Controller
                     ? AiScore::toTen($index->calculated_rating)
                     : (is_numeric($index->rating) ? (float) $index->rating : null);
             }));
+        $this->applyServingOutlooks($indices);
+        $indices = $indices
+            ->filter(fn (object $index): bool => collect([10, 20, 40])
+                ->contains(fn (int $horizon): bool => is_numeric($index->{"expected_return_{$horizon}d"} ?? null)))
+            ->values();
         $index60Date = Schema::hasTable('market_context_predictions')
             ? DB::table('market_context_predictions')->where('scope_type', 'index60')->max('prediction_date')
             : null;
@@ -262,5 +278,138 @@ class IndexScreenerController extends Controller
 
             return $median > 0 && $point['close'] >= $median * .65 && $point['close'] <= $median * 1.35;
         })->values();
+    }
+
+    private function applyServingOutlooks($indices): void
+    {
+        $serviceSymbolByMarketSymbol = [
+            '^GDAXI' => 'DAX',
+        ];
+        $requestedSymbols = $indices->map(fn (object $index): string => $serviceSymbolByMarketSymbol[$index->symbol] ?? $index->symbol)->unique()->values();
+        $serviceInstruments = DB::connection('serving')->table('serving_instruments')
+            ->where('instrument_type', 'index')->where('is_active', true)
+            ->whereIn('symbol', $requestedSymbols)->get(['id', 'symbol'])->keyBy('symbol');
+        $servicePredictions = DB::connection('serving')->table('serving_predictions as prediction')
+            ->join('serving_active_models as active', function ($join): void {
+                $join->on('active.instrument_id', '=', 'prediction.instrument_id')
+                    ->on('active.release_id', '=', 'prediction.release_id');
+            })
+            ->whereIn('prediction.instrument_id', $serviceInstruments->pluck('id'))
+            ->whereIn('prediction.horizon', [10, 20, 40])
+            ->where('prediction.variant', 'standard')
+            ->orderByDesc('prediction.as_of')->orderByDesc('prediction.id')
+            ->get(['prediction.*'])->groupBy('instrument_id');
+
+        $indices->each(function (object $index) use ($serviceSymbolByMarketSymbol, $serviceInstruments, $servicePredictions): void {
+            $serviceSymbol = $serviceSymbolByMarketSymbol[$index->symbol] ?? $index->symbol;
+            $instrument = $serviceInstruments->get($serviceSymbol);
+            $predictions = collect($instrument ? $servicePredictions->get($instrument->id, collect()) : collect());
+            foreach ([10, 20, 40] as $horizon) {
+                $prediction = $predictions->first(fn (object $row): bool => (int) $row->horizon === $horizon);
+                $index->{"expected_return_{$horizon}d"} = is_numeric($prediction?->expected_return)
+                    ? (float) $prediction->expected_return * 100
+                    : null;
+            }
+            $index->expected_return = $index->expected_return_20d;
+            if ($predictions->isNotEmpty()) {
+                $index->average_risk = $predictions->whereNotNull('risk_score')->avg('risk_score') * 20;
+                $index->average_confidence = $predictions->whereNotNull('confidence')->avg('confidence') * 100;
+
+                // Index releases do not use the legacy market_indices.rating column.
+                // Build the displayed directional grade from their actual 10/20/40-day
+                // Serving predictions and use confidence only as an evidence weight.
+                $directionalRating = DirectionalSignalRating::calculate([
+                    5 => $index->expected_return_10d,
+                    10 => $index->expected_return_20d,
+                    20 => $index->expected_return_40d,
+                ], $index->average_confidence / 10);
+                $index->rating_value = $directionalRating['percent'] / 10;
+            }
+        });
+
+        return;
+
+        $indexIds = $indices->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        if ($indexIds === []) {
+            return;
+        }
+
+        $memberSymbols = DB::table('index_memberships as membership')
+            ->join('instruments as instrument', 'instrument.id', '=', 'membership.instrument_id')
+            ->whereIn('membership.market_index_id', $indexIds)
+            ->whereNull('membership.removed_at')
+            ->get(['membership.market_index_id', 'instrument.symbol'])
+            ->groupBy('market_index_id');
+        $symbols = $memberSymbols->flatten(1)->pluck('symbol')->filter()->unique()->values()->all();
+        if ($symbols === []) {
+            return;
+        }
+
+        $servingInstruments = DB::connection('serving')->table('serving_instruments')
+            ->whereIn('symbol', $symbols)
+            ->where('instrument_type', 'stock')
+            ->where('is_active', true)
+            ->where('is_tradeable', true)
+            ->get(['id', 'symbol'])
+            ->keyBy('symbol');
+        $instrumentIds = $servingInstruments->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        if ($instrumentIds === []) {
+            return;
+        }
+
+        $currentBatches = DB::connection('serving')->table('serving_current_stock_signals')
+            ->whereIn('instrument_id', $instrumentIds)
+            ->pluck('batch_id', 'instrument_id');
+        $predictions = DB::connection('serving')->table('serving_predictions')
+            ->whereIn('instrument_id', $instrumentIds)
+            ->whereIn('horizon', [10, 20, 40])
+            ->orderByDesc('as_of')->orderByDesc('id')->get()
+            ->filter(fn (object $prediction): bool => (string) $prediction->batch_id === (string) $currentBatches->get($prediction->instrument_id))
+            ->groupBy('instrument_id');
+        $statuses = DB::connection('serving')->table('serving_model_horizon_status')
+            ->whereIn('instrument_id', $instrumentIds)
+            ->get()->groupBy('instrument_id');
+
+        $indices->each(function (object $index) use ($memberSymbols, $servingInstruments, $predictions, $statuses): void {
+            $serviceIds = collect($memberSymbols->get($index->id, collect()))
+                ->map(fn (object $member) => $servingInstruments->get($member->symbol)?->id)
+                ->filter()->map(fn ($id): int => (int) $id)->unique();
+
+            foreach ([10, 20, 40] as $horizon) {
+                $returns = $serviceIds->map(function (int $instrumentId) use ($predictions, $statuses, $horizon) {
+                    $instrumentStatuses = collect($statuses->get($instrumentId, collect()));
+                    $prediction = collect($predictions->get($instrumentId, collect()))
+                        ->where('horizon', $horizon)
+                        ->filter(function (object $candidate) use ($instrumentStatuses): bool {
+                            $status = $instrumentStatuses->first(fn (object $item): bool => (int) $item->horizon === (int) $candidate->horizon
+                                && (string) $item->variant === (string) $candidate->variant
+                                && (string) $item->release_id === (string) $candidate->release_id);
+
+                            return $status
+                                && (bool) $status->prediction_enabled
+                                && (bool) $status->selected_for_prediction
+                                && is_numeric($candidate->expected_return);
+                        })
+                        ->sortByDesc(function (object $candidate) use ($instrumentStatuses): float {
+                            $status = $instrumentStatuses->first(fn (object $item): bool => (int) $item->horizon === (int) $candidate->horizon
+                                && (string) $item->variant === (string) $candidate->variant
+                                && (string) $item->release_id === (string) $candidate->release_id);
+                            $quality = match ((string) ($status->model_quality_class ?? '')) {
+                                'quality' => 4, 'solid' => 3, 'basic' => 2, 'underperform' => 1, default => 0,
+                            };
+
+                            return ((bool) ($status->quality_gate_passed ?? false) ? 100_000 : 0)
+                                + ($quality * 1_000)
+                                + ((float) ($candidate->confidence ?? 0) * 100)
+                                + ((float) ($candidate->expected_return ?? 0) * 10);
+                        })->first();
+
+                    return is_numeric($prediction?->expected_return) ? (float) $prediction->expected_return * 100 : null;
+                })->filter(fn ($value): bool => is_numeric($value));
+                $index->{"expected_return_{$horizon}d"} = $returns->isNotEmpty() ? $returns->avg() : null;
+            }
+            $index->expected_return = $index->expected_return_20d;
+            unset($index->expected_return_5d, $index->expected_return_15d);
+        });
     }
 }
