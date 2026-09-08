@@ -15,8 +15,12 @@ final class ServingSignalTransitionController extends Controller
         $search = mb_strtolower(trim((string) $request->query('q', '')));
         $target = strtoupper(trim((string) $request->query('signal', '')));
         $rows = $allRows->filter(function (object $row) use ($search, $target): bool {
-            if ($search !== '' && ! str_contains(mb_strtolower($row->name.' '.$row->symbol), $search)) return false;
-            if ($target !== '' && $row->to_signal !== $target) return false;
+            if ($search !== '' && ! str_contains(mb_strtolower($row->name.' '.$row->symbol), $search)) {
+                return false;
+            }
+            if ($target !== '' && $row->to_signal !== $target) {
+                return false;
+            }
 
             return true;
         })->values();

@@ -12,6 +12,7 @@ final class CTraderBroker
     public function hasAccountAccess(BrokerConnection $connection): bool
     {
         $credentials = $connection->credentials ?? [];
+
         return filled($credentials['client_id'] ?? null)
             && filled($credentials['client_secret'] ?? null)
             && filled($credentials['access_token'] ?? null)
@@ -39,6 +40,7 @@ final class CTraderBroker
         $loss = $pnlRows->sum(fn (array $row): float => min(0, (float) ($row['netUnrealizedPnL'] ?? 0))) / $factor;
         $usedMargin = collect(data_get($responses, 'reconcile.position', []))->sum(function (array $position): float {
             $digits = (int) ($position['moneyDigits'] ?? 2);
+
             return (float) ($position['usedMargin'] ?? 0) / (10 ** $digits);
         });
         $equity = $balance + $netPnl;
@@ -65,8 +67,12 @@ final class CTraderBroker
         $receive = function (int $expected) use ($client): array {
             for ($attempt = 0; $attempt < 20; $attempt++) {
                 $response = json_decode((string) $client->receive(), true, 512, JSON_THROW_ON_ERROR);
-                if (in_array((int) ($response['payloadType'] ?? 0), [50, 2142], true)) throw new RuntimeException(data_get($response, 'payload.description', 'cTrader hat die Anfrage abgelehnt.'));
-                if ((int) ($response['payloadType'] ?? 0) === $expected) return $response['payload'] ?? [];
+                if (in_array((int) ($response['payloadType'] ?? 0), [50, 2142], true)) {
+                    throw new RuntimeException(data_get($response, 'payload.description', 'cTrader hat die Anfrage abgelehnt.'));
+                }
+                if ((int) ($response['payloadType'] ?? 0) === $expected) {
+                    return $response['payload'] ?? [];
+                }
             }
             throw new RuntimeException('Keine passende cTrader-Antwort empfangen.');
         };
@@ -80,6 +86,7 @@ final class CTraderBroker
                 $send($requestType, $payload);
                 $result[$key] = $receive($responseType);
             }
+
             return $result;
         } finally {
             $client->close();
@@ -89,7 +96,11 @@ final class CTraderBroker
     private function exchange(BrokerConnection $connection, array $messages, int $expectedPayload): array
     {
         $credentials = $connection->credentials ?? [];
-        foreach (['client_id', 'client_secret', 'access_token'] as $key) if (! filled($credentials[$key] ?? null)) throw new RuntimeException("cTrader {$key} fehlt.");
+        foreach (['client_id', 'client_secret', 'access_token'] as $key) {
+            if (! filled($credentials[$key] ?? null)) {
+                throw new RuntimeException("cTrader {$key} fehlt.");
+            }
+        }
         $host = $connection->environment === 'live' ? 'live.ctraderapi.com' : 'demo.ctraderapi.com';
         $client = new Client("wss://{$host}:5036", ['timeout' => 12]);
         try {
@@ -97,12 +108,20 @@ final class CTraderBroker
                 $client->text(json_encode(['clientMsgId' => (string) Str::uuid(), 'payloadType' => $payloadType, 'payload' => $payload], JSON_THROW_ON_ERROR));
                 for ($attempt = 0; $attempt < 12; $attempt++) {
                     $response = json_decode((string) $client->receive(), true, 512, JSON_THROW_ON_ERROR);
-                    if (in_array((int) ($response['payloadType'] ?? 0), [50, 2142], true)) throw new RuntimeException(data_get($response, 'payload.description', 'cTrader hat die Anfrage abgelehnt.'));
-                    if ((int) ($response['payloadType'] ?? 0) === $expectedPayload && $payloadType === array_last($messages)[0]) return $response['payload'] ?? [];
-                    if ($payloadType !== array_last($messages)[0]) break;
+                    if (in_array((int) ($response['payloadType'] ?? 0), [50, 2142], true)) {
+                        throw new RuntimeException(data_get($response, 'payload.description', 'cTrader hat die Anfrage abgelehnt.'));
+                    }
+                    if ((int) ($response['payloadType'] ?? 0) === $expectedPayload && $payloadType === array_last($messages)[0]) {
+                        return $response['payload'] ?? [];
+                    }
+                    if ($payloadType !== array_last($messages)[0]) {
+                        break;
+                    }
                 }
             }
-        } finally { $client->close(); }
+        } finally {
+            $client->close();
+        }
         throw new RuntimeException('Keine bestätigte cTrader-Antwort empfangen.');
     }
 
@@ -131,16 +150,25 @@ final class CTraderBroker
 
     public function place(BrokerConnection $connection, array $order): array
     {
-        if (! is_numeric($order['symbol'])) throw new RuntimeException('Für cTrader wird zunächst die numerische Symbol-ID aus dem Pepperstone-Konto benötigt.');
+        if (! is_numeric($order['symbol'])) {
+            throw new RuntimeException('Für cTrader wird zunächst die numerische Symbol-ID aus dem Pepperstone-Konto benötigt.');
+        }
         $payload = [
             'ctidTraderAccountId' => (int) $connection->external_account_id,
             'symbolId' => (int) $order['symbol'], 'orderType' => strtoupper($order['order_type']),
             'tradeSide' => strtoupper($order['side']), 'volume' => (int) round((float) $order['quantity'] * 100),
             'label' => 'AktienKI',
         ];
-        if ($order['limit_price'] ?? null) $payload['limitPrice'] = (float) $order['limit_price'];
-        if ($order['stop_loss'] ?? null) $payload['stopLoss'] = (float) $order['stop_loss'];
-        if ($order['take_profit'] ?? null) $payload['takeProfit'] = (float) $order['take_profit'];
+        if ($order['limit_price'] ?? null) {
+            $payload['limitPrice'] = (float) $order['limit_price'];
+        }
+        if ($order['stop_loss'] ?? null) {
+            $payload['stopLoss'] = (float) $order['stop_loss'];
+        }
+        if ($order['take_profit'] ?? null) {
+            $payload['takeProfit'] = (float) $order['take_profit'];
+        }
+
         return $this->exchange($connection, [...$this->authMessages($connection), [2106, $payload]], 2126);
     }
 }

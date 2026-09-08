@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         if (! Schema::hasTable('walk_forward_horizon_forecasts')) {
@@ -28,7 +29,9 @@ return new class extends Migration {
                 $table->id();
                 $table->foreignId('instrument_id')->constrained()->cascadeOnDelete();
                 $table->date('signal_date');
-                foreach ([5, 10, 15, 20] as $days) $table->decimal("return_{$days}d", 16, 10);
+                foreach ([5, 10, 15, 20] as $days) {
+                    $table->decimal("return_{$days}d", 16, 10);
+                }
                 $table->decimal('positive_area', 18, 8);
                 $table->decimal('negative_area', 18, 8);
                 $table->decimal('net_area', 18, 8);

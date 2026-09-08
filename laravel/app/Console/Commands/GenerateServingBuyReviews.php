@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 final class GenerateServingBuyReviews extends Command
 {
     protected $signature = 'reports:serving-buy-reviews {--backfill-current : Review every current BUY once, then continue transition-only}';
+
     protected $description = 'Queue Twelve Data/Luna reviews for genuine Serving transitions to BUY';
 
     public function handle(): int
@@ -27,11 +28,12 @@ final class GenerateServingBuyReviews extends Command
             ->flatMap(fn (Instrument $item) => collect([$item->symbol, $item->provider_symbol])->filter()
                 ->mapWithKeys(fn ($symbol) => [strtoupper((string) $symbol) => $item]));
         $reviewedSymbols = ExternalBuyReview::query()->whereIn('status', ['pending', 'running', 'completed'])
-            ->with('instrument:id,symbol,provider_symbol')->get()->flatMap(fn (ExternalBuyReview $review) =>
-                collect([$review->instrument?->symbol, $review->instrument?->provider_symbol])->filter()->map(fn ($s) => strtoupper((string) $s))
+            ->with('instrument:id,symbol,provider_symbol')->get()->flatMap(fn (ExternalBuyReview $review) => collect([$review->instrument?->symbol, $review->instrument?->provider_symbol])->filter()->map(fn ($s) => strtoupper((string) $s))
             )->flip();
 
-        $queued = 0; $transitions = 0; $skipped = 0;
+        $queued = 0;
+        $transitions = 0;
+        $skipped = 0;
         DB::transaction(function () use ($rows, $main, $reviewedSymbols, &$queued, &$transitions, &$skipped): void {
             foreach ($rows as $row) {
                 $signal = strtoupper((string) $row->signal);
@@ -72,7 +74,9 @@ final class GenerateServingBuyReviews extends Command
                             GenerateExternalBuyReview::dispatch($review->id);
                             $queued++;
                         }
-                    } else $skipped++;
+                    } else {
+                        $skipped++;
+                    }
                 }
 
                 DB::table('external_buy_review_signal_states')->updateOrInsert(
@@ -84,6 +88,7 @@ final class GenerateServingBuyReviews extends Command
         });
 
         $this->info("Serving stocks: {$rows->count()}, BUY transitions/backfills: {$transitions}, queued: {$queued}, skipped: {$skipped}");
+
         return self::SUCCESS;
     }
 }

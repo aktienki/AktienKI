@@ -37,8 +37,12 @@ final class DashboardEmailMap
                             $points[] = (int) round(((float) $lon + 180) / 360 * $width);
                             $points[] = (int) round((90 - (float) $lat) / 180 * $height);
                         }
-                        if (count($points) < 6) continue;
-                        if ($ringIndex === 0) imagefilledpolygon($image, $points, $fill);
+                        if (count($points) < 6) {
+                            continue;
+                        }
+                        if ($ringIndex === 0) {
+                            imagefilledpolygon($image, $points, $fill);
+                        }
                         imagepolygon($image, $points, $stroke);
                     }
                 }
@@ -48,6 +52,7 @@ final class DashboardEmailMap
         ob_start();
         imagepng($image, null, 8);
         $png = (string) ob_get_clean();
+
         return $png;
     }
 
@@ -56,11 +61,16 @@ final class DashboardEmailMap
         $parts = [[]];
         $previous = null;
         foreach ($ring as $point) {
-            if (! is_array($point) || count($point) < 2) continue;
-            if ($previous !== null && abs((float) $point[0] - $previous) > 180) $parts[] = [];
+            if (! is_array($point) || count($point) < 2) {
+                continue;
+            }
+            if ($previous !== null && abs((float) $point[0] - $previous) > 180) {
+                $parts[] = [];
+            }
             $parts[array_key_last($parts)][] = [(float) $point[0], (float) $point[1]];
             $previous = (float) $point[0];
         }
+
         return array_values(array_filter($parts, fn (array $part): bool => count($part) >= 3));
     }
 }

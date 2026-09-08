@@ -73,6 +73,7 @@ final class SyncGermanStockListings extends Command
         }
 
         $this->info("Abgeschlossen: {$found} handelbar, {$missing} nicht gefunden, {$failed} Fehler.");
+
         return $failed > 0 ? self::FAILURE : self::SUCCESS;
     }
 }

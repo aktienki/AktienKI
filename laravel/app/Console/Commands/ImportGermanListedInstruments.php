@@ -37,6 +37,7 @@ class ImportGermanListedInstruments extends Command
             $listing = $catalog['XETR'][$symbol] ?? $catalog['FSX'][$symbol] ?? null;
             if (! $listing) {
                 $skipped++;
+
                 continue;
             }
 
@@ -53,6 +54,7 @@ class ImportGermanListedInstruments extends Command
 
             if ($this->option('dry-run')) {
                 $existing ? $updated++ : $created++;
+
                 continue;
             }
 
@@ -122,7 +124,9 @@ class ImportGermanListedInstruments extends Command
         $header = fgetcsv($handle);
         $rows = [];
         while (($values = fgetcsv($handle)) !== false) {
-            if (count($values) === count($header)) $rows[] = array_combine($header, $values);
+            if (count($values) === count($header)) {
+                $rows[] = array_combine($header, $values);
+            }
         }
         fclose($handle);
 

@@ -84,6 +84,7 @@ class ImportSectorEtfHistory extends Command
         }
 
         $this->line('Abgeschlossen: '.(count(self::ETFS) - count($failures)).'/'.count(self::ETFS));
+
         return $failures === [] ? self::SUCCESS : self::FAILURE;
     }
 }

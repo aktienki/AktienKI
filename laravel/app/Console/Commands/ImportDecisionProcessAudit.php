@@ -10,6 +10,7 @@ use RuntimeException;
 final class ImportDecisionProcessAudit extends Command
 {
     protected $signature = 'decision:audit-import {file : JSON audit file}';
+
     protected $description = 'Importiert einen reproduzierbaren Trainings-/Entscheidungs-Audit inklusive Laufzeiten.';
 
     public function handle(DecisionProcessAuditService $audit): int
@@ -49,6 +50,7 @@ final class ImportDecisionProcessAudit extends Command
             ]);
         }
         $this->info("Audit-Run {$runId} importiert.");
+
         return self::SUCCESS;
     }
 }

@@ -157,7 +157,9 @@ final class ServingScreenerService
             ->when($country !== '', fn (Collection $items) => $items->where('country', $country))
             ->when($sector !== '', fn (Collection $items) => $items->where('sector', $sector))
             ->when($riskFilterPresent && $riskClasses->count() < 3, fn (Collection $items) => $items->filter(function (object $stock) use ($riskClasses): bool {
-                if (! is_numeric($stock->risk_percent ?? null)) return false;
+                if (! is_numeric($stock->risk_percent ?? null)) {
+                    return false;
+                }
                 $risk = (float) $stock->risk_percent;
                 $stockRiskClass = match (true) {
                     $risk <= 25 => 'defensive',
@@ -322,6 +324,7 @@ final class ServingScreenerService
             ->first();
         $forecastPoints = collect([10, 20, 40])->mapWithKeys(function (int $horizon) use ($predictions, $statuses): array {
             $prediction = $this->selectPrediction($predictions, $statuses, $horizon);
+
             return [$horizon => is_numeric($prediction?->expected_return) ? (float) $prediction->expected_return * 100 : null];
         })->filter(fn ($value) => $value !== null)->all();
         $transition = DB::connection('serving')->table('serving_signal_transitions')
@@ -573,7 +576,9 @@ final class ServingScreenerService
 
     private function predictionRiskPercent(mixed $risk): ?float
     {
-        if (! is_numeric($risk) || (float) $risk <= 0) return null;
+        if (! is_numeric($risk) || (float) $risk <= 0) {
+            return null;
+        }
 
         $value = (float) $risk;
         if ($value >= 2 && $value <= 5 && abs($value - round($value)) < .0001) {

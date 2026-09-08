@@ -33,10 +33,10 @@ return new class extends Migration
         $marker = "\n   FROM predictions p";
         $extra = ",\n    p.source_data_hash";
         if ($append) {
-            if (!str_contains($row->definition, $marker)) {
+            if (! str_contains($row->definition, $marker)) {
                 throw new RuntimeException('Unexpected public prediction view');
             }
-            $view = str_replace($marker, $extra . $marker, $row->definition);
+            $view = str_replace($marker, $extra.$marker, $row->definition);
         } else {
             $view = str_replace($extra, '', $row->definition, $count);
             if ($count !== 1) {
@@ -44,6 +44,6 @@ return new class extends Migration
             }
         }
         DB::statement('DROP VIEW public_prediction_models');
-        DB::statement('CREATE VIEW public_prediction_models AS ' . $view);
+        DB::statement('CREATE VIEW public_prediction_models AS '.$view);
     }
 };

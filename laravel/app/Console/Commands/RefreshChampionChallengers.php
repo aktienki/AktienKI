@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 final class RefreshChampionChallengers extends Command
 {
     protected $signature = 'models:refresh-champion-challengers';
+
     protected $description = 'Aktualisiert Champions und Challenger aus den Modellqualitätswerten.';
 
     public function handle(): int
@@ -21,6 +22,7 @@ final class RefreshChampionChallengers extends Command
                 'configuration' => json_encode(['promotion_margin' => .03, 'minimum_trades' => 30]),
                 'version' => 1, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
             ]);
+
             return (int) DB::table('strategy_profiles')->where('code', 'aki-daily-20d')->value('id');
         });
 
@@ -61,7 +63,9 @@ final class RefreshChampionChallengers extends Command
                     ]
                 );
                 DB::table('model_challengers')->where('strategy_profile_id', $profileId)->where('instrument_id', $instrumentId)->delete();
-                if (! $challenger) continue;
+                if (! $challenger) {
+                    continue;
+                }
                 DB::table('model_challengers')->insert([
                     'strategy_profile_id' => $profileId, 'instrument_id' => $instrumentId,
                     'trained_model_id' => $challenger->id, 'champion_model_id' => $champion->id,
@@ -76,6 +80,7 @@ final class RefreshChampionChallengers extends Command
             }
         });
         $this->info("Aktualisiert: {$groups->count()} Instrumente.");
+
         return self::SUCCESS;
     }
 }

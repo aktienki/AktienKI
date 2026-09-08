@@ -45,7 +45,9 @@ final class TwelveDataBuyContextService
     private function fetchLiveContext(string $symbol): array
     {
         $apiKey = trim((string) config('aktienki.twelve_data.api_key'));
-        if ($apiKey === '') return ['limitations' => ['TWELVE_DATA_API_KEY ist nicht konfiguriert.']];
+        if ($apiKey === '') {
+            return ['limitations' => ['TWELVE_DATA_API_KEY ist nicht konfiguriert.']];
+        }
 
         try {
             $baseUrl = (string) config('aktienki.twelve_data.base_url', 'https://api.twelvedata.com');
@@ -62,9 +64,13 @@ final class TwelveDataBuyContextService
             ]);
             $limitations = [];
             $quote = $this->validPayload($responses['quote']) ?? [];
-            if ($quote === []) $limitations[] = 'Aktuelles Twelve-Data-Quote nicht verfügbar.';
+            if ($quote === []) {
+                $limitations[] = 'Aktuelles Twelve-Data-Quote nicht verfügbar.';
+            }
             $press = $this->validPayload($responses['press']) ?? [];
-            if ($press === []) $limitations[] = 'Twelve-Data-Pressemitteilungen nicht verfügbar.';
+            if ($press === []) {
+                $limitations[] = 'Twelve-Data-Pressemitteilungen nicht verfügbar.';
+            }
 
             return [
                 'market' => array_filter([
@@ -91,9 +97,14 @@ final class TwelveDataBuyContextService
 
     private function validPayload(mixed $response): ?array
     {
-        if (! $response || ! $response->successful()) return null;
+        if (! $response || ! $response->successful()) {
+            return null;
+        }
         $payload = $response->json();
-        if (! is_array($payload) || ($payload['status'] ?? null) === 'error' || isset($payload['code'])) return null;
+        if (! is_array($payload) || ($payload['status'] ?? null) === 'error' || isset($payload['code'])) {
+            return null;
+        }
+
         return $payload;
     }
 
@@ -101,11 +112,14 @@ final class TwelveDataBuyContextService
     private function storedFundamentals(int $instrumentId): ?array
     {
         $row = DB::table('instrument_fundamentals')->where('instrument_id', $instrumentId)->orderByDesc('snapshot_date')->first();
-        if (! $row) return null;
+        if (! $row) {
+            return null;
+        }
         $fields = ['snapshot_date', 'fiscal_date', 'retrieved_at', 'market_cap', 'trailing_pe', 'forward_pe',
             'price_to_book', 'price_to_sales', 'dividend_yield', 'profit_margin', 'operating_margin',
             'return_on_equity', 'revenue_growth', 'total_cash', 'total_debt', 'debt_to_equity',
             'current_ratio', 'free_cash_flow', 'source'];
+
         return collect($fields)->mapWithKeys(fn (string $field): array => [$field => $row->{$field} ?? null])
             ->filter(fn ($value): bool => $value !== null && $value !== '')->all();
     }

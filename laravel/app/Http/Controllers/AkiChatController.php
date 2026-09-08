@@ -6,9 +6,9 @@ use App\Services\AkiChatBudgetService;
 use App\Services\FreeRegionalStockUniverseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class AkiChatController extends Controller
@@ -34,7 +34,10 @@ final class AkiChatController extends Controller
         try {
             $usageRequestId = $budgetService->reserve($user, $mode);
         } catch (RuntimeException $exception) {
-            if ($exception->getMessage() !== 'AKI_MONTHLY_BUDGET_EXHAUSTED') throw $exception;
+            if ($exception->getMessage() !== 'AKI_MONTHLY_BUDGET_EXHAUSTED') {
+                throw $exception;
+            }
+
             return response()->json([
                 'message' => 'Dein monatliches AKI-Budget ist aufgebraucht. Es wird zum Monatsanfang automatisch erneuert.',
                 'code' => 'aki_budget_exhausted',
@@ -103,7 +106,7 @@ final class AkiChatController extends Controller
             : null;
         $currentList = $this->currentPredictionList($data['filters'] ?? [], $allowedInstrumentIds);
         $input = array_merge([
-            ['role' => 'developer', 'content' => 'Aktuelle Filter und die sichtbare Prognoseliste der Seite (diese Daten darfst du direkt auswerten): '.json_encode(['filters' => $data['filters'] ?? [], 'predictions' => $currentList], JSON_UNESCAPED_UNICODE)."\nVerwende ausnahmslos aktive Aktien (instruments.is_active = true) ohne SLEEP-Status. Nenne, bewerte oder filtere niemals inaktive oder SLEEP-Aktien. Antworte immer in der aktuell ausgewählten Sprache ".(app()->getLocale() === 'en' ? 'Englisch' : 'Deutsch')." und in kurzen Stichpunkten. Behaupte niemals, dass du keinen Zugriff auf die Datenbank oder Liste hast. Wenn aktuelle Werte gefragt werden, nutze die übergebenen Listendaten oder rufe das Backtest-Werkzeug auf."],
+            ['role' => 'developer', 'content' => 'Aktuelle Filter und die sichtbare Prognoseliste der Seite (diese Daten darfst du direkt auswerten): '.json_encode(['filters' => $data['filters'] ?? [], 'predictions' => $currentList], JSON_UNESCAPED_UNICODE)."\nVerwende ausnahmslos aktive Aktien (instruments.is_active = true) ohne SLEEP-Status. Nenne, bewerte oder filtere niemals inaktive oder SLEEP-Aktien. Antworte immer in der aktuell ausgewählten Sprache ".(app()->getLocale() === 'en' ? 'Englisch' : 'Deutsch').' und in kurzen Stichpunkten. Behaupte niemals, dass du keinen Zugriff auf die Datenbank oder Liste hast. Wenn aktuelle Werte gefragt werden, nutze die übergebenen Listendaten oder rufe das Backtest-Werkzeug auf.'],
         ], $history);
         $response = Http::withToken($apiKey)
             ->acceptJson()
@@ -120,7 +123,8 @@ final class AkiChatController extends Controller
 
         if ($response->failed()) {
             $budgetService->release($usageRequestId);
-            report(new \RuntimeException('OpenAI chat request failed: '.$response->status().' '.$response->body()));
+            report(new RuntimeException('OpenAI chat request failed: '.$response->status().' '.$response->body()));
+
             return response()->json(['message' => 'Die KI ist gerade nicht erreichbar.'], 502);
         }
 
@@ -129,7 +133,9 @@ final class AkiChatController extends Controller
         $filterSuggestion = null;
         for ($round = 0; $round < 3; $round++) {
             $calls = collect(data_get($payload, 'output', []))->filter(fn (array $item): bool => data_get($item, 'type') === 'function_call');
-            if ($calls->isEmpty()) break;
+            if ($calls->isEmpty()) {
+                break;
+            }
             $toolOutputs = [];
             foreach ($calls as $call) {
                 $arguments = json_decode((string) data_get($call, 'arguments', '{}'), true) ?: [];
@@ -152,7 +158,9 @@ final class AkiChatController extends Controller
                 'tools' => $tools,
                 'max_output_tokens' => $mode === 'deep' ? 900 : 220,
             ]);
-            if ($followUp->failed()) break;
+            if ($followUp->failed()) {
+                break;
+            }
             $payload = $followUp->json();
             $allUsages[] = (array) data_get($payload, 'usage', []);
         }
@@ -162,16 +170,22 @@ final class AkiChatController extends Controller
                 ->flatMap(fn (array $item): array => (array) data_get($item, 'content', []))
                 ->pluck('text')->filter()->implode("\n");
         }
-        if ($filterSuggestion === null) $filterSuggestion = [];
+        if ($filterSuggestion === null) {
+            $filterSuggestion = [];
+        }
         if (empty($filterSuggestion['symbols'])) {
             $answerUpper = strtoupper((string) $answer);
             $mentionedSymbols = collect($currentList)
                 ->pluck('symbol')
                 ->filter(fn ($symbol) => $symbol !== '' && str_contains($answerUpper, strtoupper((string) $symbol)))
                 ->unique()->values()->all();
-            if ($mentionedSymbols !== []) $filterSuggestion['symbols'] = $mentionedSymbols;
+            if ($mentionedSymbols !== []) {
+                $filterSuggestion['symbols'] = $mentionedSymbols;
+            }
         }
-        if ($filterSuggestion === []) $filterSuggestion = null;
+        if ($filterSuggestion === []) {
+            $filterSuggestion = null;
+        }
         $answer = $this->formatAsBullets((string) $answer);
 
         $usage = $budgetService->mergeUsage(...$allUsages);
@@ -212,15 +226,22 @@ final class AkiChatController extends Controller
         ];
         $result = [];
         foreach ($numeric as $key => [$min, $max]) {
-            if (isset($filters[$key]) && is_numeric($filters[$key])) $result[$key] = max($min, min($max, (float) $filters[$key]));
+            if (isset($filters[$key]) && is_numeric($filters[$key])) {
+                $result[$key] = max($min, min($max, (float) $filters[$key]));
+            }
         }
         foreach (['country', 'exchange', 'sector', 'index', 'ai_type', 'quality_tier', 'signal'] as $key) {
-            if (filled($filters[$key] ?? null)) $result[$key] = trim((string) $filters[$key]);
+            if (filled($filters[$key] ?? null)) {
+                $result[$key] = trim((string) $filters[$key]);
+            }
         }
         if (is_array($filters['symbols'] ?? null)) {
             $result['symbols'] = collect($filters['symbols'])->map(fn ($symbol) => strtoupper(trim((string) $symbol)))->filter(fn ($symbol) => preg_match('/^[A-Z0-9.\-]{1,20}$/', $symbol))->unique()->take(20)->values()->all();
-            if ($result['symbols'] !== [] && ! array_key_exists('predicted_return_min', $result)) $result['predicted_return_min'] = 0;
+            if ($result['symbols'] !== [] && ! array_key_exists('predicted_return_min', $result)) {
+                $result['predicted_return_min'] = 0;
+            }
         }
+
         return $result;
     }
 
@@ -230,8 +251,10 @@ final class AkiChatController extends Controller
         $lines = collect($lines)->map(function (string $line): string {
             $line = trim($line);
             $line = preg_replace('/^[\-*•·▪]+\s*/u', '', $line) ?: $line;
+
             return $line === '' ? '' : '• '.$line;
         })->filter()->values();
+
         return $lines->implode("\n");
     }
 
@@ -261,12 +284,16 @@ final class AkiChatController extends Controller
     {
         if (isset($filters['index'])) {
             $indexCountry = DB::table('instruments')->where('type', 'index')->where('symbol', $filters['index'])->value('country');
-            if (filled($indexCountry)) $filters['country'] = $indexCountry;
+            if (filled($indexCountry)) {
+                $filters['country'] = $indexCountry;
+            }
         }
         $run = DB::table('backtest_runs')->whereIn('status', ['completed', 'completed_with_errors'])
             ->whereRaw("COALESCE(settings->>'run_type', 'system') <> 'user_filter'")
             ->orderByDesc('finished_at')->first();
-        if ($run === null) return ['trades' => 0, 'message' => 'Keine abgeschlossene Backtest-Auswertung vorhanden.'];
+        if ($run === null) {
+            return ['trades' => 0, 'message' => 'Keine abgeschlossene Backtest-Auswertung vorhanden.'];
+        }
         $rows = DB::table('backtest_trades as trade')
             ->join('instruments as instrument', 'instrument.id', '=', 'trade.instrument_id')
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
@@ -286,6 +313,7 @@ final class AkiChatController extends Controller
         $wins = $rows->where('net_return', '>', 0)->count();
         $loss = abs((float) $rows->where('net_return', '<', 0)->sum('net_return'));
         $profit = (float) $rows->where('net_return', '>', 0)->sum('net_return');
+
         return ['trades' => $rows->count(), 'winning_trades' => $wins, 'hit_rate' => $rows->count() ? round($wins / $rows->count() * 100, 1) : 0, 'profit_factor' => $loss ? round($profit / $loss, 2) : 0, 'max_drawdown' => round((float) $rows->max(fn ($r) => abs((float) $r->max_drawdown)) * 100, 1)];
     }
 

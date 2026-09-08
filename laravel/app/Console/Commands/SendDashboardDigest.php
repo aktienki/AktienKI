@@ -2,21 +2,23 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\PlanLevel;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\RecommendationController;
 use App\Models\User;
 use App\Notifications\DashboardDigestNotification;
 use App\Services\IndexAiScoreService;
 use App\Services\MarketService;
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
-use App\Http\Controllers\RecommendationController;
-use App\Http\Controllers\DashboardController;
-use App\Enums\PlanLevel;
 use App\Services\PlanAccessService;
+use Illuminate\Console\Command;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 final class SendDashboardDigest extends Command
 {
     protected $signature = 'dashboard:send-digest {--user= : User ID; defaults to the most recently logged-in account} {--all : Send the optional digest to all eligible Pro accounts}';
+
     protected $description = 'Send a dashboard-style market digest to an account email address';
 
     public function handle(MarketService $marketService, IndexAiScoreService $scores, RecommendationController $recommendations): int
@@ -27,8 +29,11 @@ final class SendDashboardDigest extends Command
                 ->filter(fn (User $user): bool => $planAccess->allowsTariff($user, PlanLevel::Pro)
                     && (bool) data_get($user->preferences, 'email_service', true)
                     && (bool) data_get($user->preferences, 'email_signal_cockpit', false));
-            foreach ($users as $digestUser) $this->call('dashboard:send-digest', ['--user' => $digestUser->id]);
+            foreach ($users as $digestUser) {
+                $this->call('dashboard:send-digest', ['--user' => $digestUser->id]);
+            }
             $this->info("Signal-Cockpit digest sent to {$users->count()} Pro account(s).");
+
             return self::SUCCESS;
         }
         $user = User::query()->whereNotNull('email')
@@ -41,6 +46,7 @@ final class SendDashboardDigest extends Command
                 ->orderByDesc('bar.bar_time')->limit(2)->get(['bar.close', 'instrument.currency']);
             $price = is_numeric($bars->get(0)?->close) ? (float) $bars->get(0)->close : null;
             $previous = is_numeric($bars->get(1)?->close) ? (float) $bars->get(1)->close : null;
+
             return ['name' => $name, 'symbol' => $symbol, 'price' => $price, 'currency' => $bars->get(0)?->currency ?? '',
                 'change' => $price !== null && $previous ? (($price / $previous) - 1) * 100 : null];
         })->values()->all();
@@ -98,13 +104,14 @@ final class SendDashboardDigest extends Command
             'analysisUrl' => route('daily-market-analysis'),
             'dashboardUrl' => route('dashboard'),
             'dataDate' => $analysis?->analysis_date
-                ? \Illuminate\Support\Carbon::parse($analysis->analysis_date)->format('d.m.Y')
+                ? Carbon::parse($analysis->analysis_date)->format('d.m.Y')
                 : now()->format('d.m.Y'),
             'topStock' => $topStock,
             'countryChanges' => $countryChanges,
             'signalCockpit' => $signalCockpit,
         ]));
         $this->info('Dashboard digest sent.');
+
         return self::SUCCESS;
     }
 }

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 final class CalculateMarketFactors extends Command
 {
     protected $signature = 'market-factors:calculate {--days=14 : Anzahl zurückzurechnender Handelstage}';
+
     protected $description = 'Berechnet globalen Markttrend und globale technische Stimmung über alle handelbaren Aktien.';
 
     public function handle(): int
@@ -47,7 +48,9 @@ final class CalculateMarketFactors extends Command
             SQL, [$date, $date]));
 
             [$trend, $timing, $members] = $this->aggregate($rows);
-            if ($members === 0) continue;
+            if ($members === 0) {
+                continue;
+            }
 
             DB::table('market_factor_snapshots')->updateOrInsert(
                 ['trading_date' => $date, 'scope_type' => 'market', 'scope_key' => '__aggregate__'],
@@ -59,6 +62,7 @@ final class CalculateMarketFactors extends Command
         }
 
         DB::table('market_factor_snapshots')->whereDate('trading_date', '<', today()->subDays(27))->delete();
+
         return self::SUCCESS;
     }
 
@@ -68,12 +72,16 @@ final class CalculateMarketFactors extends Command
         $timingScores = [];
         foreach ($rows as $row) {
             if (! is_numeric($row->close) || ! is_numeric($row->sma_20) || ! is_numeric($row->sma_50)
-                || ! is_numeric($row->sma_200) || ! is_numeric($row->roc_12)) continue;
+                || ! is_numeric($row->sma_200) || ! is_numeric($row->roc_12)) {
+                continue;
+            }
             $close = (float) $row->close;
             $trend = 50.0;
             $trend += $close >= (float) $row->sma_20 ? 10 : -10;
             $trend += (float) $row->sma_50 >= (float) $row->sma_200 ? 15 : -15;
-            if (is_numeric($row->macd_histogram)) $trend += (float) $row->macd_histogram >= 0 ? 10 : -10;
+            if (is_numeric($row->macd_histogram)) {
+                $trend += (float) $row->macd_histogram >= 0 ? 10 : -10;
+            }
             $trend += max(-15, min(15, (float) $row->roc_12));
             $trendScores[] = max(0, min(100, $trend));
 
@@ -84,6 +92,7 @@ final class CalculateMarketFactors extends Command
                 ));
             }
         }
+
         return [round(collect($trendScores)->avg() ?? 0, 2), round(collect($timingScores)->avg() ?? 0, 2), count($trendScores)];
     }
 }

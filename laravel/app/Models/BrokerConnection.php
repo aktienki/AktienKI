@@ -15,6 +15,13 @@ class BrokerConnection extends Model
         return ['credentials' => 'encrypted:array', 'trading_enabled' => 'boolean', 'emergency_stop' => 'boolean', 'last_connected_at' => 'datetime'];
     }
 
-    public function user(): BelongsTo { return $this->belongsTo(User::class); }
-    public function orders(): HasMany { return $this->hasMany(BrokerOrder::class); }
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(BrokerOrder::class);
+    }
 }

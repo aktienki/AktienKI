@@ -11,12 +11,14 @@ use Throwable;
 class GenerateTopStockScreening extends Command
 {
     protected $signature = 'stocks:screen-top100 {--with-ai : Generate bilingual explanations with GPT mini} {--user= : Owning user id} {--limit=10 : Number of ranked stocks} {--force : Rebuild even when a current daily result exists}';
+
     protected $description = 'Create a versioned deterministic Top-10 stock ranking with optional AI explanations';
 
     public function handle(): int
     {
         if (! Schema::hasTable('stock_screening_runs')) {
             $this->error('Bitte zuerst php artisan migrate --force ausführen.');
+
             return self::FAILURE;
         }
 
@@ -35,6 +37,7 @@ class GenerateTopStockScreening extends Command
                 ->first();
             if ($todaysRun !== null) {
                 $this->info("Top-{$rankingLimit}-Auswertung ist für heute bereits vorhanden (Lauf {$todaysRun->id}).");
+
                 return self::SUCCESS;
             }
         }
@@ -48,16 +51,19 @@ class GenerateTopStockScreening extends Command
             ->whereIn('p.id', $latestIds)->where('i.type', 'stock')->where('i.is_active', true)->whereNull('i.deleted_at')
             // Top-100 is a positive-watchlist ranking: BUY and WATCH only.
             ->whereIn(DB::raw('UPPER(COALESCE(p.signal, \'HOLD\'))'), ['BUY', 'WATCH'])
-            ->select(['p.id as prediction_id','p.instrument_id','p.prediction_score','p.confidence','p.risk_score','p.drawdown_risk_factor','p.current_price','p.predicted_price_20d','p.signal','i.symbol','i.name','i.country','i.sector','e.code as exchange_code'])
+            ->select(['p.id as prediction_id', 'p.instrument_id', 'p.prediction_score', 'p.confidence', 'p.risk_score', 'p.drawdown_risk_factor', 'p.current_price', 'p.predicted_price_20d', 'p.signal', 'i.symbol', 'i.name', 'i.country', 'i.sector', 'e.code as exchange_code'])
             ->get()
             ->map(function (object $row): object {
                 $score = (float) $row->prediction_score;
                 $score10 = $score <= 1 ? $score * 10 : ($score <= 10 ? $score : $score / 10);
-                $confidence = (float) $row->confidence; $confidence = $confidence <= 1 ? $confidence * 100 : $confidence;
-                $risk = (float) ($row->risk_score ?? $row->drawdown_risk_factor ?? 0); $risk = $risk <= 1 ? $risk * 100 : $risk;
+                $confidence = (float) $row->confidence;
+                $confidence = $confidence <= 1 ? $confidence * 100 : $confidence;
+                $risk = (float) ($row->risk_score ?? $row->drawdown_risk_factor ?? 0);
+                $risk = $risk <= 1 ? $risk * 100 : $risk;
                 $return = $row->current_price ? (((float) $row->predicted_price_20d - (float) $row->current_price) / (float) $row->current_price) * 100 : 0;
                 $row->ranking_score = ($score10 / 10) * 40 + ($confidence / 100) * 25 + (max(0, 100 - min(100, $risk)) / 100) * 20 + (max(0, min(100, $return + 20)) / 100) * 15;
                 $row->metrics = ['score_10' => round($score10, 2), 'confidence_percent' => round($confidence, 2), 'risk_percent' => round($risk, 2), 'expected_return_20d' => round($return, 2)];
+
                 return $row;
             })->sortByDesc('ranking_score')->values()->take(100);
 
@@ -84,7 +90,9 @@ class GenerateTopStockScreening extends Command
                     foreach ((array) ($payload['output'] ?? []) as $outputItem) {
                         foreach ((array) data_get($outputItem, 'content', []) as $contentItem) {
                             $text = data_get($contentItem, 'text');
-                            if (is_string($text) && trim($text) !== '') $texts[] = $text;
+                            if (is_string($text) && trim($text) !== '') {
+                                $texts[] = $text;
+                            }
                         }
                     }
                     $rawOutput = implode("\n", $texts);
@@ -102,17 +110,26 @@ class GenerateTopStockScreening extends Command
                 $comments = collect(is_array($decodedComments) ? $decodedComments : [])
                     ->map(function ($comment, $key): array {
                         $comment = is_array($comment) ? $comment : [];
-                        if (! isset($comment['rank']) && is_numeric($key)) $comment['rank'] = (int) $key + 1;
+                        if (! isset($comment['rank']) && is_numeric($key)) {
+                            $comment['rank'] = (int) $key + 1;
+                        }
+
                         return $comment;
                     })->values()->all();
                 $inputRate = str_contains(strtolower($model), '5.4-mini') ? .75 : .25;
                 $outputRate = str_contains(strtolower($model), '5.4-mini') ? 4.5 : 2.0;
                 DB::table('stock_screening_runs')->where('id', $runId)->update(['input_tokens' => data_get($payload, 'usage.input_tokens'), 'output_tokens' => data_get($payload, 'usage.output_tokens'), 'estimated_cost_usd' => ((float) data_get($payload, 'usage.input_tokens') * $inputRate + (float) data_get($payload, 'usage.output_tokens') * $outputRate) / 1000000]);
-            } catch (Throwable $e) { $this->warn('AI-Erklärungen übersprungen: '.$e->getMessage()); }
+            } catch (Throwable $e) {
+                $this->warn('AI-Erklärungen übersprungen: '.$e->getMessage());
+            }
         }
         $byRank = collect($comments)->keyBy('rank');
-        foreach ($rows as $index => $row) { $comment = $byRank->get($index + 1, []); DB::table('stock_screening_items')->insert(['screening_run_id' => $runId, 'instrument_id' => $row->instrument_id, 'rank' => $index + 1, 'ranking_score' => $row->ranking_score, 'signal' => $row->signal, 'comment_de' => $comment['comment_de'] ?? null, 'comment_en' => $comment['comment_en'] ?? null, 'metrics' => json_encode($row->metrics), 'created_at' => now(), 'updated_at' => now()]); }
-            $this->info("Top-{$rankingLimit}-Auswertung gespeichert (Lauf {$runId}, {$rows->count()} Aktien).");
+        foreach ($rows as $index => $row) {
+            $comment = $byRank->get($index + 1, []);
+            DB::table('stock_screening_items')->insert(['screening_run_id' => $runId, 'instrument_id' => $row->instrument_id, 'rank' => $index + 1, 'ranking_score' => $row->ranking_score, 'signal' => $row->signal, 'comment_de' => $comment['comment_de'] ?? null, 'comment_en' => $comment['comment_en'] ?? null, 'metrics' => json_encode($row->metrics), 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $this->info("Top-{$rankingLimit}-Auswertung gespeichert (Lauf {$runId}, {$rows->count()} Aktien).");
+
         return self::SUCCESS;
     }
 }

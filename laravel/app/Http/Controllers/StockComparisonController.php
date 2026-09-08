@@ -28,8 +28,7 @@ final class StockComparisonController extends Controller
         $signalSql = $personalizedSignals->sql('prediction', $request->user());
 
         $rows = DB::table('instruments as instrument')
-            ->leftJoinSub($latestPredictions, 'latest', fn ($join) =>
-                $join->on('latest.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($latestPredictions, 'latest', fn ($join) => $join->on('latest.instrument_id', '=', 'instrument.id'))
             ->leftJoin('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
             ->whereIn('instrument.id', $instrumentIds)
             ->where('instrument.type', 'stock')

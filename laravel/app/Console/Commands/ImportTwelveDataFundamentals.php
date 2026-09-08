@@ -10,6 +10,7 @@ use Throwable;
 class ImportTwelveDataFundamentals extends Command
 {
     protected $signature = 'fundamentals:import-twelve-data {--limit=0} {--force} {--missing-only : Import only stocks without any fundamental snapshot} {--analysis-only} {--sleep=61000}';
+
     protected $description = 'One-time import of Twelve Data fundamentals for active stocks';
 
     public function handle(TwelveDataFundamentalImporter $importer): int
@@ -25,7 +26,9 @@ class ImportTwelveDataFundamentals extends Command
                 ->whereColumn($alias.'.instrument_id', 'instruments.id')->where($alias.'.source', 'twelve_data')->whereDate($alias.'.snapshot_date', today()));
         }
         $limit = max(0, (int) $this->option('limit'));
-        if ($limit) $query->limit($limit);
+        if ($limit) {
+            $query->limit($limit);
+        }
         $stocks = $query->get(['id', 'symbol', 'provider_symbol']);
         $bar = $this->output->createProgressBar($stocks->count());
         $bar->start();
@@ -48,6 +51,7 @@ class ImportTwelveDataFundamentals extends Command
                             $this->newLine();
                             $this->warn('Analysis-Endpunkte sind für dieses Symbol im aktuellen TwelveData-Tarif gesperrt; weitere Sperren werden still übersprungen.');
                         }
+
                         continue;
                     }
                     $rateLimited = str_contains($message, 'api credits');
@@ -55,6 +59,7 @@ class ImportTwelveDataFundamentals extends Command
                         $this->newLine();
                         $this->warn($stock->symbol.': Minutenlimit erreicht, Wiederholung nach 65 Sekunden.');
                         sleep(65);
+
                         continue;
                     }
                     $failed++;
@@ -69,6 +74,7 @@ class ImportTwelveDataFundamentals extends Command
         $bar->finish();
         $this->newLine(2);
         $this->info("Import abgeschlossen: {$success} erfolgreich, {$skipped} tarifbedingt übersprungen, {$failed} fehlgeschlagen.");
+
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
 }

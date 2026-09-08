@@ -155,5 +155,4 @@ final class HistoricalActionScoreService
             (float) $points[1]['stochastic'],
         );
     }
-
 }

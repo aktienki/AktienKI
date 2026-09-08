@@ -86,16 +86,22 @@ class EtfHoldingImportService
         $lines = preg_split('/\R/u', preg_replace('/^\xEF\xBB\xBF/', '', $payload)) ?: [];
         $headerIndex = collect($lines)->search(function ($line) {
             $line = strtolower($line);
+
             return str_contains($line, 'isin') || str_contains($line, 'emittententicker') || str_contains($line, 'issuer ticker');
         });
-        if ($headerIndex === false) return collect();
+        if ($headerIndex === false) {
+            return collect();
+        }
         $delimiter = substr_count($lines[$headerIndex], ';') > substr_count($lines[$headerIndex], ',') ? ';' : ',';
         $headers = array_map([$this, 'key'], str_getcsv($lines[$headerIndex], $delimiter));
 
         return collect(array_slice($lines, $headerIndex + 1))->filter(fn ($line) => trim($line) !== '')
             ->map(function ($line) use ($delimiter, $headers) {
                 $values = str_getcsv($line, $delimiter);
-                if (count($values) < count($headers)) $values = array_pad($values, count($headers), null);
+                if (count($values) < count($headers)) {
+                    $values = array_pad($values, count($headers), null);
+                }
+
                 return $this->normalize(array_combine($headers, array_slice($values, 0, count($headers))) ?: []);
             })->filter(fn ($row) => filled($row['isin'] ?? null) || filled($row['symbol'] ?? null))->values();
     }
@@ -104,6 +110,7 @@ class EtfHoldingImportService
     {
         $decoded = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
         $rows = $decoded['holdings'] ?? $decoded['data'] ?? $decoded;
+
         return collect(is_array($rows) ? $rows : [])->map(fn ($row) => $this->normalize((array) $row))
             ->filter(fn ($row) => filled($row['isin'] ?? null))->values();
     }
@@ -111,9 +118,15 @@ class EtfHoldingImportService
     private function normalize(array $row): array
     {
         $find = function (array $aliases) use ($row) {
-            foreach ($aliases as $alias) if (array_key_exists($alias, $row)) return $row[$alias];
+            foreach ($aliases as $alias) {
+                if (array_key_exists($alias, $row)) {
+                    return $row[$alias];
+                }
+            }
+
             return null;
         };
+
         return [
             'isin' => $find(['isin']),
             'symbol' => $find(['ticker', 'symbol', 'borsenticker', 'lokaler_ticker', 'emittententicker', 'issuer_ticker']),
@@ -126,42 +139,54 @@ class EtfHoldingImportService
     private function key(string $value): string
     {
         $value = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', trim($value)) ?: $value;
+
         return trim(strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $value)), '_');
     }
 
     private function isin(mixed $value): ?string
     {
         $isin = strtoupper(preg_replace('/\s+/', '', (string) $value));
+
         return preg_match('/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/', $isin) ? $isin : null;
     }
 
     private function number(mixed $value): ?float
     {
         $value = trim(str_replace(['%', ' '], '', (string) $value));
-        if (str_contains($value, ',') && ! str_contains($value, '.')) $value = str_replace(',', '.', $value);
-        elseif (str_contains($value, ',') && str_contains($value, '.')) $value = str_replace(',', '', $value);
+        if (str_contains($value, ',') && ! str_contains($value, '.')) {
+            $value = str_replace(',', '.', $value);
+        } elseif (str_contains($value, ',') && str_contains($value, '.')) {
+            $value = str_replace(',', '', $value);
+        }
+
         return is_numeric($value) ? (float) $value : null;
     }
 
     private function date(mixed $value): ?string
     {
-        try { return filled($value) ? CarbonImmutable::parse((string) $value)->toDateString() : null; }
-        catch (\Throwable) { return null; }
+        try {
+            return filled($value) ? CarbonImmutable::parse((string) $value)->toDateString() : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function dateFromMetadata(string $payload): ?string
     {
         if (preg_match('/[" ](\d{1,2}\.[A-Za-zÄÖÜäöü]+\.\d{4})["\r\n]/u', mb_substr($payload, 0, 500), $match)) {
-            $months = ['Jan'=>'Jan', 'Feb'=>'Feb', 'Mär'=>'Mar', 'Apr'=>'Apr', 'Mai'=>'May', 'Jun'=>'Jun', 'Jul'=>'Jul', 'Aug'=>'Aug', 'Sep'=>'Sep', 'Okt'=>'Oct', 'Nov'=>'Nov', 'Dez'=>'Dec'];
+            $months = ['Jan' => 'Jan', 'Feb' => 'Feb', 'Mär' => 'Mar', 'Apr' => 'Apr', 'Mai' => 'May', 'Jun' => 'Jun', 'Jul' => 'Jul', 'Aug' => 'Aug', 'Sep' => 'Sep', 'Okt' => 'Oct', 'Nov' => 'Nov', 'Dez' => 'Dec'];
             $date = str_replace(array_keys($months), array_values($months), $match[1]);
+
             return $this->date($date);
         }
+
         return null;
     }
 
     private function text(mixed $value, int $length): ?string
     {
         $value = trim((string) $value);
+
         return $value === '' ? null : mb_substr($value, 0, $length);
     }
 }

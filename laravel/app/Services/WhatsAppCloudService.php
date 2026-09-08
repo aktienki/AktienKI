@@ -17,6 +17,7 @@ final class WhatsAppCloudService
                 'type' => 'text', 'text' => ['preview_url' => false, 'body' => $message],
             ])->throw()->json();
         $connection->update(['last_sent_at' => now()]);
+
         return $response;
     }
 }

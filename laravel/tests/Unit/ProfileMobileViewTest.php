@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Http\Controllers\ProfileController;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 use Tests\TestCase;
 
 final class ProfileMobileViewTest extends TestCase
@@ -34,7 +35,7 @@ final class ProfileMobileViewTest extends TestCase
         $this->assertSame(['market', 'signal-cockpit'], $view->getData()['selectedCards']);
     }
 
-    private function mobileView(array $preferences): \Illuminate\View\View
+    private function mobileView(array $preferences): View
     {
         $user = new User(['preferences' => $preferences]);
         $request = Request::create('/profile/mobile-view');

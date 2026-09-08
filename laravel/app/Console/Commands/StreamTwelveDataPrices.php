@@ -29,6 +29,7 @@ class StreamTwelveDataPrices extends Command
             $instruments = $this->requestedInstruments();
             if ($instruments->isEmpty()) {
                 sleep(1);
+
                 continue;
             }
 

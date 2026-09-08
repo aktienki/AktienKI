@@ -1,9 +1,12 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration {
-    public function up(): void {
+return new class extends Migration
+{
+    public function up(): void
+    {
         DB::unprepared(<<<'SQL'
 ALTER TABLE predictions
  ADD COLUMN range_probability NUMERIC(8,7),
@@ -21,7 +24,9 @@ ALTER TABLE predictions
  );
 SQL);
     }
-    public function down(): void {
+
+    public function down(): void
+    {
         DB::unprepared(<<<'SQL'
 ALTER TABLE predictions
  DROP CONSTRAINT predictions_range_probability_chk,

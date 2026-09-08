@@ -28,12 +28,15 @@ final class RecommendationEmailChart
         $bars = collect($candles)->filter(fn ($bar) => isset($bar['y']) && count($bar['y']) >= 4)->take(-32)->values();
         if ($bars->isEmpty()) {
             imagestring($chart, 5, 260, 140, 'Keine Kursdaten', $text);
+
             return $this->png($chart);
         }
 
         $prices = $bars->flatMap(fn ($bar) => array_map('floatval', $bar['y']))->all();
         $forecasts = collect($forecasts)->filter(fn ($price, $days) => is_numeric($days) && is_numeric($price))->mapWithKeys(fn ($price, $days) => [(int) $days => (float) $price])->sortKeys();
-        foreach ($forecasts as $price) $prices[] = $price;
+        foreach ($forecasts as $price) {
+            $prices[] = $price;
+        }
         $min = min($prices);
         $max = max($prices);
         $padding = max(($max - $min) * .13, max(abs($max), 1) * .015);
@@ -94,6 +97,7 @@ final class RecommendationEmailChart
         ob_start();
         imagepng($image, null, 7);
         $png = (string) ob_get_clean();
+
         return $png;
     }
 }

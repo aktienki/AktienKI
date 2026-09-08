@@ -8,6 +8,7 @@ use App\Services\ServingReadService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Symfony\Component\Mime\Email;
 
 class PredictionPurchaseReminderNotification extends Notification
 {
@@ -20,7 +21,10 @@ class PredictionPurchaseReminderNotification extends Notification
         public string $currentSignal = 'HOLD',
     ) {}
 
-    public function via(object $notifiable): array { return ['mail']; }
+    public function via(object $notifiable): array
+    {
+        return ['mail'];
+    }
 
     public function toMail(object $notifiable): MailMessage
     {
@@ -52,7 +56,7 @@ class PredictionPurchaseReminderNotification extends Notification
                 'performance' => $performance, 'prediction' => $prediction, 'forecasts' => $forecasts,
                 'stockUrl' => route('stocks.show', $this->instrument->symbol), 'purchased' => $purchased,
             ])
-            ->withSymfonyMessage(function (\Symfony\Component\Mime\Email $email) use ($chart): void {
+            ->withSymfonyMessage(function (Email $email) use ($chart): void {
                 $email->embed($chart, 'prediction-chart.png', 'image/png');
             });
     }

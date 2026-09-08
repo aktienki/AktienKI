@@ -6,6 +6,7 @@ use App\Services\RecommendationEmailLogo;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\Mime\Email;
 use Throwable;
 
 final class PortfolioTradeNotification extends Notification
@@ -40,7 +41,7 @@ final class PortfolioTradeNotification extends Notification
                 'isSale' => $isSale,
                 'depotUrl' => route('depots.show', $this->trade['portfolio_id']),
             ])
-            ->withSymfonyMessage(function (\Symfony\Component\Mime\Email $email) use ($logo): void {
+            ->withSymfonyMessage(function (Email $email) use ($logo): void {
                 $email->embed($logo, 'aktienki-logo.png', 'image/png');
             });
     }

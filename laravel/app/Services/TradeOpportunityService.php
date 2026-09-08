@@ -22,7 +22,9 @@ final class TradeOpportunityService
 
     public function syncForUser(User $user): int
     {
-        if (! $this->plans->allowsTariff($user, PlanLevel::Pro)) return 0;
+        if (! $this->plans->allowsTariff($user, PlanLevel::Pro)) {
+            return 0;
+        }
 
         UserTradeOpportunity::query()->where('user_id', $user->id)->where('expires_at', '<=', now())->delete();
         $signalSql = $this->signals->sql('prediction', $user);
@@ -37,9 +39,13 @@ final class TradeOpportunityService
 
         $created = 0;
         foreach ($rows as $row) {
-            if (! in_array(strtoupper((string) $row->personalized_signal), ['WAIT', 'HOLD'], true)) continue;
+            if (! in_array(strtoupper((string) $row->personalized_signal), ['WAIT', 'HOLD'], true)) {
+                continue;
+            }
             $price = is_numeric($row->current_price) ? (float) $row->current_price : null;
-            if ($price === null || $price <= 0) continue;
+            if ($price === null || $price <= 0) {
+                continue;
+            }
 
             $returns = [];
             foreach ([5, 10, 15, 20] as $days) {
@@ -61,12 +67,18 @@ final class TradeOpportunityService
             $confidence = $confidence === null ? null : ($confidence <= 1 ? $confidence * 100 : $confidence);
             $riskSource = is_numeric($row->risk_score) ? (float) $row->risk_score : (is_numeric($row->drawdown_risk_factor) ? (float) $row->drawdown_risk_factor : null);
             $risk = $riskSource === null ? null : ($riskSource <= 1 ? $riskSource * 100 : $riskSource);
-            if ($shortNegative < 2 || ! is_numeric($returns[20]) || $returns[20] < 1.0) continue;
-            if ($score === null || $score < 40 || $confidence === null || $confidence < 40 || $risk === null || $risk > 50) continue;
+            if ($shortNegative < 2 || ! is_numeric($returns[20]) || $returns[20] < 1.0) {
+                continue;
+            }
+            if ($score === null || $score < 40 || $confidence === null || $confidence < 40 || $risk === null || $risk > 50) {
+                continue;
+            }
 
             $detectedAt = CarbonImmutable::parse($row->prediction_time ?: now());
             $expiresAt = $detectedAt->addWeekdays(20)->endOfDay();
-            if ($expiresAt->isPast()) continue;
+            if ($expiresAt->isPast()) {
+                continue;
+            }
 
             $opportunity = UserTradeOpportunity::query()->firstOrNew(['user_id' => $user->id, 'instrument_id' => $row->instrument_id]);
             $predictionChanged = $opportunity->exists && (int) $opportunity->prediction_id !== (int) $row->id;

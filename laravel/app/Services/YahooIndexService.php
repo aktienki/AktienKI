@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -100,6 +101,7 @@ class YahooIndexService
                 || $instrumentType !== 'INDEX'
                 || ! is_numeric($price)) {
                 Cache::put($this->errorKey($requestedSymbol), true, now()->addMinutes(5));
+
                 continue;
             }
 
@@ -111,7 +113,7 @@ class YahooIndexService
                     ? (((float) $price - (float) $previous) / (float) $previous) * 100
                     : null,
                 'quote_time' => isset($meta['regularMarketTime'])
-                    ? \Illuminate\Support\Carbon::createFromTimestampUTC((int) $meta['regularMarketTime'])
+                    ? Carbon::createFromTimestampUTC((int) $meta['regularMarketTime'])
                     : null,
                 'source' => 'yahoo_index_rest',
             ];

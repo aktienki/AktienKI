@@ -100,18 +100,18 @@ return new class extends Migration
         ]);
 
         DB::statement(
-            "ALTER TABLE users ADD CONSTRAINT users_tariff_status_chk "
-            . "CHECK (tariff_status IN "
-            . "('inactive','trialing','active','past_due','cancelled','expired'))"
+            'ALTER TABLE users ADD CONSTRAINT users_tariff_status_chk '
+            .'CHECK (tariff_status IN '
+            ."('inactive','trialing','active','past_due','cancelled','expired'))"
         );
         DB::statement(
-            "ALTER TABLE users ADD CONSTRAINT users_billing_cycle_chk "
-            . "CHECK (billing_cycle IN ('monthly','yearly'))"
+            'ALTER TABLE users ADD CONSTRAINT users_billing_cycle_chk '
+            ."CHECK (billing_cycle IN ('monthly','yearly'))"
         );
         DB::statement(
             'ALTER TABLE users ADD CONSTRAINT users_tariff_period_chk '
-            . 'CHECK (tariff_ends_at IS NULL OR tariff_started_at IS NULL '
-            . 'OR tariff_ends_at >= tariff_started_at)'
+            .'CHECK (tariff_ends_at IS NULL OR tariff_started_at IS NULL '
+            .'OR tariff_ends_at >= tariff_started_at)'
         );
     }
 

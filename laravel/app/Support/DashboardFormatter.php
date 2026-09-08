@@ -16,7 +16,7 @@ class DashboardFormatter
             $number *= 100;
         }
 
-        return number_format($number, $digits, ',', '.') . '%';
+        return number_format($number, $digits, ',', '.').'%';
     }
 
     public static function signedPercent(mixed $value, int $digits = 2): string
@@ -33,7 +33,7 @@ class DashboardFormatter
 
         $prefix = $number > 0 ? '+' : '';
 
-        return $prefix . number_format($number, $digits, ',', '.') . '%';
+        return $prefix.number_format($number, $digits, ',', '.').'%';
     }
 
     public static function money(mixed $value, ?string $currency = null): string
@@ -42,7 +42,7 @@ class DashboardFormatter
             return '—';
         }
 
-        return trim(number_format((float) $value, 2, ',', '.') . ' ' . ($currency ?? ''));
+        return trim(number_format((float) $value, 2, ',', '.').' '.($currency ?? ''));
     }
 
     public static function risk(mixed $rawOutput): ?float

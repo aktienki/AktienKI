@@ -10,7 +10,9 @@ final class SignalStrength
      */
     public static function fromReturn(?float $returnPercent): ?int
     {
-        if ($returnPercent === null || ! is_finite($returnPercent)) return null;
+        if ($returnPercent === null || ! is_finite($returnPercent)) {
+            return null;
+        }
 
         $absolute = abs($returnPercent);
         $strength = match (true) {
@@ -28,8 +30,12 @@ final class SignalStrength
     public static function label(?float $returnPercent): string
     {
         $strength = self::fromReturn($returnPercent);
-        if ($strength === null) return '—';
-        if ($strength === 0) return '0';
+        if ($strength === null) {
+            return '—';
+        }
+        if ($strength === 0) {
+            return '0';
+        }
 
         return ($strength > 0 ? '+' : '−').abs($strength);
     }

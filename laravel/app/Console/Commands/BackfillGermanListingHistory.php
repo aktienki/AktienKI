@@ -63,6 +63,7 @@ final class BackfillGermanListingHistory extends Command
         }
 
         $this->line("Abgeschlossen: {$completed} erfolgreich, {$failed} fehlgeschlagen.");
+
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
 }

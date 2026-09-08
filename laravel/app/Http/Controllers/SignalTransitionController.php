@@ -64,6 +64,7 @@ class SignalTransitionController extends Controller
                 $row->risk_at_signal = null;
                 $row->previous_signal = '—';
                 $row->closed = $row->validated_at !== null;
+
                 return $row;
             })->filter(fn (object $row): bool => $row->closed && $row->performance_percent !== null);
 
@@ -75,8 +76,12 @@ class SignalTransitionController extends Controller
             )->values();
             $activeInstrumentIds = $activePositions->pluck('instrument_id')->map(fn ($id): int => (int) $id)->all();
             foreach ($dailyCandidates->sortByDesc(fn (object $row): float => (float) ($row->score_at_signal ?? -INF)) as $candidate) {
-                if ($activePositions->count() >= 10) break;
-                if (in_array((int) $candidate->instrument_id, $activeInstrumentIds, true)) continue;
+                if ($activePositions->count() >= 10) {
+                    break;
+                }
+                if (in_array((int) $candidate->instrument_id, $activeInstrumentIds, true)) {
+                    continue;
+                }
                 $closed->push($candidate);
                 $activePositions->push($candidate);
                 $activeInstrumentIds[] = (int) $candidate->instrument_id;
@@ -111,14 +116,21 @@ class SignalTransitionController extends Controller
                 'max_drawdown' => $maxDrawdown,
             ];
         })->sortByDesc('total')->values();
-        $equity = 1.0; $peak = 1.0; $grossWins = 0.0; $grossLosses = 0.0;
+        $equity = 1.0;
+        $peak = 1.0;
+        $grossWins = 0.0;
+        $grossLosses = 0.0;
         $chartData = ['performance' => [], 'profit_factor' => [], 'drawdown' => [], 'dated_performance' => []];
         foreach ($closed->sortBy('prediction_time')->values() as $trade) {
             $value = (float) $trade->performance_percent;
             $equity *= max(0.0, 1 + ($value / 1000));
             $peak = max($peak, $equity);
-            if ($value > 0) $grossWins += $value;
-            if ($value < 0) $grossLosses += abs($value);
+            if ($value > 0) {
+                $grossWins += $value;
+            }
+            if ($value < 0) {
+                $grossLosses += abs($value);
+            }
             $chartData['performance'][] = round(($equity - 1) * 100, 4);
             $chartData['dated_performance'][substr((string) $trade->validated_at, 0, 10)] = round(($equity - 1) * 100, 4);
             $chartData['profit_factor'][] = $grossLosses > 0 ? round($grossWins / $grossLosses, 4) : ($grossWins > 0 ? 1.0 : 0.0);
@@ -177,7 +189,9 @@ class SignalTransitionController extends Controller
                     'bar_time' => Carbon::createFromTimestampUTC($bar['timestamp'])->toDateTimeString(),
                     'close' => $bar['adjusted_close'] ?? $bar['close'],
                 ])->values();
-            if ($daxHistory->isNotEmpty()) $benchmarkBars->put($daxInstrumentId, $daxHistory);
+            if ($daxHistory->isNotEmpty()) {
+                $benchmarkBars->put($daxInstrumentId, $daxHistory);
+            }
         }
         $benchmarkData = $benchmarkDefinitions->map(function (array $definition) use ($benchmarkInstruments, $benchmarkBars, $chartData): array {
             $instrumentId = $benchmarkInstruments->get($definition['symbol']);
@@ -187,7 +201,10 @@ class SignalTransitionController extends Controller
             $lastStrategyValue = 0.0;
             $timeline = $start > 0 ? $bars->map(function (object $bar) use ($start, $strategyByDate, &$lastStrategyValue): array {
                 $date = substr((string) $bar->bar_time, 0, 10);
-                if ($strategyByDate->has($date)) $lastStrategyValue = (float) $strategyByDate->get($date);
+                if ($strategyByDate->has($date)) {
+                    $lastStrategyValue = (float) $strategyByDate->get($date);
+                }
+
                 return [
                     'date' => $date,
                     'strategy' => round($lastStrategyValue, 4),
@@ -211,6 +228,7 @@ class SignalTransitionController extends Controller
             $wins = $trades->filter(fn (object $row): bool => $row->performance_percent > 0);
             $grossProfit = $wins->sum('performance_percent');
             $grossLoss = abs($trades->filter(fn (object $row): bool => $row->performance_percent < 0)->sum('performance_percent'));
+
             return [
                 'label' => $label,
                 'trades' => $trades->count(),
@@ -220,11 +238,9 @@ class SignalTransitionController extends Controller
                 'profit_factor' => $grossLoss > 0 ? $grossProfit / $grossLoss : ($grossProfit > 0 ? null : 0),
             ];
         };
-        $signalStats = collect(['BUY'])->map(fn (string $signal): array =>
-            $groupStats($closed, $signal)
+        $signalStats = collect(['BUY'])->map(fn (string $signal): array => $groupStats($closed, $signal)
         );
-        $horizonStats = collect([20])->map(fn (int $horizon): array =>
-            $groupStats($closed->filter(fn (object $row): bool => $row->horizon_days === $horizon), $horizon.' Tage')
+        $horizonStats = collect([20])->map(fn (int $horizon): array => $groupStats($closed->filter(fn (object $row): bool => $row->horizon_days === $horizon), $horizon.' Tage')
         );
 
         $scoreRanges = collect([
@@ -241,7 +257,9 @@ class SignalTransitionController extends Controller
                 && (float) $row->score_at_signal < $range['max'])
                 ->sortBy('prediction_time')->values();
             $wins = $trades->filter(fn (object $row): bool => $row->performance_percent > 0)->count();
-            $equity = 1.0; $peak = 1.0; $drawdowns = [];
+            $equity = 1.0;
+            $peak = 1.0;
+            $drawdowns = [];
             foreach ($trades as $trade) {
                 $equity *= max(0.0, 1 + ((float) $trade->performance_percent / 100));
                 $peak = max($peak, $equity);
@@ -286,7 +304,9 @@ class SignalTransitionController extends Controller
         $portfolios = DB::table('portfolios')->where('user_id', $request->user()->id)
             ->where('type', 'paper')->where('active', true)->orderByDesc('is_default')->orderBy('name')->get(['id', 'name', 'currency']);
         $selectedPortfolioId = (int) $request->query('portfolio', $portfolios->first()?->id ?? 0);
-        if (! $portfolios->contains('id', $selectedPortfolioId)) $selectedPortfolioId = (int) ($portfolios->first()?->id ?? 0);
+        if (! $portfolios->contains('id', $selectedPortfolioId)) {
+            $selectedPortfolioId = (int) ($portfolios->first()?->id ?? 0);
+        }
         $transactions = $selectedPortfolioId ? DB::table('portfolio_transactions as transaction')
             ->join('instruments as instrument', 'instrument.id', '=', 'transaction.instrument_id')
             ->where('transaction.portfolio_id', $selectedPortfolioId)->where('transaction.type', 'sell')
@@ -294,6 +314,7 @@ class SignalTransitionController extends Controller
             ->get(['transaction.*', 'instrument.symbol', 'instrument.name', 'instrument.country', 'instrument.meta']) : collect();
         $trades = $transactions->map(function (object $transaction): array {
             $meta = is_string($transaction->meta) ? (json_decode($transaction->meta, true) ?: []) : (array) $transaction->meta;
+
             return [
                 'id' => $transaction->id, 'instrument_id' => $transaction->instrument_id,
                 'symbol' => $transaction->symbol, 'name' => $transaction->name, 'country' => $transaction->country,
@@ -303,13 +324,18 @@ class SignalTransitionController extends Controller
                 'currency' => $transaction->currency,
             ];
         });
-        $equity = 1.0; $peak = 1.0; $maxDrawdown = 0.0; $curve = [];
+        $equity = 1.0;
+        $peak = 1.0;
+        $maxDrawdown = 0.0;
+        $curve = [];
         foreach ($trades as $trade) {
-            $equity *= max(0.0, 1 + ($trade['return'] / 100)); $peak = max($peak, $equity);
+            $equity *= max(0.0, 1 + ($trade['return'] / 100));
+            $peak = max($peak, $equity);
             $maxDrawdown = min($maxDrawdown, max(-100.0, (($equity / $peak) - 1) * 100));
             $curve[] = ['date' => $trade['date'], 'value' => round(($equity - 1) * 100, 4)];
         }
-        $firstDate = $trades->first()['date'] ?? null; $lastDate = $trades->last()['date'] ?? null;
+        $firstDate = $trades->first()['date'] ?? null;
+        $lastDate = $trades->last()['date'] ?? null;
         $periodDays = $firstDate && $lastDate ? max(1, Carbon::parse($firstDate)->diffInDays(Carbon::parse($lastDate))) : 0;
         $totalPerformance = ($equity - 1) * 100;
         $stats = [
@@ -319,8 +345,16 @@ class SignalTransitionController extends Controller
             'max_drawdown' => $maxDrawdown, 'total_performance' => $totalPerformance,
         ];
         $stockPerformance = $trades->groupBy('instrument_id')->map(function ($rows): array {
-            $first = $rows->first(); $equity = 1.0; $peak = 1.0; $maxDrawdown = 0.0;
-            foreach ($rows as $row) { $equity *= max(0, 1 + $row['return'] / 100); $peak = max($peak, $equity); $maxDrawdown = min($maxDrawdown, (($equity / $peak) - 1) * 100); }
+            $first = $rows->first();
+            $equity = 1.0;
+            $peak = 1.0;
+            $maxDrawdown = 0.0;
+            foreach ($rows as $row) {
+                $equity *= max(0, 1 + $row['return'] / 100);
+                $peak = max($peak, $equity);
+                $maxDrawdown = min($maxDrawdown, (($equity / $peak) - 1) * 100);
+            }
+
             return $first + ['trades' => $rows->count(), 'gross_profit' => $rows->where('return', '>', 0)->sum('return'), 'gross_loss' => $rows->where('return', '<', 0)->sum('return'), 'total' => ($equity - 1) * 100, 'average' => $rows->avg('return'), 'max_drawdown' => $maxDrawdown];
         })->sortByDesc('total')->values();
 

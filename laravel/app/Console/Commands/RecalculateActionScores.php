@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 class RecalculateActionScores extends Command
 {
     protected $signature = 'scores:recalculate {--all : Recalculate every latest analyzed stock} {--instrument= : Restrict to one instrument id}';
+
     protected $description = 'Recalculate the unified actionable AI score from the latest completed walk-forward evidence';
 
     public function handle(ActionScoreService $service): int

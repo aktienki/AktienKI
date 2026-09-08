@@ -21,6 +21,7 @@ final class FinalizeStockTraining extends Command
             ->where('type', 'stock')->whereNull('deleted_at')->first(['id', 'symbol', 'meta']);
         if (! $instrument) {
             $this->error("Aktie nicht gefunden: {$symbol}");
+
             return self::FAILURE;
         }
 
@@ -29,6 +30,7 @@ final class FinalizeStockTraining extends Command
             'symbols' => [$symbol], '--feature-version' => (string) $this->option('feature-version'),
         ]) !== self::SUCCESS) {
             $this->documentIncomplete($instrument, 'pipeline_incomplete');
+
             return self::FAILURE;
         }
 
@@ -36,6 +38,7 @@ final class FinalizeStockTraining extends Command
         if (! $this->hasCurrentArimaValidation($instrument)) {
             $this->documentIncomplete($instrument, 'arima_validation_missing_or_stale');
             $this->error("{$symbol}: verpflichtender ARIMA-Abgleich des MacBook-Finalizers fehlt oder ist älter als die aktiven Modelle.");
+
             return self::FAILURE;
         }
 
@@ -44,7 +47,9 @@ final class FinalizeStockTraining extends Command
             ->where('membership.instrument_id', $instrument->id)->whereNull('membership.removed_at')
             ->where('market_index.is_active', true)->orderByRaw('market_index.global_rank NULLS LAST')
             ->orderBy('market_index.id')->first(['market_index.symbol', 'market_index.name']);
-        if (! $index) $this->warn("{$symbol}: Heimatindex fehlt; Indexfilter wird dokumentiert übersprungen.");
+        if (! $index) {
+            $this->warn("{$symbol}: Heimatindex fehlt; Indexfilter wird dokumentiert übersprungen.");
+        }
 
         // A previous rollout restriction must never survive a new complete
         // stock pipeline. Activation is nevertheless decided only below by
@@ -59,17 +64,23 @@ final class FinalizeStockTraining extends Command
             '--instrument' => (int) $instrument->id,
             '--recalibrate' => true,
         ];
-        if ($index) $arguments['index'] = (string) $index->symbol;
+        if ($index) {
+            $arguments['index'] = (string) $index->symbol;
+        }
         if ($this->call('thresholds:calibrate-index', $arguments) !== self::SUCCESS) {
             $this->documentIncomplete($instrument, 'calibration_failed');
+
             return self::FAILURE;
         }
 
         $this->stage('Index-, Sektor-, 60T- und Noise-Filter ohne Verschlechterung prüfen');
         $contextArguments = ['instrument' => $symbol];
-        if ($index) $contextArguments['--index'] = (string) $index->symbol;
+        if ($index) {
+            $contextArguments['--index'] = (string) $index->symbol;
+        }
         if ($this->call('thresholds:evaluate-context-filters', $contextArguments) !== self::SUCCESS) {
             $this->documentIncomplete($instrument, 'post_filter_evaluation_failed');
+
             return self::FAILURE;
         }
 
@@ -77,6 +88,7 @@ final class FinalizeStockTraining extends Command
             ->where('horizon_days', 20)->orderByDesc('updated_at')->orderByDesc('id')->first();
         if (! $threshold) {
             $this->documentIncomplete($instrument, 'threshold_missing_after_calibration');
+
             return self::FAILURE;
         }
 
@@ -97,6 +109,7 @@ final class FinalizeStockTraining extends Command
         $this->info($released
             ? "{$symbol}: Pipeline vollständig und Aktie freigegeben."
             : "{$symbol}: Pipeline vollständig; Qualitätsentscheidung dokumentiert, Aktie nicht freigegeben.");
+
         return self::SUCCESS;
     }
 
@@ -109,7 +122,9 @@ final class FinalizeStockTraining extends Command
     private function clearLegacyRolloutRestriction(object $instrument): void
     {
         $meta = is_string($instrument->meta) ? (json_decode($instrument->meta, true) ?: []) : (array) $instrument->meta;
-        if (($meta['deactivated_reason'] ?? null) !== 'dax_only_rollout') return;
+        if (($meta['deactivated_reason'] ?? null) !== 'dax_only_rollout') {
+            return;
+        }
         unset($meta['deactivated_reason'], $meta['deactivated_at']);
         DB::table('instruments')->where('id', $instrument->id)->update([
             'meta' => json_encode($meta, JSON_THROW_ON_ERROR), 'updated_at' => now(),
@@ -132,7 +147,9 @@ final class FinalizeStockTraining extends Command
         $latestModel = DB::table('trained_models')
             ->where('instrument_id', $instrument->id)->whereNull('deleted_at')->where('status', 'active')
             ->max('created_at');
-        if (! $latestModel) return false;
+        if (! $latestModel) {
+            return false;
+        }
 
         try {
             return CarbonImmutable::parse((string) $validation['completed_at'])

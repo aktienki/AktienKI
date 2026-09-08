@@ -15,12 +15,19 @@ final class RestrictToValidatedDaxStocks extends Command
     protected $description = 'Zeigt ausschließlich DAX-Aktien, deren vollständige Trainings- und Validierungspipeline bestanden ist.';
 
     private const HORIZONS = [7200, 14400, 21600, 28800];
+
     private const HORIZON_DAYS = [5, 10, 15, 20];
+
     private const RAW_MINIMUM_HIT_RATE = 50.0;
+
     private const RAW_MINIMUM_PROFIT_FACTOR = 1.05;
+
     private const RAW_MINIMUM_AVERAGE_RETURN = 0.0;
+
     private const RAW_MINIMUM_TRADES = 15;
+
     private const RAW_REDUCED_MINIMUM_TRADES = 10;
+
     private const RAW_REDUCED_TRADE_HIT_RATE = 65.0;
 
     public function handle(): int
@@ -28,6 +35,7 @@ final class RestrictToValidatedDaxStocks extends Command
         $indexId = DB::table('market_indices')->where('symbol', '^GDAXI')->value('id');
         if (! $indexId) {
             $this->error('DAX-Index ^GDAXI wurde nicht gefunden.');
+
             return self::FAILURE;
         }
 
@@ -65,7 +73,9 @@ final class RestrictToValidatedDaxStocks extends Command
                 ->where('run.status', 'completed')->where('run.horizon_days', 20)
                 ->where('trade.instrument_id', $instrumentId)
                 ->orderByDesc('run.finished_at')->orderByDesc('run.id')->value('run.id');
-            if (! $latestRunId) return false;
+            if (! $latestRunId) {
+                return false;
+            }
             $stats = DB::table('walk_forward_backtest_trades')->where('run_id', $latestRunId)
                 ->where('instrument_id', $instrumentId)
                 ->selectRaw('COUNT(*) AS trades')
@@ -73,10 +83,13 @@ final class RestrictToValidatedDaxStocks extends Command
                 ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
                 ->selectRaw('SUM(CASE WHEN net_return > 0 THEN net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN net_return < 0 THEN net_return ELSE 0 END)), 0) AS profit_factor')
                 ->first();
-            if (! $stats || ! is_numeric($stats->profit_factor) || ! is_numeric($stats->average_return)) return false;
+            if (! $stats || ! is_numeric($stats->profit_factor) || ! is_numeric($stats->average_return)) {
+                return false;
+            }
             $hitRate = (float) $stats->hit_rate;
             $requiredTrades = $hitRate >= self::RAW_REDUCED_TRADE_HIT_RATE
                 ? self::RAW_REDUCED_MINIMUM_TRADES : self::RAW_MINIMUM_TRADES;
+
             return (int) $stats->trades >= $requiredTrades
                 && $hitRate >= self::RAW_MINIMUM_HIT_RATE
                 && (float) $stats->profit_factor >= self::RAW_MINIMUM_PROFIT_FACTOR
@@ -122,6 +135,7 @@ final class RestrictToValidatedDaxStocks extends Command
         }
 
         $this->info("DAX-only-Freigabe aktiv: {$qualified->count()} Aktien sichtbar; alle übrigen Aktien deaktiviert.");
+
         return self::SUCCESS;
     }
 }

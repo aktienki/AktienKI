@@ -27,6 +27,7 @@ final class QualityGateSetupController extends Controller
     public function edit(Request $request, QualityGateAccessService $access): View
     {
         $profile = UserQualityGateProfile::query()->where('user_id', $request->user()->id)->first();
+
         return view('setup.quality-gate', [
             'profile' => $profile,
             'rules' => array_merge(self::DEFAULTS, (array) $profile?->rules),

@@ -161,6 +161,7 @@ class PersonalizedSignalService
                     'threshold' => number_format($thresholds['buy_score'], 0, ',', '.'),
                 ])
                 : __('Mindestens eine BUY-Anforderung ist noch nicht vollständig erfüllt.');
+
             return __('WATCH statt BUY: :reason Volatilität :volatility, Sektor :sector. :limits', [
                 'reason' => $reason,
                 'volatility' => $volatilityText,

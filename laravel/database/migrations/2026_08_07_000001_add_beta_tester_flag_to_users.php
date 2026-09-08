@@ -13,7 +13,7 @@ return new class extends Migration
         });
 
         // Preserve the existing tester cohort while moving the flag to a first-class field.
-        \DB::table('users')
+        DB::table('users')
             ->where('account_status', 'tester')
             ->update(['is_beta_tester' => true]);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\AiScore;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -39,7 +40,7 @@ class SignalDistributionDeltaService
                 ->get();
 
             $counts = fn (int $rank): array => $this->distribution(
-                $rows->where('snapshot_rank', $rank)->map(fn (object $row) => \App\Support\AiScore::toTen(
+                $rows->where('snapshot_rank', $rank)->map(fn (object $row) => AiScore::toTen(
                     is_numeric($row->ai_score) ? $row->ai_score : $row->prediction_score
                 ))->filter(fn ($score) => is_numeric($score))
             );

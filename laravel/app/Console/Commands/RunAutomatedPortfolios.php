@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 final class RunAutomatedPortfolios extends Command
 {
     protected $signature = 'portfolios:run-automation';
+
     protected $description = 'Apply linked BUY strategies to virtual portfolios';
 
     public function handle(AutomatedPortfolioService $service): int

@@ -125,53 +125,53 @@ class MarketService
         return [
 
             [
-                'title'   => 'Trend',
-                'value'   => $this->trend($marketScore),
-                'status'  => number_format($marketScore,2,",",".") . '%',
-                'percent' => min(100,max(0,50+$marketScore*8)),
-                'color'   => $marketScore >= 0 ? 'green' : 'red',
+                'title' => 'Trend',
+                'value' => $this->trend($marketScore),
+                'status' => number_format($marketScore, 2, ',', '.').'%',
+                'percent' => min(100, max(0, 50 + $marketScore * 8)),
+                'color' => $marketScore >= 0 ? 'green' : 'red',
             ],
 
             [
-                'title'   => 'Momentum',
-                'value'   => $this->momentum($marketScore),
-                'status'  => $marketScore >= 0 ? 'Steigend' : 'Fallend',
-                'percent' => min(100,max(0,50+$marketScore*8)),
-                'color'   => $marketScore >= 0 ? 'green' : 'red',
+                'title' => 'Momentum',
+                'value' => $this->momentum($marketScore),
+                'status' => $marketScore >= 0 ? 'Steigend' : 'Fallend',
+                'percent' => min(100, max(0, 50 + $marketScore * 8)),
+                'color' => $marketScore >= 0 ? 'green' : 'red',
             ],
 
             [
-                'title'   => 'Marktphase',
-                'value'   => $this->phase($marketScore),
-                'status'  => 'AI Analyse',
-                'percent' => min(100,max(0,50+$marketScore*8)),
-                'color'   => $marketScore >= 0 ? 'violet' : 'amber',
+                'title' => 'Marktphase',
+                'value' => $this->phase($marketScore),
+                'status' => 'AI Analyse',
+                'percent' => min(100, max(0, 50 + $marketScore * 8)),
+                'color' => $marketScore >= 0 ? 'violet' : 'amber',
             ],
 
             [
-                'title'   => 'Volatilität',
-                'value'   => abs($marketScore) > 1.5 ? 'Hoch' : 'Normal',
-                'status'  => 'Markt',
-                'percent' => min(100,max(15,abs($marketScore)*25)),
-                'color'   => abs($marketScore) > 1.5 ? 'amber' : 'green',
+                'title' => 'Volatilität',
+                'value' => abs($marketScore) > 1.5 ? 'Hoch' : 'Normal',
+                'status' => 'Markt',
+                'percent' => min(100, max(15, abs($marketScore) * 25)),
+                'color' => abs($marketScore) > 1.5 ? 'amber' : 'green',
             ],
 
             [
-                'title'   => 'Market Score',
-                'value'   => number_format($marketScore,2,",","."),
-                'status'  => 'Composite',
-                'percent' => min(100,max(0,50+$marketScore*8)),
-                'color'   => $marketScore >= 0 ? 'green' : 'red',
+                'title' => 'Market Score',
+                'value' => number_format($marketScore, 2, ',', '.'),
+                'status' => 'Composite',
+                'percent' => min(100, max(0, 50 + $marketScore * 8)),
+                'color' => $marketScore >= 0 ? 'green' : 'red',
             ],
 
         ];
     }
 
-    private function change(array $markets,string $name): ?float
+    private function change(array $markets, string $name): ?float
     {
-        foreach($markets as $market){
+        foreach ($markets as $market) {
 
-            if($market['name']===$name){
+            if ($market['name'] === $name) {
 
                 return $market['change'];
 
@@ -184,33 +184,33 @@ class MarketService
 
     private function trend(float $score): string
     {
-        return match(true){
-            $score>1.5 => 'Strong Bull',
-            $score>0.5 => 'Bullish',
-            $score>-0.5 => 'Neutral',
-            $score>-1.5 => 'Bearish',
+        return match (true) {
+            $score > 1.5 => 'Strong Bull',
+            $score > 0.5 => 'Bullish',
+            $score > -0.5 => 'Neutral',
+            $score > -1.5 => 'Bearish',
             default => 'Strong Bear',
         };
     }
 
     private function momentum(float $score): string
     {
-        return match(true){
-            $score>1.5 => 'Sehr Stark',
-            $score>0.5 => 'Positiv',
-            $score>-0.5 => 'Seitwärts',
-            $score>-1.5 => 'Negativ',
+        return match (true) {
+            $score > 1.5 => 'Sehr Stark',
+            $score > 0.5 => 'Positiv',
+            $score > -0.5 => 'Seitwärts',
+            $score > -1.5 => 'Negativ',
             default => 'Sehr Schwach',
         };
     }
 
     private function phase(float $score): string
     {
-        return match(true){
-            $score>1.5 => 'Risk On',
-            $score>0.5 => 'Aufwärtstrend',
-            $score>-0.5 => 'Konsolidierung',
-            $score>-1.5 => 'Korrektur',
+        return match (true) {
+            $score > 1.5 => 'Risk On',
+            $score > 0.5 => 'Aufwärtstrend',
+            $score > -0.5 => 'Konsolidierung',
+            $score > -1.5 => 'Korrektur',
             default => 'Risk Off',
         };
     }

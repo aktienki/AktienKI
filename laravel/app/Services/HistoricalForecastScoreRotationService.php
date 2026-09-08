@@ -16,8 +16,7 @@ final class HistoricalForecastScoreRotationService
         bool $sectorRotation = false,
         bool $indexRotation = false,
         string $strategyPriority = 'rotation_first',
-    ): array
-    {
+    ): array {
         DB::table('backtest_strategy_trades')
             ->where('backtest_run_id', $runId)
             ->where('strategy', self::STRATEGY)
@@ -104,7 +103,9 @@ final class HistoricalForecastScoreRotationService
         foreach ($rebalanceDays as $day) {
             foreach ($snapshotsByInstrument as $instrumentId => $instrumentSnapshots) {
                 $available = $instrumentSnapshots->filter(fn (object $row): bool => (string) $row->entry_date <= $day)->last();
-                if ($available !== null) $latest[(int) $instrumentId] = $available;
+                if ($available !== null) {
+                    $latest[(int) $instrumentId] = $available;
+                }
             }
 
             if ($strategyPriority === 'exit_first') {
@@ -136,8 +137,10 @@ final class HistoricalForecastScoreRotationService
                         $sectorMatch = $sectorRotation && $bestSector !== null && ($row->sector ?? null) === $bestSector;
                         $indexMatch = $indexRotation && $bestIndex !== null
                             && $indexMemberships->get((int) $row->instrument_id, collect())->contains(fn (object $membership): bool => (int) $membership->market_index_id === (int) $bestIndex);
+
                         return (int) $sectorMatch + (int) $indexMatch;
                     };
+
                     return ($priority($right) <=> $priority($left))
                     ?: ((float) $right->predicted_return <=> (float) $left->predicted_return)
                     ?: ((float) $right->ki_score <=> (float) $left->ki_score)
@@ -148,16 +151,23 @@ final class HistoricalForecastScoreRotationService
             while (count($positions) < max(1, $maxPositions)) {
                 $candidate = $ranked->first(fn (object $row): bool => ! isset($positions[(int) $row->instrument_id])
                     && ! isset($usedSourceTrades[(int) $row->id]));
-                if ($candidate === null) break;
+                if ($candidate === null) {
+                    break;
+                }
                 $positions[(int) $candidate->instrument_id] = $this->openPosition($runId, $candidate, $day, $bars, $strategyPriority);
                 $usedSourceTrades[(int) $candidate->id] = true;
             }
 
-            if ($positions === []) continue;
+            if ($positions === []) {
+                continue;
+            }
             $candidate = $ranked->first(fn (object $row): bool => ! isset($positions[(int) $row->instrument_id])
                 && ! isset($usedSourceTrades[(int) $row->id]));
             if ($candidate === null) {
-                if ($strategyPriority === 'rotation_first') $this->closeDuePositions($positions, $completed, $day, $bars, $latest);
+                if ($strategyPriority === 'rotation_first') {
+                    $this->closeDuePositions($positions, $completed, $day, $bars, $latest);
+                }
+
                 continue;
             }
 
@@ -166,12 +176,17 @@ final class HistoricalForecastScoreRotationService
             })->keys()->first();
             $weakestSnapshot = $latest[(int) $weakestId] ?? null;
             if ($weakestSnapshot === null || (float) $candidate->predicted_return <= (float) $weakestSnapshot->predicted_return) {
-                if ($strategyPriority === 'rotation_first') $this->closeDuePositions($positions, $completed, $day, $bars, $latest);
+                if ($strategyPriority === 'rotation_first') {
+                    $this->closeDuePositions($positions, $completed, $day, $bars, $latest);
+                }
+
                 continue;
             }
 
             $closed = $this->closePosition($positions[(int) $weakestId], $day, $bars, 'better_forecast', $latest[(int) $weakestId]);
-            if ($closed !== null) $completed[] = $closed;
+            if ($closed !== null) {
+                $completed[] = $closed;
+            }
             unset($positions[(int) $weakestId]);
             $positions[(int) $candidate->instrument_id] = $this->openPosition($runId, $candidate, $day, $bars, $strategyPriority);
             $usedSourceTrades[(int) $candidate->id] = true;
@@ -185,7 +200,9 @@ final class HistoricalForecastScoreRotationService
         $lastDay = (string) $tradingDays->last();
         foreach ($positions as $position) {
             $closed = $this->closePosition($position, $lastDay, $bars, 'period_end', $latest[$position['instrument_id']] ?? null);
-            if ($closed !== null) $completed[] = $closed;
+            if ($closed !== null) {
+                $completed[] = $closed;
+            }
         }
 
         foreach (array_chunk($completed, 500) as $chunk) {
@@ -207,6 +224,7 @@ final class HistoricalForecastScoreRotationService
     private function openPosition(int $runId, object $snapshot, string $day, Collection $bars, string $strategyPriority): array
     {
         $bar = $this->priceOn($bars->get((int) $snapshot->instrument_id), $day);
+
         return [
             'run_id' => $runId,
             'source_id' => (int) $snapshot->id,
@@ -224,11 +242,14 @@ final class HistoricalForecastScoreRotationService
     {
         $instrumentBars = $bars->get($position['instrument_id']);
         $bar = $this->priceOn($instrumentBars, $day);
-        if ($bar === null || $position['entry_price'] <= 0) return null;
+        if ($bar === null || $position['entry_price'] <= 0) {
+            return null;
+        }
         $heldBars = $instrumentBars->filter(fn (object $item, string $date): bool => $date >= $position['entry_date'] && $date <= $day);
         $minimum = (float) ($heldBars->min('low') ?? $position['entry_price']);
         $exitPrice = (float) $bar->close;
         $now = now();
+
         return [
             'backtest_run_id' => $position['run_id'],
             'backtest_trade_id' => $position['source_id'],
@@ -257,25 +278,34 @@ final class HistoricalForecastScoreRotationService
 
     private function priceOn(?Collection $bars, string $day): ?object
     {
-        if ($bars === null || $bars->isEmpty()) return null;
+        if ($bars === null || $bars->isEmpty()) {
+            return null;
+        }
+
         return $bars->get($day) ?? $bars->filter(fn (object $bar, string $date): bool => $date <= $day)->last();
     }
 
     private function plannedExitDate(?Collection $bars, string $entryDay, int $holdingDays): string
     {
-        if ($bars === null || $bars->isEmpty()) return $entryDay;
+        if ($bars === null || $bars->isEmpty()) {
+            return $entryDay;
+        }
         $dates = $bars->keys()->filter(fn (string $date): bool => $date >= $entryDay)->values();
+
         return (string) ($dates->get($holdingDays) ?? $dates->last() ?? $entryDay);
     }
 
     private function closeDuePositions(array &$positions, array &$completed, string $day, Collection $bars, array $latest): void
     {
         foreach ($positions as $instrumentId => $position) {
-            if (($position['planned_exit_date'] ?? '9999-12-31') > $day) continue;
+            if (($position['planned_exit_date'] ?? '9999-12-31') > $day) {
+                continue;
+            }
             $closed = $this->closePosition($position, $day, $bars, 'selected_exit_strategy', $latest[(int) $instrumentId] ?? null);
-            if ($closed !== null) $completed[] = $closed;
+            if ($closed !== null) {
+                $completed[] = $closed;
+            }
             unset($positions[$instrumentId]);
         }
     }
-
 }

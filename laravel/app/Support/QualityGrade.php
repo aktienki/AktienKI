@@ -38,8 +38,11 @@ final class QualityGrade
      */
     public static function riskLevel(?float $riskPercent): ?int
     {
-        if ($riskPercent === null || ! is_finite($riskPercent)) return null;
+        if ($riskPercent === null || ! is_finite($riskPercent)) {
+            return null;
+        }
         $risk = max(0, min(100, $riskPercent));
+
         return match (true) {
             $risk <= 40 => 2,
             $risk <= 60 => 3,

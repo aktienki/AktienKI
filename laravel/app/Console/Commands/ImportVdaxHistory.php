@@ -29,6 +29,7 @@ class ImportVdaxHistory extends Command
 
         if (! $instrument) {
             $this->error('Das VDAX-Instrument wurde nicht gefunden.');
+
             return self::FAILURE;
         }
 
@@ -98,6 +99,7 @@ class ImportVdaxHistory extends Command
         ]);
 
         $this->info("VDAX: {$rows->count()} echte Tageskurse für {$years} Jahre importiert.");
+
         return self::SUCCESS;
     }
 }

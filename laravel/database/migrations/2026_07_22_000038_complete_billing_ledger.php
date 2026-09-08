@@ -28,9 +28,9 @@ return new class extends Migration
             $table->timestampTz('resumes_at')->nullable();
         });
         DB::statement(
-            "CREATE UNIQUE INDEX billing_subscriptions_one_live_product_idx "
-            . "ON billing_subscriptions (user_id, product_type) "
-            . "WHERE status IN ('incomplete','trialing','active','past_due','paused')"
+            'CREATE UNIQUE INDEX billing_subscriptions_one_live_product_idx '
+            .'ON billing_subscriptions (user_id, product_type) '
+            ."WHERE status IN ('incomplete','trialing','active','past_due','paused')"
         );
     }
 
@@ -84,8 +84,8 @@ return new class extends Migration
         });
         DB::statement(
             'CREATE UNIQUE INDEX billing_payment_methods_one_default_idx '
-            . 'ON billing_payment_methods (billing_account_id, provider) '
-            . 'WHERE is_default=TRUE'
+            .'ON billing_payment_methods (billing_account_id, provider) '
+            .'WHERE is_default=TRUE'
         );
 
         Schema::create('billing_invoice_items', function (Blueprint $table): void {

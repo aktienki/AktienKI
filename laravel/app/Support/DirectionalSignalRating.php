@@ -9,7 +9,7 @@ final class DirectionalSignalRating
      * signal; a low value means a strong negative signal. Model quality only
      * controls how far the rating may move away from neutral.
      *
-     * @param  array<int|string, mixed>  $horizonReturns Expected returns in percent.
+     * @param  array<int|string, mixed>  $horizonReturns  Expected returns in percent.
      * @return array{percent:float,label:string,weighted_return:float,agreement:float,quality:float,complete:bool}
      */
     public static function calculate(array $horizonReturns, mixed $modelQuality = null): array
@@ -23,7 +23,9 @@ final class DirectionalSignalRating
                 ?? $horizonReturns[(string) $horizon]
                 ?? $horizonReturns[$horizon.'d']
                 ?? null;
-            if (! is_numeric($value) || ! is_finite((float) $value)) continue;
+            if (! is_numeric($value) || ! is_finite((float) $value)) {
+                continue;
+            }
 
             $values[$horizon] = (float) $value;
             $availableWeight += $weight;
@@ -40,8 +42,11 @@ final class DirectionalSignalRating
         foreach ($values as $horizon => $value) {
             $weight = $weights[$horizon] / $availableWeight;
             $weightedReturn += $value * $weight;
-            if ($value > .25) $positiveWeight += $weight;
-            elseif ($value < -.25) $negativeWeight += $weight;
+            if ($value > .25) {
+                $positiveWeight += $weight;
+            } elseif ($value < -.25) {
+                $negativeWeight += $weight;
+            }
         }
 
         $agreement = max($positiveWeight, $negativeWeight);
@@ -55,8 +60,12 @@ final class DirectionalSignalRating
         $complete = count($values) === 4;
 
         // The extreme grades require complete agreement across all horizons.
-        if (! $complete || $positiveWeight < .999) $percent = min(89.99, $percent);
-        if (! $complete || $negativeWeight < .999) $percent = max(10.0, $percent);
+        if (! $complete || $positiveWeight < .999) {
+            $percent = min(89.99, $percent);
+        }
+        if (! $complete || $negativeWeight < .999) {
+            $percent = max(10.0, $percent);
+        }
 
         return self::result($percent, $weightedReturn, $agreement * 100, $quality, $complete);
     }

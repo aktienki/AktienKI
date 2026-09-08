@@ -101,24 +101,39 @@ class NewsController extends Controller
 
         $newsItems->getCollection()->transform(function (object $item) use ($watchlistInstrumentIds, $portfolioInstrumentIds, $labels): object {
             $reasons = [];
-            if ($watchlistInstrumentIds->has((int) $item->instrument_id)) $reasons[] = __('Watchlist');
-            if ($portfolioInstrumentIds->has((int) $item->instrument_id)) $reasons[] = __('Musterdepot');
+            if ($watchlistInstrumentIds->has((int) $item->instrument_id)) {
+                $reasons[] = __('Watchlist');
+            }
+            if ($portfolioInstrumentIds->has((int) $item->instrument_id)) {
+                $reasons[] = __('Musterdepot');
+            }
             $score = is_numeric($item->current_ai_score) ? (float) $item->current_ai_score : null;
             $confidence = is_numeric($item->current_confidence) ? (float) $item->current_confidence : null;
-            if ($confidence !== null && $confidence <= 1) $confidence *= 100;
+            if ($confidence !== null && $confidence <= 1) {
+                $confidence *= 100;
+            }
             $current = is_numeric($item->current_price) ? (float) $item->current_price : null;
             $target = is_numeric($item->predicted_price_20d) ? (float) $item->predicted_price_20d : null;
             $return = $current && $target ? (($target / $current) - 1) * 100 : null;
             foreach ($labels as $label) {
                 $criteria = is_string($label->criteria) ? (json_decode($label->criteria, true) ?: []) : (array) $label->criteria;
-                if (strtoupper((string) $item->current_signal) !== 'BUY') continue;
-                if ($score === null || $score < (float) ($criteria['score_min'] ?? 0)) continue;
-                if ($confidence === null || $confidence < (float) ($criteria['confidence_min'] ?? 0)) continue;
-                if ($return === null || $return < (float) ($criteria['predicted_return_min'] ?? -20)) continue;
+                if (strtoupper((string) $item->current_signal) !== 'BUY') {
+                    continue;
+                }
+                if ($score === null || $score < (float) ($criteria['score_min'] ?? 0)) {
+                    continue;
+                }
+                if ($confidence === null || $confidence < (float) ($criteria['confidence_min'] ?? 0)) {
+                    continue;
+                }
+                if ($return === null || $return < (float) ($criteria['predicted_return_min'] ?? -20)) {
+                    continue;
+                }
                 $reasons[] = __('Label: :name', ['name' => $label->name]);
             }
             $item->personal_reasons = array_values(array_unique($reasons));
             $item->is_personal = $item->personal_reasons !== [];
+
             return $item;
         });
 

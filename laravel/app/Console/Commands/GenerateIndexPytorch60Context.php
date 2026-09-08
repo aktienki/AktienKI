@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 final class GenerateIndexPytorch60Context extends Command
 {
     protected $signature = 'predictions:index-pytorch60-context {--dry-run} {--minimum-members=5} {--max-members=25} {--show-skipped}';
+
     protected $description = 'Aggregiert den PyTorch-60T-Sektorkontext über die abgedeckten Mitglieder je Index.';
 
     public function handle(): int
@@ -67,6 +68,7 @@ final class GenerateIndexPytorch60Context extends Command
                 if ($this->option('show-skipped')) {
                     $this->warn(sprintf('%s: skipped coverage=%d/%d', $index->symbol, count($probabilities), $members->count()));
                 }
+
                 continue;
             }
             $probability = array_sum($probabilities) / count($probabilities);

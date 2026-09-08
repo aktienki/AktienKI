@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('indicator_signal_statistics', function (Blueprint $table) {
@@ -31,7 +32,7 @@ return new class extends Migration {
             $table->timestampsTz();
             $table->unique(
                 ['instrument_id', 'interval', 'indicator', 'regime',
-                 'position_side', 'horizon_days', 'value_bucket'],
+                    'position_side', 'horizon_days', 'value_bucket'],
                 'indicator_signal_statistics_scope_unique'
             );
             $table->index(

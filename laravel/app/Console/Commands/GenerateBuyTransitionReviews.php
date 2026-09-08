@@ -34,7 +34,9 @@ final class GenerateBuyTransitionReviews extends Command
                         ->orderByDesc('id')
                         ->first();
 
-                    if ($previous && $reviews->queueForTransition($prediction, $previous)) $queued++;
+                    if ($previous && $reviews->queueForTransition($prediction, $previous)) {
+                        $queued++;
+                    }
                 }
             });
 

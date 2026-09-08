@@ -39,20 +39,13 @@ final class MacdStochasticMarketPhaseService
         $stochasticRising = $stochastic > $previousStochastic;
 
         return match (true) {
-            $macd >= 0 && $macdRising && $stochastic >= 50 && $stochastic < 80
-                => $this->phase('bullish_impulse', 'Bullischer Impuls', 4),
-            $macd >= 0 && ! $macdRising && $stochastic >= 80
-                => $this->phase('overheated_fading', 'Überhitzt / nachlassend', -12, true),
-            $macdRising && $stochasticRising && $stochastic < 50
-                => $this->phase('early_recovery', 'Frühe Erholung', 7),
-            $macd < 0 && ! $macdRising && $stochastic < 50
-                => $this->phase('bearish_impulse', 'Bärischer Impuls / Rebound-Fenster', 3),
-            $stochastic < 20 && $macdRising
-                => $this->phase('oversold_stabilizing', 'Überverkauft / Stabilisierung', 8),
-            $macd >= 0 && $stochastic >= 80
-                => $this->phase('mature_uptrend', 'Starker reifer Trend', 0),
-            $macd < 0 && $stochastic >= 50
-                => $this->phase('negative_divergence', 'Negative Divergenz / Erholungschance', 8),
+            $macd >= 0 && $macdRising && $stochastic >= 50 && $stochastic < 80 => $this->phase('bullish_impulse', 'Bullischer Impuls', 4),
+            $macd >= 0 && ! $macdRising && $stochastic >= 80 => $this->phase('overheated_fading', 'Überhitzt / nachlassend', -12, true),
+            $macdRising && $stochasticRising && $stochastic < 50 => $this->phase('early_recovery', 'Frühe Erholung', 7),
+            $macd < 0 && ! $macdRising && $stochastic < 50 => $this->phase('bearish_impulse', 'Bärischer Impuls / Rebound-Fenster', 3),
+            $stochastic < 20 && $macdRising => $this->phase('oversold_stabilizing', 'Überverkauft / Stabilisierung', 8),
+            $macd >= 0 && $stochastic >= 80 => $this->phase('mature_uptrend', 'Starker reifer Trend', 0),
+            $macd < 0 && $stochastic >= 50 => $this->phase('negative_divergence', 'Negative Divergenz / Erholungschance', 8),
             default => $this->phase('neutral_transition', 'Neutral / Übergang', 0),
         };
     }

@@ -92,13 +92,28 @@ final class PerformanceTransparencyController extends Controller
         $minimumProfitFactor = $request->filled('profit_factor') ? (float) $request->query('profit_factor') : null;
 
         $filtered = $rows->filter(function (object $row) use ($search, $signal, $score, $risk, $quality, $minimumHitRate, $minimumProfitFactor): bool {
-            if ($search !== '' && ! str_contains(mb_strtolower($row->name.' '.$row->symbol), mb_strtolower($search))) return false;
-            if ($signal !== '' && strtoupper((string) $row->personalized_signal) !== $signal) return false;
-            if ($score !== '' && (string) $row->score_grade !== $score) return false;
-            if ($risk !== '' && (string) $row->risk_level !== $risk) return false;
-            if ($quality !== '' && strtolower((string) $row->quality_class) !== $quality) return false;
-            if ($minimumHitRate !== null && (float) ($row->after_metrics['hit_rate'] ?? -INF) < $minimumHitRate) return false;
-            if ($minimumProfitFactor !== null && (float) ($row->after_metrics['profit_factor'] ?? -INF) < $minimumProfitFactor) return false;
+            if ($search !== '' && ! str_contains(mb_strtolower($row->name.' '.$row->symbol), mb_strtolower($search))) {
+                return false;
+            }
+            if ($signal !== '' && strtoupper((string) $row->personalized_signal) !== $signal) {
+                return false;
+            }
+            if ($score !== '' && (string) $row->score_grade !== $score) {
+                return false;
+            }
+            if ($risk !== '' && (string) $row->risk_level !== $risk) {
+                return false;
+            }
+            if ($quality !== '' && strtolower((string) $row->quality_class) !== $quality) {
+                return false;
+            }
+            if ($minimumHitRate !== null && (float) ($row->after_metrics['hit_rate'] ?? -INF) < $minimumHitRate) {
+                return false;
+            }
+            if ($minimumProfitFactor !== null && (float) ($row->after_metrics['profit_factor'] ?? -INF) < $minimumProfitFactor) {
+                return false;
+            }
+
             return true;
         })->values();
 
@@ -118,8 +133,12 @@ final class PerformanceTransparencyController extends Controller
     private function reason(object $row, array $metrics): string
     {
         $trades = (int) ($metrics['trades'] ?? $row->validation_event_count ?? 0);
-        if ($trades < 10) return __('Vorläufig: weniger als zehn unabhängige Out-of-Sample-Signale.');
-        if (! $row->validation_passed) return __('Beobachtung: Die aktuelle Validierung erfüllt noch nicht alle Freigabekriterien.');
+        if ($trades < 10) {
+            return __('Vorläufig: weniger als zehn unabhängige Out-of-Sample-Signale.');
+        }
+        if (! $row->validation_passed) {
+            return __('Beobachtung: Die aktuelle Validierung erfüllt noch nicht alle Freigabekriterien.');
+        }
 
         return __('Validiert: individuelle Schwelle und nachgelagerte Filter wurden außerhalb des Trainingszeitraums geprüft.');
     }

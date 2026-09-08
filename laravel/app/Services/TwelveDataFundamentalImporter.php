@@ -177,7 +177,9 @@ class TwelveDataFundamentalImporter
             foreach ($ratings as $rating) {
                 $date = $this->date($rating['date'] ?? null);
                 $firm = trim((string) ($rating['firm'] ?? ''));
-                if (! $date || $firm === '') continue;
+                if (! $date || $firm === '') {
+                    continue;
+                }
                 DB::table('instrument_analyst_ratings')->updateOrInsert(
                     ['instrument_id' => $instrument->id, 'rating_date' => $date, 'firm' => $firm],
                     [
@@ -200,6 +202,7 @@ class TwelveDataFundamentalImporter
     private function records(array $payload, string $root)
     {
         $records = $payload[$root] ?? [];
+
         return collect(Arr::isList($records) ? $records : [])->filter(fn ($row) => is_array($row));
     }
 
@@ -207,7 +210,9 @@ class TwelveDataFundamentalImporter
     {
         foreach ($this->records($payload, $root) as $row) {
             $date = $this->date($row['fiscal_date'] ?? $row['date'] ?? null);
-            if (! $date) continue;
+            if (! $date) {
+                continue;
+            }
             DB::table('instrument_financial_statements')->updateOrInsert(
                 ['instrument_id' => $instrumentId, 'statement_type' => $type, 'fiscal_date' => $date, 'period' => (string) ($row['period'] ?? 'unknown')],
                 ['currency' => $row['currency'] ?? null, 'reported_at' => $this->date($row['reported_at'] ?? null),
@@ -220,7 +225,9 @@ class TwelveDataFundamentalImporter
     {
         foreach ($this->records($payload, 'earnings') as $row) {
             $date = $this->date($row['date'] ?? $row['fiscal_date'] ?? null);
-            if (! $date) continue;
+            if (! $date) {
+                continue;
+            }
             DB::table('instrument_earnings')->updateOrInsert(
                 ['instrument_id' => $instrumentId, 'earnings_date' => $date, 'period' => (string) ($row['period'] ?? 'unknown')],
                 ['eps_estimate' => $this->numeric($row['eps_estimate'] ?? null), 'eps_actual' => $this->numeric($row['eps_actual'] ?? null),
@@ -234,7 +241,9 @@ class TwelveDataFundamentalImporter
     {
         foreach ($this->records($payload, 'dividends') as $row) {
             $date = $this->date($row['ex_date'] ?? $row['date'] ?? null);
-            if (! $date) continue;
+            if (! $date) {
+                continue;
+            }
             DB::table('instrument_dividends')->updateOrInsert(
                 ['instrument_id' => $instrumentId, 'ex_date' => $date],
                 ['record_date' => $this->date($row['record_date'] ?? null), 'payment_date' => $this->date($row['payment_date'] ?? null),
@@ -250,9 +259,12 @@ class TwelveDataFundamentalImporter
             $flat = $this->flatten($payload);
             foreach ($candidates as $candidate) {
                 $key = strtolower($candidate);
-                if (isset($flat[$key]) && is_numeric($flat[$key])) return (float) $flat[$key];
+                if (isset($flat[$key]) && is_numeric($flat[$key])) {
+                    return (float) $flat[$key];
+                }
             }
         }
+
         return null;
     }
 
@@ -260,24 +272,50 @@ class TwelveDataFundamentalImporter
     {
         $flat = [];
         array_walk_recursive($payload, function ($value, $key) use (&$flat): void {
-            if (! array_key_exists(strtolower((string) $key), $flat)) $flat[strtolower((string) $key)] = $value;
+            if (! array_key_exists(strtolower((string) $key), $flat)) {
+                $flat[strtolower((string) $key)] = $value;
+            }
         });
+
         return $flat;
     }
 
     private function firstValue(array $payload, array $keys): mixed
     {
         $flat = $this->flatten($payload);
-        foreach ($keys as $key) if (array_key_exists(strtolower($key), $flat)) return $flat[strtolower($key)];
+        foreach ($keys as $key) {
+            if (array_key_exists(strtolower($key), $flat)) {
+                return $flat[strtolower($key)];
+            }
+        }
+
         return null;
     }
 
-    private function ratio(?float $value): ?float { return $value !== null && abs($value) > 1 ? $value / 100 : $value; }
-    private function numeric(mixed $value): ?float { return is_numeric($value) ? (float) $value : null; }
-    private function integer(mixed $value): ?int { return is_numeric($value) ? (int) $value : null; }
+    private function ratio(?float $value): ?float
+    {
+        return $value !== null && abs($value) > 1 ? $value / 100 : $value;
+    }
+
+    private function numeric(mixed $value): ?float
+    {
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    private function integer(mixed $value): ?int
+    {
+        return is_numeric($value) ? (int) $value : null;
+    }
+
     private function date(mixed $value): ?string
     {
-        if (! $value) return null;
-        try { return CarbonImmutable::parse($value)->toDateString(); } catch (\Throwable) { return null; }
+        if (! $value) {
+            return null;
+        }
+        try {
+            return CarbonImmutable::parse($value)->toDateString();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

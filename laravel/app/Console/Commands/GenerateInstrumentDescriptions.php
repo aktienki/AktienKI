@@ -22,12 +22,14 @@ class GenerateInstrumentDescriptions extends Command
         $apiKey = (string) env('OPENAI_API_KEY');
         if ($apiKey === '') {
             $this->error('OPENAI_API_KEY ist nicht konfiguriert.');
+
             return self::FAILURE;
         }
 
         foreach (['business_summary', 'business_description', 'business_summary_en', 'business_description_en'] as $column) {
             if (! Schema::hasColumn('instruments', $column)) {
                 $this->error("Die Spalte {$column} fehlt. Bitte zuerst php artisan migrate --force ausführen.");
+
                 return self::FAILURE;
             }
         }
@@ -46,14 +48,16 @@ class GenerateInstrumentDescriptions extends Command
         }
 
         $limit = max(0, (int) $this->option('limit'));
-        if ($limit > 0) $query->limit($limit);
+        if ($limit > 0) {
+            $query->limit($limit);
+        }
         $stocks = $query->get(['instruments.id', 'instruments.symbol', 'instruments.name', 'instruments.country', 'instruments.sector', 'instruments.industry', 'instruments.currency']);
         $this->info("{$stocks->count()} Aktien werden verarbeitet (Modell: {$model}).");
 
         $success = $failed = 0;
         foreach ($stocks as $stock) {
             try {
-                $prompt = "Erstelle für dieses börsennotierte Unternehmen jeweils eine deutsche und englische Version. "
+                $prompt = 'Erstelle für dieses börsennotierte Unternehmen jeweils eine deutsche und englische Version. '
                     .'compact_de und compact_en: jeweils 3–4 informative, gut lesbare Sätze für eine Screener-Karte. '
                     .'expanded_de und expanded_en: jeweils 6–8 kompakte, aber umfassende Sätze für eine Detailseite. '
                     .'Beschreibe Geschäftsmodell, wichtigste Produkte/Dienstleistungen, Kundengruppen, Hauptmärkte, Branche und relevante Wertschöpfung. '
@@ -75,7 +79,9 @@ class GenerateInstrumentDescriptions extends Command
                     'max_output_tokens' => 700,
                     'metadata' => ['feature' => 'instrument-business-descriptions'],
                 ]);
-                if ($response->failed()) throw new \RuntimeException('HTTP '.$response->status().': '.(string) data_get($response->json(), 'error.message', 'OpenAI-Fehler'));
+                if ($response->failed()) {
+                    throw new \RuntimeException('HTTP '.$response->status().': '.(string) data_get($response->json(), 'error.message', 'OpenAI-Fehler'));
+                }
 
                 $raw = (string) ($response->json('output_text') ?: data_get($response->json(), 'output.0.content.0.text', ''));
                 $json = json_decode(trim($raw), true);
@@ -83,7 +89,9 @@ class GenerateInstrumentDescriptions extends Command
                 $expanded = trim((string) ($json['expanded_de'] ?? ''));
                 $compactEn = trim((string) ($json['compact_en'] ?? ''));
                 $expandedEn = trim((string) ($json['expanded_en'] ?? ''));
-                if ($compact === '' || $expanded === '' || $compactEn === '' || $expandedEn === '') throw new \RuntimeException('Ungültige JSON-Antwort für '.$stock->symbol);
+                if ($compact === '' || $expanded === '' || $compactEn === '' || $expandedEn === '') {
+                    throw new \RuntimeException('Ungültige JSON-Antwort für '.$stock->symbol);
+                }
 
                 DB::table('instruments')->where('id', $stock->id)->update([
                     'business_summary' => $compact,
@@ -104,6 +112,7 @@ class GenerateInstrumentDescriptions extends Command
         }
 
         $this->info("Abgeschlossen: {$success} erfolgreich, {$failed} fehlgeschlagen.");
+
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
 }

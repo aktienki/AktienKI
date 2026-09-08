@@ -11,8 +11,7 @@ class PredictionService
 {
     public function __construct(
         protected TwelveDataService $yahoo
-    ) {
-    }
+    ) {}
 
     public function topSignals(int $limit = 5): array
     {
@@ -79,8 +78,7 @@ class PredictionService
 
                     'company' => Str::limit($company?->name ?? '', 20),
 
-                    'index' =>
-                        $company?->index_name
+                    'index' => $company?->index_name
                         ?? $company?->market_index
                         ?? $company?->listed_index
                         ?? $company?->exchange_index
@@ -97,8 +95,7 @@ class PredictionService
                         98
                     ),
 
-                    'prediction_time' =>
-                        $prediction->prediction_date
+                    'prediction_time' => $prediction->prediction_date
                         ?? $prediction->created_at,
 
                     'price' => $quote['price'] ?? null,

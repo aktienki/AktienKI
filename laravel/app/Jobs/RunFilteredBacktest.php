@@ -2,14 +2,14 @@
 
 namespace App\Jobs;
 
-use App\Services\TwelveDataService;
-use App\Services\YahooIndexService;
+use App\Services\HistoricalAreaEntryRotationService;
 use App\Services\HistoricalDynamicExitService;
 use App\Services\HistoricalForecastScoreRotationService;
-use App\Services\HistoricalAreaEntryRotationService;
 use App\Services\HistoricalIndicatorMatrixService;
 use App\Services\HistoricalIndicatorProbabilityService;
 use App\Services\HistoricalPortfolioExecutionCalculator;
+use App\Services\TwelveDataService;
+use App\Services\YahooIndexService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Query\Builder;
@@ -50,6 +50,7 @@ final class RunFilteredBacktest implements ShouldQueue
     {
         if ($this->isCancelled()) {
             $this->clearCancellationMarker();
+
             return;
         }
         [$periodStart, $periodEnd] = $this->periodBounds();
@@ -82,15 +83,12 @@ final class RunFilteredBacktest implements ShouldQueue
         $query = DB::table('backtest_trades as trade')
             ->join('instruments as instrument', 'instrument.id', '=', 'trade.instrument_id')
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
-            ->leftJoinSub($latestQuality, 'latest_quality', fn ($join) =>
-                $join->on('latest_quality.trained_model_id', '=', 'trade.trained_model_id'))
+            ->leftJoinSub($latestQuality, 'latest_quality', fn ($join) => $join->on('latest_quality.trained_model_id', '=', 'trade.trained_model_id'))
             ->leftJoin('model_quality_rankings as model_quality', 'model_quality.id', '=', 'latest_quality.ranking_id')
             ->leftJoin('model_quality_tiers as quality_tier', 'quality_tier.id', '=', 'model_quality.tier_id')
-            ->leftJoinSub($latestFundamental, 'latest_fundamental', fn ($join) =>
-                $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($latestFundamental, 'latest_fundamental', fn ($join) => $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
             ->leftJoin('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental.fundamental_id')
-            ->leftJoinSub($latestTechnical, 'latest_technical', fn ($join) =>
-                $join->on('latest_technical.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($latestTechnical, 'latest_technical', fn ($join) => $join->on('latest_technical.instrument_id', '=', 'instrument.id'))
             ->leftJoin('technical_indicators as technical', 'technical.id', '=', 'latest_technical.technical_id')
             ->where('trade.backtest_run_id', $this->sourceRunId)
             ->where('trade.entry_date', '>=', $periodStart)
@@ -138,25 +136,20 @@ final class RunFilteredBacktest implements ShouldQueue
                 ->where('eligible_trade.exit_date', '<=', $periodEnd)
                 ->groupBy('eligible_trade.instrument_id')
                 ->select('eligible_trade.instrument_id')
-                ->when($drawdownMaximum < 50, fn (Builder $query) =>
-                    $query->havingRaw('MAX(ABS(eligible_trade.max_drawdown)) <= ?', [max(0, $drawdownMaximum) / 100]))
-                ->when($profitPerTradeMinimum > 0, fn (Builder $query) =>
-                    $query->havingRaw(
-                        'AVG(eligible_trade.net_return) * 100 >= ?',
-                        [$profitPerTradeMinimum],
-                    ))
-                ->when($medianReturnMinimum !== null, fn (Builder $query) =>
-                    $query->havingRaw(
-                        'PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY eligible_trade.net_return) * 100 >= ?',
-                        [$medianReturnMinimum],
-                    ))
-                ->when($hitRateMinimum > 0, fn (Builder $query) =>
-                    $query->havingRaw(
-                        'AVG(CASE WHEN eligible_trade.net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 >= ?',
-                        [min(100, $hitRateMinimum)],
-                    ))
-                ->when($minimumTrades > 1, fn (Builder $query) =>
-                    $query->havingRaw('COUNT(*) >= ?', [$minimumTrades]));
+                ->when($drawdownMaximum < 50, fn (Builder $query) => $query->havingRaw('MAX(ABS(eligible_trade.max_drawdown)) <= ?', [max(0, $drawdownMaximum) / 100]))
+                ->when($profitPerTradeMinimum > 0, fn (Builder $query) => $query->havingRaw(
+                    'AVG(eligible_trade.net_return) * 100 >= ?',
+                    [$profitPerTradeMinimum],
+                ))
+                ->when($medianReturnMinimum !== null, fn (Builder $query) => $query->havingRaw(
+                    'PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY eligible_trade.net_return) * 100 >= ?',
+                    [$medianReturnMinimum],
+                ))
+                ->when($hitRateMinimum > 0, fn (Builder $query) => $query->havingRaw(
+                    'AVG(CASE WHEN eligible_trade.net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 >= ?',
+                    [min(100, $hitRateMinimum)],
+                ))
+                ->when($minimumTrades > 1, fn (Builder $query) => $query->havingRaw('COUNT(*) >= ?', [$minimumTrades]));
             $query->whereIn('trade.instrument_id', $eligibleInstruments);
         }
 
@@ -196,7 +189,9 @@ final class RunFilteredBacktest implements ShouldQueue
                     'trades_return' => [$stats->confidence, $stats->average_return],
                     default => [null, null],
                 };
-                if (! is_numeric($x) || ! is_numeric($y)) return null;
+                if (! is_numeric($x) || ! is_numeric($y)) {
+                    return null;
+                }
                 [$xMin, $xMax, $xStep, $yMin, $yMax, $yStep] = match ($map) {
                     'profit_factor_hit_rate' => [0, 3, .3, 0, 100, 10],
                     'signal_risk' => [0, 100, 10, 0, 50, 5],
@@ -232,11 +227,19 @@ final class RunFilteredBacktest implements ShouldQueue
                     'median_return' => (float) ($rows->pluck('net_return')->median() ?? 0) * 100,
                 ];
                 foreach ($heatmapSelections as $map => $selectedCells) {
-                    if (! is_array($selectedCells) || $selectedCells === []) continue;
-                    if (in_array($cellFor((string) $map, $stats), $selectedCells, true)) return false;
+                    if (! is_array($selectedCells) || $selectedCells === []) {
+                        continue;
+                    }
+                    if (in_array($cellFor((string) $map, $stats), $selectedCells, true)) {
+                        return false;
+                    }
                 }
-                if ($stats->profit_factor < $profitFactorMinimum || $stats->signal_quality < $signalQualityMinimum) return false;
-                if ($medianReturnMinimum !== null && $stats->median_return < $medianReturnMinimum) return false;
+                if ($stats->profit_factor < $profitFactorMinimum || $stats->signal_quality < $signalQualityMinimum) {
+                    return false;
+                }
+                if ($medianReturnMinimum !== null && $stats->median_return < $medianReturnMinimum) {
+                    return false;
+                }
 
                 return true;
             })->keys();
@@ -267,8 +270,7 @@ final class RunFilteredBacktest implements ShouldQueue
                 ->where('calculation_version', 'noise-score-tanh-v1')
                 ->get(['instrument_id', 'signal_date', 'score'])
                 ->mapWithKeys(fn (object $row): array => [(int) $row->instrument_id.'|'.(string) $row->signal_date => (float) $row->score]);
-            $candidates = $candidates->filter(fn (object $trade): bool =>
-                (float) $noiseScores->get((int) $trade->instrument_id.'|'.(string) $trade->entry_date, -1) >= $minimumNoiseScore
+            $candidates = $candidates->filter(fn (object $trade): bool => (float) $noiseScores->get((int) $trade->instrument_id.'|'.(string) $trade->entry_date, -1) >= $minimumNoiseScore
             )->values();
         }
         $riskStyle = in_array($this->filters['entry_risk_style'] ?? null, ['conservative', 'balanced', 'chance'], true)
@@ -320,6 +322,7 @@ final class RunFilteredBacktest implements ShouldQueue
         foreach ($rows->chunk(500) as $chunk) {
             if ($this->isCancelled()) {
                 $this->clearCancellationMarker();
+
                 return;
             }
             DB::table('backtest_trades')->insertOrIgnore($chunk->map(function (object $trade) use ($positionCapital, $tradeCost): array {
@@ -397,6 +400,7 @@ final class RunFilteredBacktest implements ShouldQueue
         $indicatorMatrixSummary = $indicatorMatrix->applyExits($this->runId, $this->filters);
         if (! $this->calculateExitStrategies()) {
             $this->clearCancellationMarker();
+
             return;
         }
         $automaticComparison = filter_var($this->filters['automatic_strategy_comparison'] ?? false, FILTER_VALIDATE_BOOL);
@@ -433,7 +437,9 @@ final class RunFilteredBacktest implements ShouldQueue
                 'entry_wait_5d_enabled' => 'entry_wait_5d',
                 'signal_change_exit_enabled' => 'signal_change_exit',
                 'forecast_below_price_exit_enabled' => 'forecast_below_price_exit',
-            ] as $filterKey => $ruleKey) data_set($settings, 'selection_filters.'.$filterKey, ! empty($dynamicExitSummary['rules'][$ruleKey]) ? 1 : 0);
+            ] as $filterKey => $ruleKey) {
+                data_set($settings, 'selection_filters.'.$filterKey, ! empty($dynamicExitSummary['rules'][$ruleKey]) ? 1 : 0);
+            }
             data_set($settings, 'optimization.dynamic_exit', $dynamicExitSummary);
             DB::table('backtest_runs')->where('id', $this->runId)->update(['settings' => json_encode($settings, JSON_THROW_ON_ERROR), 'updated_at' => now()]);
         }
@@ -454,6 +460,7 @@ final class RunFilteredBacktest implements ShouldQueue
         );
         if ($this->isCancelled()) {
             $this->clearCancellationMarker();
+
             return;
         }
 
@@ -534,11 +541,11 @@ final class RunFilteredBacktest implements ShouldQueue
             ->where('id', $this->runId)
             ->where('status', '<>', 'cancelled')
             ->update([
-            'status' => 'failed',
-            'finished_at' => now(),
-            'error_message' => mb_substr($exception->getMessage(), 0, 4000),
-            'updated_at' => now(),
-        ]);
+                'status' => 'failed',
+                'finished_at' => now(),
+                'error_message' => mb_substr($exception->getMessage(), 0, 4000),
+                'updated_at' => now(),
+            ]);
     }
 
     private function applyFilters(Builder $query, callable $fundamentalNumber): void
@@ -550,17 +557,27 @@ final class RunFilteredBacktest implements ShouldQueue
                 ->whereRaw('LOWER(instrument.symbol) LIKE ?', [$term])
                 ->orWhereRaw('LOWER(instrument.name) LIKE ?', [$term]));
         }
-        if ($filter('country')) $query->where('instrument.country', strtoupper(trim((string) $filter('country'))));
-        if ($filter('sector')) $query->where('instrument.sector', trim((string) $filter('sector')));
-        if ($filter('exchange')) $query->where('exchange.code', strtoupper(trim((string) $filter('exchange'))));
-        if (in_array($filter('ai_type'), ['horizon', 'pulse'], true)) $query->where('trade.ai_type', $filter('ai_type'));
+        if ($filter('country')) {
+            $query->where('instrument.country', strtoupper(trim((string) $filter('country'))));
+        }
+        if ($filter('sector')) {
+            $query->where('instrument.sector', trim((string) $filter('sector')));
+        }
+        if ($filter('exchange')) {
+            $query->where('exchange.code', strtoupper(trim((string) $filter('exchange'))));
+        }
+        if (in_array($filter('ai_type'), ['horizon', 'pulse'], true)) {
+            $query->where('trade.ai_type', $filter('ai_type'));
+        }
         $modelIds = collect(is_array($filter('model')) ? $filter('model') : [$filter('model')])
             ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
-        if ($modelIds !== []) $query->whereIn('trade.model_definition_id', $modelIds);
+        if ($modelIds !== []) {
+            $query->whereIn('trade.model_definition_id', $modelIds);
+        }
         $servingConfigurations = $filter('serving_model_configurations');
         $usesServingConfigurations = $this->usesServingConfigurations();
         if ($usesServingConfigurations) {
@@ -598,23 +615,40 @@ final class RunFilteredBacktest implements ShouldQueue
         if (! is_array($servingQualitySymbols) && array_key_exists((string) $filter('quality_tier'), $minimumQualityTiers)) {
             $query->whereIn('quality_tier.code', $minimumQualityTiers[(string) $filter('quality_tier')]);
         }
-        if (! is_array($servingQualitySymbols) && $filter('quality_tier') === 'unqualified') $query->whereNull('quality_tier.code');
-        if (in_array(strtoupper((string) $filter('signal')), ['BUY', 'WAIT', 'WATCH', 'HOLD', 'SELL'], true)) $query->where('trade.signal', strtoupper((string) $filter('signal')));
-        if (is_numeric($filter('score_min'))) $query->where('trade.ki_score', '>=', max(0, min(10, (float) $filter('score_min'))));
-        if (! $usesServingConfigurations && is_numeric($filter('confidence_min'))) $query->where('trade.confidence', '>=', max(0, min(100, (float) $filter('confidence_min'))));
+        if (! is_array($servingQualitySymbols) && $filter('quality_tier') === 'unqualified') {
+            $query->whereNull('quality_tier.code');
+        }
+        if (in_array(strtoupper((string) $filter('signal')), ['BUY', 'WAIT', 'WATCH', 'HOLD', 'SELL'], true)) {
+            $query->where('trade.signal', strtoupper((string) $filter('signal')));
+        }
+        if (is_numeric($filter('score_min'))) {
+            $query->where('trade.ki_score', '>=', max(0, min(10, (float) $filter('score_min'))));
+        }
+        if (! $usesServingConfigurations && is_numeric($filter('confidence_min'))) {
+            $query->where('trade.confidence', '>=', max(0, min(100, (float) $filter('confidence_min'))));
+        }
         if (! $usesServingConfigurations && is_numeric($filter('risk_max')) && (float) $filter('risk_max') < 100) {
             $query->whereRaw('ABS(COALESCE(trade.max_drawdown, 0)) <= ?', [max(0, (float) $filter('risk_max')) / 100]);
         }
         $minimumReturn = is_numeric($filter('predicted_return_min')) ? (float) $filter('predicted_return_min') : null;
-        if ($minimumReturn !== null) $query->where('trade.predicted_return', '>=', $minimumReturn / 100);
-        elseif ((bool) $filter('positive_prediction_required', false)) $query->where('trade.predicted_return', '>', 0);
-        if (is_numeric($filter('volatility_max')) && (float) $filter('volatility_max') < 100) $query->where('technical.volatility_20', '<=', max(0, (float) $filter('volatility_max')) / 100);
-        if (is_numeric($filter('pe_max')) && (float) $filter('pe_max') < 100) $query->whereRaw($fundamentalNumber('trailingPE').' <= ?', [(float) $filter('pe_max')]);
+        if ($minimumReturn !== null) {
+            $query->where('trade.predicted_return', '>=', $minimumReturn / 100);
+        } elseif ((bool) $filter('positive_prediction_required', false)) {
+            $query->where('trade.predicted_return', '>', 0);
+        }
+        if (is_numeric($filter('volatility_max')) && (float) $filter('volatility_max') < 100) {
+            $query->where('technical.volatility_20', '<=', max(0, (float) $filter('volatility_max')) / 100);
+        }
+        if (is_numeric($filter('pe_max')) && (float) $filter('pe_max') < 100) {
+            $query->whereRaw($fundamentalNumber('trailingPE').' <= ?', [(float) $filter('pe_max')]);
+        }
         if (is_numeric($filter('dividend_yield_min')) && ($filter('dividend_yield_operator', 'gte') === 'lte' || (float) $filter('dividend_yield_min') > 0)) {
             $operator = $filter('dividend_yield_operator', 'gte') === 'lte' ? '<=' : '>=';
             $query->whereRaw($fundamentalNumber('dividendYield').' '.$operator.' ?', [(float) $filter('dividend_yield_min') / 100]);
         }
-        if (is_numeric($filter('market_cap_min')) && (float) $filter('market_cap_min') > 0) $query->whereRaw($fundamentalNumber('marketCap').' >= ?', [(float) $filter('market_cap_min') * 1_000_000_000]);
+        if (is_numeric($filter('market_cap_min')) && (float) $filter('market_cap_min') > 0) {
+            $query->whereRaw($fundamentalNumber('marketCap').' >= ?', [(float) $filter('market_cap_min') * 1_000_000_000]);
+        }
         if (in_array($filter('market_cap_group'), ['small', 'mid', 'large'], true)) {
             $value = $fundamentalNumber('marketCap');
             match ($filter('market_cap_group')) {
@@ -623,7 +657,9 @@ final class RunFilteredBacktest implements ShouldQueue
                 'large' => $query->whereRaw($value.' >= ?', [10_000_000_000]),
             };
         }
-        if (is_numeric($filter('revenue_growth_min')) && (float) $filter('revenue_growth_min') > -50) $query->whereRaw($fundamentalNumber('revenueGrowth').' >= ?', [(float) $filter('revenue_growth_min') / 100]);
+        if (is_numeric($filter('revenue_growth_min')) && (float) $filter('revenue_growth_min') > -50) {
+            $query->whereRaw($fundamentalNumber('revenueGrowth').' >= ?', [(float) $filter('revenue_growth_min') / 100]);
+        }
     }
 
     private function usesServingConfigurations(): bool
@@ -677,7 +713,9 @@ final class RunFilteredBacktest implements ShouldQueue
             ])
             ->unique(static fn (array $row): string => implode('|', $row))
             ->values();
-        if ($configurations->isEmpty()) return collect();
+        if ($configurations->isEmpty()) {
+            return collect();
+        }
 
         $allowed = $configurations->mapWithKeys(fn (array $row): array => [
             implode('|', [$row['release_id'], $row['symbol'], $row['horizon'], $row['variant']]) => true,
@@ -719,7 +757,9 @@ final class RunFilteredBacktest implements ShouldQueue
             // immutable release and variant. Use exactly the latest one.
             ->unique(fn (array $run): string => $run['release_id'].'|'.$run['variant'])
             ->keyBy('id');
-        if ($runs->isEmpty()) return collect();
+        if ($runs->isEmpty()) {
+            return collect();
+        }
 
         $rows = $serving->table('serving_strategy_trades as trade')
             ->join('serving_instruments as instrument', 'instrument.id', '=', 'trade.instrument_id')
@@ -734,7 +774,9 @@ final class RunFilteredBacktest implements ShouldQueue
                 'trade.*', 'instrument.symbol', 'instrument.sector_code as rotation_sector',
             ])->filter(function (object $row) use ($allowed, $runs): bool {
                 $run = $runs->get((string) $row->strategy_run_id);
-                if (! is_array($run)) return false;
+                if (! is_array($run)) {
+                    return false;
+                }
 
                 return isset($allowed[implode('|', [
                     $run['release_id'],
@@ -756,9 +798,13 @@ final class RunFilteredBacktest implements ShouldQueue
 
         return $rows->map(function (object $row) use ($localInstrumentIds, $runs): ?object {
             $instrumentId = $localInstrumentIds->get((string) $row->symbol);
-            if (! $instrumentId) return null;
+            if (! $instrumentId) {
+                return null;
+            }
             $run = $runs->get((string) $row->strategy_run_id);
-            if (! is_array($run)) return null;
+            if (! is_array($run)) {
+                return null;
+            }
             $netReturn = (float) $row->net_return;
             $transactionCost = max(0.0, (float) $row->transaction_cost);
 
@@ -834,6 +880,7 @@ final class RunFilteredBacktest implements ShouldQueue
         while ($process->isRunning()) {
             if ($this->isCancelled()) {
                 $process->stop(3);
+
                 return false;
             }
             usleep(750000);
@@ -929,12 +976,16 @@ final class RunFilteredBacktest implements ShouldQueue
     {
         try {
             $instrumentId = DB::table('instruments')->where('symbol', '^GSPC')->value('id');
-            if (! $instrumentId) return;
+            if (! $instrumentId) {
+                return;
+            }
             $firstBar = DB::table('price_bars')
                 ->where('instrument_id', $instrumentId)
                 ->where('interval', '1d')
                 ->min('bar_time');
-            if ($firstBar !== null && strtotime((string) $firstBar) <= now()->subYears(3)->timestamp) return;
+            if ($firstBar !== null && strtotime((string) $firstBar) <= now()->subYears(3)->timestamp) {
+                return;
+            }
 
             $history = $marketData->dailyHistory('^GSPC', 820);
             $source = 'twelve_data';

@@ -9,12 +9,16 @@ use Illuminate\Support\Facades\Schema;
 final class TradeEligibilityStatusService
 {
     public const ACTIONABLE = 'actionable';
+
     public const PAUSED_LOW_RETURN = 'paused_low_return';
+
     public const NOT_BUY = 'not_buy';
 
     public function apply(Collection $stocks): void
     {
-        if ($stocks->isEmpty() || ! Schema::hasTable('stock_trade_eligibility_states')) return;
+        if ($stocks->isEmpty() || ! Schema::hasTable('stock_trade_eligibility_states')) {
+            return;
+        }
 
         $ids = $stocks->pluck('instrument_id')->map(fn ($id): int => (int) $id)->all();
         $states = DB::table('stock_trade_eligibility_states')->whereIn('instrument_id', $ids)->get()->keyBy('instrument_id');
@@ -62,7 +66,9 @@ final class TradeEligibilityStatusService
     /** @return array{0: string, 1: ?string} */
     public function resolveStatus(string $signal, ?float $net, ?string $previousStatus, float $pauseBelow, float $resumeAt): array
     {
-        if (strtoupper($signal) !== 'BUY') return [self::NOT_BUY, 'model_signal_not_buy'];
+        if (strtoupper($signal) !== 'BUY') {
+            return [self::NOT_BUY, 'model_signal_not_buy'];
+        }
 
         if ($previousStatus === self::ACTIONABLE) {
             $status = $net !== null && $net < $pauseBelow ? self::PAUSED_LOW_RETURN : self::ACTIONABLE;

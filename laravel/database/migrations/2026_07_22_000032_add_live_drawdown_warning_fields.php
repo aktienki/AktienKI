@@ -42,13 +42,13 @@ return new class extends Migration
         $marker = "\n   FROM predictions p";
         $extra = $append
             ? ",\n    p.live_profit_factor,\n    p.live_maximum_drawdown,"
-                . "\n    p.live_drawdown_limit,\n    p.live_drawdown_warning_used"
+                ."\n    p.live_drawdown_limit,\n    p.live_drawdown_warning_used"
             : '';
         if ($append) {
-            if (!str_contains($row->definition, $marker)) {
+            if (! str_contains($row->definition, $marker)) {
                 throw new RuntimeException('Unexpected public prediction view');
             }
-            $view = str_replace($marker, $extra . $marker, $row->definition);
+            $view = str_replace($marker, $extra.$marker, $row->definition);
         } else {
             foreach ([
                 'live_profit_factor', 'live_maximum_drawdown',
@@ -56,7 +56,7 @@ return new class extends Migration
             ] as $column) {
                 $view = $view ?? $row->definition;
                 $view = preg_replace(
-                    '/,?\s*p\.' . $column . '\b/',
+                    '/,?\s*p\.'.$column.'\b/',
                     '',
                     $view,
                     1,
@@ -68,6 +68,6 @@ return new class extends Migration
             }
         }
         DB::statement('DROP VIEW public_prediction_models');
-        DB::statement('CREATE VIEW public_prediction_models AS ' . $view);
+        DB::statement('CREATE VIEW public_prediction_models AS '.$view);
     }
 };

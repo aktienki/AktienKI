@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 final class RefreshChartViewSignals extends Command
 {
     protected $signature = 'chartview:refresh-signals';
+
     protected $description = 'Recalculate global and stock-specific ChartView probabilities and retain three trading days';
 
     public function handle(): int
@@ -129,6 +130,7 @@ final class RefreshChartViewSignals extends Command
         Cache::forget('dashboard.personal.signal-cockpit-v1');
         Cache::forget('dashboard.personal.signal-cockpit-v2');
         $this->info('ChartView global and stock-specific probabilities refreshed.');
+
         return self::SUCCESS;
     }
 }

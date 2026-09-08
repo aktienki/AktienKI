@@ -27,12 +27,12 @@ return new class extends Migration
 
             $table->unique(
                 ['user_id', 'instrument_id', 'ai_type', 'timeframe',
-                 'prediction_horizon_minutes'],
+                    'prediction_horizon_minutes'],
                 'user_model_preferences_scope_unique'
             );
             $table->index(
                 ['instrument_id', 'ai_type', 'timeframe',
-                 'prediction_horizon_minutes'],
+                    'prediction_horizon_minutes'],
                 'user_model_preferences_lookup_idx'
             );
         });

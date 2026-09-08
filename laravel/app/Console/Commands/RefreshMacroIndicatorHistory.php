@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Services\YahooIndexService;
 use App\Services\TwelveDataService;
+use App\Services\YahooIndexService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +62,9 @@ class RefreshMacroIndicatorHistory extends Command
         ] as [$proxySymbol, $proxyName, $proxyCurrency, $proxyMic, $proxyCountry]) {
             $proxyId = $this->instrumentId($proxySymbol, $proxyName, 'etf', $proxyCurrency, $proxyMic, $proxyCountry);
             $proxyHistory = $twelveData->dailyHistory($proxySymbol, $range === '1y' ? 280 : ($range === '5y' ? 1320 : 800));
-            if ($proxyHistory === []) throw new RuntimeException("Keine Twelve-Data-Tageskurse für {$proxySymbol} empfangen.");
+            if ($proxyHistory === []) {
+                throw new RuntimeException("Keine Twelve-Data-Tageskurse für {$proxySymbol} empfangen.");
+            }
             $proxyRows = collect($proxyHistory)->map(fn (array $bar): array => [
                 'instrument_id' => $proxyId, 'interval' => '1d',
                 'bar_time' => date('Y-m-d H:i:sP', (int) $bar['timestamp']),
@@ -90,7 +92,9 @@ class RefreshMacroIndicatorHistory extends Command
             ->where('symbol', $symbol)
             ->whereNull('deleted_at')
             ->value('id');
-        if ($instrumentId) return (int) $instrumentId;
+        if ($instrumentId) {
+            return (int) $instrumentId;
+        }
 
         $exchangeId = ($mic ? DB::table('exchanges')->where('mic', $mic)->value('id') : null)
             ?? DB::table('exchanges')->where('mic', 'ARCX')->value('id')

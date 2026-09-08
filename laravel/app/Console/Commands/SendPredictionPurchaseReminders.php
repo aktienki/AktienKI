@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 class SendPredictionPurchaseReminders extends Command
 {
     protected $signature = 'predictions:send-purchase-reminders';
+
     protected $description = 'Sendet fällige Erinnerungen zu Prognosekäufen und Kaufinteresse.';
 
     public function handle(): int
@@ -20,12 +21,18 @@ class SendPredictionPurchaseReminders extends Command
         PredictionPurchaseReminder::where('status', 'active')->whereDate('remind_on', '<=', today())->each(function ($reminder) use (&$sent): void {
             $user = User::find($reminder->user_id);
             $instrument = DB::table('instruments')->find($reminder->instrument_id);
-            if (! $user || ! $instrument) return;
+            if (! $user || ! $instrument) {
+                return;
+            }
             $stock = app(ServingReadService::class)->stock($instrument->symbol);
-            if (! $stock) return;
+            if (! $stock) {
+                return;
+            }
             $latest = $stock->latest_prediction;
             $price = $latest?->current_price;
-            if (! is_numeric($price)) return;
+            if (! is_numeric($price)) {
+                return;
+            }
             $instrument->currency = $stock->currency;
             $instrument->name = $stock->name;
             $instrument->sector = $stock->sector_code;
@@ -39,6 +46,7 @@ class SendPredictionPurchaseReminders extends Command
             ->delete();
 
         $this->info("{$sent} Erinnerungen versendet, {$deleted} abgelaufene Erinnerungen gelöscht.");
+
         return self::SUCCESS;
     }
 }

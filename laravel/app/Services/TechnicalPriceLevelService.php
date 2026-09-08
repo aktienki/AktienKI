@@ -13,7 +13,9 @@ final class TechnicalPriceLevelService
             ->where('interval', '1d')
             ->orderByDesc('bar_time')->orderByDesc('id')->limit($limit)
             ->get(['high', 'low', 'close'])->reverse()->values();
-        if ($bars->count() < 7) return ['support' => null, 'resistance' => null, 'broken_resistance' => null];
+        if ($bars->count() < 7) {
+            return ['support' => null, 'resistance' => null, 'broken_resistance' => null];
+        }
 
         $current = (float) $bars->last()->close;
         $range = max(0.01, (float) $bars->max('high') - (float) $bars->min('low'));

@@ -68,9 +68,9 @@ class AiEngine extends Component
 
             [
                 'title' => 'Job',
-                'value' => number_format($processed,0,',','.')
+                'value' => number_format($processed, 0, ',', '.')
                     .' / '.
-                    number_format($total,0,',','.'),
+                    number_format($total, 0, ',', '.'),
                 'status' => $progress.' %',
                 'percent' => $progress,
                 'color' => 'violet',
@@ -78,23 +78,20 @@ class AiEngine extends Component
 
             [
                 'title' => 'Modelle',
-                'value' =>
-                    ($metrics['models']
+                'value' => ($metrics['models']
                     ?? $metrics['model_count']
                     ?? 0)
                     .' aktiv',
 
-                'status' =>
-                    'Hitrate '.
+                'status' => 'Hitrate '.
                     (
                         isset($metrics['hitrate'])
-                            ? number_format($metrics['hitrate']*100,1,',','.')
+                            ? number_format($metrics['hitrate'] * 100, 1, ',', '.')
                             : '—'
                     ).' %',
 
-                'percent' =>
-                    isset($metrics['hitrate'])
-                        ? round($metrics['hitrate']*100)
+                'percent' => isset($metrics['hitrate'])
+                        ? round($metrics['hitrate'] * 100)
                         : 0,
 
                 'color' => 'green',
@@ -102,13 +99,11 @@ class AiEngine extends Component
 
             [
                 'title' => 'Letzter Run',
-                'value' =>
-                    $run?->finished_at
+                'value' => $run?->finished_at
                         ? $run->finished_at->diffForHumans()
                         : '—',
 
-                'status' =>
-                    $run?->finished_at
+                'status' => $run?->finished_at
                         ? $run->finished_at->format('d.m.Y H:i')
                         : 'Kein Run',
 

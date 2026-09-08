@@ -164,6 +164,7 @@ final class ResearchLabController extends Controller
                 'error_message' => $job->error_message,
             ])->saveQuietly();
         }
+
         return response()->json([
             'status' => $experiment->status,
             'stage' => $experiment->stage,

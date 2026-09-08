@@ -16,6 +16,7 @@ class ImportPanelPredictions extends Command
         $path = $this->argument('path');
         if (! is_file($path)) {
             $this->error("File not found: {$path}");
+
             return self::FAILURE;
         }
 
@@ -59,6 +60,7 @@ class ImportPanelPredictions extends Command
         foreach ($need as $c) {
             if (! isset($idx[$c])) {
                 $this->error("Missing column: {$c}");
+
                 return self::FAILURE;
             }
         }
@@ -80,6 +82,7 @@ class ImportPanelPredictions extends Command
             $version ??= $r[$idx['model_version']];
             if (! isset($map[$sym])) {
                 $unmatched[$sym] = ($unmatched[$sym] ?? 0) + 1;
+
                 continue;
             }
             // Drop non-physical rows from a broken (e.g. unadjusted / wrong-unit)
@@ -89,29 +92,30 @@ class ImportPanelPredictions extends Command
             if (($rv50 !== null && $rv50 > 1.0) || ($beta !== null && abs($beta) > 8.0)
                 || abs((float) $r[$idx['raw_score']]) > 0.5) {
                 $skipped++;
+
                 continue;
             }
             $key = $r[$idx['model_version']].'|'.$map[$sym].'|'.substr($r[$idx['as_of_date']], 0, 10);
             $rows[$key] = [
-                'model_version'   => $r[$idx['model_version']],
-                'instrument_id'   => $map[$sym],
-                'as_of_date'      => substr($r[$idx['as_of_date']], 0, 10),
-                'raw_score'       => $num($r[$idx['raw_score']]),
-                'xsec_pctile'     => $num($r[$idx['xsec_pctile']]),
-                'decile'          => $r[$idx['decile']] === '' ? null : (int) $r[$idx['decile']],
+                'model_version' => $r[$idx['model_version']],
+                'instrument_id' => $map[$sym],
+                'as_of_date' => substr($r[$idx['as_of_date']], 0, 10),
+                'raw_score' => $num($r[$idx['raw_score']]),
+                'xsec_pctile' => $num($r[$idx['xsec_pctile']]),
+                'decile' => $r[$idx['decile']] === '' ? null : (int) $r[$idx['decile']],
                 'target_demeaned' => $num($r[$idx['target_demeaned']]),
-                'fwd_ret_20d'     => $num($r[$idx['fwd_ret_20d']]),
-                'univ_mean_fwd'   => $num($r[$idx['univ_mean_fwd']]),
-                'ret_20'          => $num($r[$idx['ret_20']]),
-                'ret_120'         => $num($r[$idx['ret_120']]),
-                'rv_20'           => $num($r[$idx['rv_20']]),
-                'rv_50'           => $num($r[$idx['rv_50']]),
-                'beta_60'         => $num($r[$idx['beta_60']]),
-                'ivol_60'         => $num($r[$idx['ivol_60']]),
-                'dd_120'          => $num($r[$idx['dd_120']]),
-                'rsi_14'          => $num($r[$idx['rsi_14']]),
-                'created_at'      => $now,
-                'updated_at'      => $now,
+                'fwd_ret_20d' => $num($r[$idx['fwd_ret_20d']]),
+                'univ_mean_fwd' => $num($r[$idx['univ_mean_fwd']]),
+                'ret_20' => $num($r[$idx['ret_20']]),
+                'ret_120' => $num($r[$idx['ret_120']]),
+                'rv_20' => $num($r[$idx['rv_20']]),
+                'rv_50' => $num($r[$idx['rv_50']]),
+                'beta_60' => $num($r[$idx['beta_60']]),
+                'ivol_60' => $num($r[$idx['ivol_60']]),
+                'dd_120' => $num($r[$idx['dd_120']]),
+                'rsi_14' => $num($r[$idx['rsi_14']]),
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
             if (count($rows) >= 2000) {
                 DB::table('panel_predictions')->upsert(array_values($rows), ['model_version', 'instrument_id', 'as_of_date']);

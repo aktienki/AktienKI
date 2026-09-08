@@ -7,7 +7,9 @@ final class RiskScore
     public static function toPercent(mixed ...$candidates): ?float
     {
         foreach ($candidates as $candidate) {
-            if (! is_numeric($candidate) || (float) $candidate <= 0) continue;
+            if (! is_numeric($candidate) || (float) $candidate <= 0) {
+                continue;
+            }
 
             $percent = (float) $candidate <= 1 ? (float) $candidate * 100 : (float) $candidate;
 

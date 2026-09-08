@@ -10,14 +10,13 @@ final class SignalQualityCalibration
      * Calibrate a user-facing grade from realized signal-change performance.
      * Raw model/action scores are deliberately not part of this calculation.
      *
-     * @param array{trades:int,hit_rate:float,profit_factor:float,average_return_percent:float} $overall
-     * @param array{trades:int,hit_rate:float,profit_factor:float,average_return_percent:float} $validation
+     * @param  array{trades:int,hit_rate:float,profit_factor:float,average_return_percent:float}  $overall
+     * @param  array{trades:int,hit_rate:float,profit_factor:float,average_return_percent:float}  $validation
      * @return array<string,mixed>
      */
     public static function calculate(array $overall, array $validation, bool $allFourHorizonsConfirmed = false): array
     {
-        $blend = static fn (string $key): float =>
-            ((float) $overall[$key] * .70) + ((float) $validation[$key] * .30);
+        $blend = static fn (string $key): float => ((float) $overall[$key] * .70) + ((float) $validation[$key] * .30);
 
         $hitRate = $blend('hit_rate');
         $profitFactor = $blend('profit_factor');
@@ -64,13 +63,22 @@ final class SignalQualityCalibration
     ): string {
         $sparseGrade = null;
         foreach (self::ladder() as $grade => $limits) {
-            if ($hitRate < $limits['hit_rate']) continue;
-            if ($profitFactor < $limits['profit_factor']) continue;
-            if ($averageReturn < $limits['average_return_percent']) continue;
-            if ($grade === '1+' && ! $allFourHorizonsConfirmed) continue;
+            if ($hitRate < $limits['hit_rate']) {
+                continue;
+            }
+            if ($profitFactor < $limits['profit_factor']) {
+                continue;
+            }
+            if ($averageReturn < $limits['average_return_percent']) {
+                continue;
+            }
+            if ($grade === '1+' && ! $allFourHorizonsConfirmed) {
+                continue;
+            }
 
             if ($validationTrades < $limits['trades']) {
                 $sparseGrade ??= $grade;
+
                 continue;
             }
 
@@ -82,7 +90,9 @@ final class SignalQualityCalibration
             return $grade;
         }
 
-        if ($sparseGrade !== null && $validationTrades > 0) return '2−';
+        if ($sparseGrade !== null && $validationTrades > 0) {
+            return '2−';
+        }
 
         return '5−';
     }

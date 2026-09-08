@@ -43,10 +43,12 @@ final class CalibrateIndexStockThresholds extends Command
             ->first(['id', 'symbol', 'name']);
         if ($indexArgument !== '' && ! $index) {
             $this->error('Index nicht gefunden.');
+
             return self::FAILURE;
         }
         if (! $index && ! $this->option('instrument')) {
             $this->error('Ohne Heimatindex ist --instrument erforderlich.');
+
             return self::FAILURE;
         }
         $horizon = (int) $this->option('horizon');
@@ -66,6 +68,7 @@ final class CalibrateIndexStockThresholds extends Command
                 ->where('algorithm_version', self::VERSION)->exists();
             if ($existingFrozenCalibration && ! $this->option('recalibrate')) {
                 $this->line("{$instrument->symbol}: bestehende Forward-Kalibrierung bleibt eingefroren");
+
                 continue;
             }
             $runId = DB::table('walk_forward_backtest_runs as run')
@@ -77,6 +80,7 @@ final class CalibrateIndexStockThresholds extends Command
             if (! $runId) {
                 $summary['missing_run']++;
                 $this->warn("{$instrument->symbol}: kein abgeschlossener {$horizon}T-Lauf");
+
                 continue;
             }
 
@@ -89,6 +93,7 @@ final class CalibrateIndexStockThresholds extends Command
             if ($rows->count() < 30) {
                 $this->store($instrumentId, $horizon, 'insufficient_data', null, $rows->count(), 0, 0, false, $runId, null);
                 $summary['insufficient_data']++;
+
                 continue;
             }
 
@@ -103,6 +108,7 @@ final class CalibrateIndexStockThresholds extends Command
                 ]);
                 $summary['insufficient_data']++;
                 $this->warn("{$instrument->symbol}: zu wenig historische Rohscore-Daten");
+
                 continue;
             }
             $lastDate = CarbonImmutable::parse((string) $scored->max('signal_date'));
@@ -112,22 +118,20 @@ final class CalibrateIndexStockThresholds extends Command
                 $entries = $this->entries($scored, $threshold);
                 $calibration = $this->stats($entries->filter(fn ($row) => (string) $row->signal_date < $split));
                 $validation = $this->stats($entries->filter(fn ($row) => (string) $row->signal_date >= $split));
+
                 return compact('threshold', 'calibration', 'validation') + ['overall' => $this->stats($entries)];
             });
             $minimumCalibration = max(10, (int) $this->option('minimum-calibration-events'));
             $targetCalibration = max($minimumCalibration, (int) $this->option('target-calibration-events'));
-            $rank = fn (Collection $rows): Collection => $rows->sortByDesc(fn (array $row): float =>
-                (float) ($row['calibration']['hit_rate'] ?? 0)
+            $rank = fn (Collection $rows): Collection => $rows->sortByDesc(fn (array $row): float => (float) ($row['calibration']['hit_rate'] ?? 0)
                 + min(5.0, (float) ($row['calibration']['profit_factor'] ?? 0)) * 10
                 + max(-5.0, min(5.0, (float) ($row['calibration']['average_return_percent'] ?? 0))) * 3
             );
-            $standard = $rank($candidates->filter(fn (array $row): bool =>
-                $row['calibration']['trades'] >= $targetCalibration
+            $standard = $rank($candidates->filter(fn (array $row): bool => $row['calibration']['trades'] >= $targetCalibration
                 && ($row['calibration']['profit_factor'] ?? 0) >= self::SOLID_MINIMUM_PROFIT_FACTOR
                 && ($row['calibration']['average_return_percent'] ?? -1) > 0
             ));
-            $provisional = $rank($candidates->filter(fn (array $row): bool =>
-                $row['calibration']['trades'] >= $minimumCalibration
+            $provisional = $rank($candidates->filter(fn (array $row): bool => $row['calibration']['trades'] >= $minimumCalibration
                 && $row['calibration']['trades'] < $targetCalibration
                 && ($row['calibration']['profit_factor'] ?? 0) >= self::SOLID_MINIMUM_PROFIT_FACTOR
                 && ($row['calibration']['hit_rate'] ?? 0) >= 65
@@ -136,12 +140,10 @@ final class CalibrateIndexStockThresholds extends Command
             // A weak raw result must never stop the downstream context-filter
             // evaluation. If no strong threshold exists, retain the best
             // exploratory threshold and let phase/index/sector/60T/noise decide.
-            $exploratory = $rank($candidates->filter(fn (array $row): bool =>
-                $row['calibration']['trades'] >= $minimumCalibration
+            $exploratory = $rank($candidates->filter(fn (array $row): bool => $row['calibration']['trades'] >= $minimumCalibration
             ));
             $sparse = $candidates->filter(fn (array $row): bool => $row['calibration']['trades'] > 0)
-                ->sortByDesc(fn (array $row): float =>
-                    ((int) $row['calibration']['trades'] * 1000)
+                ->sortByDesc(fn (array $row): float => ((int) $row['calibration']['trades'] * 1000)
                     + (float) ($row['calibration']['hit_rate'] ?? 0)
                 );
             $best = $standard->first() ?? $provisional->first() ?? $exploratory->first() ?? $sparse->first() ?? $candidates->first();
@@ -152,6 +154,7 @@ final class CalibrateIndexStockThresholds extends Command
                 $this->store($instrumentId, $horizon, 'insufficient_data', null, $rows->count(), 0, 0, false, $runId, ['split' => $split]);
                 $summary['insufficient_data']++;
                 $this->warn("{$instrument->symbol}: keine belastbare Schwelle");
+
                 continue;
             }
 
@@ -213,16 +216,19 @@ final class CalibrateIndexStockThresholds extends Command
         }
 
         $this->info(json_encode($summary, JSON_UNESCAPED_SLASHES));
+
         return self::SUCCESS;
     }
 
     private function entries(Collection $rows, float $threshold): Collection
     {
         $previous = false;
+
         return $rows->filter(function ($row) use ($threshold, &$previous): bool {
             $accepted = (float) $row->historical_action_score >= $threshold;
             $entry = $accepted && ! $previous;
             $previous = $accepted;
+
             return $entry;
         })->values();
     }
@@ -232,6 +238,7 @@ final class CalibrateIndexStockThresholds extends Command
         $returns = $rows->filter(fn ($row) => is_numeric($row->net_return ?? null))->map(fn ($row) => (float) $row->net_return);
         $wins = $returns->filter(fn ($v) => $v > 0)->sum();
         $losses = abs($returns->filter(fn ($v) => $v < 0)->sum());
+
         return [
             'trades' => $returns->count(),
             'hit_rate' => $returns->isEmpty() ? null : round(100 * $returns->filter(fn ($v) => $v > 0)->count() / $returns->count(), 2),
@@ -247,9 +254,15 @@ final class CalibrateIndexStockThresholds extends Command
         $profitFactor = (float) ($stats['profit_factor'] ?? 0);
         $averageReturn = (float) ($stats['average_return_percent'] ?? 0);
 
-        if ($trades >= 20 && $hitRate >= 65 && $profitFactor >= self::QUALITY_MINIMUM_PROFIT_FACTOR && $averageReturn > 0) return 'quality';
-        if ($trades >= 10 && $hitRate >= 60 && $profitFactor >= self::SOLID_MINIMUM_PROFIT_FACTOR && $averageReturn > 0) return 'solid';
-        if ($trades >= 10 && $hitRate >= 55 && $profitFactor >= self::BASIC_MINIMUM_PROFIT_FACTOR && $averageReturn > 0) return 'basic';
+        if ($trades >= 20 && $hitRate >= 65 && $profitFactor >= self::QUALITY_MINIMUM_PROFIT_FACTOR && $averageReturn > 0) {
+            return 'quality';
+        }
+        if ($trades >= 10 && $hitRate >= 60 && $profitFactor >= self::SOLID_MINIMUM_PROFIT_FACTOR && $averageReturn > 0) {
+            return 'solid';
+        }
+        if ($trades >= 10 && $hitRate >= 55 && $profitFactor >= self::BASIC_MINIMUM_PROFIT_FACTOR && $averageReturn > 0) {
+            return 'basic';
+        }
 
         return 'unqualified';
     }
@@ -258,7 +271,9 @@ final class CalibrateIndexStockThresholds extends Command
         int $events, int $calibrationEvents, int $validationEvents, bool $validationPassed,
         int $runId, ?array $result): void
     {
-        if ($this->option('dry-run')) return;
+        if ($this->option('dry-run')) {
+            return;
+        }
         $now = now();
         $payload = $result ?? ['source_run_id' => $runId];
         DB::table('stock_individual_thresholds')->updateOrInsert([

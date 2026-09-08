@@ -45,6 +45,7 @@ final class RunServerPredictions extends Command
         // walk-forward horizons are present before predict-active selects them.
         if ($this->call('stocks:activate-completed-training') !== self::SUCCESS) {
             $this->error('Vollständig trainierte Aktien konnten nicht freigegeben werden.');
+
             return self::FAILURE;
         }
 
@@ -143,6 +144,7 @@ final class RunServerPredictions extends Command
 
         if ($this->option('defer-finalization') || $symbols->isNotEmpty()) {
             $this->info('Regionaler Batch abgeschlossen; die Veröffentlichung wartet auf den finalen Tageslauf.');
+
             return self::SUCCESS;
         }
 
@@ -197,12 +199,14 @@ final class RunServerPredictions extends Command
                 'Tagessnapshot nicht veröffentlicht: Mindestabdeckung %.1f%% unterschritten.',
                 $minimumCoverage * 100,
             ));
+
             return self::FAILURE;
         }
 
         // Technical indicators consume the same completed daily price snapshot.
         if ($this->call('chartview:refresh-signals') !== self::SUCCESS) {
             $this->error('Indikatorfilter konnten nicht aktualisiert werden.');
+
             return self::FAILURE;
         }
 
@@ -219,11 +223,13 @@ final class RunServerPredictions extends Command
                 ]);
             if (! $sectorResult->successful()) {
                 $this->error(trim($sectorResult->errorOutput()) ?: 'Sektorfilter konnten nicht aktualisiert werden.');
+
                 return self::FAILURE;
             }
             $this->line(trim($sectorResult->output()));
             if ($this->call('predictions:index-pytorch60-context', ['--max-members' => 25]) !== self::SUCCESS) {
                 $this->error('Indexfilter konnten nicht aktualisiert werden.');
+
                 return self::FAILURE;
             }
         } else {
@@ -285,6 +291,7 @@ final class RunServerPredictions extends Command
             $query->whereNotIn(DB::raw('UPPER(country)'), $asia)
                 ->whereNotIn(DB::raw('UPPER(country)'), $americas);
         }
+
         return $query->orderByDesc('market_cap')->limit($limit)->pluck('symbol')
             ->map(fn ($symbol): string => strtoupper((string) $symbol))->values();
     }
@@ -322,6 +329,7 @@ final class RunServerPredictions extends Command
             SQL);
         $eligible = (int) ($row->eligible ?? 0);
         $complete = (int) ($row->complete ?? 0);
+
         return ['eligible' => $eligible, 'complete' => $complete,
             'ratio' => $eligible > 0 ? $complete / $eligible : 1.0];
     }

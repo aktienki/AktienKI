@@ -4,23 +4,26 @@ namespace App\Http\Controllers;
 
 use App\Enums\PlanLevel;
 use App\Models\Portfolio;
-use App\Services\PlanAccessService;
 use App\Services\PersonalCollectionLimitService;
 use App\Services\PersonalizedSignalService;
+use App\Services\PlanAccessService;
+use App\Services\PublicPortfolioFollowerNotifier;
 use App\Services\ServingPortfolioCalculator;
 use App\Services\ServingPortfolioSimulationService;
 use App\Services\StockSpecificExitPortfolioSimulationService;
 use App\Services\TwelveDataService;
 use App\Support\AiScore;
 use Carbon\CarbonImmutable;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
-use Dompdf\Dompdf;
-use Dompdf\Options;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -159,7 +162,7 @@ final class DepotController extends Controller
                 'fees' => $fee, 'currency' => $portfolio->currency, 'meta' => json_encode(['source' => 'screener_manual', 'ai_score' => $aiScore, 'prediction_id' => $prediction?->id, 'signal' => $prediction?->signal, 'pricing_source' => $usesGermanListing ? 'german_listing' : 'primary_listing', 'pricing_listing' => $listing, 'primary_currency' => $stock->currency]),
                 'created_at' => now(), 'updated_at' => now(),
             ]);
-            DB::afterCommit(fn () => app(\App\Services\PublicPortfolioFollowerNotifier::class)->send((int) $transactionId));
+            DB::afterCommit(fn () => app(PublicPortfolioFollowerNotifier::class)->send((int) $transactionId));
             $balance = (float) $account->balance - $totalDebit;
             DB::table('portfolio_cash_accounts')->where('id', $account->id)->update(['balance' => $balance, 'updated_at' => now()]);
             DB::table('portfolio_cash_ledger')->insert([
@@ -185,24 +188,30 @@ final class DepotController extends Controller
         $prediction = DB::table('predictions')->where('instrument_id', $instrument)->orderByDesc('prediction_time')->orderByDesc('id')->first(['id', 'prediction_score', 'signal']);
 
         DB::transaction(function () use ($portfolio, $instrument, $position, $validated, $price, $prediction): void {
-            $quantity = (float) $validated['quantity']; $price = (float) $price;
-            $proceeds = $quantity * $price; $costBasis = $quantity * (float) $position->average_buy_price;
+            $quantity = (float) $validated['quantity'];
+            $price = (float) $price;
+            $proceeds = $quantity * $price;
+            $costBasis = $quantity * (float) $position->average_buy_price;
             $profit = $proceeds - $costBasis;
             $account = DB::table('portfolio_cash_accounts')->where('portfolio_id', $portfolio->id)->where('currency', $portfolio->currency)->lockForUpdate()->firstOrFail();
             $transactionId = DB::table('portfolio_transactions')->insertGetId([
-                'portfolio_id'=>$portfolio->id,'instrument_id'=>$instrument,'type'=>'sell','transaction_date'=>now()->toDateString(),
-                'quantity'=>$quantity,'price'=>$price,'fees'=>0,'currency'=>$portfolio->currency,
-                'meta'=>json_encode(['source'=>'manual','ai_score'=>AiScore::toPercent($prediction?->prediction_score),'prediction_id'=>$prediction?->id,'signal'=>$prediction?->signal,'realized_profit'=>$profit,'performance_percent'=>$costBasis > 0 ? ($profit/$costBasis)*100 : null]),
-                'created_at'=>now(),'updated_at'=>now(),
+                'portfolio_id' => $portfolio->id, 'instrument_id' => $instrument, 'type' => 'sell', 'transaction_date' => now()->toDateString(),
+                'quantity' => $quantity, 'price' => $price, 'fees' => 0, 'currency' => $portfolio->currency,
+                'meta' => json_encode(['source' => 'manual', 'ai_score' => AiScore::toPercent($prediction?->prediction_score), 'prediction_id' => $prediction?->id, 'signal' => $prediction?->signal, 'realized_profit' => $profit, 'performance_percent' => $costBasis > 0 ? ($profit / $costBasis) * 100 : null]),
+                'created_at' => now(), 'updated_at' => now(),
             ]);
-            DB::afterCommit(fn () => app(\App\Services\PublicPortfolioFollowerNotifier::class)->send((int) $transactionId));
+            DB::afterCommit(fn () => app(PublicPortfolioFollowerNotifier::class)->send((int) $transactionId));
             $remaining = (float) $position->quantity - $quantity;
-            if ($remaining <= 0.000001) DB::table('portfolio_positions')->where('id', $position->id)->delete();
-            else DB::table('portfolio_positions')->where('id', $position->id)->update(['quantity'=>$remaining,'current_price'=>$price,'updated_at'=>now()]);
+            if ($remaining <= 0.000001) {
+                DB::table('portfolio_positions')->where('id', $position->id)->delete();
+            } else {
+                DB::table('portfolio_positions')->where('id', $position->id)->update(['quantity' => $remaining, 'current_price' => $price, 'updated_at' => now()]);
+            }
             $balance = (float) $account->balance + $proceeds;
-            DB::table('portfolio_cash_accounts')->where('id',$account->id)->update(['balance'=>$balance,'updated_at'=>now()]);
-            DB::table('portfolio_cash_ledger')->insert(['portfolio_cash_account_id'=>$account->id,'portfolio_transaction_id'=>$transactionId,'type'=>'sale_credit','amount'=>$proceeds,'balance_after'=>$balance,'currency'=>$portfolio->currency,'occurred_at'=>now(),'meta'=>json_encode(['source'=>'manual','realized_profit'=>$profit]),'created_at'=>now(),'updated_at'=>now()]);
+            DB::table('portfolio_cash_accounts')->where('id', $account->id)->update(['balance' => $balance, 'updated_at' => now()]);
+            DB::table('portfolio_cash_ledger')->insert(['portfolio_cash_account_id' => $account->id, 'portfolio_transaction_id' => $transactionId, 'type' => 'sale_credit', 'amount' => $proceeds, 'balance_after' => $balance, 'currency' => $portfolio->currency, 'occurred_at' => now(), 'meta' => json_encode(['source' => 'manual', 'realized_profit' => $profit]), 'created_at' => now(), 'updated_at' => now()]);
         });
+
         return back()->with('status', __('Verkauf wurde im Musterdepot simuliert.'));
     }
 
@@ -236,8 +245,7 @@ final class DepotController extends Controller
                 ->join('technical_indicators as technical', 'technical.id', '=', 'latest_indicator_id.id')
                 ->leftJoinSub(clone $latestFundamentals, 'latest_fundamental_id', fn ($join) => $join->on('latest_fundamental_id.instrument_id', '=', 'instrument.id'))
                 ->leftJoin('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental_id.id')
-                ->leftJoinSub(clone $latestModelQuality, 'latest_model_quality', fn ($join) =>
-                    $join->on('latest_model_quality.trained_model_id', '=', 'prediction.trained_model_id'))
+                ->leftJoinSub(clone $latestModelQuality, 'latest_model_quality', fn ($join) => $join->on('latest_model_quality.trained_model_id', '=', 'prediction.trained_model_id'))
                 ->leftJoin('model_quality_rankings as model_quality', 'model_quality.id', '=', 'latest_model_quality.ranking_id')
                 ->leftJoin('model_quality_tiers as model_tier', 'model_tier.id', '=', 'model_quality.tier_id')
                 ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
@@ -342,7 +350,7 @@ final class DepotController extends Controller
                 'model_quality_score' => $instrument->model_quality_score,
                 'model_tier_code' => $instrument->model_tier_code ?: 'unqualified',
                 'model_tier_name' => $instrument->model_tier_name ?: 'Nicht qualifiziert',
-                'purchase_date' => \Illuminate\Support\Carbon::parse($bars->first()->bar_time)->format('d.m.Y'),
+                'purchase_date' => Carbon::parse($bars->first()->bar_time)->format('d.m.Y'),
                 'quantity' => $quantity,
                 'buy_price' => $buyPrice,
                 'current_price' => $currentPrice,
@@ -367,12 +375,11 @@ final class DepotController extends Controller
             ->avg();
         $history = collect(range(0, max(0, $priceSeries->min(fn (array $position) => $position['bars']->count()) - 1)))
             ->map(function (int $index) use ($priceSeries, $invested, $currentScore): array {
-                $value = $priceSeries->sum(fn (array $position) =>
-                    $position['quantity'] * (float) $position['bars']->get($index)->close
+                $value = $priceSeries->sum(fn (array $position) => $position['quantity'] * (float) $position['bars']->get($index)->close
                 );
 
                 return [
-                    'x' => \Illuminate\Support\Carbon::parse($priceSeries->first()['bars']->get($index)->bar_time)->format('Y-m-d'),
+                    'x' => Carbon::parse($priceSeries->first()['bars']->get($index)->bar_time)->format('Y-m-d'),
                     'y' => $invested > 0 ? round((($value - $invested) / $invested) * 100, 2) : 0,
                     'score' => round((float) ($currentScore ?? 0), 1),
                 ];
@@ -526,7 +533,7 @@ final class DepotController extends Controller
                 ->where('is_active', true)
                 ->whereNull('deleted_at'))
             ->with('instrument'), 'transactions' => fn ($query) => $query
-                ->with('instrument')->orderByDesc('transaction_date')->orderByDesc('id')]);
+            ->with('instrument')->orderByDesc('transaction_date')->orderByDesc('id')]);
         $invested = $portfolio->positions->sum(
             fn ($position) => (float) $position->quantity * (float) $position->average_buy_price
         );
@@ -550,8 +557,7 @@ final class DepotController extends Controller
         $positionQuotes = $positionInstrumentIds->isEmpty()
             ? collect()
             : DB::table('current_stock_quotes as quote')
-                ->joinSub($latestPositionQuoteIds, 'latest_quote', fn ($join) =>
-                    $join->on('latest_quote.quote_id', '=', 'quote.id'))
+                ->joinSub($latestPositionQuoteIds, 'latest_quote', fn ($join) => $join->on('latest_quote.quote_id', '=', 'quote.id'))
                 ->get(['quote.instrument_id', 'quote.price', 'quote.quote_time'])
                 ->keyBy('instrument_id');
         $signalSql = app(PersonalizedSignalService::class)->sql('prediction', $request->user());
@@ -566,9 +572,12 @@ final class DepotController extends Controller
                     ->select(['prediction.id', 'prediction.prediction_time'])->selectRaw($signalSql.' AS personalized_signal')
                     ->orderByDesc('prediction_time')->orderByDesc('id')->limit(30)->get();
                 $latest = $rows->first();
-                if (! $latest) return [$instrumentId => null];
+                if (! $latest) {
+                    return [$instrumentId => null];
+                }
                 $to = strtoupper((string) ($latest->personalized_signal ?: 'HOLD'));
                 $previous = $rows->skip(1)->first(fn ($row) => strtoupper((string) ($row->personalized_signal ?: 'HOLD')) !== $to);
+
                 return [$instrumentId => $previous ? ['from' => strtoupper((string) ($previous->personalized_signal ?: 'HOLD')), 'to' => $to, 'date' => $latest->prediction_time] : null];
             });
         }
@@ -580,10 +589,13 @@ final class DepotController extends Controller
                 ->selectRaw('AVG(net_return) * 100 AS average_profit_per_trade_percent')->get()->keyBy('instrument_id');
         $positionPerformanceSeries = $portfolio->positions->mapWithKeys(function ($position): array {
             $entry = (float) $position->average_buy_price;
-            if ($entry <= 0) return [$position->instrument_id => collect()];
+            if ($entry <= 0) {
+                return [$position->instrument_id => collect()];
+            }
             $points = DB::table('price_bars')->where('instrument_id', $position->instrument_id)->where('interval', '1d')->where('close', '>', 0)
                 ->orderByDesc('bar_time')->limit(60)->get(['bar_time', 'close'])->reverse()->values()
                 ->map(fn ($bar) => ['date' => (string) $bar->bar_time, 'value' => (((float) $bar->close - $entry) / $entry) * 100]);
+
             return [$position->instrument_id => $points];
         });
         $currentValue = $portfolio->positions->sum(
@@ -619,7 +631,9 @@ final class DepotController extends Controller
 
                     return null;
                 }
-                if (strtolower((string) $transaction->type) !== 'sell') return null;
+                if (strtolower((string) $transaction->type) !== 'sell') {
+                    return null;
+                }
                 $buy = $openBuys[$instrumentId] ?? null;
                 $performance = data_get($transaction->meta, 'performance_percent');
                 $buyPrice = $buy ? (float) $buy->price : null;
@@ -653,6 +667,7 @@ final class DepotController extends Controller
                 ->get();
             $realized = $transactions->sum(function (object $transaction): float {
                 $meta = is_string($transaction->meta) ? (json_decode($transaction->meta, true) ?: []) : (array) $transaction->meta;
+
                 return (float) ($meta['realized_profit'] ?? 0);
             });
 
@@ -735,19 +750,24 @@ final class DepotController extends Controller
         $positionEntryData = DB::table('portfolio_transactions')->where('portfolio_id', $portfolio->id)->where('type', 'buy')
             ->whereIn('instrument_id', $positionInstrumentIds)->orderByDesc('transaction_date')->orderByDesc('id')->get()
             ->groupBy('instrument_id')->map(function ($rows): array {
-                $latest = $rows->first(); $meta = is_string($latest?->meta) ? (json_decode($latest->meta, true) ?: []) : (array) ($latest?->meta ?? []);
+                $latest = $rows->first();
+                $meta = is_string($latest?->meta) ? (json_decode($latest->meta, true) ?: []) : (array) ($latest?->meta ?? []);
+
                 return ['ai_score' => $meta['ai_score'] ?? null, 'signal' => $meta['signal'] ?? null, 'date' => $latest?->transaction_date];
             });
         $positionHistoryByInstrument = $positionInstrumentIds->isEmpty() ? collect() : DB::table('price_bars')
             ->whereIn('instrument_id', $positionInstrumentIds)->where('interval', '1d')->where('close', '>', 0)
-            ->orderByDesc('bar_time')->limit(max(60, $positionInstrumentIds->count() * 60))->get(['instrument_id','bar_time','close'])
-            ->groupBy('instrument_id')->map(fn($rows) => $rows->take(60)->keyBy(fn($row) => substr((string)$row->bar_time,0,10)));
-        $portfolioValueCurve = collect($positionHistoryByInstrument)->flatMap(fn($rows) => $rows->keys())->unique()->sort()->values()->map(function($date) use($portfolio, $positionHistoryByInstrument, $cashBalance) {
-            $positionsValue = $portfolio->positions->sum(function($position) use($date,$positionHistoryByInstrument) {
-                $rows=$positionHistoryByInstrument->get($position->instrument_id,collect()); $bar=$rows->get($date) ?? $rows->filter(fn($row,$day)=>$day <= $date)->last();
-                return (float)$position->quantity * (float)($bar?->close ?? $position->average_buy_price);
+            ->orderByDesc('bar_time')->limit(max(60, $positionInstrumentIds->count() * 60))->get(['instrument_id', 'bar_time', 'close'])
+            ->groupBy('instrument_id')->map(fn ($rows) => $rows->take(60)->keyBy(fn ($row) => substr((string) $row->bar_time, 0, 10)));
+        $portfolioValueCurve = collect($positionHistoryByInstrument)->flatMap(fn ($rows) => $rows->keys())->unique()->sort()->values()->map(function ($date) use ($portfolio, $positionHistoryByInstrument, $cashBalance) {
+            $positionsValue = $portfolio->positions->sum(function ($position) use ($date, $positionHistoryByInstrument) {
+                $rows = $positionHistoryByInstrument->get($position->instrument_id, collect());
+                $bar = $rows->get($date) ?? $rows->filter(fn ($row, $day) => $day <= $date)->last();
+
+                return (float) $position->quantity * (float) ($bar?->close ?? $position->average_buy_price);
             });
-            return ['x'=>$date,'y'=>round($cashBalance+$positionsValue,2)];
+
+            return ['x' => $date, 'y' => round($cashBalance + $positionsValue, 2)];
         })->values();
 
         return view('depots.show', compact(
@@ -868,8 +888,7 @@ final class DepotController extends Controller
         Portfolio $portfolio,
         ServingPortfolioSimulationService $servingSimulation,
         StockSpecificExitPortfolioSimulationService $exitSimulation,
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         $this->authorizePortfolioEdit($request, $portfolio, true);
         if (! app(PlanAccessService::class)->allowsTariff($request->user(), PlanLevel::Plus)) {
             return back()->withErrors([
@@ -1105,12 +1124,13 @@ final class DepotController extends Controller
         );
     }
 
-    public function simulationStatus(Request $request, Portfolio $portfolio, string $publicId): \Illuminate\Http\JsonResponse
+    public function simulationStatus(Request $request, Portfolio $portfolio, string $publicId): JsonResponse
     {
         abort_unless((int) $portfolio->user_id === (int) $request->user()->id || $portfolio->is_public_readonly, 404);
         $run = DB::table('portfolio_simulation_runs')->where('portfolio_id', $portfolio->id)->where('public_id', $publicId)->first();
         abort_if($run === null, 404);
         $job = DB::table('python_engine_jobs')->whereRaw("payload->>'simulation_run_id' = ?", [(string) $run->id])->latest('id')->first();
+
         return response()->json(['status' => $run->status, 'finished' => in_array($run->status, ['completed', 'failed'], true), 'progress' => (int) ($job?->progress ?? 0), 'error' => $run->error_message ?: $job?->error_message]);
     }
 
@@ -1124,10 +1144,12 @@ final class DepotController extends Controller
         $transactions = $portfolio->transactions()->with('instrument')->orderBy('transaction_date')->orderBy('id')->get();
         $rotationStrategies = $portfolio->strategies->filter(function ($strategy): bool {
             $filters = is_string($strategy->filters) ? (json_decode($strategy->filters, true) ?: []) : (array) $strategy->filters;
+
             return (bool) ($filters['sector_score_rotation'] ?? false) || (bool) ($filters['index_score_rotation'] ?? false);
         });
         $rotationFilters = $rotationStrategies->map(function ($strategy): array {
             $filters = is_string($strategy->filters) ? (json_decode($strategy->filters, true) ?: []) : (array) $strategy->filters;
+
             return [
                 'name' => (string) $strategy->name,
                 'sector' => (bool) ($filters['sector_score_rotation'] ?? false),
@@ -1139,6 +1161,7 @@ final class DepotController extends Controller
             ->map(fn ($rows): int => $rows->count())->sortDesc()->all();
         $backtestTradeIds = $buyTransactions->map(function ($transaction): ?int {
             $meta = is_string($transaction->meta) ? (json_decode($transaction->meta, true) ?: []) : (array) $transaction->meta;
+
             return is_numeric($meta['backtest_trade_id'] ?? null) ? (int) $meta['backtest_trade_id'] : null;
         })->filter()->unique()->values();
         $sectorScoreRows = $backtestTradeIds->isNotEmpty()
@@ -1155,6 +1178,7 @@ final class DepotController extends Controller
         $transactionRows = $transactions->map(function ($transaction) use ($backtestRows): array {
             $meta = is_string($transaction->meta) ? (json_decode($transaction->meta, true) ?: []) : (array) $transaction->meta;
             $trade = $backtestRows->get((int) ($meta['backtest_trade_id'] ?? 0));
+
             return [
                 'id' => (int) $transaction->id,
                 'ki_score' => $trade?->ki_score ?? ($meta['ki_score'] ?? null),
@@ -1177,8 +1201,10 @@ final class DepotController extends Controller
                 $sells = $rows->where('type', 'sell')->count();
                 $pnl = $rows->sum(function ($transaction): float {
                     $meta = is_string($transaction->meta) ? (json_decode($transaction->meta, true) ?: []) : (array) $transaction->meta;
+
                     return (float) ($meta['realized_profit'] ?? 0);
                 });
+
                 return ['symbol' => $symbol, 'name' => (string) ($instrument?->name ?: ''), 'buys' => $buys, 'sells' => $sells, 'pnl' => $pnl];
             })->sortByDesc('buys')->values()->all();
         $indexRows = DB::table('index_memberships as im')->join('market_indices as mi', 'mi.id', '=', 'im.market_index_id')
@@ -1207,11 +1233,15 @@ final class DepotController extends Controller
             'index_stats' => $indexStats,
             'stock_rows' => $stockRows,
         ];
-        $options = new Options(); $options->set('isRemoteEnabled', false);
+        $options = new Options;
+        $options->set('isRemoteEnabled', false);
         $logoPath = public_path('brand/generated/bull-logo-light-clean.png');
         $logoData = is_file($logoPath) ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath)) : null;
-        $pdf = new Dompdf($options); $pdf->loadHtml(view('depots.simulation-report', compact('portfolio', 'run', 'summary', 'transactions', 'rotation', 'transactionRows', 'logoData'))->render());
-        $pdf->setPaper('a4', 'portrait'); $pdf->render();
+        $pdf = new Dompdf($options);
+        $pdf->loadHtml(view('depots.simulation-report', compact('portfolio', 'run', 'summary', 'transactions', 'rotation', 'transactionRows', 'logoData'))->render());
+        $pdf->setPaper('a4', 'portrait');
+        $pdf->render();
+
         return response($pdf->output(), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'attachment; filename="Depot-Simulation-'.$portfolio->id.'.pdf"']);
     }
 
@@ -1284,7 +1314,9 @@ final class DepotController extends Controller
             $portfolio->delete();
             if ($wasDefault) {
                 $nextPortfolioId = Portfolio::query()->where('user_id', $userId)->where('active', true)->orderBy('id')->value('id');
-                if ($nextPortfolioId) Portfolio::query()->whereKey($nextPortfolioId)->update(['is_default' => true]);
+                if ($nextPortfolioId) {
+                    Portfolio::query()->whereKey($nextPortfolioId)->update(['is_default' => true]);
+                }
             }
         });
 
@@ -1309,12 +1341,13 @@ final class DepotController extends Controller
         $validated = $request->validate(['following' => ['required', 'boolean']]);
         if ((bool) $validated['following']) {
             DB::table('portfolio_followers')->updateOrInsert(
-                ['portfolio_id'=>$portfolio->id, 'user_id'=>$request->user()->id],
-                ['email_enabled'=>true, 'updated_at'=>now(), 'created_at'=>now()],
+                ['portfolio_id' => $portfolio->id, 'user_id' => $request->user()->id],
+                ['email_enabled' => true, 'updated_at' => now(), 'created_at' => now()],
             );
         } else {
             DB::table('portfolio_followers')->where('portfolio_id', $portfolio->id)->where('user_id', $request->user()->id)->delete();
         }
+
         return back()->with('status', (bool) $validated['following']
             ? __('Du folgst diesem Musterdepot und erhältst E-Mails bei Käufen und Verkäufen.')
             : __('Du folgst diesem Musterdepot nicht mehr.'));

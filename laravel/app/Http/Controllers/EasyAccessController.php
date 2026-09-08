@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BetaInvitationLink;
 use App\Models\EasyAccessSubscriber;
 use App\Models\SavedPredictionFilter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class EasyAccessController extends Controller
@@ -15,7 +15,7 @@ class EasyAccessController extends Controller
     {
         $invite = trim((string) $request->query('invite', ''));
         $invitationValid = $invite !== ''
-            && \App\Models\BetaInvitationLink::query()->where('token_hash', hash('sha256', $invite))->first()?->isUsable() === true;
+            && BetaInvitationLink::query()->where('token_hash', hash('sha256', $invite))->first()?->isUsable() === true;
 
         $strategies = SavedPredictionFilter::query()
             ->with('user:id,name')

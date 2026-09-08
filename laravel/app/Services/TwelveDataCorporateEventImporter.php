@@ -41,7 +41,9 @@ class TwelveDataCorporateEventImporter
             DB::transaction(function () use ($records, $universe, $run, &$matched): void {
                 foreach ($records as $record) {
                     $instrument = $this->matchInstrument($universe, $record);
-                    if (! $instrument) continue;
+                    if (! $instrument) {
+                        continue;
+                    }
                     $date = CarbonImmutable::parse($record['date'])->toDateString();
                     $key = implode(':', ['earnings', $instrument->id, $date, strtoupper((string) $record['symbol'])]);
                     CorporateEvent::updateOrCreate(
@@ -70,6 +72,7 @@ class TwelveDataCorporateEventImporter
                 'api_credits_used' => $this->integerHeader($response, 'api-credits-used'),
                 'raw_payload' => $payload, 'finished_at' => now(),
             ]);
+
             return ['received' => $records->count(), 'matched' => $matched, 'ignored' => max(0, $records->count() - $matched)];
         } catch (Throwable $exception) {
             $run->update(['status' => 'failed', 'error_message' => $exception->getMessage(), 'finished_at' => now()]);
@@ -86,6 +89,7 @@ class TwelveDataCorporateEventImporter
             ->map(function (object $instrument): object {
                 $instrument->keys = collect([$instrument->symbol, $instrument->provider_symbol])
                     ->filter()->map(fn ($symbol) => strtoupper($this->marketData->providerSymbol((string) $symbol)))->unique()->all();
+
                 return $instrument;
             });
     }
@@ -101,9 +105,12 @@ class TwelveDataCorporateEventImporter
     {
         $symbol = strtoupper($this->marketData->providerSymbol((string) ($record['symbol'] ?? '')));
         $candidates = $universe->filter(fn (object $instrument) => in_array($symbol, $instrument->keys, true));
-        if ($candidates->count() <= 1) return $candidates->first();
+        if ($candidates->count() <= 1) {
+            return $candidates->first();
+        }
         $mic = strtoupper((string) ($record['mic_code'] ?? ''));
         $exchange = strtoupper((string) ($record['exchange'] ?? ''));
+
         return $candidates->first(fn (object $instrument) => ($mic && strtoupper((string) $instrument->exchange_mic) === $mic)
             || ($exchange && strtoupper((string) $instrument->exchange_code) === $exchange)) ?: $candidates->first();
     }
@@ -115,6 +122,15 @@ class TwelveDataCorporateEventImporter
             ->acceptJson()->retry(2, 500, throw: false)->timeout(45)->get($endpoint, $parameters);
     }
 
-    private function number(mixed $value): ?float { return is_numeric($value) ? (float) $value : null; }
-    private function integerHeader(Response $response, string $name): ?int { $value = $response->header($name); return is_numeric($value) ? (int) $value : null; }
+    private function number(mixed $value): ?float
+    {
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    private function integerHeader(Response $response, string $name): ?int
+    {
+        $value = $response->header($name);
+
+        return is_numeric($value) ? (int) $value : null;
+    }
 }

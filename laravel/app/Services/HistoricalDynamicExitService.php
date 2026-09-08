@@ -16,29 +16,41 @@ final class HistoricalDynamicExitService
         'auto_exit_forecast_below_price' => ['forecast_below_price_exit' => true],
         'auto_entry_wait_5d' => ['entry_wait_5d' => true, 'fixed_20d' => true],
     ];
+
     private array $barsCache = [];
+
     private array $predictionCache = [];
+
     private array $walkForwardSignalCache = [];
+
     private array $marketPhaseCache = [];
+
     private array $horizonCache = [];
+
     private array $levelCache = [];
 
     public function optimize(int $runId, string $goal = 'maximize_performance', string $riskProfile = 'normal'): array
     {
         $this->clearCaches();
         $trades = DB::table('backtest_trades')->where('backtest_run_id', $runId)->orderBy('entry_date')->orderBy('id')->get();
-        if ($trades->isEmpty()) return ['rules' => [], 'variants_checked' => 0, 'metrics' => []];
+        if ($trades->isEmpty()) {
+            return ['rules' => [], 'variants_checked' => 0, 'metrics' => []];
+        }
         $ruleKeys = ['fixed_20d', 'dynamic_horizon', 'support_stop', 'resistance_trailing_stop', 'entry_wait_5d'];
         $best = null;
         $comparison = [];
         for ($mask = 0; $mask < 32; $mask++) {
             $rules = collect($ruleKeys)->mapWithKeys(fn (string $key, int $bit): array => [$key => (bool) ($mask & (1 << $bit))])->all();
             $results = $trades->map(fn (object $trade) => $this->evaluate($trade, $rules))->filter()->values();
-            if ($results->count() < 10) continue;
+            if ($results->count() < 10) {
+                continue;
+            }
             $split = max(1, (int) floor($results->count() * .7));
             $training = $this->metrics($results->take($split));
             $validation = $this->metrics($results->slice($split));
-            if ($validation['average_return'] <= 0 || $validation['profit_factor'] < 1) continue;
+            if ($validation['average_return'] <= 0 || $validation['profit_factor'] < 1) {
+                continue;
+            }
             $robustness = min($training['average_return'], $validation['average_return'])
                 - abs($training['average_return'] - $validation['average_return']) * .35;
             $score = match ($goal) {
@@ -47,9 +59,11 @@ final class HistoricalDynamicExitService
                 default => $robustness * 100 + $validation['profit_factor'] * 8 - $validation['max_drawdown'] * ($riskProfile === 'cautious' ? 1.5 : .5),
             };
             $comparison[] = ['rules' => $rules, 'training' => $training, 'validation' => $validation, 'score' => $score];
-            if ($best === null || $score > $best['score']) $best = compact('rules', 'training', 'validation', 'score');
+            if ($best === null || $score > $best['score']) {
+                $best = compact('rules', 'training', 'validation', 'score');
+            }
         }
-        $best ??= ['rules' => ['fixed_20d'=>true,'dynamic_horizon'=>false,'support_stop'=>false,'resistance_trailing_stop'=>false], 'training'=>[], 'validation'=>[], 'score'=>0.0];
+        $best ??= ['rules' => ['fixed_20d' => true, 'dynamic_horizon' => false, 'support_stop' => false, 'resistance_trailing_stop' => false], 'training' => [], 'validation' => [], 'score' => 0.0];
         $applied = $this->apply($runId, $best['rules']);
 
         return [...$best, ...$applied, 'comparison' => collect($comparison)->sortByDesc('score')->values()->all(),
@@ -58,13 +72,19 @@ final class HistoricalDynamicExitService
 
     public function apply(int $runId, array $rules): array
     {
-        if ($this->barsCache === []) $this->clearCaches();
-        if (! collect($rules)->contains(true)) return ['trades' => 0, 'changed' => 0];
+        if ($this->barsCache === []) {
+            $this->clearCaches();
+        }
+        if (! collect($rules)->contains(true)) {
+            return ['trades' => 0, 'changed' => 0];
+        }
         $trades = DB::table('backtest_trades')->where('backtest_run_id', $runId)->orderBy('id')->get();
         $changed = 0;
         foreach ($trades as $trade) {
             $result = $this->evaluate($trade, $rules);
-            if ($result === null) continue;
+            if ($result === null) {
+                continue;
+            }
             $metadata = is_string($trade->metadata) ? (json_decode($trade->metadata, true) ?: []) : (array) $trade->metadata;
             DB::table('backtest_trades')->where('id', $trade->id)->update([
                 'exit_date' => $result['exit_date'], 'exit_price' => $result['exit_price'],
@@ -76,6 +96,7 @@ final class HistoricalDynamicExitService
             ]);
             $changed++;
         }
+
         return ['trades' => $trades->count(), 'changed' => $changed];
     }
 
@@ -90,7 +111,9 @@ final class HistoricalDynamicExitService
             $rows = [];
             foreach ($trades as $trade) {
                 $result = $this->evaluate($trade, $rules);
-                if ($result === null) continue;
+                if ($result === null) {
+                    continue;
+                }
                 $rows[] = [
                     'backtest_run_id' => $runId,
                     'backtest_trade_id' => $trade->id,
@@ -105,18 +128,26 @@ final class HistoricalDynamicExitService
                     'metadata' => json_encode(['engine' => 'automatic_strategy_comparison_v1', 'rules' => $rules, 'details' => $result['details']], JSON_THROW_ON_ERROR),
                     'created_at' => now(), 'updated_at' => now(),
                 ];
-                if (count($rows) >= 500) { DB::table('backtest_strategy_trades')->insert($rows); $rows = []; }
+                if (count($rows) >= 500) {
+                    DB::table('backtest_strategy_trades')->insert($rows);
+                    $rows = [];
+                }
             }
-            if ($rows !== []) DB::table('backtest_strategy_trades')->insert($rows);
+            if ($rows !== []) {
+                DB::table('backtest_strategy_trades')->insert($rows);
+            }
             $summary[$strategy] = DB::table('backtest_strategy_trades')->where('backtest_run_id', $runId)->where('strategy', $strategy)->count();
         }
+
         return $summary;
     }
 
     private function evaluate(object $trade, array $rules): ?array
     {
         $entry = (float) $trade->entry_price;
-        if ($entry <= 0) return null;
+        if ($entry <= 0) {
+            return null;
+        }
         $originalEntryDate = (string) $trade->entry_date;
         $entryDate = $originalEntryDate;
         $entryWaitDays = 0;
@@ -125,13 +156,16 @@ final class HistoricalDynamicExitService
             $expected = collect([5, 10, 15, 20])->map(function (int $days) use ($prediction): ?float {
                 $current = (float) ($prediction?->current_price ?? 0);
                 $target = (float) data_get($prediction, 'predicted_price_'.$days.'d', 0);
+
                 return $current > 0 && $target > 0 ? ($target - $current) / $current : null;
             })->filter(fn ($value): bool => $value !== null)->max();
             if (is_numeric($expected) && $expected > 0) {
                 $bars = $this->bars((int) $trade->instrument_id)->filter(fn (object $bar): bool => $bar->date >= $originalEntryDate)->take(6)->values();
                 $reference = (float) ($prediction?->current_price ?: $entry);
                 $eligible = $bars->search(fn (object $bar): bool => (((float) $bar->close - $reference) / max(.0001, $reference)) <= (float) $expected);
-                if ($eligible === false) return null;
+                if ($eligible === false) {
+                    return null;
+                }
                 $entryWaitDays = (int) $eligible;
                 $entryDate = substr((string) $bars[$eligible]->bar_time, 0, 10);
                 $entry = (float) $bars[$eligible]->close;
@@ -140,11 +174,15 @@ final class HistoricalDynamicExitService
         $endDate = (string) $trade->exit_date;
         if ($rules['fixed_20d'] ?? false) {
             $fixedBar = $this->bars((int) $trade->instrument_id)->filter(fn (object $bar): bool => $bar->date >= $entryDate)->values()->get(19);
-            if ($fixedBar?->bar_time) $endDate = min($endDate, substr((string) $fixedBar->bar_time, 0, 10));
+            if ($fixedBar?->bar_time) {
+                $endDate = min($endDate, substr((string) $fixedBar->bar_time, 0, 10));
+            }
         }
         if ($rules['dynamic_horizon'] ?? false) {
             $peak = $this->horizonAt((int) $trade->instrument_id, $originalEntryDate);
-            if ($peak?->exit_date) $endDate = min($endDate, (string) $peak->exit_date);
+            if ($peak?->exit_date) {
+                $endDate = min($endDate, (string) $peak->exit_date);
+            }
         }
         if ($rules['signal_change_exit'] ?? false) {
             $signalChange = $this->signalChangeAfter((int) $trade->instrument_id, $entryDate, (int) ($trade->horizon_days ?? 20));
@@ -154,7 +192,9 @@ final class HistoricalDynamicExitService
             // capped by the source trade's fixed 20-day exit date; otherwise
             // both strategies produce the same result whenever the signal
             // changes after day 20.
-            if ($changeDates->isNotEmpty()) $endDate = (string) $changeDates->first();
+            if ($changeDates->isNotEmpty()) {
+                $endDate = (string) $changeDates->first();
+            }
         }
         if ($rules['forecast_below_price_exit'] ?? false) {
             $forecastExitDate = $this->forecastBelowPriceAfter((int) $trade->instrument_id, $entryDate, 20);
@@ -163,7 +203,9 @@ final class HistoricalDynamicExitService
         }
         $history = $this->bars((int) $trade->instrument_id)->filter(fn (object $bar): bool => $bar->date <= $endDate)->values();
         $entryIndex = $history->search(fn (object $bar): bool => $bar->date >= $entryDate);
-        if ($entryIndex === false) return null;
+        if ($entryIndex === false) {
+            return null;
+        }
         $stop = null;
         $reason = ($rules['forecast_below_price_exit'] ?? false) && $endDate === ($forecastExitDate ?? null)
             ? 'forecast_below_current_price'
@@ -172,7 +214,8 @@ final class HistoricalDynamicExitService
             : (($rules['signal_change_exit'] ?? false) && $endDate === ($signalChange ?? null)
                 ? 'signal_change'
                 : (($rules['dynamic_horizon'] ?? false) ? 'dynamic_horizon' : 'scheduled_exit')));
-        $exitBar = $history->last(); $runningLow = $entry;
+        $exitBar = $history->last();
+        $runningLow = $entry;
         for ($index = (int) $entryIndex; $index < $history->count(); $index++) {
             $bar = $history[$index];
             $runningLow = min($runningLow, (float) $bar->low);
@@ -187,13 +230,16 @@ final class HistoricalDynamicExitService
                 $reason = 'resistance_stop_armed';
             }
             if ($stop !== null && (float) $bar->low <= $stop) {
-                $exitBar = $bar; $reason = 'dynamic_stop_triggered';
+                $exitBar = $bar;
+                $reason = 'dynamic_stop_triggered';
                 $exitPrice = min((float) $bar->open, $stop);
                 break;
             }
-            $exitBar = $bar; $exitPrice = (float) $bar->close;
+            $exitBar = $bar;
+            $exitPrice = (float) $bar->close;
         }
         $exitPrice ??= (float) $exitBar->close;
+
         return [
             'entry_price' => $entry,
             'exit_date' => substr((string) $exitBar->bar_time, 0, 10), 'exit_price' => $exitPrice,
@@ -213,6 +259,7 @@ final class HistoricalDynamicExitService
         $returns = $results->pluck('net_return')->map(fn ($value): float => (float) $value);
         $wins = $returns->filter(fn (float $value): bool => $value > 0)->sum();
         $losses = abs((float) $returns->filter(fn (float $value): bool => $value < 0)->sum());
+
         return [
             'trades' => $results->count(),
             'average_return' => (float) $returns->avg() * 100,
@@ -225,19 +272,36 @@ final class HistoricalDynamicExitService
 
     private function levels(Collection $bars, float $current): array
     {
-        if ($bars->count() < 7) return ['support' => null, 'resistance' => null];
+        if ($bars->count() < 7) {
+            return ['support' => null, 'resistance' => null];
+        }
         $range = max(.01, (float) $bars->max('high') - (float) $bars->min('low'));
         $tolerance = max($range * .012, $current * .006);
-        $lows = []; $highs = [];
+        $lows = [];
+        $highs = [];
         for ($i = 2; $i < $bars->count() - 2; $i++) {
-            if ((float) $bars[$i]->low <= (float) $bars[$i-1]->low && (float) $bars[$i]->low <= (float) $bars[$i-2]->low && (float) $bars[$i]->low <= (float) $bars[$i+1]->low && (float) $bars[$i]->low <= (float) $bars[$i+2]->low) $lows[]=(float)$bars[$i]->low;
-            if ((float) $bars[$i]->high >= (float) $bars[$i-1]->high && (float) $bars[$i]->high >= (float) $bars[$i-2]->high && (float) $bars[$i]->high >= (float) $bars[$i+1]->high && (float) $bars[$i]->high >= (float) $bars[$i+2]->high) $highs[]=(float)$bars[$i]->high;
+            if ((float) $bars[$i]->low <= (float) $bars[$i - 1]->low && (float) $bars[$i]->low <= (float) $bars[$i - 2]->low && (float) $bars[$i]->low <= (float) $bars[$i + 1]->low && (float) $bars[$i]->low <= (float) $bars[$i + 2]->low) {
+                $lows[] = (float) $bars[$i]->low;
+            }
+            if ((float) $bars[$i]->high >= (float) $bars[$i - 1]->high && (float) $bars[$i]->high >= (float) $bars[$i - 2]->high && (float) $bars[$i]->high >= (float) $bars[$i + 1]->high && (float) $bars[$i]->high >= (float) $bars[$i + 2]->high) {
+                $highs[] = (float) $bars[$i]->high;
+            }
         }
-        $zone = function(array $values, bool $above) use($tolerance,$current): ?float {
-            $groups=[]; foreach($values as $value){$key=collect($groups)->search(fn($g)=>abs($g[0]-$value)<=$tolerance); if($key===false)$groups[]=[$value];else$groups[$key][]=$value;}
-            return collect($groups)->filter(fn($g)=>count($g)>=2)->map(fn($g)=>array_sum($g)/count($g))->filter(fn($v)=>$above?$v>=$current:$v<=$current)->sortBy(fn($v)=>abs($v-$current))->first();
+        $zone = function (array $values, bool $above) use ($tolerance, $current): ?float {
+            $groups = [];
+            foreach ($values as $value) {
+                $key = collect($groups)->search(fn ($g) => abs($g[0] - $value) <= $tolerance);
+                if ($key === false) {
+                    $groups[] = [$value];
+                } else {
+                    $groups[$key][] = $value;
+                }
+            }
+
+            return collect($groups)->filter(fn ($g) => count($g) >= 2)->map(fn ($g) => array_sum($g) / count($g))->filter(fn ($v) => $above ? $v >= $current : $v <= $current)->sortBy(fn ($v) => abs($v - $current))->first();
         };
-        return ['support'=>$zone($lows,false),'resistance'=>$zone($highs,true)];
+
+        return ['support' => $zone($lows, false), 'resistance' => $zone($highs, true)];
     }
 
     private function clearCaches(): void
@@ -251,6 +315,7 @@ final class HistoricalDynamicExitService
             ->where('instrument_id', $instrumentId)->where('interval', '1d')->orderBy('bar_time')
             ->get(['bar_time', 'open', 'high', 'low', 'close'])->map(function (object $bar): object {
                 $bar->date = substr((string) $bar->bar_time, 0, 10);
+
                 return $bar;
             });
     }
@@ -262,6 +327,7 @@ final class HistoricalDynamicExitService
                 ->orderBy('prediction_time')->get(['prediction_time', 'signal', 'current_price', 'predicted_price_5d',
                     'predicted_price_10d', 'predicted_price_15d', 'predicted_price_20d']);
         }
+
         return $this->predictionCache[$instrumentId]->last(fn (object $prediction): bool => substr((string) $prediction->prediction_time, 0, 10) <= $date);
     }
 
@@ -278,6 +344,7 @@ final class HistoricalDynamicExitService
                 ->map(function (Collection $rows): object {
                     $signal = (string) ($rows->countBy(fn (object $row): string => strtoupper((string) $row->signal))
                         ->sortDesc()->keys()->first() ?? '');
+
                     return (object) ['date' => substr((string) $rows->first()->signal_date, 0, 10), 'signal' => $signal];
                 })->values();
         }
@@ -285,7 +352,9 @@ final class HistoricalDynamicExitService
         $historical = $this->walkForwardSignalCache[$key]->first(
             fn (object $row): bool => $row->date > $entryDate && strtoupper($row->signal) !== 'BUY'
         );
-        if ($historical !== null) return $historical->date;
+        if ($historical !== null) {
+            return $historical->date;
+        }
 
         // Fallback for newly added instruments without a completed
         // walk-forward history yet.
@@ -310,13 +379,16 @@ final class HistoricalDynamicExitService
             ->orderByDesc('id')
             ->first(['signal_date']);
 
-        if ($row !== null) return substr((string) $row->signal_date, 0, 10);
+        if ($row !== null) {
+            return substr((string) $row->signal_date, 0, 10);
+        }
 
         $this->predictionAt($instrumentId, $entryDate);
         $prediction = $this->predictionCache[$instrumentId]->first(function (object $prediction) use ($entryDate): bool {
             $date = substr((string) $prediction->prediction_time, 0, 10);
             $current = (float) ($prediction->current_price ?? 0);
             $forecast = (float) ($prediction->predicted_price_20d ?? 0);
+
             return $date > $entryDate && $current > 0 && $forecast > 0 && $forecast < $current;
         });
 
@@ -333,22 +405,31 @@ final class HistoricalDynamicExitService
             $previousMacd = null;
             $this->marketPhaseCache[$instrumentId] = $rows->map(function (object $row) use (&$previousMacd): ?object {
                 $macd = (float) $row->macd_histogram;
-                if ($previousMacd === null) { $previousMacd = $macd; return null; }
+                if ($previousMacd === null) {
+                    $previousMacd = $macd;
+
+                    return null;
+                }
                 $phase = $this->classifyMarketPhase($macd, $previousMacd, (float) $row->stochastic_k);
                 $previousMacd = $macd;
+
                 return (object) ['date' => substr((string) $row->bar_time, 0, 10), 'phase' => $phase];
             })->filter()->values();
         }
         $series = $this->marketPhaseCache[$instrumentId];
         $entryPoint = $series->last(fn (object $row): bool => $row->date <= $entryDate);
-        if ($entryPoint === null) return null;
+        if ($entryPoint === null) {
+            return null;
+        }
         $change = $series->first(fn (object $row): bool => $row->date > $entryDate && $row->phase !== $entryPoint->phase);
+
         return $change === null ? null : ['date' => $change->date, 'from' => $entryPoint->phase, 'to' => $change->phase];
     }
 
     private function classifyMarketPhase(float $macd, float $previousMacd, float $stochastic): string
     {
         $rising = $macd > $previousMacd;
+
         return match (true) {
             $macd >= 0 && $rising && $stochastic >= 50 && $stochastic < 80 => 'bullish_impulse',
             $macd >= 0 && ! $rising && $stochastic >= 80 => 'overheated_fading',
@@ -369,12 +450,14 @@ final class HistoricalDynamicExitService
                 ->whereNotNull('predicted_return')->orderByDesc('predicted_return')->get(['signal_date', 'exit_date', 'predicted_return'])
                 ->groupBy(fn (object $row): string => substr((string) $row->signal_date, 0, 10));
         }
+
         return $this->horizonCache[$instrumentId]->get($date)?->first();
     }
 
     private function levelsAt(int $instrumentId, Collection $history, int $index, float $current): array
     {
         $key = $instrumentId.':'.$index;
+
         return $this->levelCache[$key] ??= $this->levels($history->slice(max(0, $index - 180), min(180, $index))->values(), $current);
     }
 }

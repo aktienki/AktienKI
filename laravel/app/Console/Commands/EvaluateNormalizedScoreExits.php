@@ -9,6 +9,7 @@ use Illuminate\Console\Command;
 final class EvaluateNormalizedScoreExits extends Command
 {
     protected $signature = 'exits:evaluate-normalized-scores {--limit=5000}';
+
     protected $description = 'Bewertet offene Positionen über normierte, bestätigte KI-Score-Exits.';
 
     public function handle(NormalizedScoreExitService $service): int
@@ -21,6 +22,7 @@ final class EvaluateNormalizedScoreExits extends Command
                 $counts[$decision] = ($counts[$decision] ?? 0) + 1;
             });
         $this->info(collect($counts)->map(fn ($count, $name) => "{$name}={$count}")->implode(' '));
+
         return self::SUCCESS;
     }
 }

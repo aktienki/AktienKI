@@ -2,10 +2,11 @@
 
 namespace App\Notifications;
 
-use App\Services\RecommendationEmailLogo;
 use App\Services\DashboardEmailMap;
+use App\Services\RecommendationEmailLogo;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Symfony\Component\Mime\Email;
 
 final class DashboardDigestNotification extends Notification
 {
@@ -26,7 +27,7 @@ final class DashboardDigestNotification extends Notification
         return (new MailMessage)
             ->subject('aKI Dashboard · Aktuelle Marktsituation')
             ->markdown('mail.dashboard-digest', $this->dashboard)
-            ->withSymfonyMessage(function (\Symfony\Component\Mime\Email $email) use ($logo, $map): void {
+            ->withSymfonyMessage(function (Email $email) use ($logo, $map): void {
                 $email->embed($logo, 'aktienki-logo.png', 'image/png');
                 $email->embed($map, 'aki-market-map.png', 'image/png');
             });

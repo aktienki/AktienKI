@@ -2,19 +2,24 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Contracts\View\View;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use App\Enums\PlanLevel;
+use App\Models\CommunityPost;
+use App\Models\Portfolio;
+use App\Models\SmartSelectionLabel;
+use App\Models\User;
 use App\Services\PlanAccessService;
 use App\Services\ServingMarketSnapshotService;
 use App\Services\ServingReadService;
 use App\Services\ServingScreenerService;
 use App\Services\StockRiskClassificationService;
-use App\Models\User;
+use App\Support\AiScore;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -72,6 +77,7 @@ class DashboardController extends Controller
         ];
         abort_if(collect($validated['cards'])->contains(function (array $card) use ($fixedDimensions): bool {
             $fixed = $fixedDimensions[$card['id']] ?? null;
+
             return $fixed && ($card['width'] !== $fixed['width'] || $card['height'] !== $fixed['height']);
         }), 422, __('Eine oder mehrere Karten besitzen eine feste Größe.'));
         abort_if(collect($validated['cards'])->contains(
@@ -108,16 +114,16 @@ class DashboardController extends Controller
                 ->count(),
             'watchlists' => $user->watchlists()->where('active', true)->count(),
             'strategies' => $user->savedPredictionFilters()->count(),
-            'labels' => \App\Models\SmartSelectionLabel::query()
+            'labels' => SmartSelectionLabel::query()
                 ->where('user_id', $user->id)
                 ->where('is_active', true)
                 ->count(),
             'news' => 0,
         ];
         $communityOverview = [
-            'posts' => \App\Models\CommunityPost::query()->where('is_published', true)->count(),
-            'members' => \App\Models\CommunityPost::query()->where('is_published', true)->distinct('user_id')->count('user_id'),
-            'recent' => \App\Models\CommunityPost::query()->where('is_published', true)->where('created_at', '>=', now()->subDays(7))->count(),
+            'posts' => CommunityPost::query()->where('is_published', true)->count(),
+            'members' => CommunityPost::query()->where('is_published', true)->distinct('user_id')->count('user_id'),
+            'recent' => CommunityPost::query()->where('is_published', true)->where('created_at', '>=', now()->subDays(7))->count(),
             'news' => 0,
         ];
         $servingMarketSnapshot = app(ServingMarketSnapshotService::class)->snapshot();
@@ -210,7 +216,7 @@ class DashboardController extends Controller
                     ->orderBy('reminder.remind_on')
                     ->get(['reminder.id', 'reminder.intent', 'reminder.horizon_days', 'reminder.remind_on', 'reminder.status', 'instrument.symbol', 'instrument.name'])
                     ->map(function (object $reminder): array {
-                        $remindOn = \Illuminate\Support\Carbon::parse($reminder->remind_on)->startOfDay();
+                        $remindOn = Carbon::parse($reminder->remind_on)->startOfDay();
 
                         return [
                             'id' => $reminder->id,
@@ -293,7 +299,7 @@ class DashboardController extends Controller
 
     private function strategyPortfolio(int $userId): mixed
     {
-        $portfolios = \App\Models\Portfolio::query()
+        $portfolios = Portfolio::query()
             ->where('user_id', $userId)
             ->where('type', 'paper')
             ->where('active', true)
@@ -301,16 +307,14 @@ class DashboardController extends Controller
             ->with(['cashAccount', 'strategies:id,name', 'positions.instrument:id,symbol,name,country'])
             ->get();
 
-        $portfolio = $portfolios->first(fn ($candidate): bool =>
-            (bool) data_get($candidate->meta, 'automation.live_enabled', false))
+        $portfolio = $portfolios->first(fn ($candidate): bool => (bool) data_get($candidate->meta, 'automation.live_enabled', false))
             ?? $portfolios->first();
 
         if (! $portfolio) {
             return null;
         }
 
-        $positionsValue = $portfolio->positions->sum(fn ($position): float =>
-            (float) $position->quantity * (float) ($position->current_price ?? $position->average_buy_price));
+        $positionsValue = $portfolio->positions->sum(fn ($position): float => (float) $position->quantity * (float) ($position->current_price ?? $position->average_buy_price));
         $cash = (float) ($portfolio->cashAccount?->balance ?? 0);
         $initialCapital = max(0.0, (float) data_get($portfolio->meta, 'automation.initial_capital', 0));
         $totalValue = $positionsValue + $cash;
@@ -378,7 +382,7 @@ class DashboardController extends Controller
     {
         return Cache::remember('dashboard.personal.recent-signal-overview-serving-v1', now()->addMinutes(2), function (): array {
             $recommendations = app(ServingReadService::class)->signalTransitions()
-                ->filter(fn (object $row): bool => \Illuminate\Support\Carbon::parse($row->changed_at)->gte(now()->subHours(48)))
+                ->filter(fn (object $row): bool => Carbon::parse($row->changed_at)->gte(now()->subHours(48)))
                 ->map(function (object $row): object {
                     $row->signal = $row->to_signal;
                     $row->prediction_time = $row->changed_at;
@@ -405,7 +409,7 @@ class DashboardController extends Controller
             $serving = app(ServingReadService::class);
             $predictions = $serving->latestPredictions()->groupBy('instrument_id');
             $signalChanges = $serving->signalTransitions()
-                ->filter(fn (object $row): bool => \Illuminate\Support\Carbon::parse($row->changed_at)->gte(now()->subDays(7)))
+                ->filter(fn (object $row): bool => Carbon::parse($row->changed_at)->gte(now()->subDays(7)))
                 ->map(function (object $row) use ($predictions): array {
                     $horizons = collect($predictions->get($row->instrument_id, collect()))
                         ->mapWithKeys(fn (object $prediction): array => [
@@ -420,7 +424,7 @@ class DashboardController extends Controller
                         'from' => $row->from_signal,
                         'to' => $row->to_signal,
                         'at' => $row->changed_at,
-                        'score' => is_numeric($row->score_at_change) ? \App\Support\AiScore::toTen($row->score_at_change) : null,
+                        'score' => is_numeric($row->score_at_change) ? AiScore::toTen($row->score_at_change) : null,
                         'risk' => is_numeric($row->risk_at_change) ? min(100.0, max(0.0, (float) $row->risk_at_change * 20.0)) : null,
                         'horizons' => [
                             5 => null,
@@ -488,5 +492,4 @@ class DashboardController extends Controller
             'bins' => $bins,
         ];
     }
-
 }

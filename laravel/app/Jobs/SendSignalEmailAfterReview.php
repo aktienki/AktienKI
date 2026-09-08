@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\PlanLevel;
 use App\Models\EasyAccessSubscriber;
 use App\Models\ExternalBuyReview;
 use App\Models\Prediction;
@@ -9,10 +10,9 @@ use App\Models\SavedPredictionFilter;
 use App\Models\SignalEmailDelivery;
 use App\Models\SmartSelectionLabel;
 use App\Models\User;
-use App\Enums\PlanLevel;
-use App\Services\PlanAccessService;
 use App\Notifications\SignalChangedNotification;
 use App\Notifications\SmartSelectionSignalNotification;
+use App\Services\PlanAccessService;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

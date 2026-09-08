@@ -42,17 +42,17 @@ return new class extends Migration
             "SELECT pg_get_viewdef('public_prediction_models'::regclass, true) AS definition"
         );
         $marker = "\n   FROM predictions p";
-        if (!str_contains($row->definition, $marker)) {
+        if (! str_contains($row->definition, $marker)) {
             throw new RuntimeException('Unexpected public_prediction_models definition');
         }
         $extra = ",\n    p.feature_drift_status,\n"
-            . "    p.feature_drift_max_zscore,\n"
-            . "    p.feature_drift_ratio,\n"
-            . "    p.feature_drift_veto_used,\n"
-            . "    p.feature_drift_details";
-        $view = str_replace($marker, $extra . $marker, $row->definition);
+            ."    p.feature_drift_max_zscore,\n"
+            ."    p.feature_drift_ratio,\n"
+            ."    p.feature_drift_veto_used,\n"
+            .'    p.feature_drift_details';
+        $view = str_replace($marker, $extra.$marker, $row->definition);
         DB::statement('DROP VIEW public_prediction_models');
-        DB::statement('CREATE VIEW public_prediction_models AS ' . $view);
+        DB::statement('CREATE VIEW public_prediction_models AS '.$view);
     }
 
     private function removeViewColumns(): void
@@ -61,15 +61,15 @@ return new class extends Migration
             "SELECT pg_get_viewdef('public_prediction_models'::regclass, true) AS definition"
         );
         $pattern = '/,\n    p\.feature_drift_status,\n'
-            . '    p\.feature_drift_max_zscore,\n'
-            . '    p\.feature_drift_ratio,\n'
-            . '    p\.feature_drift_veto_used,\n'
-            . '    p\.feature_drift_details/';
+            .'    p\.feature_drift_max_zscore,\n'
+            .'    p\.feature_drift_ratio,\n'
+            .'    p\.feature_drift_veto_used,\n'
+            .'    p\.feature_drift_details/';
         $view = preg_replace($pattern, '', $row->definition, 1);
         if ($view === null || $view === $row->definition) {
             throw new RuntimeException('Feature drift columns not found in public view');
         }
         DB::statement('DROP VIEW public_prediction_models');
-        DB::statement('CREATE VIEW public_prediction_models AS ' . $view);
+        DB::statement('CREATE VIEW public_prediction_models AS '.$view);
     }
 };

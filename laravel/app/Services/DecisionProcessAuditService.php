@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Carbon\CarbonImmutable;
 
 final class DecisionProcessAuditService
 {
@@ -13,6 +13,7 @@ final class DecisionProcessAuditService
     public function start(string $type, ?int $instrumentId, ?int $predictionId, array $context = []): int
     {
         $canonical = $this->canonicalJson($context);
+
         return (int) DB::table('decision_process_runs')->insertGetId([
             'public_id' => (string) Str::uuid(), 'instrument_id' => $instrumentId,
             'prediction_id' => $predictionId, 'process_type' => $type,
@@ -63,11 +64,18 @@ final class DecisionProcessAuditService
     private function canonicalJson(array $value): string
     {
         $sort = function (&$item) use (&$sort): void {
-            if (! is_array($item)) return;
-            foreach ($item as &$child) $sort($child);
-            if (! array_is_list($item)) ksort($item);
+            if (! is_array($item)) {
+                return;
+            }
+            foreach ($item as &$child) {
+                $sort($child);
+            }
+            if (! array_is_list($item)) {
+                ksort($item);
+            }
         };
         $sort($value);
+
         return json_encode($value, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
     }
 }

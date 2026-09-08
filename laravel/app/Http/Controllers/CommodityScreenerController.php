@@ -46,6 +46,7 @@ final class CommodityScreenerController extends Controller
             $commodity->as_of = $rows->max('as_of');
             $commodity->signal = $rows->contains(fn (object $row) => $row->signal === 'BUY') ? 'BUY'
                 : ($rows->contains(fn (object $row) => $row->signal === 'SELL') ? 'SELL' : 'WATCH');
+
             return $commodity;
         })->filter(fn (object $commodity) => collect([10, 20, 40])
             ->contains(fn (int $horizon) => is_numeric($commodity->{"return_{$horizon}d"})))->values();

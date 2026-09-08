@@ -34,7 +34,7 @@ final class CookieConsentNavigationTest extends TestCase
         $this->assertStringContainsString('data-cc-backdrop data-cc-hidden', $this->view);
         $this->assertStringContainsString('<section class="cc-banner" data-cc-banner role="dialog" aria-labelledby="cc-title">', $this->view);
         $this->assertStringContainsString("const openBanner=()=>{root.removeAttribute('data-cc-hidden');backdrop.setAttribute('data-cc-hidden','');", $this->view);
-        $this->assertStringContainsString("const openSettings=event=>{", $this->view);
+        $this->assertStringContainsString('const openSettings=event=>{', $this->view);
         $this->assertStringContainsString("backdrop.removeAttribute('data-cc-hidden')", $this->view);
     }
 

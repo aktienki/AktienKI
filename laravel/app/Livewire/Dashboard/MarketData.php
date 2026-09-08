@@ -6,10 +6,11 @@ namespace App\Livewire\Dashboard;
 
 use App\Enums\PlanLevel;
 use App\Services\FreeRegionalStockUniverseService;
-use App\Services\MarketService;
 use App\Services\IndexAiScoreService;
+use App\Services\MarketService;
 use App\Services\PlanAccessService;
 use App\Services\ServingMarketSnapshotService;
+use App\Support\AiScore;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -43,27 +44,25 @@ class MarketData extends Component
 
     protected array $symbols = [
 
-        'DAX'        => '^GDAXI',
-        'NASDAQ'     => '^IXIC',
-        'S&P 500'    => '^GSPC',
-        'Japan'      => '^N225',
-        'China'      => '000001.SS',
+        'DAX' => '^GDAXI',
+        'NASDAQ' => '^IXIC',
+        'S&P 500' => '^GSPC',
+        'Japan' => '^N225',
+        'China' => '000001.SS',
 
     ];
 
     public function mount(
         MarketService $marketService,
         IndexAiScoreService $indexAiScores
-    ): void
-    {
+    ): void {
         $this->loadData($marketService, $indexAiScores, true);
     }
 
     public function refreshData(
         MarketService $marketService,
         IndexAiScoreService $indexAiScores
-    ): void
-    {
+    ): void {
         $this->loadData($marketService, $indexAiScores, false);
     }
 
@@ -71,8 +70,7 @@ class MarketData extends Component
         MarketService $marketService,
         IndexAiScoreService $indexAiScores,
         bool $loadCandles
-    ): void
-    {
+    ): void {
         $existingCandles = collect($this->markets)
             ->mapWithKeys(fn (array $market) => [
                 $market['symbol'] ?? $market['name'] => $market['candles'] ?? [],
@@ -223,8 +221,7 @@ class MarketData extends Component
             ->orderBy('bar.bar_time')->get(['bar.close', 'bar.bar_time']);
         $daxMedian = (float) $daxLevels->pluck('close')->filter(fn ($value) => is_numeric($value) && (float) $value > 0)->median();
         if ($daxMedian > 0) {
-            $daxLevels = $daxLevels->filter(fn (object $row): bool =>
-                is_numeric($row->close)
+            $daxLevels = $daxLevels->filter(fn (object $row): bool => is_numeric($row->close)
                 && (float) $row->close >= $daxMedian * .5
                 && (float) $row->close <= $daxMedian * 1.5
             )->values();
@@ -252,7 +249,7 @@ class MarketData extends Component
             ->map(fn (object $point): array => [
                 'day' => (string) $point->day,
                 'label' => Carbon::parse($point->day)->format('d.m.'),
-                'value' => (float) (\App\Support\AiScore::toTen($point->score) ?? 0),
+                'value' => (float) (AiScore::toTen($point->score) ?? 0),
             ]);
         // Daily predictions supersede an older backtest sample for the same
         // calendar day, while the backtest remains the long-term history.
@@ -261,6 +258,7 @@ class MarketData extends Component
         // keeping the direction and timing of the KI-score visible.
         $aiSeries = $aiSeries->map(function (array $point, int $index) use ($aiSeries): array {
             $window = $aiSeries->slice(max(0, $index - 6), 7)->pluck('value')->filter(fn ($value) => is_numeric($value));
+
             return ['label' => $point['label'], 'value' => round((float) ($window->median() ?? $point['value']), 2)];
         })->values()->all();
         $daxCompareSeries = count($aiSeries) > 0 ? array_slice($daxSeries, -count($aiSeries)) : [];
@@ -287,7 +285,9 @@ class MarketData extends Component
             $dax = $daxLevels->values();
             $prices = $dax->map(fn (object $row): ?float => is_numeric($row->close) ? (float) $row->close : null)->filter(fn ($value) => $value !== null)->values();
             $returns = collect();
-            for ($index = 1; $index < $prices->count(); $index++) $returns->push($prices[$index - 1] > 0 ? ($prices[$index] / $prices[$index - 1]) - 1 : null);
+            for ($index = 1; $index < $prices->count(); $index++) {
+                $returns->push($prices[$index - 1] > 0 ? ($prices[$index] / $prices[$index - 1]) - 1 : null);
+            }
             for ($index = 20; $index < $returns->count(); $index++) {
                 $window = $returns->slice($index - 20, 20)->filter(fn ($value) => $value !== null)->values();
                 $mean = $window->avg();
@@ -317,6 +317,7 @@ class MarketData extends Component
             ->where('bar.bar_time', '>=', now()->subYear()->subMonths(2))
             ->orderBy('bar.bar_time')->get(['bar.close', 'bar.bar_time']);
         $nasdaqSeries = $series($nasdaqBars);
+
         return collect([
             ['key' => 'dax-backtest', 'title' => __('DAX · Kursverlauf'), 'subtitle' => __('Letzter DAX-ETF-Kurs von Twelve Data'), 'unit' => ' EUR', 'series' => [['name' => __('DAX-ETF'), 'color' => '#06b6d4', 'points' => $daxSeries, 'axis' => 'price', 'display_unit' => ' EUR']]],
             ['key' => 'sp500-backtest', 'title' => __('S&P 500 · Kursverlauf'), 'subtitle' => __('Letzter SPY-Kurs von Twelve Data'), 'unit' => ' USD', 'series' => [['name' => __('S&P 500 ETF'), 'color' => '#38bdf8', 'points' => $sp500Series, 'axis' => 'price', 'display_unit' => ' USD']]],
@@ -383,8 +384,7 @@ class MarketData extends Component
                 ->selectRaw('instrument_id, MAX(id) AS prediction_id')
                 ->groupBy('instrument_id');
             $latestSignals = DB::table('predictions as current_prediction')
-                ->joinSub($latestPredictionIds, 'latest_prediction', fn ($join) =>
-                    $join->on('latest_prediction.prediction_id', '=', 'current_prediction.id'))
+                ->joinSub($latestPredictionIds, 'latest_prediction', fn ($join) => $join->on('latest_prediction.prediction_id', '=', 'current_prediction.id'))
                 ->join('instruments as current_instrument', 'current_instrument.id', '=', 'current_prediction.instrument_id')
                 ->where('current_instrument.type', 'stock')
                 ->where(fn ($query) => $query->whereNull('current_instrument.risk_status')->orWhere('current_instrument.risk_status', '<>', 'sleep'))
@@ -393,7 +393,7 @@ class MarketData extends Component
                 ->where('current_prediction.prediction_time', '>=', now()->subHours(48))
                 ->whereIn(DB::raw('UPPER(current_prediction.signal)'), ['SELL', 'HOLD', 'WAIT', 'BUY'])
                 ->select(['current_prediction.instrument_id'])
-                ->selectRaw("UPPER(current_prediction.signal) AS signal");
+                ->selectRaw('UPPER(current_prediction.signal) AS signal');
             $distribution = DB::query()
                 ->fromSub($latestSignals, 'latest_signal')
                 ->groupBy('signal')
@@ -526,8 +526,12 @@ class MarketData extends Component
             $summary = sprintf(
                 '%d von %d aktuellen Prognosen weisen eine positive Renditeerwartung auf, %d eine negative. Die durchschnittliche 20-Tage-Erwartung liegt bei %+.1f %%. Da nur %d von %d Prognosen das Quality Gate bestehen, bleibt die Einordnung %s bei %s Modellrisiko.',
                 $positive, $count, $negative, $averageReturn, $qualityCount, $count,
-                match ($outlook) { 'BULLISH' => 'positiv', 'BEARISH' => 'negativ', default => 'neutral' },
-                match ($riskLevel) { 'LOW' => 'niedrigem', 'MEDIUM' => 'erhöhtem', default => 'hohem' },
+                match ($outlook) {
+                    'BULLISH' => 'positiv', 'BEARISH' => 'negativ', default => 'neutral'
+                },
+                match ($riskLevel) {
+                    'LOW' => 'niedrigem', 'MEDIUM' => 'erhöhtem', default => 'hohem'
+                },
             );
             $breadth = $bestSector && $weakestSector
                 ? sprintf('Stärkster Sektor: %s (%+.1f %%). Schwächster Sektor: %s (%+.1f %%). Berechnet aus dem aktuellen Modellstand triple_daily_macro_v1.', $bestSector['sector'], $bestSector['return'], $weakestSector['sector'], $weakestSector['return'])
@@ -641,8 +645,7 @@ class MarketData extends Component
                 $price = $latest && is_numeric($latest->close) ? (float) $latest->close : null;
                 $latestDay = $latest ? Carbon::parse($latest->bar_time)->toDateString() : null;
                 $previousDaily = $symbolBars
-                    ->first(fn (object $bar): bool =>
-                        $bar->interval === '1d'
+                    ->first(fn (object $bar): bool => $bar->interval === '1d'
                         && is_numeric($bar->close)
                         && $latestDay !== null
                         && Carbon::parse($bar->bar_time)->toDateString() < $latestDay

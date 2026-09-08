@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Services\TechnicalPriceLevelService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
@@ -167,12 +167,9 @@ class EtfCertificateController extends Controller
                     });
                 });
 
-            $officialCatalogDate = Cache::remember('deutsche-boerse-certificates:source-date', 3600, fn () =>
-                DB::table('deutsche_boerse_certificates')->max('source_date'));
-            $stats['certificates'] = Cache::remember('deutsche-boerse-certificates:count', 3600, fn () =>
-                DB::table('deutsche_boerse_certificates')->count());
-            $stats['underlyings'] = Cache::remember('deutsche-boerse-certificates:underlyings', 3600, fn () =>
-                DB::table('deutsche_boerse_certificates')->whereNotNull('underlying_code')->distinct()->count('underlying_code'));
+            $officialCatalogDate = Cache::remember('deutsche-boerse-certificates:source-date', 3600, fn () => DB::table('deutsche_boerse_certificates')->max('source_date'));
+            $stats['certificates'] = Cache::remember('deutsche-boerse-certificates:count', 3600, fn () => DB::table('deutsche_boerse_certificates')->count());
+            $stats['underlyings'] = Cache::remember('deutsche-boerse-certificates:underlyings', 3600, fn () => DB::table('deutsche_boerse_certificates')->whereNotNull('underlying_code')->distinct()->count('underlying_code'));
 
             $officialCertificates = $officialBase
                 ->orderByRaw('maturity_date IS NULL')

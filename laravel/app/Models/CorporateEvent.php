@@ -18,6 +18,13 @@ class CorporateEvent extends Model
         'data' => 'array',
     ];
 
-    public function instrument(): BelongsTo { return $this->belongsTo(Instrument::class); }
-    public function import(): BelongsTo { return $this->belongsTo(CorporateEventImport::class, 'import_id'); }
+    public function instrument(): BelongsTo
+    {
+        return $this->belongsTo(Instrument::class);
+    }
+
+    public function import(): BelongsTo
+    {
+        return $this->belongsTo(CorporateEventImport::class, 'import_id');
+    }
 }

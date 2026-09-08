@@ -12,20 +12,20 @@ return new class extends Migration
             $table->id();
             $table->foreignId('exchange_id')->nullable()->constrained('exchanges')->nullOnDelete();
 
-            $table->string('type',20)->index();
-            $table->string('symbol',30);
-            $table->string('provider_symbol',60)->nullable()->index();
-            $table->string('isin',20)->nullable()->index();
+            $table->string('type', 20)->index();
+            $table->string('symbol', 30);
+            $table->string('provider_symbol', 60)->nullable()->index();
+            $table->string('isin', 20)->nullable()->index();
 
             $table->string('name');
             $table->string('short_name')->nullable();
 
-            $table->string('country',2)->nullable()->index();
-            $table->string('currency',3)->nullable()->index();
+            $table->string('country', 2)->nullable()->index();
+            $table->string('currency', 3)->nullable()->index();
             $table->string('sector')->nullable()->index();
             $table->string('industry')->nullable()->index();
 
-            $table->decimal('market_cap',24,2)->nullable();
+            $table->decimal('market_cap', 24, 2)->nullable();
 
             $table->boolean('is_active')->default(true);
             $table->boolean('is_tradeable')->default(true);
@@ -35,7 +35,7 @@ return new class extends Migration
             $table->timestampsTz();
             $table->softDeletesTz();
 
-            $table->unique(['exchange_id','symbol','type']);
+            $table->unique(['exchange_id', 'symbol', 'type']);
         });
     }
 

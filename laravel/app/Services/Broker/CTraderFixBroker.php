@@ -42,14 +42,20 @@ final class CTraderFixBroker
                 59 => '1',
                 60 => now('UTC')->format('Ymd-H:i:s.v'),
             ];
-            if ($type === '2') $fields[44] = $this->decimal((float) $order['limit_price']);
-            if ($type === '3') $fields[99] = $this->decimal((float) ($order['limit_price'] ?? 0));
+            if ($type === '2') {
+                $fields[44] = $this->decimal((float) $order['limit_price']);
+            }
+            if ($type === '3') {
+                $fields[99] = $this->decimal((float) ($order['limit_price'] ?? 0));
+            }
             $this->send($session, 'D', $fields);
             $response = $this->receive($session, ['8', '9']);
             if (($response[35] ?? '') === '8' && in_array(($response[39] ?? ''), ['8'], true)) {
                 throw new RuntimeException($response[58] ?? 'FIX-Order wurde abgelehnt.');
             }
-            if (($response[35] ?? '') === '3') throw new RuntimeException($response[58] ?? 'FIX Session Reject.');
+            if (($response[35] ?? '') === '3') {
+                throw new RuntimeException($response[58] ?? 'FIX Session Reject.');
+            }
 
             return [
                 'protocol' => 'FIX.4.4',
@@ -79,7 +85,9 @@ final class CTraderFixBroker
                 if (($report[35] ?? '') !== 'AP') {
                     throw new RuntimeException($report[58] ?? 'cTrader hat die Positionsabfrage abgelehnt.');
                 }
-                if (($report[728] ?? '0') === '2') break;
+                if (($report[728] ?? '0') === '2') {
+                    break;
+                }
                 if (($report[728] ?? '0') !== '0') {
                     throw new RuntimeException('cTrader meldet ein ungültiges Ergebnis der Positionsabfrage.');
                 }
@@ -106,6 +114,7 @@ final class CTraderFixBroker
         $session = $this->open($connection, $channel);
         try {
             $response = $this->authenticate($session);
+
             return ['status' => 'connected', 'channel' => $channel, 'message_type' => $response[35] ?? null];
         } finally {
             $this->close($session);
@@ -119,12 +128,16 @@ final class CTraderFixBroker
             throw new RuntimeException('Die cTrader-Kontonummer fehlt. Sie wird als FIX Username verwendet.');
         }
         foreach (['fix_host', 'fix_sender_comp_id', 'fix_target_comp_id', 'fix_password'] as $key) {
-            if (! filled($credentials[$key] ?? null)) throw new RuntimeException("FIX {$key} fehlt.");
+            if (! filled($credentials[$key] ?? null)) {
+                throw new RuntimeException("FIX {$key} fehlt.");
+            }
         }
         $portKey = $channel === 'quote' ? 'fix_quote_port' : 'fix_trade_port';
         $subKey = $channel === 'quote' ? 'fix_quote_sender_sub_id' : 'fix_trade_sender_sub_id';
         $port = (int) ($credentials[$portKey] ?? 0);
-        if ($port < 1) throw new RuntimeException("FIX {$portKey} fehlt.");
+        if ($port < 1) {
+            throw new RuntimeException("FIX {$portKey} fehlt.");
+        }
         $context = stream_context_create(['ssl' => [
             'verify_peer' => true,
             'verify_peer_name' => true,
@@ -139,8 +152,11 @@ final class CTraderFixBroker
             STREAM_CLIENT_CONNECT,
             $context,
         );
-        if (! is_resource($socket)) throw new RuntimeException("FIX {$channel}-Verbindung fehlgeschlagen: {$errorMessage} ({$errorNumber}).");
+        if (! is_resource($socket)) {
+            throw new RuntimeException("FIX {$channel}-Verbindung fehlgeschlagen: {$errorMessage} ({$errorNumber}).");
+        }
         stream_set_timeout($socket, 12);
+
         return [
             'socket' => $socket, 'sequence' => 1, 'channel' => $channel, 'buffer' => '',
             'sender' => (string) $credentials['fix_sender_comp_id'],
@@ -155,7 +171,10 @@ final class CTraderFixBroker
     {
         $this->send($session, 'A', [98 => '0', 108 => '30', 141 => 'Y', 553 => $session['username'], 554 => $session['password']]);
         $response = $this->receive($session, ['A', '5', '3']);
-        if (($response[35] ?? '') !== 'A') throw new RuntimeException($response[58] ?? 'FIX-Logon wurde abgelehnt.');
+        if (($response[35] ?? '') !== 'A') {
+            throw new RuntimeException($response[58] ?? 'FIX-Logon wurde abgelehnt.');
+        }
+
         return $response;
     }
 
@@ -172,11 +191,15 @@ final class CTraderFixBroker
             52 => now('UTC')->format('Ymd-H:i:s.v'),
         ];
         $body = '';
-        foreach ($standard + $fields as $tag => $value) $body .= $tag.'='.$value.self::SOH;
+        foreach ($standard + $fields as $tag => $value) {
+            $body .= $tag.'='.$value.self::SOH;
+        }
         $head = '8=FIX.4.4'.self::SOH.'9='.strlen($body).self::SOH;
         $unsigned = $head.$body;
         $message = $unsigned.'10='.str_pad((string) (array_sum(unpack('C*', $unsigned)) % 256), 3, '0', STR_PAD_LEFT).self::SOH;
-        if (fwrite($session['socket'], $message) !== strlen($message)) throw new RuntimeException('FIX-Nachricht konnte nicht vollständig gesendet werden.');
+        if (fwrite($session['socket'], $message) !== strlen($message)) {
+            throw new RuntimeException('FIX-Nachricht konnte nicht vollständig gesendet werden.');
+        }
     }
 
     private function receive(array &$session, array $accepted): array
@@ -190,25 +213,34 @@ final class CTraderFixBroker
                 $session['buffer'] = substr($session['buffer'], strlen($message));
                 $fields = [];
                 foreach (explode(self::SOH, $message) as $field) {
-                    if (! str_contains($field, '=')) continue;
+                    if (! str_contains($field, '=')) {
+                        continue;
+                    }
                     [$tag, $value] = explode('=', $field, 2);
                     $fields[(int) $tag] = $value;
                 }
                 if (($fields[35] ?? '') === '1') {
                     $this->send($session, '0', isset($fields[112]) ? [112 => $fields[112]] : []);
+
                     continue;
                 }
-                if (in_array($fields[35] ?? '', $accepted, true)) return $fields;
+                if (in_array($fields[35] ?? '', $accepted, true)) {
+                    return $fields;
+                }
             }
             $meta = stream_get_meta_data($session['socket']);
-            if ($meta['timed_out'] ?? false) throw new RuntimeException('Zeitüberschreitung bei der FIX-Antwort.');
+            if ($meta['timed_out'] ?? false) {
+                throw new RuntimeException('Zeitüberschreitung bei der FIX-Antwort.');
+            }
         }
         throw new RuntimeException('FIX-Verbindung wurde ohne Antwort geschlossen.');
     }
 
     private function close(array $session): void
     {
-        if (is_resource($session['socket'] ?? null)) fclose($session['socket']);
+        if (is_resource($session['socket'] ?? null)) {
+            fclose($session['socket']);
+        }
     }
 
     private function decimal(float $value): string

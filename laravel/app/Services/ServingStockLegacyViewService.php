@@ -390,24 +390,38 @@ final class ServingStockLegacyViewService
         for ($index = 1; $index < $candles->count(); $index++) {
             $bar = $candles->get($index);
             $previous = $candles->get($index - 1);
-            if (! is_array($bar) || ! is_array($previous) || count($bar['y'] ?? []) < 4 || count($previous['y'] ?? []) < 4) continue;
+            if (! is_array($bar) || ! is_array($previous) || count($bar['y'] ?? []) < 4 || count($previous['y'] ?? []) < 4) {
+                continue;
+            }
             [$open, $high, $low, $close] = array_map('floatval', $bar['y']);
             [$previousOpen, , , $previousClose] = array_map('floatval', $previous['y']);
             $found = [];
-            if ($close > $open && $previousClose < $previousOpen && $open <= $previousClose && $close >= $previousOpen) $found[] = 'bullish-engulfing';
-            if ($close < $open && $previousClose > $previousOpen && $open >= $previousClose && $close <= $previousOpen) $found[] = 'bearish-engulfing';
+            if ($close > $open && $previousClose < $previousOpen && $open <= $previousClose && $close >= $previousOpen) {
+                $found[] = 'bullish-engulfing';
+            }
+            if ($close < $open && $previousClose > $previousOpen && $open >= $previousClose && $close <= $previousOpen) {
+                $found[] = 'bearish-engulfing';
+            }
             $body = abs($close - $open);
             $range = $high - $low;
             if ($range > 0) {
                 $lowerWick = min($open, $close) - $low;
                 $upperWick = $high - max($open, $close);
-                if ($lowerWick >= 2 * max($body, $range * .05) && $upperWick <= $body) $found[] = 'bullish-pin-bar';
-                if ($upperWick >= 2 * max($body, $range * .05) && $lowerWick <= $body) $found[] = 'bearish-pin-bar';
+                if ($lowerWick >= 2 * max($body, $range * .05) && $upperWick <= $body) {
+                    $found[] = 'bullish-pin-bar';
+                }
+                if ($upperWick >= 2 * max($body, $range * .05) && $lowerWick <= $body) {
+                    $found[] = 'bearish-pin-bar';
+                }
             }
             if ($index >= 20) {
                 $prior = $candles->slice($index - 20, 20);
-                if ($close > (float) $prior->max(fn (array $row): float => (float) ($row['y'][1] ?? 0))) $found[] = 'upside-breakout';
-                if ($close < (float) $prior->min(fn (array $row): float => (float) ($row['y'][2] ?? INF))) $found[] = 'downside-breakout';
+                if ($close > (float) $prior->max(fn (array $row): float => (float) ($row['y'][1] ?? 0))) {
+                    $found[] = 'upside-breakout';
+                }
+                if ($close < (float) $prior->min(fn (array $row): float => (float) ($row['y'][2] ?? INF))) {
+                    $found[] = 'downside-breakout';
+                }
             }
 
             foreach (array_unique($found) as $key) {
@@ -427,7 +441,9 @@ final class ServingStockLegacyViewService
         $recentCutoff = max(0, $candles->count() - 5);
         $recent = collect($definitions)->map(function (array $definition, string $key) use ($occurrences, $candles, $recentCutoff): ?array {
             $latest = collect($occurrences[$key])->last();
-            if (! $latest || $latest['index'] < $recentCutoff) return null;
+            if (! $latest || $latest['index'] < $recentCutoff) {
+                return null;
+            }
             $bar = $candles->get($latest['index']);
             $previous = $candles->get(max(0, $latest['index'] - 1));
             $range = collect([...($previous['y'] ?? []), ...($bar['y'] ?? [])])->filter(fn ($value): bool => is_numeric($value));
@@ -518,11 +534,15 @@ final class ServingStockLegacyViewService
             ['label' => __('Momentum 10T'), 'field' => 'momentum10Pct', 'unit' => '%'],
         ];
         $valueFor = static function (?array $row, string $field): ?float {
-            if (! $row) return null;
+            if (! $row) {
+                return null;
+            }
             if ($field !== 'momentum10Pct') {
                 return is_numeric($row[$field] ?? null) ? (float) $row[$field] : null;
             }
-            if (! is_numeric($row['momentum10'] ?? null) || ! is_numeric($row['close'] ?? null)) return null;
+            if (! is_numeric($row['momentum10'] ?? null) || ! is_numeric($row['close'] ?? null)) {
+                return null;
+            }
             $priorClose = (float) $row['close'] - (float) $row['momentum10'];
 
             return abs($priorClose) > 0.000001 ? (float) $row['momentum10'] / $priorClose : null;
@@ -536,7 +556,9 @@ final class ServingStockLegacyViewService
             $previousRaw = $valueFor($fiveDaysAgo, $definition['field']);
             $points = $rows->map(function (array $row) use ($definition, $scale, $valueFor): ?array {
                 $value = $valueFor($row, $definition['field']);
-                if ($value === null || ! is_numeric($row['target'])) return null;
+                if ($value === null || ! is_numeric($row['target'])) {
+                    return null;
+                }
 
                 return [
                     'x' => $value * $scale,
@@ -579,7 +601,9 @@ final class ServingStockLegacyViewService
             ->filter(fn ($point): bool => is_array($point) && is_numeric($point['close'] ?? null))
             ->sortBy('timestamp')
             ->values();
-        if ($prices->count() < 45) return collect();
+        if ($prices->count() < 45) {
+            return collect();
+        }
 
         $ema12 = $ema26 = $macdSignal = null;
         $rows = $prices->map(function (array $point, int $index) use ($prices, &$ema12, &$ema26, &$macdSignal): array {
@@ -593,7 +617,9 @@ final class ServingStockLegacyViewService
             $high = (float) $window->max(fn (array $row): float => (float) ($row['high'] ?? $row['close']));
             $low = (float) $window->min(fn (array $row): float => (float) ($row['low'] ?? $row['close']));
             $dailyMoves = $closes->values()->map(function (float $value, int $offset) use ($closes): ?float {
-                if ($offset === 0) return null;
+                if ($offset === 0) {
+                    return null;
+                }
                 $previous = (float) $closes->get($offset - 1);
 
                 return $previous !== 0.0 ? abs(($value / $previous) - 1) : null;

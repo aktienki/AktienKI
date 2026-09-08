@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::table('prediction_purchase_reminders', function (Blueprint $table): void {
@@ -16,7 +17,6 @@ return new class extends Migration {
 
     public function down(): void
     {
-        Schema::table('prediction_purchase_reminders', fn (Blueprint $table) =>
-            $table->dropColumn(['exit_rules', 'active_stop_price', 'exit_state']));
+        Schema::table('prediction_purchase_reminders', fn (Blueprint $table) => $table->dropColumn(['exit_rules', 'active_stop_price', 'exit_state']));
     }
 };

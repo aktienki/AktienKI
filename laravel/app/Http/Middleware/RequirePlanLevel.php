@@ -13,7 +13,9 @@ final class RequirePlanLevel
 
     public function handle(Request $request, Closure $next, string $level): Response
     {
-        if ($request->user() && $this->access->allowsTariff($request->user(), $level)) return $next($request);
+        if ($request->user() && $this->access->allowsTariff($request->user(), $level)) {
+            return $next($request);
+        }
 
         $requiredPlan = match (strtolower($level)) {
             'premium' => 'Premium',

@@ -11,7 +11,9 @@ final class AkiChatBudgetService
 {
     public function planCode(User $user): string
     {
-        if ($user->is_admin) return 'pro';
+        if ($user->is_admin) {
+            return 'pro';
+        }
 
         return strtolower((string) (DB::table('tariff_plans')->where('id', $user->tariff_plan_id)->value('code') ?: 'free'));
     }
@@ -91,6 +93,7 @@ final class AkiChatBudgetService
             $result['output_tokens'] += (int) ($usage['output_tokens'] ?? 0);
             $result['input_tokens_details']['cached_tokens'] += (int) data_get($usage, 'input_tokens_details.cached_tokens', 0);
         }
+
         return $result;
     }
 }

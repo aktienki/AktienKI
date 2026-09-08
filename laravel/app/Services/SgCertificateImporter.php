@@ -58,6 +58,7 @@ final class SgCertificateImporter
                     }
                     if (! $instrument) {
                         $result['unmatched']++;
+
                         continue;
                     }
 
@@ -146,6 +147,7 @@ final class SgCertificateImporter
     {
         $value = Str::ascii(mb_strtolower($value));
         $value = preg_replace('/\b(ag|se|sa|nv|plc|inc|corp|corporation|company|co|ltd|limited|holding|holdings)\b/', '', $value) ?? $value;
+
         return trim(preg_replace('/[^a-z0-9]+/', ' ', $value) ?? '');
     }
 
@@ -156,7 +158,13 @@ final class SgCertificateImporter
 
     private function date(mixed $value): ?Carbon
     {
-        if (! filled($value)) return null;
-        try { return Carbon::parse((string) $value); } catch (\Throwable) { return null; }
+        if (! filled($value)) {
+            return null;
+        }
+        try {
+            return Carbon::parse((string) $value);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

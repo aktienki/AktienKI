@@ -8,8 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('prediction_purchase_reminders', fn (Blueprint $table) =>
-            $table->string('intent', 20)->default('purchased')->after('horizon_days'));
+        Schema::table('prediction_purchase_reminders', fn (Blueprint $table) => $table->string('intent', 20)->default('purchased')->after('horizon_days'));
     }
 
     public function down(): void

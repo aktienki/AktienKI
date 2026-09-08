@@ -75,6 +75,7 @@ class PredictionPurchaseReminderController extends Controller
     {
         $this->authorizeReminder($request, $reminder);
         $reminder->update(['status' => 'disabled']);
+
         return back()->with('status', __('Kauferinnerung wurde deaktiviert.'));
     }
 
@@ -82,6 +83,7 @@ class PredictionPurchaseReminderController extends Controller
     {
         $this->authorizeReminder($request, $reminder);
         $reminder->update(['status' => 'active', 'notified_at' => null]);
+
         return back()->with('status', __('Kauferinnerung wurde aktiviert.'));
     }
 
@@ -90,6 +92,7 @@ class PredictionPurchaseReminderController extends Controller
         $this->authorizeReminder($request, $reminder);
         $validated = $request->validate(['remind_on' => ['required', 'date', 'after_or_equal:today']]);
         $reminder->update(['remind_on' => $validated['remind_on'], 'notified_at' => null]);
+
         return back()->with('status', __('Termin der Erinnerung wurde verschoben.'));
     }
 
@@ -97,6 +100,7 @@ class PredictionPurchaseReminderController extends Controller
     {
         $this->authorizeReminder($request, $reminder);
         $reminder->delete();
+
         return back()->with('status', __('Kauferinnerung wurde gelöscht.'));
     }
 

@@ -6,8 +6,8 @@ use App\Models\ContactMessage;
 use App\Notifications\BetaAccessRequestNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 

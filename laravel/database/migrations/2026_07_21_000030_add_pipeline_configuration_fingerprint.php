@@ -21,7 +21,7 @@ return new class extends Migration
         foreach (['training_runs', 'trained_models', 'predictions'] as $table) {
             DB::statement(
                 "ALTER TABLE {$table} ADD CONSTRAINT {$table}_configuration_hash_chk "
-                . "CHECK (configuration_hash IS NULL OR configuration_hash ~ '^[0-9a-f]{64}$')"
+                ."CHECK (configuration_hash IS NULL OR configuration_hash ~ '^[0-9a-f]{64}$')"
             );
         }
         $this->rewriteView(true);
@@ -45,10 +45,10 @@ return new class extends Migration
         $marker = "\n   FROM predictions p";
         $extra = ",\n    p.configuration_hash";
         if ($append) {
-            if (!str_contains($row->definition, $marker)) {
+            if (! str_contains($row->definition, $marker)) {
                 throw new RuntimeException('Unexpected public prediction view');
             }
-            $view = str_replace($marker, $extra . $marker, $row->definition);
+            $view = str_replace($marker, $extra.$marker, $row->definition);
         } else {
             $view = str_replace($extra, '', $row->definition, $count);
             if ($count !== 1) {
@@ -56,6 +56,6 @@ return new class extends Migration
             }
         }
         DB::statement('DROP VIEW public_prediction_models');
-        DB::statement('CREATE VIEW public_prediction_models AS ' . $view);
+        DB::statement('CREATE VIEW public_prediction_models AS '.$view);
     }
 };

@@ -51,7 +51,7 @@ final class ServingPredictionTableController extends Controller
         });
 
         $filtered = $allStocks->filter(function (object $stock) use (
-            $search, $country, $exchange, $sector, $quality, $status, $signal,
+            $search, $country, $exchange, $sector, $quality, $status,
             $modelFilterActive
         ): bool {
             if ($search !== '' && ! str_contains(mb_strtolower(implode(' ', [
@@ -59,14 +59,30 @@ final class ServingPredictionTableController extends Controller
             ])), $search)) {
                 return false;
             }
-            if ($country !== '' && strtoupper((string) $stock->country_code) !== $country) return false;
-            if ($exchange !== '' && strtoupper((string) $stock->exchange) !== $exchange) return false;
-            if ($sector !== '' && (string) $stock->sector_code !== $sector) return false;
-            if ($quality !== '' && (string) $stock->quality_class !== $quality) return false;
-            if ($status === 'eligible' && $stock->eligible_horizon_count < 1) return false;
-            if ($status === 'blocked' && $stock->eligible_horizon_count > 0) return false;
-            if ($status === 'published' && $stock->prediction_count < 1) return false;
-            if ($status === 'waiting' && $stock->prediction_count > 0) return false;
+            if ($country !== '' && strtoupper((string) $stock->country_code) !== $country) {
+                return false;
+            }
+            if ($exchange !== '' && strtoupper((string) $stock->exchange) !== $exchange) {
+                return false;
+            }
+            if ($sector !== '' && (string) $stock->sector_code !== $sector) {
+                return false;
+            }
+            if ($quality !== '' && (string) $stock->quality_class !== $quality) {
+                return false;
+            }
+            if ($status === 'eligible' && $stock->eligible_horizon_count < 1) {
+                return false;
+            }
+            if ($status === 'blocked' && $stock->eligible_horizon_count > 0) {
+                return false;
+            }
+            if ($status === 'published' && $stock->prediction_count < 1) {
+                return false;
+            }
+            if ($status === 'waiting' && $stock->prediction_count > 0) {
+                return false;
+            }
             if ($modelFilterActive && ! collect($stock->horizons)->contains(
                 fn (object $model): bool => $model->matches_active_filter
             )) {
@@ -185,14 +201,26 @@ final class ServingPredictionTableController extends Controller
             || $profitPerTradeMin !== null
             || $drawdownMax !== null
             || $hitRateMin !== null;
-        if ($requiresReleasedPrediction && ! $model->prediction_enabled) return false;
-        if ($signal !== '' && strtoupper((string) ($model->prediction?->signal ?? '')) !== $signal) return false;
-        if ($horizon !== null && (int) $model->horizon !== $horizon) return false;
+        if ($requiresReleasedPrediction && ! $model->prediction_enabled) {
+            return false;
+        }
+        if ($signal !== '' && strtoupper((string) ($model->prediction?->signal ?? '')) !== $signal) {
+            return false;
+        }
+        if ($horizon !== null && (int) $model->horizon !== $horizon) {
+            return false;
+        }
 
         $metrics = $model->metrics;
-        if ($profitPerTradeMin !== null && (! is_numeric($metrics->average_return) || (float) $metrics->average_return < $profitPerTradeMin)) return false;
-        if ($drawdownMax !== null && (! is_numeric($metrics->max_drawdown) || abs((float) $metrics->max_drawdown) > $drawdownMax)) return false;
-        if ($hitRateMin !== null && (! is_numeric($metrics->hit_rate) || (float) $metrics->hit_rate < $hitRateMin)) return false;
+        if ($profitPerTradeMin !== null && (! is_numeric($metrics->average_return) || (float) $metrics->average_return < $profitPerTradeMin)) {
+            return false;
+        }
+        if ($drawdownMax !== null && (! is_numeric($metrics->max_drawdown) || abs((float) $metrics->max_drawdown) > $drawdownMax)) {
+            return false;
+        }
+        if ($hitRateMin !== null && (! is_numeric($metrics->hit_rate) || (float) $metrics->hit_rate < $hitRateMin)) {
+            return false;
+        }
 
         return true;
     }

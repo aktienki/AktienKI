@@ -3,24 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PlanLevel;
-use App\Services\PlanAccessService;
+use App\Services\LeveragedProductRiskService;
 use App\Services\MarketDataEntitlementService;
 use App\Services\PersonalizedSignalService;
-use App\Services\LeveragedProductRiskService;
-use App\Services\TwelveDataService;
-use App\Services\TechnicalPriceLevelService;
-use App\Services\ServingReadService;
+use App\Services\PlanAccessService;
 use App\Services\ServingChartCacheService;
+use App\Services\ServingReadService;
 use App\Services\ServingStockLegacyViewService;
+use App\Services\TechnicalPriceLevelService;
+use App\Services\TwelveDataService;
+use App\Support\AiScore;
 use App\Support\ProfitFactor;
+use App\Support\RiskScore;
 use Carbon\CarbonImmutable;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -200,7 +202,7 @@ class StockController extends Controller
         $opportunities = $this->servingReportOpportunities($stock, $horizons, $indicators);
         $risks = $this->servingReportRisks($stock, $horizons, $indicators);
 
-        $options = new Options();
+        $options = new Options;
         $options->set('isRemoteEnabled', false);
         $pdf = new Dompdf($options);
         $pdf->loadHtml(view('stocks.serving-report', compact(
@@ -229,14 +231,24 @@ class StockController extends Controller
         $items = collect();
         $positive = collect($horizons)->filter(fn ($horizon): bool => is_numeric($horizon->prediction?->expected_return_percent)
             && (float) $horizon->prediction->expected_return_percent > 0);
-        if ($positive->isNotEmpty()) $items->push(__(':count von :total Prognosehorizonten erwarten steigende Kurse.', ['count' => $positive->count(), 'total' => collect($horizons)->count()]));
+        if ($positive->isNotEmpty()) {
+            $items->push(__(':count von :total Prognosehorizonten erwarten steigende Kurse.', ['count' => $positive->count(), 'total' => collect($horizons)->count()]));
+        }
         $bestReturn = $positive->max(fn ($horizon) => (float) $horizon->prediction->expected_return_percent);
-        if (is_numeric($bestReturn)) $items->push(__('Die höchste freigegebene Prognose liegt bei :value %.', ['value' => number_format((float) $bestReturn, 1, ',', '.')]));
+        if (is_numeric($bestReturn)) {
+            $items->push(__('Die höchste freigegebene Prognose liegt bei :value %.', ['value' => number_format((float) $bestReturn, 1, ',', '.')]));
+        }
         $bestProfitFactor = collect($horizons)->max(fn ($horizon) => is_numeric($horizon->metrics?->profit_factor ?? null) ? (float) $horizon->metrics->profit_factor : null);
-        if (is_numeric($bestProfitFactor) && $bestProfitFactor > 1) $items->push(__('Der beste historische Profitfaktor beträgt :value.', ['value' => number_format((float) $bestProfitFactor, 2, ',', '.')]));
+        if (is_numeric($bestProfitFactor) && $bestProfitFactor > 1) {
+            $items->push(__('Der beste historische Profitfaktor beträgt :value.', ['value' => number_format((float) $bestProfitFactor, 2, ',', '.')]));
+        }
         $indicatorProbability = collect($indicators)->pluck('currentProbability')->filter(fn ($value) => is_numeric($value))->avg();
-        if (is_numeric($indicatorProbability) && $indicatorProbability >= 50) $items->push(__('Die technischen Indikatoren ergeben im Mittel eine 20-Tage-Steigwahrscheinlichkeit von :value %.', ['value' => number_format((float) $indicatorProbability, 1, ',', '.')]));
-        if (is_numeric($stock->revenue_growth ?? null) && (float) $stock->revenue_growth > 0) $items->push(__('Positives Umsatzwachstum von :value %.', ['value' => number_format((float) $stock->revenue_growth * 100, 1, ',', '.')]));
+        if (is_numeric($indicatorProbability) && $indicatorProbability >= 50) {
+            $items->push(__('Die technischen Indikatoren ergeben im Mittel eine 20-Tage-Steigwahrscheinlichkeit von :value %.', ['value' => number_format((float) $indicatorProbability, 1, ',', '.')]));
+        }
+        if (is_numeric($stock->revenue_growth ?? null) && (float) $stock->revenue_growth > 0) {
+            $items->push(__('Positives Umsatzwachstum von :value %.', ['value' => number_format((float) $stock->revenue_growth * 100, 1, ',', '.')]));
+        }
 
         return $items->take(5)->values()->all();
     }
@@ -246,20 +258,34 @@ class StockController extends Controller
         $items = collect();
         $negative = collect($horizons)->filter(fn ($horizon): bool => is_numeric($horizon->prediction?->expected_return_percent)
             && (float) $horizon->prediction->expected_return_percent < 0);
-        if ($negative->isNotEmpty()) $items->push(__(':count Prognosehorizonte erwarten fallende Kurse.', ['count' => $negative->count()]));
+        if ($negative->isNotEmpty()) {
+            $items->push(__(':count Prognosehorizonte erwarten fallende Kurse.', ['count' => $negative->count()]));
+        }
         $maximumDrawdown = collect($horizons)->max(function ($horizon): ?float {
-            if (! is_numeric($horizon->metrics?->max_drawdown ?? null)) return null;
+            if (! is_numeric($horizon->metrics?->max_drawdown ?? null)) {
+                return null;
+            }
             $drawdown = abs((float) $horizon->metrics->max_drawdown);
 
             return $drawdown <= 1 ? $drawdown * 100 : $drawdown;
         });
-        if (is_numeric($maximumDrawdown)) $items->push(__('Der höchste historische Modelldrawdown beträgt :value %.', ['value' => number_format((float) $maximumDrawdown, 1, ',', '.')]));
+        if (is_numeric($maximumDrawdown)) {
+            $items->push(__('Der höchste historische Modelldrawdown beträgt :value %.', ['value' => number_format((float) $maximumDrawdown, 1, ',', '.')]));
+        }
         $failedGates = collect($horizons)->filter(fn ($horizon): bool => ! (bool) ($horizon->quality_gate_passed ?? false))->count();
-        if ($failedGates > 0) $items->push(__(':count Modell-/Horizont-Kombinationen bestehen das Quality Gate nicht.', ['count' => $failedGates]));
+        if ($failedGates > 0) {
+            $items->push(__(':count Modell-/Horizont-Kombinationen bestehen das Quality Gate nicht.', ['count' => $failedGates]));
+        }
         $indicatorProbability = collect($indicators)->pluck('currentProbability')->filter(fn ($value) => is_numeric($value))->avg();
-        if (is_numeric($indicatorProbability) && $indicatorProbability < 50) $items->push(__('Die technische 20-Tage-Auswertung liegt mit :value % unter der neutralen Schwelle.', ['value' => number_format((float) $indicatorProbability, 1, ',', '.')]));
-        if (is_numeric($stock->trailing_pe ?? null) && (float) $stock->trailing_pe > 30) $items->push(__('Das KGV von :value weist auf eine erhöhte Bewertung hin.', ['value' => number_format((float) $stock->trailing_pe, 1, ',', '.')]));
-        if ($items->isEmpty()) $items->push(__('Keine zusätzlichen kompakten Warnsignale in den verfügbaren Service-Daten.'));
+        if (is_numeric($indicatorProbability) && $indicatorProbability < 50) {
+            $items->push(__('Die technische 20-Tage-Auswertung liegt mit :value % unter der neutralen Schwelle.', ['value' => number_format((float) $indicatorProbability, 1, ',', '.')]));
+        }
+        if (is_numeric($stock->trailing_pe ?? null) && (float) $stock->trailing_pe > 30) {
+            $items->push(__('Das KGV von :value weist auf eine erhöhte Bewertung hin.', ['value' => number_format((float) $stock->trailing_pe, 1, ',', '.')]));
+        }
+        if ($items->isEmpty()) {
+            $items->push(__('Keine zusätzlichen kompakten Warnsignale in den verfügbaren Service-Daten.'));
+        }
 
         return $items->take(5)->values()->all();
     }
@@ -372,6 +398,7 @@ class StockController extends Controller
                 && CarbonImmutable::parse($pattern['latest_at'])->gte(now()->subDays(5)->startOfDay()))
             ->map(function (array $pattern): array {
                 $pattern['chart'] = $this->stockReportPatternChart($pattern['example'] ?? []);
+
                 return $pattern;
             })->values()->all();
         $indicators = $this->indicatorCards($instrument);
@@ -385,6 +412,7 @@ class StockController extends Controller
                     ->when($prediction?->prediction_time, fn ($query) => $query->where('prediction_time', '<=', $prediction->prediction_time))
                     ->orderByDesc('prediction_time')->orderByDesc('id')->value($column);
             }
+
             return [$days => is_numeric($value) ? (float) $value : null];
         })->all();
         $chartBars = $this->dailyBars((int) $instrument->id)
@@ -402,7 +430,9 @@ class StockController extends Controller
         $previousSignal = null;
         foreach ($signalHistory as $signalPoint) {
             $pointSignal = strtoupper((string) $signalPoint->signal);
-            if ($previousSignal !== null && $pointSignal !== $previousSignal) $signalTransition = $signalPoint;
+            if ($previousSignal !== null && $pointSignal !== $previousSignal) {
+                $signalTransition = $signalPoint;
+            }
             $previousSignal = $pointSignal;
         }
         $signalPrice = is_numeric($signalTransition?->current_price) ? (float) $signalTransition->current_price : null;
@@ -419,18 +449,19 @@ class StockController extends Controller
         $toPercent = static fn ($value): ?float => is_numeric($value)
             ? max(0, min(100, (float) $value * ((float) $value <= 1 ? 100 : 1))) : null;
         $reportDonuts = [
-            ['label' => 'KI-Score', 'value' => \App\Support\AiScore::toPercent($prediction?->prediction_score), 'display' => is_numeric(\App\Support\AiScore::toPercent($prediction?->prediction_score)) ? number_format((float) \App\Support\AiScore::toPercent($prediction?->prediction_score), 0, ',', '.') : '—', 'reverse' => false],
+            ['label' => 'KI-Score', 'value' => AiScore::toPercent($prediction?->prediction_score), 'display' => is_numeric(AiScore::toPercent($prediction?->prediction_score)) ? number_format((float) AiScore::toPercent($prediction?->prediction_score), 0, ',', '.') : '—', 'reverse' => false],
             ['label' => $english ? 'Conf.' : 'Konf.', 'value' => $toPercent($prediction?->confidence), 'display' => $toPercent($prediction?->confidence) !== null ? number_format($toPercent($prediction?->confidence), 0, ',', '.').'%' : '—', 'reverse' => false],
             ['label' => 'Hit Rate', 'value' => is_numeric($walkForwardStats?->hit_rate) ? (float) $walkForwardStats->hit_rate : null, 'display' => is_numeric($walkForwardStats?->hit_rate) ? number_format((float) $walkForwardStats->hit_rate, 0, ',', '.').'%' : '—', 'reverse' => false],
             ['label' => 'Ø/Trade', 'value' => is_numeric($walkForwardStats?->average_profit_per_trade_percent) ? max(0, min(100, 50 + ((float) $walkForwardStats->average_profit_per_trade_percent * 25))) : null, 'display' => is_numeric($walkForwardStats?->average_profit_per_trade_percent) ? (((float) $walkForwardStats->average_profit_per_trade_percent > 0 ? '+' : '').number_format((float) $walkForwardStats->average_profit_per_trade_percent, 2, ',', '.').'%') : '—', 'reverse' => false],
             ['label' => $english ? 'Stability' : 'Stabilität', 'value' => $toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability), 'display' => $toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability) !== null ? number_format($toPercent($prediction?->horizon_fusion_stability_score ?? $trainedModel?->model_stability), 0, ',', '.').'%' : '—', 'reverse' => false],
-            ['label' => $english ? 'Risk' : 'Risiko', 'value' => \App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown), 'display' => \App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown) !== null ? number_format(\App\Support\RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown), 0, ',', '.').'%' : '—', 'reverse' => true],
+            ['label' => $english ? 'Risk' : 'Risiko', 'value' => RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown), 'display' => RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown) !== null ? number_format(RiskScore::toPercent($prediction?->risk_score, $prediction?->drawdown_risk_factor, $trainedModel?->max_drawdown), 0, ',', '.').'%' : '—', 'reverse' => true],
         ];
         $reportDonuts = collect($reportDonuts)->map(function (array $donut): array {
             $donut['image'] = $this->stockReportDonut($donut);
+
             return $donut;
         })->all();
-        $options = new Options();
+        $options = new Options;
         $options->set('isRemoteEnabled', false);
         $pdf = new Dompdf($options);
         $pdf->loadHtml(view('stocks.report', compact('instrument', 'prediction', 'fundamental', 'fundamentals', 'assessment', 'trainedModel', 'patterns', 'indicators', 'indicatorMatrices', 'horizonTargets', 'chart', 'logoData', 'reportDonuts', 'signalPrice', 'signalAt'))->render(), 'UTF-8');
@@ -449,26 +480,63 @@ class StockController extends Controller
     private function stockReportChart($bars, array $targets, ?float $forecastBase = null, ?float $signalPrice = null, ?CarbonImmutable $signalAt = null): ?string
     {
         $closes = collect($bars)->map(fn ($bar) => (float) $bar->close)->filter(fn ($value) => $value > 0)->values();
-        if ($closes->count() < 2) return null;
+        if ($closes->count() < 2) {
+            return null;
+        }
         $forecast = collect([5, 10, 15, 20])->map(fn ($day) => $targets[$day] ?? null)->filter(fn ($value) => is_numeric($value));
         $forecastBase = $forecastBase !== null && $forecastBase > 0 ? $forecastBase : (float) $closes->last();
-        $all = $closes->concat($forecast)->push($forecastBase)->when($signalPrice !== null, fn ($values) => $values->push($signalPrice))->values(); $min = (float) $all->min(); $max = (float) $all->max();
-        $pad = max(($max - $min) * .12, $max * .015); $min -= $pad; $max += $pad; $range = max(.00001, $max - $min);
-        $w = 720; $h = 190; $left = 38; $right = 18; $top = 16; $bottom = 28; $plotW = $w-$left-$right; $plotH = $h-$top-$bottom;
-        $hx = fn ($i) => $left + ($i / max(1, $closes->count()-1)) * ($plotW * .78);
-        $fy = fn ($value) => $top + (($max-(float)$value)/$range)*$plotH;
-        $history = $closes->map(fn ($value,$i) => number_format($hx($i),1,'.','').','.number_format($fy($value),1,'.',''))->implode(' ');
-        $lastX = $hx($closes->count()-1); $forecastPoints = [number_format($lastX,1,'.','').','.number_format($fy($forecastBase),1,'.','')];
-        $labels = ''; foreach ([5,10,15,20] as $i => $day) { if (!is_numeric($targets[$day] ?? null)) continue; $x=$lastX+(($i+1)/4)*($plotW*.22); $y=$fy($targets[$day]); $forecastPoints[]=number_format($x,1,'.','').','.number_format($y,1,'.',''); $labels.='<circle cx="'.$x.'" cy="'.$y.'" r="3" fill="#22d3ee"/><text x="'.$x.'" y="'.($y-7).'" text-anchor="middle" font-size="8" fill="#0e7490" font-weight="bold">'.$day.'T</text>'; }
-        $grid=''; for($i=0;$i<4;$i++){ $y=$top+($i/3)*$plotH; $value=$max-($i/3)*$range; $grid.='<line x1="'.$left.'" y1="'.$y.'" x2="'.($w-$right).'" y2="'.$y.'" stroke="#cbd5e1" stroke-width=".6"/><text x="'.($left-5).'" y="'.($y+3).'" text-anchor="end" font-size="7" fill="#64748b">'.number_format($value,0,',','.').'</text>'; }
+        $all = $closes->concat($forecast)->push($forecastBase)->when($signalPrice !== null, fn ($values) => $values->push($signalPrice))->values();
+        $min = (float) $all->min();
+        $max = (float) $all->max();
+        $pad = max(($max - $min) * .12, $max * .015);
+        $min -= $pad;
+        $max += $pad;
+        $range = max(.00001, $max - $min);
+        $w = 720;
+        $h = 190;
+        $left = 38;
+        $right = 18;
+        $top = 16;
+        $bottom = 28;
+        $plotW = $w - $left - $right;
+        $plotH = $h - $top - $bottom;
+        $hx = fn ($i) => $left + ($i / max(1, $closes->count() - 1)) * ($plotW * .78);
+        $fy = fn ($value) => $top + (($max - (float) $value) / $range) * $plotH;
+        $history = $closes->map(fn ($value, $i) => number_format($hx($i), 1, '.', '').','.number_format($fy($value), 1, '.', ''))->implode(' ');
+        $lastX = $hx($closes->count() - 1);
+        $forecastPoints = [number_format($lastX, 1, '.', '').','.number_format($fy($forecastBase), 1, '.', '')];
+        $labels = '';
+        foreach ([5, 10, 15, 20] as $i => $day) {
+            if (! is_numeric($targets[$day] ?? null)) {
+                continue;
+            } $x = $lastX + (($i + 1) / 4) * ($plotW * .22);
+            $y = $fy($targets[$day]);
+            $forecastPoints[] = number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+            $labels .= '<circle cx="'.$x.'" cy="'.$y.'" r="3" fill="#22d3ee"/><text x="'.$x.'" y="'.($y - 7).'" text-anchor="middle" font-size="8" fill="#0e7490" font-weight="bold">'.$day.'T</text>';
+        }
+        $grid = '';
+        for ($i = 0; $i < 4; $i++) {
+            $y = $top + ($i / 3) * $plotH;
+            $value = $max - ($i / 3) * $range;
+            $grid .= '<line x1="'.$left.'" y1="'.$y.'" x2="'.($w - $right).'" y2="'.$y.'" stroke="#cbd5e1" stroke-width=".6"/><text x="'.($left - 5).'" y="'.($y + 3).'" text-anchor="end" font-size="7" fill="#64748b">'.number_format($value, 0, ',', '.').'</text>';
+        }
         $signalLine = '';
         if ($signalPrice !== null) {
             $signalIndex = 0;
-            if ($signalAt) foreach (collect($bars)->values() as $index => $bar) { if (CarbonImmutable::parse($bar->bar_time)->gte($signalAt)) { $signalIndex = $index; break; } }
-            $signalX = $hx(min($signalIndex, max(0, $closes->count() - 1))); $signalY = $fy($signalPrice);
-            $signalLine = '<line x1="'.$signalX.'" y1="'.$signalY.'" x2="'.($w-$right).'" y2="'.$signalY.'" stroke="#f59e0b" stroke-width="1.4" stroke-dasharray="5 3"/><text x="'.($w-$right).'" y="'.($signalY-4).'" text-anchor="end" font-size="8" fill="#b45309" font-weight="bold">Signalkurs '.number_format($signalPrice, 2, ',', '.').'</text>';
+            if ($signalAt) {
+                foreach (collect($bars)->values() as $index => $bar) {
+                    if (CarbonImmutable::parse($bar->bar_time)->gte($signalAt)) {
+                        $signalIndex = $index;
+                        break;
+                    }
+                }
+            }
+            $signalX = $hx(min($signalIndex, max(0, $closes->count() - 1)));
+            $signalY = $fy($signalPrice);
+            $signalLine = '<line x1="'.$signalX.'" y1="'.$signalY.'" x2="'.($w - $right).'" y2="'.$signalY.'" stroke="#f59e0b" stroke-width="1.4" stroke-dasharray="5 3"/><text x="'.($w - $right).'" y="'.($signalY - 4).'" text-anchor="end" font-size="8" fill="#b45309" font-weight="bold">Signalkurs '.number_format($signalPrice, 2, ',', '.').'</text>';
         }
-        $svg='<svg xmlns="http://www.w3.org/2000/svg" width="'.$w.'" height="'.$h.'" viewBox="0 0 '.$w.' '.$h.'"><rect width="100%" height="100%" rx="8" fill="#f8fafc"/>'.$grid.'<polyline points="'.$history.'" fill="none" stroke="#0891b2" stroke-width="2"/>'.$signalLine.'<line x1="'.$lastX.'" y1="'.$top.'" x2="'.$lastX.'" y2="'.($h-$bottom).'" stroke="#f59e0b" stroke-dasharray="4 3"/><polyline points="'.implode(' ',$forecastPoints).'" fill="none" stroke="#22c55e" stroke-width="2.2"/>'.$labels.'<text x="'.$left.'" y="'.($h-8).'" font-size="8" fill="#64748b">Historischer Kurs</text><text x="'.($w-$right).'" y="'.($h-8).'" text-anchor="end" font-size="8" fill="#16a34a">Prognose 5/10/15/20T</text></svg>';
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'.$w.'" height="'.$h.'" viewBox="0 0 '.$w.' '.$h.'"><rect width="100%" height="100%" rx="8" fill="#f8fafc"/>'.$grid.'<polyline points="'.$history.'" fill="none" stroke="#0891b2" stroke-width="2"/>'.$signalLine.'<line x1="'.$lastX.'" y1="'.$top.'" x2="'.$lastX.'" y2="'.($h - $bottom).'" stroke="#f59e0b" stroke-dasharray="4 3"/><polyline points="'.implode(' ', $forecastPoints).'" fill="none" stroke="#22c55e" stroke-width="2.2"/>'.$labels.'<text x="'.$left.'" y="'.($h - 8).'" font-size="8" fill="#64748b">Historischer Kurs</text><text x="'.($w - $right).'" y="'.($h - 8).'" text-anchor="end" font-size="8" fill="#16a34a">Prognose 5/10/15/20T</text></svg>';
+
         return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 
@@ -500,32 +568,62 @@ class StockController extends Controller
     private function stockReportPatternChart(array $bars): ?string
     {
         $bars = collect($bars)->values();
-        if ($bars->isEmpty()) return null;
-        $low = (float) $bars->min('low'); $high = (float) $bars->max('high'); $range = max(.000001, $high - $low);
+        if ($bars->isEmpty()) {
+            return null;
+        }
+        $low = (float) $bars->min('low');
+        $high = (float) $bars->max('high');
+        $range = max(.000001, $high - $low);
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="62" viewBox="0 0 180 62"><rect width="180" height="62" rx="6" fill="#f8fafc"/>';
         foreach ($bars as $index => $bar) {
             $x = 16 + $index * (148 / max(1, $bars->count() - 1));
             $y = fn ($value) => 54 - (((float) $value - $low) / $range) * 46;
-            $open = $y($bar['open']); $close = $y($bar['close']); $color = (float) $bar['close'] >= (float) $bar['open'] ? '#10b981' : '#ef4444';
-            $svg .= '<line x1="'.$x.'" y1="'.$y($bar['high']).'" x2="'.$x.'" y2="'.$y($bar['low']).'" stroke="'.$color.'"/><rect x="'.($x-4).'" y="'.min($open,$close).'" width="8" height="'.max(2,abs($close-$open)).'" rx="1" fill="'.$color.'"/>';
+            $open = $y($bar['open']);
+            $close = $y($bar['close']);
+            $color = (float) $bar['close'] >= (float) $bar['open'] ? '#10b981' : '#ef4444';
+            $svg .= '<line x1="'.$x.'" y1="'.$y($bar['high']).'" x2="'.$x.'" y2="'.$y($bar['low']).'" stroke="'.$color.'"/><rect x="'.($x - 4).'" y="'.min($open, $close).'" width="8" height="'.max(2, abs($close - $open)).'" rx="1" fill="'.$color.'"/>';
         }
+
         return 'data:image/svg+xml;base64,'.base64_encode($svg.'</svg>');
     }
 
     private function stockReportIndicatorMatrices($indicators): array
     {
         $cards = collect($indicators)->keyBy('label');
-        return collect([[__('Momentum 10T'),'Stochastik %K'],['ADX 14','Stochastik %K'],['MACD Histogramm','Stochastik %K']])->map(function ($pair) use ($cards) {
-            $a=$cards->get($pair[0]); $b=$cards->get($pair[1]); if(!$a||!$b)return null;
-            $ap=collect($a['points'])->keyBy('date'); $points=collect($b['points'])->map(fn($p)=>isset($ap[$p['date']])?['x'=>(float)$ap[$p['date']]['x'],'y'=>(float)$p['x'],'up'=>(bool)$p['up']]:null)->filter()->values();
-            if($points->isEmpty())return null;
-            $limits=fn($v)=>collect($v)->sort()->values()->pipe(fn($s)=>collect([.2,.4,.6,.8])->map(fn($q)=>(float)$s[(int)floor(($s->count()-1)*$q)])->all());
-            $xl=$limits($points->pluck('x')); $yl=$limits($points->pluck('y')); $bin=fn($v,$ls)=>collect($ls)->search(fn($l)=>$v<=$l)===false?4:(int)collect($ls)->search(fn($l)=>$v<=$l);
-            $cells=array_fill(0,5,array_fill(0,5,['n'=>0,'up'=>0])); foreach($points as $p){$x=$bin($p['x'],$xl);$y=$bin($p['y'],$yl);$cells[$y][$x]['n']++;if($p['up'])$cells[$y][$x]['up']++;}
-            foreach($cells as $y=>$row)foreach($row as $x=>$c)$cells[$y][$x]['p']=$c['n']?($c['up']/$c['n'])*100:null;
-            $currentX=is_numeric($a['currentValue']??null)?$bin((float)$a['currentValue'],$xl):null;
-            $currentY=is_numeric($b['currentValue']??null)?$bin((float)$b['currentValue'],$yl):null;
-            return ['x'=>$a['label'],'y'=>$b['label'],'cells'=>$cells,'samples'=>$points->count(),'currentX'=>$currentX,'currentY'=>$currentY];
+
+        return collect([[__('Momentum 10T'), 'Stochastik %K'], ['ADX 14', 'Stochastik %K'], ['MACD Histogramm', 'Stochastik %K']])->map(function ($pair) use ($cards) {
+            $a = $cards->get($pair[0]);
+            $b = $cards->get($pair[1]);
+            if (! $a || ! $b) {
+                return null;
+            }
+            $ap = collect($a['points'])->keyBy('date');
+            $points = collect($b['points'])->map(fn ($p) => isset($ap[$p['date']]) ? ['x' => (float) $ap[$p['date']]['x'], 'y' => (float) $p['x'], 'up' => (bool) $p['up']] : null)->filter()->values();
+            if ($points->isEmpty()) {
+                return null;
+            }
+            $limits = fn ($v) => collect($v)->sort()->values()->pipe(fn ($s) => collect([.2, .4, .6, .8])->map(fn ($q) => (float) $s[(int) floor(($s->count() - 1) * $q)])->all());
+            $xl = $limits($points->pluck('x'));
+            $yl = $limits($points->pluck('y'));
+            $bin = fn ($v, $ls) => collect($ls)->search(fn ($l) => $v <= $l) === false ? 4 : (int) collect($ls)->search(fn ($l) => $v <= $l);
+            $cells = array_fill(0, 5, array_fill(0, 5, ['n' => 0, 'up' => 0]));
+            foreach ($points as $p) {
+                $x = $bin($p['x'], $xl);
+                $y = $bin($p['y'], $yl);
+                $cells[$y][$x]['n']++;
+                if ($p['up']) {
+                    $cells[$y][$x]['up']++;
+                }
+            }
+            foreach ($cells as $y => $row) {
+                foreach ($row as $x => $c) {
+                    $cells[$y][$x]['p'] = $c['n'] ? ($c['up'] / $c['n']) * 100 : null;
+                }
+            }
+            $currentX = is_numeric($a['currentValue'] ?? null) ? $bin((float) $a['currentValue'], $xl) : null;
+            $currentY = is_numeric($b['currentValue'] ?? null) ? $bin((float) $b['currentValue'], $yl) : null;
+
+            return ['x' => $a['label'], 'y' => $b['label'], 'cells' => $cells, 'samples' => $points->count(), 'currentX' => $currentX, 'currentY' => $currentY];
         })->filter()->values()->all();
     }
 
@@ -549,8 +647,7 @@ class StockController extends Controller
         PlanAccessService $planAccess,
         TwelveDataService $yahooFinance,
         MarketDataEntitlementService $marketDataEntitlements,
-    ): View
-    {
+    ): View {
         $instrument = $this->instrument($symbol);
         $canViewRealtime = $planAccess->allowsTariff($request->user(), PlanLevel::Pro);
         $canUseChartIndicators = $planAccess->allowsTariff($request->user(), PlanLevel::Plus);
@@ -615,8 +712,7 @@ class StockController extends Controller
             return [$days => ['price' => $target, 'return' => $return]];
         })->all();
         if ($canViewRealtime && $prediction && in_array(strtoupper((string) ($prediction->personalized_signal ?? 'HOLD')), ['BUY', 'WATCH'], true)) {
-            $shortPullback = collect([5, 10])->contains(fn (int $days): bool =>
-                is_numeric(data_get($horizonTargets, $days.'.return'))
+            $shortPullback = collect([5, 10])->contains(fn (int $days): bool => is_numeric(data_get($horizonTargets, $days.'.return'))
                 && (float) data_get($horizonTargets, $days.'.return') < 0
             );
             $longReturn = data_get($horizonTargets, '20.return');
@@ -944,7 +1040,7 @@ class StockController extends Controller
                 ->values()
                 ->map(fn (object $row): array => [
                     'x' => CarbonImmutable::parse($row->prediction_time)->getTimestampMs(),
-                    'y' => \App\Support\AiScore::toTen($row->prediction_score),
+                    'y' => AiScore::toTen($row->prediction_score),
                     'signal' => strtoupper((string) ($row->personalized_signal ?: $row->signal ?: 'HOLD')),
                     'price' => is_numeric($row->current_price) ? (float) $row->current_price : null,
                 ])
@@ -957,8 +1053,7 @@ class StockController extends Controller
         ]);
         $historicalSignalTransitions = $historicalAiHistory
             ->values()
-            ->filter(fn (array $point, int $index): bool =>
-                $index > 0 && $point['signal'] !== $historicalAiHistory->values()->get($index - 1)['signal'])
+            ->filter(fn (array $point, int $index): bool => $index > 0 && $point['signal'] !== $historicalAiHistory->values()->get($index - 1)['signal'])
             ->map(function (array $point, int $index) use ($historicalAiHistory): array {
                 $previous = $historicalAiHistory->values()->get($index - 1);
 
@@ -988,7 +1083,7 @@ class StockController extends Controller
                 ->map(fn ($id) => (int) $id);
         $paperPortfolios = DB::table('portfolios')->leftJoin('portfolio_cash_accounts as cash', 'cash.portfolio_id', '=', 'portfolios.id')
             ->where('portfolios.user_id', auth()->id())->where('portfolios.active', true)->where('portfolios.type', 'paper')
-            ->orderByDesc('portfolios.is_default')->get(['portfolios.id','portfolios.name','portfolios.currency','portfolios.meta',DB::raw('COALESCE(cash.balance - cash.reserved_balance, 0) AS available_capital')]);
+            ->orderByDesc('portfolios.is_default')->get(['portfolios.id', 'portfolios.name', 'portfolios.currency', 'portfolios.meta', DB::raw('COALESCE(cash.balance - cash.reserved_balance, 0) AS available_capital')]);
 
         $predictionData = $prediction ? [
             'prediction_time' => $prediction->prediction_time,
@@ -1104,6 +1199,7 @@ class StockController extends Controller
             ->orderBy('maturity_date')
             ->limit(150)
             ->get();
+
         return view('stocks.show', compact(
             'instrument',
             'prediction',
@@ -1227,8 +1323,7 @@ class StockController extends Controller
         string $symbol,
         TwelveDataService $yahooFinance,
         MarketDataEntitlementService $marketDataEntitlements,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $instrument = $this->instrument($symbol);
         if (! $marketDataEntitlements->historicalChartsAllowed($instrument)) {
             return response()->json([
@@ -1276,10 +1371,14 @@ class StockController extends Controller
         $add = static function (array &$patterns, string $key, string $label, string $direction, int $fromIndex, int $toIndex, $candles): void {
             $from = $candles->get($fromIndex);
             $to = $candles->get($toIndex);
-            if (! is_array($from) || ! is_array($to)) return;
+            if (! is_array($from) || ! is_array($to)) {
+                return;
+            }
             $range = collect(array_merge((array) ($from['y'] ?? []), (array) ($to['y'] ?? [])))
                 ->filter(fn ($value): bool => is_numeric($value));
-            if ($range->isEmpty()) return;
+            if ($range->isEmpty()) {
+                return;
+            }
 
             $patterns[$key] = [
                 'name' => $label,
@@ -1294,7 +1393,9 @@ class StockController extends Controller
         for ($index = $start; $index < $candles->count(); $index++) {
             $bar = $candles->get($index);
             $previous = $candles->get($index - 1);
-            if (! is_array($bar) || ! is_array($previous) || count($bar['y'] ?? []) < 4 || count($previous['y'] ?? []) < 4) continue;
+            if (! is_array($bar) || ! is_array($previous) || count($bar['y'] ?? []) < 4 || count($previous['y'] ?? []) < 4) {
+                continue;
+            }
             [$open, $high, $low, $close] = array_map('floatval', $bar['y']);
             [$previousOpen, $previousHigh, $previousLow, $previousClose] = array_map('floatval', $previous['y']);
 
@@ -1321,8 +1422,12 @@ class StockController extends Controller
                 $prior = $candles->slice($index - 20, 20);
                 $priorHigh = $prior->max(fn (array $c): float => (float) ($c['y'][1] ?? 0));
                 $priorLow = $prior->min(fn (array $c): float => (float) ($c['y'][2] ?? INF));
-                if ($close > $priorHigh) $add($patterns, 'upside-breakout', __('Ausbruch nach oben'), 'bullish', $index, $index, $candles);
-                if ($close < $priorLow) $add($patterns, 'downside-breakout', __('Ausbruch nach unten'), 'bearish', $index, $index, $candles);
+                if ($close > $priorHigh) {
+                    $add($patterns, 'upside-breakout', __('Ausbruch nach oben'), 'bullish', $index, $index, $candles);
+                }
+                if ($close < $priorLow) {
+                    $add($patterns, 'downside-breakout', __('Ausbruch nach unten'), 'bearish', $index, $index, $candles);
+                }
             }
         }
 
@@ -1352,23 +1457,43 @@ class StockController extends Controller
         for ($index = 1; $index < $bars->count(); $index++) {
             $bar = $bars[$index];
             $previous = $bars[$index - 1];
-            $open = (float) $bar->open; $high = (float) $bar->high; $low = (float) $bar->low; $close = (float) $bar->close;
-            $previousOpen = (float) $previous->open; $previousClose = (float) $previous->close;
+            $open = (float) $bar->open;
+            $high = (float) $bar->high;
+            $low = (float) $bar->low;
+            $close = (float) $bar->close;
+            $previousOpen = (float) $previous->open;
+            $previousClose = (float) $previous->close;
             $found = [];
-            if ($close > $open && $previousClose < $previousOpen && $open <= $previousClose && $close >= $previousOpen) $found[] = 'bullish-engulfing';
-            if ($close < $open && $previousClose > $previousOpen && $open >= $previousClose && $close <= $previousOpen) $found[] = 'bearish-engulfing';
-            $body = abs($close - $open); $range = $high - $low;
+            if ($close > $open && $previousClose < $previousOpen && $open <= $previousClose && $close >= $previousOpen) {
+                $found[] = 'bullish-engulfing';
+            }
+            if ($close < $open && $previousClose > $previousOpen && $open >= $previousClose && $close <= $previousOpen) {
+                $found[] = 'bearish-engulfing';
+            }
+            $body = abs($close - $open);
+            $range = $high - $low;
             if ($range > 0) {
-                $lowerWick = min($open, $close) - $low; $upperWick = $high - max($open, $close);
-                if ($lowerWick >= 2 * max($body, $range * .05) && $upperWick <= $body) $found[] = 'bullish-pin-bar';
-                if ($upperWick >= 2 * max($body, $range * .05) && $lowerWick <= $body) $found[] = 'bearish-pin-bar';
+                $lowerWick = min($open, $close) - $low;
+                $upperWick = $high - max($open, $close);
+                if ($lowerWick >= 2 * max($body, $range * .05) && $upperWick <= $body) {
+                    $found[] = 'bullish-pin-bar';
+                }
+                if ($upperWick >= 2 * max($body, $range * .05) && $lowerWick <= $body) {
+                    $found[] = 'bearish-pin-bar';
+                }
             }
             if ($index >= 20) {
                 $prior = $bars->slice($index - 20, 20);
-                if ($close > (float) $prior->max('high')) $found[] = 'upside-breakout';
-                if ($close < (float) $prior->min('low')) $found[] = 'downside-breakout';
+                if ($close > (float) $prior->max('high')) {
+                    $found[] = 'upside-breakout';
+                }
+                if ($close < (float) $prior->min('low')) {
+                    $found[] = 'downside-breakout';
+                }
             }
-            if (CarbonImmutable::parse($bar->bar_time)->lt($cutoff)) continue;
+            if (CarbonImmutable::parse($bar->bar_time)->lt($cutoff)) {
+                continue;
+            }
             foreach (array_unique($found) as $key) {
                 $future = $bars->get($index + 20);
                 $return = $future && $close !== 0.0 ? (((float) $future->close / $close) - 1) * 100 : null;
@@ -1388,6 +1513,7 @@ class StockController extends Controller
             $validated = $items->whereNotNull('return');
             $directionalReturns = $validated->pluck('return')->map(fn ($return): float => (float) $return * ($direction === 'bearish' ? -1 : 1));
             $latest = $items->last();
+
             return [
                 'key' => $key,
                 'name' => $name,
@@ -1453,7 +1579,9 @@ class StockController extends Controller
             ['label' => __('Momentum 10T'), 'field' => 'momentum10Pct', 'unit' => '%'],
         ];
         $valueFor = function (?array $row, string $field): ?float {
-            if (! $row) return null;
+            if (! $row) {
+                return null;
+            }
             $close = (float) ($row['c'] ?? 0);
 
             return match ($field) {
@@ -1475,7 +1603,9 @@ class StockController extends Controller
                 : null;
             $points = $chartRows->map(function (array $row) use ($definition, $scale, $valueFor): ?array {
                 $rawValue = $valueFor($row, $definition['field']);
-                if ($rawValue === null || ! is_numeric($row['targetReturn20d'])) return null;
+                if ($rawValue === null || ! is_numeric($row['targetReturn20d'])) {
+                    return null;
+                }
                 $return = (float) $row['targetReturn20d'];
 
                 return [
@@ -1556,8 +1686,7 @@ class StockController extends Controller
         object $instrument,
         TwelveDataService $yahooFinance,
         ?CarbonImmutable $focusAt = null,
-    ): array
-    {
+    ): array {
         if ($this->usesEuroDisplay($instrument)) {
             try {
                 $providerSymbol = (string) $instrument->german_listing_symbol;
@@ -1756,8 +1885,7 @@ class StockController extends Controller
             ->groupBy('instrument_id');
 
         $sectorFundamentals = DB::table('instruments as peer')
-            ->joinSub($latestFundamentalIds, 'latest_fundamental', fn ($join) =>
-                $join->on('latest_fundamental.instrument_id', '=', 'peer.id'))
+            ->joinSub($latestFundamentalIds, 'latest_fundamental', fn ($join) => $join->on('latest_fundamental.instrument_id', '=', 'peer.id'))
             ->join('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental.fundamental_id')
             ->where('peer.type', 'stock')
             ->whereNull('peer.deleted_at')
@@ -1795,8 +1923,7 @@ class StockController extends Controller
                     return [$name => null];
                 }
 
-                $better = $values->filter(fn (float $value) =>
-                    $definition['direction'] === 'asc' ? $value < $current : $value > $current
+                $better = $values->filter(fn (float $value) => $definition['direction'] === 'asc' ? $value < $current : $value > $current
                 )->count();
 
                 return [$name => [
@@ -1820,17 +1947,16 @@ class StockController extends Controller
         // 1M+ row trade table for every historical run. The runner already
         // persists that coverage in summary.instruments, so choose the same
         // four reference runs from the compact run table and cache the result.
-        $runIds = Cache::remember('stocks.ranking-score-reference-runs.v2', now()->addHour(), fn () =>
-            DB::table('walk_forward_backtest_runs')
-                ->where('status', 'completed')
-                ->whereIn('horizon_days', [5, 10, 15, 20])
-                ->select(['id', 'horizon_days'])
-                ->selectRaw("COALESCE((summary->>'instruments')::integer, 0) AS instrument_count")
-                ->orderByDesc('instrument_count')
-                ->orderByDesc('id')
-                ->get()
-                ->unique('horizon_days')
-                ->pluck('id')
+        $runIds = Cache::remember('stocks.ranking-score-reference-runs.v2', now()->addHour(), fn () => DB::table('walk_forward_backtest_runs')
+            ->where('status', 'completed')
+            ->whereIn('horizon_days', [5, 10, 15, 20])
+            ->select(['id', 'horizon_days'])
+            ->selectRaw("COALESCE((summary->>'instruments')::integer, 0) AS instrument_count")
+            ->orderByDesc('instrument_count')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('horizon_days')
+            ->pluck('id')
         );
 
         $stats = $runIds->isEmpty() ? collect() : DB::table('walk_forward_backtest_trades as score_trade')
@@ -1900,7 +2026,7 @@ class StockController extends Controller
             ['value' => $stabilityAvailable ? $stabilityScore : null, 'weight' => 2.5],
         ])->filter(fn (array $component): bool => $component['value'] !== null);
         $weight = (float) $components->sum('weight');
-        $fallback = \App\Support\AiScore::toTen($prediction->prediction_score) ?? 0.0;
+        $fallback = AiScore::toTen($prediction->prediction_score) ?? 0.0;
 
         return round($weight > 0 ? (float) $components->sum(fn (array $component): float => $component['value'] * $component['weight']) / $weight / 10 : $fallback, 2);
     }
@@ -1917,5 +2043,4 @@ class StockController extends Controller
 
         return json_decode($value, true) ?: [];
     }
-
 }

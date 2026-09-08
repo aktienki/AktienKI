@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\DB;
 final class HistoricalAreaEntryRotationService
 {
     public const SECTOR_STRATEGY = 'sector_entry_rotation_20d';
+
     public const INDEX_STRATEGY = 'index_entry_rotation_20d';
+
     private const FORECAST_TOLERANCE = 0.02;
 
     public function apply(int $runId, bool $sectorEnabled, bool $indexEnabled, string $riskStyle = 'balanced'): array
@@ -50,8 +52,12 @@ final class HistoricalAreaEntryRotationService
             : collect();
 
         $summary = ['forecast_tolerance_percentage_points' => 2.0];
-        if ($sectorEnabled) $summary['sector'] = $this->persist($runId, $trades, self::SECTOR_STRATEGY, $memberships, $riskStyle);
-        if ($indexEnabled) $summary['index'] = $this->persist($runId, $trades, self::INDEX_STRATEGY, $memberships, $riskStyle);
+        if ($sectorEnabled) {
+            $summary['sector'] = $this->persist($runId, $trades, self::SECTOR_STRATEGY, $memberships, $riskStyle);
+        }
+        if ($indexEnabled) {
+            $summary['index'] = $this->persist($runId, $trades, self::INDEX_STRATEGY, $memberships, $riskStyle);
+        }
 
         return $summary;
     }
@@ -84,6 +90,7 @@ final class HistoricalAreaEntryRotationService
                     : $preferredIndex !== null && $memberships->get($trade->instrument_id, collect())
                         ->contains(fn (object $membership): bool => (int) $membership->market_index_id === (int) $preferredIndex);
                 $trade->area_preferred = $areaMatch && ($bestForecast - (float) $trade->predicted_return) <= self::FORECAST_TOLERANCE;
+
                 return $trade;
             })->sort(fn (object $left, object $right): int => ((int) $right->area_preferred <=> (int) $left->area_preferred)
                 ?: $this->compareByRiskStyle($left, $right, $riskStyle))->values();
@@ -93,7 +100,10 @@ final class HistoricalAreaEntryRotationService
         $preferred = 0;
         foreach ($ordered->chunk(500) as $chunk) {
             DB::table('backtest_strategy_trades')->insert($chunk->map(function (object $trade) use ($runId, $strategy, $riskStyle, $now, &$preferred): array {
-                if ($trade->area_preferred) $preferred++;
+                if ($trade->area_preferred) {
+                    $preferred++;
+                }
+
                 return [
                     'backtest_run_id' => $runId,
                     'backtest_trade_id' => $trade->id,

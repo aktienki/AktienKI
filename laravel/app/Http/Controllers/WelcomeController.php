@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Throwable;
@@ -42,7 +42,9 @@ class WelcomeController extends Controller
         $publicTradePerformance = null;
         if (Storage::disk('public')->exists('statistics/trade-performance-backtest.json')) {
             $decoded = json_decode(Storage::disk('public')->get('statistics/trade-performance-backtest.json'), true);
-            if (is_array($decoded) && ($decoded['version'] ?? null) === 1) $publicTradePerformance = $decoded;
+            if (is_array($decoded) && ($decoded['version'] ?? null) === 1) {
+                $publicTradePerformance = $decoded;
+            }
         }
 
         try {

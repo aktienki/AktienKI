@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ProfileUpdateRequest;
 use App\Enums\PlanLevel;
+use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\MessagingConnection;
 use App\Services\PlanAccessService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\View\View;
-use App\Models\MessagingConnection;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
@@ -186,7 +187,9 @@ class ProfileController extends Controller
             $messaging = $existingMessaging ?: new MessagingConnection(['user_id' => $user->id, 'provider' => 'whatsapp_cloud']);
             $credentials = $messaging->credentials ?? [];
             foreach (['access_token' => $request->input('whatsapp_access_token'), 'phone_number_id' => $request->input('whatsapp_phone_number_id')] as $key => $value) {
-                if (filled($value)) $credentials[$key] = $value;
+                if (filled($value)) {
+                    $credentials[$key] = $value;
+                }
             }
             $messaging->fill([
                 'credentials' => $credentials,
@@ -217,7 +220,7 @@ class ProfileController extends Controller
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
-    public function updateTheme(Request $request): \Illuminate\Http\JsonResponse
+    public function updateTheme(Request $request): JsonResponse
     {
         $validated = $request->validate(['theme' => ['required', 'in:light,dark']]);
         $user = $request->user();

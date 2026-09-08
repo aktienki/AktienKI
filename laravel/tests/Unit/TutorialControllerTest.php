@@ -34,7 +34,7 @@ final class TutorialControllerTest extends TestCase
         $request->headers->set('Accept', 'application/json');
         $request->setUserResolver(static fn () => $user);
 
-        $response = (new TutorialController())->complete($request);
+        $response = (new TutorialController)->complete($request);
 
         $this->assertInstanceOf(JsonResponse::class, $response);
         $this->assertSame(['completed' => true], $response->getData(true));

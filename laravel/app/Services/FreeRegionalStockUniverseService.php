@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\DB;
 final class FreeRegionalStockUniverseService
 {
     private const EUROPE = ['AT', 'BE', 'BG', 'CH', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK'];
+
     private const NORTH_AMERICA = ['US', 'CA'];
+
     private const ASIA_PACIFIC = ['AU', 'CN', 'HK', 'JP'];
 
     /** @return Collection<int, int> */
@@ -42,7 +44,9 @@ final class FreeRegionalStockUniverseService
     private function regionCountries(string $country): array
     {
         foreach ([self::EUROPE, self::NORTH_AMERICA, self::ASIA_PACIFIC] as $region) {
-            if (in_array($country, $region, true)) return array_values(array_unique([$country, ...$region]));
+            if (in_array($country, $region, true)) {
+                return array_values(array_unique([$country, ...$region]));
+            }
         }
 
         return [$country];

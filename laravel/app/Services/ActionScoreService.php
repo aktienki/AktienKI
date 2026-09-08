@@ -106,6 +106,7 @@ class ActionScoreService
         $pointReturns = (array) data_get($fusionDetails, 'points_return', []);
         $fourHorizonReturns = collect([5, 10, 15, 20])->mapWithKeys(function (int $days) use ($pointReturns): array {
             $value = $pointReturns[$days] ?? $pointReturns[(string) $days] ?? null;
+
             return [$days => is_numeric($value) ? (float) $value : null];
         });
         $availableConfirmations = $fourHorizonReturns->filter(fn ($value): bool => $value !== null);
@@ -119,7 +120,9 @@ class ActionScoreService
         // 1+ is reserved for complete positive confirmation across all four
         // production horizons. The underlying raw score remains documented.
         $scoreBeforeConfirmationCap = $score;
-        if ($score >= 90.0 && ! $allFourPositive) $score = 89.99;
+        if ($score >= 90.0 && ! $allFourPositive) {
+            $score = 89.99;
+        }
 
         $longHorizonContext = data_get($fusionDetails, 'long_horizon_context');
         $longHorizonVeto = $signal === 'BUY'
@@ -127,10 +130,14 @@ class ActionScoreService
             && filter_var($longHorizonContext['decisive'] ?? false, FILTER_VALIDATE_BOOL)
             && array_key_exists('aligned_with_primary_20d', $longHorizonContext)
             && ! filter_var($longHorizonContext['aligned_with_primary_20d'], FILTER_VALIDATE_BOOL);
-        if ($longHorizonVeto) $signal = 'WATCH';
+        if ($longHorizonVeto) {
+            $signal = 'WATCH';
+        }
 
         $primaryDirectionVeto = $signal === 'BUY' && ! $primary20Positive;
-        if ($primaryDirectionVeto) $signal = 'WATCH';
+        if ($primaryDirectionVeto) {
+            $signal = 'WATCH';
+        }
 
         $individualThreshold = DB::table('stock_individual_thresholds')
             ->where('instrument_id', $prediction->instrument_id)

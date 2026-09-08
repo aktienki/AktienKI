@@ -1,14 +1,14 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
+use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])->name('register');
@@ -53,19 +53,20 @@ Route::post('/beta/aktivieren', function (Request $request) {
         'account_status' => 'tester',
         'is_beta_tester' => true,
         'tariff_plan_id' => $proPlanId,
-            'tariff_status' => 'trialing',
+        'tariff_status' => 'trialing',
         'billing_cycle' => 'monthly',
-            'tariff_started_at' => $trialStartsAt,
+        'tariff_started_at' => $trialStartsAt,
         'tariff_ends_at' => $trialEndsAt,
-            'subscription_metadata' => array_merge((array) ($user->subscription_metadata ?? []), [
-                'source' => 'beta_trial',
-                'trial_months' => 12,
-                'trial_starts_after_beta' => ! $phaseEnded,
-                'trial_started_at' => $trialStartsAt?->toIso8601String(),
-                'trial_ends_at' => $trialEndsAt?->toIso8601String(),
-            ]),
+        'subscription_metadata' => array_merge((array) ($user->subscription_metadata ?? []), [
+            'source' => 'beta_trial',
+            'trial_months' => 12,
+            'trial_starts_after_beta' => ! $phaseEnded,
+            'trial_started_at' => $trialStartsAt?->toIso8601String(),
+            'trial_ends_at' => $trialEndsAt?->toIso8601String(),
+        ]),
         'meta' => $meta,
     ])->save();
+
     return redirect()->route('dashboard')->with('status', 'beta-activated');
 })->middleware(['auth', 'verified', 'throttle:6,1'])->name('beta.activation.complete');
 

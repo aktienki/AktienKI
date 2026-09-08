@@ -9,6 +9,7 @@ use Illuminate\Console\Command;
 class SendBetaTrialExpiryReminders extends Command
 {
     protected $signature = 'beta:send-trial-reminders';
+
     protected $description = 'Sendet Beta-Nutzern sieben Tage vor Ablauf der Pro-Testphase eine E-Mail.';
 
     public function handle(): int

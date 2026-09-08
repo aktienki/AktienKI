@@ -4,9 +4,9 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Services\IndexAiScoreService;
 use App\Services\MarketService;
 use App\Services\TwelveDataService;
-use App\Services\IndexAiScoreService;
 use Livewire\Component;
 
 class MarketSentiment extends Component
@@ -15,11 +15,11 @@ class MarketSentiment extends Component
 
     protected array $symbols = [
 
-        'DAX'        => '^GDAXI',
-        'NASDAQ'     => '^IXIC',
-        'S&P 500'    => '^GSPC',
-        'Japan'      => '^N225',
-        'China'      => '000001.SS',
+        'DAX' => '^GDAXI',
+        'NASDAQ' => '^IXIC',
+        'S&P 500' => '^GSPC',
+        'Japan' => '^N225',
+        'China' => '000001.SS',
 
     ];
 
@@ -27,8 +27,7 @@ class MarketSentiment extends Component
         TwelveDataService $yahoo,
         MarketService $marketService,
         IndexAiScoreService $indexAiScores
-    ): void
-    {
+    ): void {
         $this->load($yahoo, $marketService, $indexAiScores);
     }
 
@@ -36,8 +35,7 @@ class MarketSentiment extends Component
         TwelveDataService $yahoo,
         MarketService $marketService,
         IndexAiScoreService $indexAiScores
-    ): void
-    {
+    ): void {
         $this->load($yahoo, $marketService, $indexAiScores);
     }
 
@@ -45,8 +43,7 @@ class MarketSentiment extends Component
         TwelveDataService $yahoo,
         MarketService $marketService,
         IndexAiScoreService $indexAiScores
-    ): void
-    {
+    ): void {
         $markets = [];
 
         foreach ($this->symbols as $name => $symbol) {
@@ -55,11 +52,11 @@ class MarketSentiment extends Component
 
             $markets[] = [
 
-                'name'     => $name,
-                'price'    => $quote['price'] ?? null,
+                'name' => $name,
+                'price' => $quote['price'] ?? null,
                 'currency' => $quote['currency'] ?? '',
-                'change'   => $quote['change_percent'] ?? null,
-                'candles'  => $yahoo->candles($symbol),
+                'change' => $quote['change_percent'] ?? null,
+                'candles' => $yahoo->candles($symbol),
 
             ];
 

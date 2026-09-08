@@ -480,7 +480,6 @@ final class ServingModelOverviewService
         $points = collect($points)->map(function (array $point) use (
             $start,
             $end,
-            $minimum,
             $maximum,
             $range,
             $left,

@@ -18,6 +18,7 @@ class ImportUsTopGermanTradeable extends Command
         $source = database_path('data/us_top1000.csv');
         if (! is_file($source)) {
             $this->error('Quelldatei fehlt: '.$source);
+
             return self::FAILURE;
         }
 
@@ -39,6 +40,7 @@ class ImportUsTopGermanTradeable extends Command
             $primary = $primaryBySymbol[$this->tickerKey($symbol)] ?? null;
             if (! $primary && ! $existing) {
                 $skippedPrimary++;
+
                 continue;
             }
 
@@ -54,15 +56,19 @@ class ImportUsTopGermanTradeable extends Command
                 $candidates = $germanByName[$this->nameKey((string) $row['name'])] ?? [];
                 $listing = collect($candidates)->first(function (array $candidate) use (&$usedGermanListings): bool {
                     $key = strtoupper((string) $candidate['mic_code']).':'.strtoupper((string) $candidate['symbol']);
+
                     return ! isset($usedGermanListings[$key]);
                 });
             }
             if (! $listing) {
                 $skippedGerman++;
+
                 continue;
             }
 
-            if (count($matched) >= 1000) break;
+            if (count($matched) >= 1000) {
+                break;
+            }
 
             $listingKey = strtoupper((string) $listing['mic_code']).':'.strtoupper((string) $listing['symbol']);
             $usedGermanListings[$listingKey] = true;
@@ -72,6 +78,7 @@ class ImportUsTopGermanTradeable extends Command
 
         if ($this->option('dry-run')) {
             $this->info("Prüfung: {$created} neu, {$updated} vorhanden, {$skippedPrimary} ohne US-Katalogtreffer, {$skippedGerman} ohne eindeutige deutsche EUR-Notierung.");
+
             return self::SUCCESS;
         }
 
@@ -127,6 +134,7 @@ class ImportUsTopGermanTradeable extends Command
         });
 
         $this->info("Import: {$created} neu, {$updated} aktualisiert, {$skippedPrimary} ohne US-Katalogtreffer, {$skippedGerman} ohne eindeutige deutsche EUR-Notierung.");
+
         return self::SUCCESS;
     }
 
@@ -138,6 +146,7 @@ class ImportUsTopGermanTradeable extends Command
         if ($response->failed() || $response->json('status') === 'error') {
             throw new RuntimeException('Twelve Data '.$country.': '.($response->json('message') ?: 'HTTP '.$response->status()));
         }
+
         return $response->json('data', []);
     }
 
@@ -148,10 +157,15 @@ class ImportUsTopGermanTradeable extends Command
             if (! in_array(strtoupper((string) ($item['mic_code'] ?? '')), [
                 'XNAS', 'XNYS', 'XNCM', 'XNGS', 'XNMS', 'ARCX', 'BATS', 'XASE',
                 'PINX', 'PSGM', 'OTCB', 'OTCQ', 'EXPM',
-            ], true)) continue;
-            if (! in_array((string) ($item['type'] ?? ''), ['Common Stock', 'Preferred Stock', 'REIT', 'American Depositary Receipt'], true)) continue;
+            ], true)) {
+                continue;
+            }
+            if (! in_array((string) ($item['type'] ?? ''), ['Common Stock', 'Preferred Stock', 'REIT', 'American Depositary Receipt'], true)) {
+                continue;
+            }
             $result[$this->tickerKey((string) $item['symbol'])] ??= $item;
         }
+
         return $result;
     }
 
@@ -161,36 +175,58 @@ class ImportUsTopGermanTradeable extends Command
         $priority = ['XETR' => 0, 'FSX' => 1, 'XFRA' => 1, 'XMUN' => 2, 'XDUS' => 3, 'XSTU' => 4, 'XHAN' => 5, 'XHAM' => 6, 'XBER' => 7];
         foreach ($catalog as $item) {
             $mic = strtoupper((string) ($item['mic_code'] ?? ''));
-            if (! isset($priority[$mic]) || strtoupper((string) ($item['currency'] ?? '')) !== 'EUR') continue;
-            if (! in_array((string) ($item['type'] ?? ''), ['Common Stock', 'Preferred Stock', 'REIT', 'Depositary Receipt'], true)) continue;
+            if (! isset($priority[$mic]) || strtoupper((string) ($item['currency'] ?? '')) !== 'EUR') {
+                continue;
+            }
+            if (! in_array((string) ($item['type'] ?? ''), ['Common Stock', 'Preferred Stock', 'REIT', 'Depositary Receipt'], true)) {
+                continue;
+            }
             $result[$this->nameKey((string) $item['name'])][] = $item;
         }
-        foreach ($result as &$items) usort($items, fn ($a, $b) => ($priority[strtoupper((string) $a['mic_code'])] ?? 99) <=> ($priority[strtoupper((string) $b['mic_code'])] ?? 99));
+        foreach ($result as &$items) {
+            usort($items, fn ($a, $b) => ($priority[strtoupper((string) $a['mic_code'])] ?? 99) <=> ($priority[strtoupper((string) $b['mic_code'])] ?? 99));
+        }
+
         return $result;
     }
 
     private function rows(string $path): array
     {
-        $handle = fopen($path, 'rb'); $header = fgetcsv($handle); $rows = [];
-        while (($values = fgetcsv($handle)) !== false) if (count($values) === count($header)) $rows[] = array_combine($header, $values);
-        fclose($handle); return $rows;
+        $handle = fopen($path, 'rb');
+        $header = fgetcsv($handle);
+        $rows = [];
+        while (($values = fgetcsv($handle)) !== false) {
+            if (count($values) === count($header)) {
+                $rows[] = array_combine($header, $values);
+            }
+        }
+        fclose($handle);
+
+        return $rows;
     }
 
-    private function tickerKey(string $symbol): string { return preg_replace('/[^A-Z0-9]/', '', strtoupper($symbol)) ?: ''; }
+    private function tickerKey(string $symbol): string
+    {
+        return preg_replace('/[^A-Z0-9]/', '', strtoupper($symbol)) ?: '';
+    }
 
     private function nameKey(string $name): string
     {
         $key = strtoupper(iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $name) ?: $name);
         $key = preg_replace('/\b(CORPORATION|CORP|INCORPORATED|INC|COMPANY|CO|LIMITED|LTD|PLC|N V|NV|S A|SA)\b/', ' ', $key);
+
         return trim(preg_replace('/[^A-Z0-9]+/', ' ', $key) ?: '');
     }
 
     private function exchange(string $mic, string $name, $now): ?int
     {
-        if ($mic === '') return null;
+        if ($mic === '') {
+            return null;
+        }
         DB::table('exchanges')->updateOrInsert(['code' => $mic], ['mic' => $mic, 'name' => $name ?: $mic,
             'country' => 'US', 'currency' => 'USD', 'timezone' => 'America/New_York', 'is_active' => true,
             'updated_at' => $now, 'created_at' => $now]);
+
         return (int) DB::table('exchanges')->where('code', $mic)->value('id');
     }
 
@@ -202,6 +238,7 @@ class ImportUsTopGermanTradeable extends Command
             'description' => 'Die größten verfügbaren US-Aktien mit bestätigter deutscher EUR-Notierung.',
             'is_active' => true, 'updated_at' => $now, 'created_at' => $now,
         ]);
+
         return (int) DB::table('market_indices')->where('symbol', 'US-DE-TOP1000')->value('id');
     }
 }

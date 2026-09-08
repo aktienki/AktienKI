@@ -22,6 +22,7 @@ class AddEtfHoldingSource extends Command
         {--format=csv : csv oder json}
         {--not-german-tradeable : Nicht als in Deutschland handelbar markieren}
         {--sync : Bestand sofort importieren}';
+
     protected $description = 'Hinterlegt eine offizielle ETF-Anbieterquelle für den automatischen Bestandsimport';
 
     public function handle(EtfHoldingImportService $importer): int
@@ -29,6 +30,7 @@ class AddEtfHoldingSource extends Command
         $isin = strtoupper(trim((string) $this->option('isin')));
         if ($isin !== '' && ! preg_match('/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/', $isin)) {
             $this->error('Die ETF-ISIN ist ungültig.');
+
             return self::FAILURE;
         }
         $identity = $isin !== ''
@@ -36,6 +38,7 @@ class AddEtfHoldingSource extends Command
             : ['provider' => trim($this->argument('provider')), 'symbol' => strtoupper(trim((string) $this->option('symbol')))];
         if (($identity['symbol'] ?? null) === '') {
             $this->error('Ohne ISIN muss --symbol angegeben werden.');
+
             return self::FAILURE;
         }
         $mic = strtoupper(trim((string) $this->option('mic')));
@@ -43,6 +46,7 @@ class AddEtfHoldingSource extends Command
         $isGermanTradeable = ! $this->option('not-german-tradeable') && in_array($mic, $germanMics, true);
         if (! $this->option('not-german-tradeable') && ! $isGermanTradeable) {
             $this->error('Für einen sichtbaren ETF ist ein deutscher --mic erforderlich (z. B. XETR oder XFRA).');
+
             return self::FAILURE;
         }
 
@@ -68,6 +72,7 @@ class AddEtfHoldingSource extends Command
             $result = $importer->sync($fund);
             $this->info("{$result['matched']}/{$result['imported']} Bestände dem Aktienuniversum zugeordnet.");
         }
+
         return self::SUCCESS;
     }
 }

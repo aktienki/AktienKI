@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Jobs\RunFilteredBacktest;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use App\Jobs\RunFilteredBacktest;
 
 require __DIR__.'/../vendor/autoload.php';
 $app = require __DIR__.'/../bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
 $rules = [
     10 => ['confidence_min' => .55, 'expected_return_min' => .03, 'profit_factor_min' => 1.50, 'hit_rate_min' => .50, 'median_return_min' => 0, 'average_return_min' => .005, 'stddev_max' => .10, 'drawdown_max' => .20, 'minimum_trades' => 10],
@@ -29,16 +30,24 @@ $twentyDayProfiles = [
     'pf-quality' => ['confidence_min' => .45, 'expected_return_min' => .02, 'profit_factor_min' => 1.50, 'hit_rate_min' => .45, 'median_return_min' => -.005, 'average_return_min' => 0, 'stddev_max' => .22, 'drawdown_max' => .40, 'minimum_trades' => 10],
 ];
 foreach ($argv as $argument) {
-    if (! str_starts_with($argument, '--10t-profile=')) continue;
+    if (! str_starts_with($argument, '--10t-profile=')) {
+        continue;
+    }
     $profile = substr($argument, strlen('--10t-profile='));
-    if (! isset($tenDayProfiles[$profile])) throw new InvalidArgumentException("Unknown 10T profile: $profile");
+    if (! isset($tenDayProfiles[$profile])) {
+        throw new InvalidArgumentException("Unknown 10T profile: $profile");
+    }
     $rules = [10 => $tenDayProfiles[$profile]];
     $strategyName = 'Optimiert 10T '.ucwords(str_replace('-', ' ', $profile));
 }
 foreach ($argv as $argument) {
-    if (! str_starts_with($argument,($prefix = '--20t-profile='))) continue;
+    if (! str_starts_with($argument, ($prefix = '--20t-profile='))) {
+        continue;
+    }
     $profile = substr($argument, strlen($prefix));
-    if (! isset($twentyDayProfiles[$profile])) throw new InvalidArgumentException("Unknown 20T profile: $profile");
+    if (! isset($twentyDayProfiles[$profile])) {
+        throw new InvalidArgumentException("Unknown 20T profile: $profile");
+    }
     $rules = [20 => $twentyDayProfiles[$profile]];
     $strategyName = 'Optimiert 20T '.ucwords(str_replace('-', ' ', $profile));
 }
@@ -56,7 +65,9 @@ $chosen = [];
 foreach ($predictions->unique(fn ($p) => "$p->instrument_id|$p->horizon|$p->variant") as $p) {
     $horizon = (int) $p->horizon;
     $rule = $rules[$horizon] ?? null;
-    if ($rule === null) continue;
+    if ($rule === null) {
+        continue;
+    }
     $metrics = data_get(json_decode((string) $p->compact_metrics, true), "horizons.$horizon.$p->variant.metrics", []);
     $passes = (float) ($p->confidence ?? 0) >= $rule['confidence_min']
         && (float) ($p->expected_return ?? -999) >= $rule['expected_return_min']
@@ -67,7 +78,9 @@ foreach ($predictions->unique(fn ($p) => "$p->instrument_id|$p->horizon|$p->vari
         && (float) ($metrics['average_net_trade'] ?? -999) >= $rule['average_return_min']
         && (float) ($metrics['stddev_net_trade'] ?? 999) <= $rule['stddev_max']
         && abs((float) ($metrics['max_drawdown'] ?? 999)) <= $rule['drawdown_max'];
-    if (! $passes) continue;
+    if (! $passes) {
+        continue;
+    }
     $release = json_decode((string) $p->compact_metrics, true);
     $chosen[] = array_filter([
         'symbol' => (string) $p->symbol,
@@ -102,8 +115,8 @@ $filters = [
 $id = DB::table('saved_prediction_filters')->updateOrInsert(
     ['user_id' => 1, 'name' => $strategyName],
     ['filters' => json_encode($filters, JSON_THROW_ON_ERROR), 'visibility' => 'private',
-     'description' => 'Horizontspezifische Max-Profit-Strategie mit Konfidenz, erwarteter Rendite, Median, Durchschnitt, Standardabweichung, Profit Factor, Trefferquote, Drawdown und Mindestanzahl Trades.',
-     'updated_at' => now(), 'created_at' => now()]
+        'description' => 'Horizontspezifische Max-Profit-Strategie mit Konfidenz, erwarteter Rendite, Median, Durchschnitt, Standardabweichung, Profit Factor, Trefferquote, Drawdown und Mindestanzahl Trades.',
+        'updated_at' => now(), 'created_at' => now()]
 );
 $strategy = DB::table('saved_prediction_filters')->where('user_id', 1)->where('name', $strategyName)->first(['id']);
 

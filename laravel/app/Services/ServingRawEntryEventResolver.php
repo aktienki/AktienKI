@@ -13,7 +13,7 @@ final class ServingRawEntryEventResolver
     public function __construct(private readonly FinalEntryCanonicalizer $canonicalizer) {}
 
     /**
-     * @param array<string, mixed> $claim Only prediction id is trusted as a lookup key.
+     * @param  array<string, mixed>  $claim  Only prediction id is trusted as a lookup key.
      * @return array{source: array<string,mixed>, metrics: array<string,mixed>, mapping: array<string,mixed>}
      */
     public function resolve(
@@ -220,9 +220,13 @@ final class ServingRawEntryEventResolver
             $score = $score <= 1 ? $score * 10 : ($score <= 10 ? $score : $score / 10);
         }
         $confidence = is_numeric($row->confidence) ? (float) $row->confidence : null;
-        if ($confidence !== null && $confidence <= 1) $confidence *= 100;
+        if ($confidence !== null && $confidence <= 1) {
+            $confidence *= 100;
+        }
         $risk = is_numeric($row->risk_score) ? abs((float) $row->risk_score) : null;
-        if ($risk !== null && $risk <= 1) $risk *= 100;
+        if ($risk !== null && $risk <= 1) {
+            $risk *= 100;
+        }
 
         return [
             'raw_signal' => strtoupper(trim((string) $row->signal)),
@@ -248,7 +252,9 @@ final class ServingRawEntryEventResolver
 
     private function jsonValue(mixed $value): mixed
     {
-        if (! is_string($value)) return $value;
+        if (! is_string($value)) {
+            return $value;
+        }
         $decoded = json_decode($value, true);
 
         return json_last_error() === JSON_ERROR_NONE ? $decoded : $value;

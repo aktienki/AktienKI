@@ -14,7 +14,9 @@ class TwelveDataService
     {
         foreach (array_filter([trim((string) $isin), trim($name), trim($symbol)]) as $term) {
             $response = $this->request('symbol_search', ['symbol' => $term, 'outputsize' => 120]);
-            if (! $this->valid($response)) continue;
+            if (! $this->valid($response)) {
+                continue;
+            }
 
             $match = collect($response->json('data', []))
                 ->filter(fn (array $item): bool => strtoupper((string) ($item['currency'] ?? '')) === 'USD')
@@ -24,12 +26,14 @@ class TwelveDataService
                     'XNAS' => 0, 'XNYS' => 1, 'ARCX' => 2, default => 3,
                 })->first();
 
-            if ($match) return [
-                'symbol' => (string) $match['symbol'],
-                'exchange' => (string) ($match['exchange'] ?? ''),
-                'mic_code' => (string) ($match['mic_code'] ?? ''),
-                'currency' => 'USD',
-            ];
+            if ($match) {
+                return [
+                    'symbol' => (string) $match['symbol'],
+                    'exchange' => (string) ($match['exchange'] ?? ''),
+                    'mic_code' => (string) ($match['mic_code'] ?? ''),
+                    'currency' => 'USD',
+                ];
+            }
         }
 
         return null;

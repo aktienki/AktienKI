@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Enums\PlanLevel;
 use App\Services\FreeRegionalStockUniverseService;
-use App\Services\PlanAccessService;
 use App\Services\PersonalizedSignalService;
+use App\Services\PlanAccessService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class SectorController extends Controller
@@ -56,16 +56,12 @@ class SectorController extends Controller
 
         $sectors = DB::table('instruments as instrument')
             ->leftJoin('market_sectors as market_sector', fn ($join) => $join->whereRaw('LOWER(market_sector.name) = LOWER(instrument.sector)'))
-            ->joinSub($latestPredictions, 'latest', fn ($join) =>
-                $join->on('latest.instrument_id', '=', 'instrument.id'))
+            ->joinSub($latestPredictions, 'latest', fn ($join) => $join->on('latest.instrument_id', '=', 'instrument.id'))
             ->join('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
-            ->leftJoinSub($walkForwardStats, 'walk_forward', fn ($join) =>
-                $join->on('walk_forward.instrument_id', '=', 'instrument.id'))
-            ->leftJoinSub($fiveDayBaselines, 'baseline', fn ($join) =>
-                $join->on('baseline.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($walkForwardStats, 'walk_forward', fn ($join) => $join->on('walk_forward.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($fiveDayBaselines, 'baseline', fn ($join) => $join->on('baseline.instrument_id', '=', 'instrument.id'))
             ->leftJoin('predictions as baseline_prediction', 'baseline_prediction.id', '=', 'baseline.prediction_id')
-            ->leftJoinSub($latestFundamentals, 'latest_fundamental', fn ($join) =>
-                $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($latestFundamentals, 'latest_fundamental', fn ($join) => $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
             ->leftJoin('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental.fundamental_id')
             ->where('instrument.type', 'stock')
             ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
@@ -175,14 +171,11 @@ class SectorController extends Controller
             ->selectRaw('MAX(close) FILTER (WHERE bar_rank = 2) AS previous_daily_close')
             ->selectRaw('MAX(bar_time) FILTER (WHERE bar_rank = 1) AS latest_daily_time');
         $rankedSectorStocks = DB::table('instruments as instrument')
-            ->joinSub($latestPredictions, 'latest', fn ($join) =>
-                $join->on('latest.instrument_id', '=', 'instrument.id'))
+            ->joinSub($latestPredictions, 'latest', fn ($join) => $join->on('latest.instrument_id', '=', 'instrument.id'))
             ->join('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
-            ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) =>
-                $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) => $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
             ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
-            ->leftJoinSub($dailyCloses, 'daily_close', fn ($join) =>
-                $join->on('daily_close.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($dailyCloses, 'daily_close', fn ($join) => $join->on('daily_close.instrument_id', '=', 'instrument.id'))
             ->where('instrument.type', 'stock')
             ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
             ->where('instrument.is_active', true)

@@ -1,53 +1,58 @@
 <?php
 
+use App\Http\Controllers\AkiChatController;
+use App\Http\Controllers\AnalysisReportController;
+use App\Http\Controllers\AppleChartController;
+use App\Http\Controllers\BacktestTradePerformanceController;
+use App\Http\Controllers\BetaInvitationController;
+use App\Http\Controllers\ChartViewSignalController;
+use App\Http\Controllers\CommodityScreenerController;
+use App\Http\Controllers\CommunityController;
+use App\Http\Controllers\ContactController;
+use App\Http\Controllers\DailyMarketAnalysisController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DepotController;
+use App\Http\Controllers\EasyAccessController;
+use App\Http\Controllers\EntrySignalAlertController;
+use App\Http\Controllers\EtfCertificateController;
+use App\Http\Controllers\IndexScreenerController;
+use App\Http\Controllers\InfrastructureAdminController;
+use App\Http\Controllers\KlaLandingController;
+use App\Http\Controllers\LivePriceSubscriptionController;
+use App\Http\Controllers\MarketAssessmentController;
+use App\Http\Controllers\MarketDeepAnalysisController;
+use App\Http\Controllers\MarketOverviewController;
+use App\Http\Controllers\MarketQuotesController;
+use App\Http\Controllers\NewsController;
+use App\Http\Controllers\NvidiaLandingController;
+use App\Http\Controllers\PerformanceTransparencyController;
+use App\Http\Controllers\PredictionController;
+use App\Http\Controllers\PredictionPurchaseReminderController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectStatusController;
-use App\Http\Controllers\PredictionController;
+use App\Http\Controllers\QualityGateSetupController;
 use App\Http\Controllers\RecommendationController;
-use App\Http\Controllers\DepotController;
-use App\Http\Controllers\StockController;
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\SavedPredictionFilterController;
+use App\Http\Controllers\SectorController;
 use App\Http\Controllers\ServingModelOverviewController;
 use App\Http\Controllers\ServingPredictionTableController;
 use App\Http\Controllers\ServingStockController;
-use App\Http\Controllers\StockComparisonController;
-use App\Http\Controllers\StockIconController;
-use App\Http\Controllers\StockListController;
-use App\Http\Controllers\ContactController;
-use App\Http\Controllers\AppleChartController;
-use App\Http\Controllers\ReviewController;
-use App\Http\Controllers\SectorController;
-use App\Http\Controllers\IndexScreenerController;
-use App\Http\Controllers\CommodityScreenerController;
-use App\Http\Controllers\MarketDeepAnalysisController;
-use App\Http\Controllers\EtfCertificateController;
-use App\Http\Controllers\WelcomeController;
-use App\Http\Controllers\KlaLandingController;
-use App\Http\Controllers\NvidiaLandingController;
-use App\Http\Controllers\WatchlistController;
-use App\Http\Controllers\TradingIntegrationController;
-use App\Http\Controllers\MarketAssessmentController;
-use App\Http\Controllers\DailyMarketAnalysisController;
-use App\Http\Controllers\MarketOverviewController;
-use App\Livewire\Stocks\Index as StocksIndex;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\LivePriceSubscriptionController;
-use App\Http\Controllers\MarketQuotesController;
-use App\Http\Controllers\SavedPredictionFilterController;
 use App\Http\Controllers\SignalEmailPreviewController;
-use App\Http\Controllers\QualityGateSetupController;
+use App\Http\Controllers\SignalTransitionController;
 use App\Http\Controllers\SmartSelectionLabelController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ChartViewSignalController;
-use App\Http\Controllers\CommunityController;
-use App\Http\Controllers\AkiChatController;
-use App\Http\Controllers\NewsController;
+use App\Http\Controllers\StockComparisonController;
+use App\Http\Controllers\StockController;
+use App\Http\Controllers\StockIconController;
 use App\Http\Controllers\TradeOpportunityController;
+use App\Http\Controllers\TradingIntegrationController;
 use App\Http\Controllers\TutorialController;
-use App\Http\Controllers\PerformanceTransparencyController;
-use App\Http\Controllers\BetaInvitationController;
-use App\Http\Controllers\EasyAccessController;
+use App\Http\Controllers\WatchlistController;
+use App\Http\Controllers\WelcomeController;
+use App\Livewire\Stocks\Index as StocksIndex;
 use Illuminate\Http\Request;
-
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', WelcomeController::class)->name('welcome');
 Route::get('/welcome', WelcomeController::class)->name('welcome.page');
@@ -66,14 +71,14 @@ Route::post('/easy-access', [EasyAccessController::class, 'store'])
     ->middleware('throttle:10,1')
     ->name('easy-access.store');
 Route::get('/preise', function () {
-    $registeredUsers = \Illuminate\Support\Facades\DB::table('users')->count();
+    $registeredUsers = DB::table('users')->count();
 
     return view('pricing', compact('registeredUsers'));
 })->name('pricing');
 Route::get('/features', function () {
     // Keep the public feature counters in sync with the current database state.
     $featureStats = (function () {
-        $instruments = \Illuminate\Support\Facades\DB::table('instruments')
+        $instruments = DB::table('instruments')
             ->whereNull('deleted_at')
             ->where('is_active', true);
 
@@ -82,7 +87,7 @@ Route::get('/features', function () {
             'sectors' => (clone $instruments)->whereNotNull('sector')->where('sector', '!=', '')->distinct()->count('sector'),
             'stocks' => (clone $instruments)->where('type', 'stock')->count(),
             'indices' => (clone $instruments)->where('type', 'index')->count(),
-            'horizon_models' => \Illuminate\Support\Facades\DB::table('model_definitions')
+            'horizon_models' => DB::table('model_definitions')
                 ->where('is_active', true)
                 ->where('is_public', true)
                 ->where('ai_type', 'horizon')
@@ -92,7 +97,7 @@ Route::get('/features', function () {
                 ->pluck('public_alias')
                 ->values()
                 ->all(),
-            'pulse_models' => \Illuminate\Support\Facades\DB::table('model_definitions')
+            'pulse_models' => DB::table('model_definitions')
                 ->where('is_active', true)
                 ->where('is_public', true)
                 ->where('ai_type', 'pulse')
@@ -105,12 +110,12 @@ Route::get('/features', function () {
         ];
     })();
 
-    $registeredUsers = \Illuminate\Support\Facades\DB::table('users')->count();
+    $registeredUsers = DB::table('users')->count();
 
     return view('features', compact('featureStats', 'registeredUsers'));
 })->name('features');
 Route::get('/roadmap', function () {
-    $registeredUsers = \Illuminate\Support\Facades\DB::table('users')->count();
+    $registeredUsers = DB::table('users')->count();
 
     return view('roadmap', compact('registeredUsers'));
 })->name('roadmap');
@@ -121,9 +126,9 @@ Route::get('/projektstatus', ProjectStatusController::class)
 // Beta invitations are deliberately restricted to administrators. The raw token is
 // generated once and only its SHA-256 digest is stored in the database.
 Route::middleware('auth')->group(function (): void {
-    Route::get('/admin/infrastruktur', [\App\Http\Controllers\InfrastructureAdminController::class, 'index'])
+    Route::get('/admin/infrastruktur', [InfrastructureAdminController::class, 'index'])
         ->name('admin.infrastructure');
-    Route::post('/admin/infrastruktur/aktion', [\App\Http\Controllers\InfrastructureAdminController::class, 'action'])
+    Route::post('/admin/infrastruktur/aktion', [InfrastructureAdminController::class, 'action'])
         ->middleware('throttle:10,1')
         ->name('admin.infrastructure.action');
     Route::get('/beta/einladungen', [BetaInvitationController::class, 'index'])
@@ -274,8 +279,8 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::patch('/dashboard/card-layout', [DashboardController::class, 'updateCardLayout'])->name('dashboard.card-layout.update');
     Route::view('/maerkte/marktlage', 'markets.situation')->name('markets.situation');
     Route::get('/apple', AppleChartController::class)->name('stocks.apple');
-    //Route::get('/stocks', StocksIndex::class)->name('stocks.index');
-    //Route::get('/stocks/{symbol}', [StockController::class, 'show'])->name('stocks.show');
+    // Route::get('/stocks', StocksIndex::class)->name('stocks.index');
+    // Route::get('/stocks/{symbol}', [StockController::class, 'show'])->name('stocks.show');
 });
 
 Route::middleware(['auth', 'verified', 'beta'])->group(function () {
@@ -317,20 +322,19 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    Route::get('/stocks', fn (Request $request) =>
-        redirect()->route('predictions.index', $request->query())
+    Route::get('/stocks', fn (Request $request) => redirect()->route('predictions.index', $request->query())
     )->name('stocks.index');
-Route::get('/predictions', ServingPredictionTableController::class)->middleware('plan:pro')->name('predictions.index');
-Route::get('/news', [NewsController::class, 'index'])->name('news.index');
-Route::get('/predictions/signal-history', [\App\Http\Controllers\SignalTransitionController::class, 'index'])->name('predictions.signal-history');
-Route::get('/predictions/chartview-signals', ChartViewSignalController::class)->middleware('plan:pro')->name('predictions.chartview-signals');
-Route::get('/chancen', [TradeOpportunityController::class, 'index'])->middleware('plan:pro')->name('opportunities.index');
-Route::post('/chancen/{opportunity}/oeffnen', [TradeOpportunityController::class, 'open'])->middleware('plan:pro')->name('opportunities.open');
-Route::patch('/chancen/{opportunity}', [TradeOpportunityController::class, 'update'])->middleware('plan:pro')->name('opportunities.update');
-Route::delete('/chancen/{opportunity}', [TradeOpportunityController::class, 'destroy'])->middleware('plan:pro')->name('opportunities.destroy');
-Route::get('/predictions/trade-performance/backtest', [\App\Http\Controllers\BacktestTradePerformanceController::class, 'index'])->name('predictions.trade-performance.backtest');
-Route::get('/reports/{analysisReport}/pdf', [\App\Http\Controllers\AnalysisReportController::class, 'pdf'])->middleware(['auth', 'verified', 'beta'])->name('analysis-reports.pdf');
-Route::get('/reports/{analysisReport}', [\App\Http\Controllers\AnalysisReportController::class, 'show'])->middleware(['auth', 'verified', 'beta'])->name('analysis-reports.show');
+    Route::get('/predictions', ServingPredictionTableController::class)->middleware('plan:pro')->name('predictions.index');
+    Route::get('/news', [NewsController::class, 'index'])->name('news.index');
+    Route::get('/predictions/signal-history', [SignalTransitionController::class, 'index'])->name('predictions.signal-history');
+    Route::get('/predictions/chartview-signals', ChartViewSignalController::class)->middleware('plan:pro')->name('predictions.chartview-signals');
+    Route::get('/chancen', [TradeOpportunityController::class, 'index'])->middleware('plan:pro')->name('opportunities.index');
+    Route::post('/chancen/{opportunity}/oeffnen', [TradeOpportunityController::class, 'open'])->middleware('plan:pro')->name('opportunities.open');
+    Route::patch('/chancen/{opportunity}', [TradeOpportunityController::class, 'update'])->middleware('plan:pro')->name('opportunities.update');
+    Route::delete('/chancen/{opportunity}', [TradeOpportunityController::class, 'destroy'])->middleware('plan:pro')->name('opportunities.destroy');
+    Route::get('/predictions/trade-performance/backtest', [BacktestTradePerformanceController::class, 'index'])->name('predictions.trade-performance.backtest');
+    Route::get('/reports/{analysisReport}/pdf', [AnalysisReportController::class, 'pdf'])->middleware(['auth', 'verified', 'beta'])->name('analysis-reports.pdf');
+    Route::get('/reports/{analysisReport}', [AnalysisReportController::class, 'show'])->middleware(['auth', 'verified', 'beta'])->name('analysis-reports.show');
     Route::post('/predictions/filters', [PredictionController::class, 'storeTableFilter'])->name('predictions.filters.store');
     Route::get('/predictions/heatmap', [PredictionController::class, 'heatmap'])->name('predictions.heatmap');
     Route::get('/predictions/heatmap/trades', [PredictionController::class, 'backtestTrades'])->name('predictions.heatmap.trades');
@@ -383,15 +387,15 @@ Route::get('/reports/{analysisReport}', [\App\Http\Controllers\AnalysisReportCon
         ->middleware('plan:pro')
         ->name('stocks.models.strategy.store');
     Route::get('/stocks/{symbol}', ServingStockController::class)->name('stocks.show');
-    Route::post('/stocks/{instrument}/entry-alert', [\App\Http\Controllers\EntrySignalAlertController::class, 'store'])->middleware('plan:pro')->name('stocks.entry-alert.store');
-    Route::post('/stocks/{instrument}/purchase-reminder', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'store'])->middleware('plan:pro')->name('stocks.purchase-reminder.store');
-    Route::patch('/notifications/entry-alerts/{alert}/disable', [\App\Http\Controllers\EntrySignalAlertController::class, 'disable'])->middleware('plan:pro')->name('notifications.entry-alerts.disable');
-    Route::patch('/notifications/entry-alerts/{alert}/enable', [\App\Http\Controllers\EntrySignalAlertController::class, 'enable'])->middleware('plan:pro')->name('notifications.entry-alerts.enable');
-    Route::delete('/notifications/entry-alerts/{alert}', [\App\Http\Controllers\EntrySignalAlertController::class, 'destroy'])->middleware('plan:pro')->name('notifications.entry-alerts.destroy');
-    Route::patch('/notifications/purchase-reminders/{reminder}/disable', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'disable'])->middleware('plan:pro')->name('notifications.purchase-reminders.disable');
-    Route::patch('/notifications/purchase-reminders/{reminder}/enable', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'enable'])->middleware('plan:pro')->name('notifications.purchase-reminders.enable');
-    Route::patch('/notifications/purchase-reminders/{reminder}/reschedule', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'reschedule'])->middleware('plan:pro')->name('notifications.purchase-reminders.reschedule');
-    Route::delete('/notifications/purchase-reminders/{reminder}', [\App\Http\Controllers\PredictionPurchaseReminderController::class, 'destroy'])->middleware('plan:pro')->name('notifications.purchase-reminders.destroy');
+    Route::post('/stocks/{instrument}/entry-alert', [EntrySignalAlertController::class, 'store'])->middleware('plan:pro')->name('stocks.entry-alert.store');
+    Route::post('/stocks/{instrument}/purchase-reminder', [PredictionPurchaseReminderController::class, 'store'])->middleware('plan:pro')->name('stocks.purchase-reminder.store');
+    Route::patch('/notifications/entry-alerts/{alert}/disable', [EntrySignalAlertController::class, 'disable'])->middleware('plan:pro')->name('notifications.entry-alerts.disable');
+    Route::patch('/notifications/entry-alerts/{alert}/enable', [EntrySignalAlertController::class, 'enable'])->middleware('plan:pro')->name('notifications.entry-alerts.enable');
+    Route::delete('/notifications/entry-alerts/{alert}', [EntrySignalAlertController::class, 'destroy'])->middleware('plan:pro')->name('notifications.entry-alerts.destroy');
+    Route::patch('/notifications/purchase-reminders/{reminder}/disable', [PredictionPurchaseReminderController::class, 'disable'])->middleware('plan:pro')->name('notifications.purchase-reminders.disable');
+    Route::patch('/notifications/purchase-reminders/{reminder}/enable', [PredictionPurchaseReminderController::class, 'enable'])->middleware('plan:pro')->name('notifications.purchase-reminders.enable');
+    Route::patch('/notifications/purchase-reminders/{reminder}/reschedule', [PredictionPurchaseReminderController::class, 'reschedule'])->middleware('plan:pro')->name('notifications.purchase-reminders.reschedule');
+    Route::delete('/notifications/purchase-reminders/{reminder}', [PredictionPurchaseReminderController::class, 'destroy'])->middleware('plan:pro')->name('notifications.purchase-reminders.destroy');
     Route::get('/sektoren', [SectorController::class, 'index'])->name('sectors.index');
     Route::get('/indizes', IndexScreenerController::class)->name('indices.index');
     Route::get('/rohstoffe', CommodityScreenerController::class)->name('commodities.index');
@@ -418,6 +422,6 @@ Route::get('/reports/{analysisReport}', [\App\Http\Controllers\AnalysisReportCon
     Route::post('/integrationen/broker/{connection}/orders', [TradingIntegrationController::class, 'placeOrder'])->middleware('throttle:10,1')->name('integrations.orders.store');
     Route::post('/integrationen/whatsapp', [TradingIntegrationController::class, 'storeWhatsApp'])->name('integrations.whatsapp.store');
     Route::post('/integrationen/whatsapp/test', [TradingIntegrationController::class, 'testWhatsApp'])->middleware('throttle:3,1')->name('integrations.whatsapp.test');
-    });
+});
 
 require __DIR__.'/auth.php';

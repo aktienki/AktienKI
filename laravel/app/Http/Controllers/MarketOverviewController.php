@@ -34,12 +34,12 @@ class MarketOverviewController extends Controller
         $personalizedSignalSql = $signals->sql('prediction', auth()->user());
         $marketCacheKey = 'markets_overview_user_'.auth()->id();
         $exchanges = Cache::remember($marketCacheKey, now()->addSeconds(30), fn () => DB::query()
-                ->fromSub($latestPredictions, 'prediction')
-                ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
-                ->join('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
-                ->where('instrument.is_active', true)
-                ->whereNull('instrument.deleted_at')
-                ->selectRaw("
+            ->fromSub($latestPredictions, 'prediction')
+            ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+            ->join('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
+            ->where('instrument.is_active', true)
+            ->whereNull('instrument.deleted_at')
+            ->selectRaw("
                 exchange.code,
                 exchange.name,
                 exchange.country,
@@ -57,9 +57,9 @@ class MarketOverviewController extends Controller
                 SUM(CASE WHEN ({$personalizedSignalSql}) = 'HOLD' THEN 1 ELSE 0 END) AS hold_count,
                 SUM(CASE WHEN ({$personalizedSignalSql}) = 'SELL' THEN 1 ELSE 0 END) AS sell_count
                 ")
-                ->groupBy('exchange.id', 'exchange.code', 'exchange.name', 'exchange.country', 'exchange.currency')
-                ->orderByDesc('instrument_count')
-                ->get());
+            ->groupBy('exchange.id', 'exchange.code', 'exchange.name', 'exchange.country', 'exchange.currency')
+            ->orderByDesc('instrument_count')
+            ->get());
 
         $latestQuotes = DB::table('current_stock_quotes')
             ->where('status', 'current')
@@ -70,8 +70,7 @@ class MarketOverviewController extends Controller
             ->fromSub(clone $latestPredictions, 'prediction')
             ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
             ->join('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
-            ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) =>
-                $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) => $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
             ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
             ->where('instrument.type', 'stock')
             ->where(fn ($query) => $query->whereNull('instrument.risk_status')->orWhere('instrument.risk_status', '<>', 'sleep'))
@@ -120,20 +119,17 @@ class MarketOverviewController extends Controller
             return $exchange;
         });
 
-        $marketAnalysis = Cache::remember('markets_latest_ai_analysis_v2', now()->addMinute(), fn () =>
-            DB::table('daily_market_ai_analyses')
-                ->select('analysis_date', 'headline', 'executive_summary', 'breadth_analysis', 'market_outlook', 'confidence', 'index_analysis')
-                ->orderByDesc('analysis_date')
-                ->orderByDesc('id')
-                ->first());
+        $marketAnalysis = Cache::remember('markets_latest_ai_analysis_v2', now()->addMinute(), fn () => DB::table('daily_market_ai_analyses')
+            ->select('analysis_date', 'headline', 'executive_summary', 'breadth_analysis', 'market_outlook', 'confidence', 'index_analysis')
+            ->orderByDesc('analysis_date')
+            ->orderByDesc('id')
+            ->first());
 
         $indexAnalyses = collect(json_decode((string) ($marketAnalysis?->index_analysis ?? '[]'), true))
             ->filter(fn (mixed $analysis): bool => is_array($analysis));
         $exchanges->each(function (object $exchange) use ($indexAnalyses): void {
-            $exchange->index_analysis = $indexAnalyses->first(fn (array $analysis): bool =>
-                strtoupper(trim((string) ($analysis['symbol'] ?? ''))) === strtoupper(trim((string) $exchange->reference_symbol))
-            ) ?? $indexAnalyses->first(fn (array $analysis): bool =>
-                mb_strtolower(trim((string) ($analysis['name'] ?? ''))) === mb_strtolower(trim((string) $exchange->reference_name))
+            $exchange->index_analysis = $indexAnalyses->first(fn (array $analysis): bool => strtoupper(trim((string) ($analysis['symbol'] ?? ''))) === strtoupper(trim((string) $exchange->reference_symbol))
+            ) ?? $indexAnalyses->first(fn (array $analysis): bool => mb_strtolower(trim((string) ($analysis['name'] ?? ''))) === mb_strtolower(trim((string) $exchange->reference_name))
             );
         });
 

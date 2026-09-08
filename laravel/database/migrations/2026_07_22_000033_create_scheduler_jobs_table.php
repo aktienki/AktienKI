@@ -25,12 +25,12 @@ return new class extends Migration
             $table->timestampsTz();
         });
         DB::statement(
-            "ALTER TABLE scheduler_jobs ADD CONSTRAINT scheduler_jobs_status_chk "
-            . "CHECK (status IN ('pending','running','completed','failed','timed_out'))"
+            'ALTER TABLE scheduler_jobs ADD CONSTRAINT scheduler_jobs_status_chk '
+            ."CHECK (status IN ('pending','running','completed','failed','timed_out'))"
         );
         DB::statement(
             'ALTER TABLE scheduler_jobs ADD CONSTRAINT scheduler_jobs_interval_chk '
-            . 'CHECK (interval_seconds >= 60 AND timeout_seconds >= 1)'
+            .'CHECK (interval_seconds >= 60 AND timeout_seconds >= 1)'
         );
     }
 

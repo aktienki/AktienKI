@@ -9,6 +9,7 @@ use Illuminate\Support\Carbon;
 final class GenerateMarketContextPredictions extends Command
 {
     protected $signature = 'predictions:market-context {--date=}';
+
     protected $description = 'Erzeugt die täglichen Prediction-Snapshots für Sektoren und Indizes.';
 
     public function handle(MarketContextPredictionService $service): int
@@ -16,6 +17,7 @@ final class GenerateMarketContextPredictions extends Command
         $date = $this->option('date') ? Carbon::parse((string) $this->option('date')) : null;
         $result = $service->generate($date);
         $this->info("{$result['date']}: {$result['sectors']} Sektoren, {$result['indices']} Indizes");
+
         return self::SUCCESS;
     }
 }

@@ -30,6 +30,7 @@ class ImportIndividualStockThresholds extends Command
             } catch (JsonException) {
                 $this->warn('Ungültiges JSON: '.$file);
                 $skipped++;
+
                 continue;
             }
 
@@ -40,6 +41,7 @@ class ImportIndividualStockThresholds extends Command
             if (! $instrument || ! $score || ! $phase) {
                 $this->warn("Übersprungen: {$symbol}");
                 $skipped++;
+
                 continue;
             }
 

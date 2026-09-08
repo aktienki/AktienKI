@@ -24,7 +24,18 @@ final class UserTradeOpportunity extends Model
         ];
     }
 
-    public function user(): BelongsTo { return $this->belongsTo(User::class); }
-    public function instrument(): BelongsTo { return $this->belongsTo(Instrument::class); }
-    public function prediction(): BelongsTo { return $this->belongsTo(Prediction::class); }
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function instrument(): BelongsTo
+    {
+        return $this->belongsTo(Instrument::class);
+    }
+
+    public function prediction(): BelongsTo
+    {
+        return $this->belongsTo(Prediction::class);
+    }
 }

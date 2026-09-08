@@ -3,13 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\SmartSelectionLabel;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 final class SmartSelectionLabelController extends Controller
 {
-    public function index(Request $request): \Illuminate\Contracts\View\View
+    public function index(Request $request): View
     {
         $labels = SmartSelectionLabel::query()
             ->where('user_id', $request->user()->id)
@@ -77,6 +78,7 @@ final class SmartSelectionLabelController extends Controller
             ->reject(fn (string $key): bool => in_array($key, ['initial_capital', 'trade_cost'], true))
             ->mapWithKeys(function (string $key) use ($request): array {
                 $value = $request->input($key, SavedPredictionFilterController::FILTER_DEFAULTS[$key] ?? null);
+
                 return [$key => is_array($value) ? array_values($value) : $value];
             })
             ->merge($numericCriteria)
@@ -127,6 +129,7 @@ final class SmartSelectionLabelController extends Controller
     {
         abort_unless((int) $label->user_id === (int) $request->user()->id, 403);
         $label->delete();
+
         return back()->with('status', __('Label gelöscht.'));
     }
 }

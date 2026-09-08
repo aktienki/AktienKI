@@ -133,8 +133,7 @@ class ServingDashboardService
     public function opportunities(int $limit = 5): Collection
     {
         return $this->latestStocks()
-            ->filter(fn (object $stock): bool =>
-                is_numeric(data_get($stock, 'horizons.20.return'))
+            ->filter(fn (object $stock): bool => is_numeric(data_get($stock, 'horizons.20.return'))
                 && (float) data_get($stock, 'horizons.20.return') > 0.0
             )
             ->sortByDesc(fn (object $stock): float => (float) data_get($stock, 'horizons.20.return', -INF))
@@ -249,12 +248,14 @@ class ServingDashboardService
     {
         if (is_numeric($score)) {
             $numeric = (float) $score;
+
             return max(0.0, min(10.0, $numeric <= 1.0 ? $numeric * 10.0 : $numeric));
         }
         $grade = strtoupper(trim((string) $score));
         if (preg_match('/^([1-5])([+-])?$/', $grade, $matches)) {
             $base = (6 - (int) $matches[1]) * 2.0 - 1.0;
             $adjustment = ($matches[2] ?? '') === '+' ? 0.75 : (($matches[2] ?? '') === '-' ? -0.75 : 0.0);
+
             return max(0.0, min(10.0, $base + $adjustment));
         }
         if (is_numeric($confidence)) {

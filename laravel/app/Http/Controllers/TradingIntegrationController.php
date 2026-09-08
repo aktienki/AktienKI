@@ -9,13 +9,13 @@ use App\Services\Broker\CTraderBroker;
 use App\Services\Broker\CTraderFixBroker;
 use App\Services\Broker\EToroBroker;
 use App\Services\WhatsAppCloudService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
-use Illuminate\Http\JsonResponse;
 use Throwable;
 
 final class TradingIntegrationController extends Controller
@@ -24,6 +24,7 @@ final class TradingIntegrationController extends Controller
     {
         $connections = BrokerConnection::query()->where('user_id', $request->user()->id)->with(['orders' => fn ($q) => $q->latest()->limit(10)])->orderBy('provider')->orderBy('environment')->get();
         $whatsapp = MessagingConnection::query()->firstOrNew(['user_id' => $request->user()->id, 'provider' => 'whatsapp_cloud']);
+
         return view('integrations.index', compact('connections', 'whatsapp'));
     }
 
@@ -56,11 +57,19 @@ final class TradingIntegrationController extends Controller
         abort_unless(data_get($connection->credentials, 'connection_type', 'openapi') === 'fix', 422, 'Live-Positionen sind für dieses Konto noch nicht eingerichtet.');
 
         $snapshot = ['positions' => [], 'updated_at' => now()->toIso8601String()];
-        try { $snapshot = array_merge($snapshot, $fix->positions($connection)); }
-        catch (Throwable $positionException) { report($positionException); $snapshot['positions_error'] = $positionException->getMessage(); }
+        try {
+            $snapshot = array_merge($snapshot, $fix->positions($connection));
+        } catch (Throwable $positionException) {
+            report($positionException);
+            $snapshot['positions_error'] = $positionException->getMessage();
+        }
         if ($ctrader->hasAccountAccess($connection)) {
-            try { $snapshot['account'] = $ctrader->accountSnapshot($connection); }
-            catch (Throwable $accountException) { report($accountException); $snapshot['account_error'] = $accountException->getMessage(); }
+            try {
+                $snapshot['account'] = $ctrader->accountSnapshot($connection);
+            } catch (Throwable $accountException) {
+                report($accountException);
+                $snapshot['account_error'] = $accountException->getMessage();
+            }
         } else {
             $snapshot['account_error'] = 'Open API noch nicht autorisiert.';
         }
@@ -97,9 +106,15 @@ final class TradingIntegrationController extends Controller
             abort_unless(filled($data['fix_password'] ?? null) || filled(data_get($connection->credentials, 'fix_password')), 422, 'Das FIX-Kontopasswort ist erforderlich.');
         }
         $credentials = $connection->credentials ?? [];
-        foreach (['api_key', 'user_key', 'client_id', 'client_secret', 'access_token', 'refresh_token', 'fix_password'] as $key) if (filled($data[$key] ?? null)) $credentials[$key] = $data[$key];
+        foreach (['api_key', 'user_key', 'client_id', 'client_secret', 'access_token', 'refresh_token', 'fix_password'] as $key) {
+            if (filled($data[$key] ?? null)) {
+                $credentials[$key] = $data[$key];
+            }
+        }
         foreach (['connection_type', 'fix_host', 'fix_quote_port', 'fix_trade_port', 'fix_sender_comp_id', 'fix_target_comp_id', 'fix_quote_sender_sub_id', 'fix_trade_sender_sub_id'] as $key) {
-            if (array_key_exists($key, $data) && filled($data[$key])) $credentials[$key] = $data[$key];
+            if (array_key_exists($key, $data) && filled($data[$key])) {
+                $credentials[$key] = $data[$key];
+            }
         }
         $connection->fill([
             'provider' => $data['provider'], 'environment' => $data['environment'],
@@ -107,6 +122,7 @@ final class TradingIntegrationController extends Controller
             'credentials' => $credentials, 'max_order_value' => $data['max_order_value'], 'daily_loss_limit' => $data['daily_loss_limit'],
             'trading_enabled' => $request->boolean('trading_enabled'), 'emergency_stop' => $request->boolean('emergency_stop', true),
         ])->save();
+
         return back()->with('status', __('Brokerverbindung gespeichert. Der Not-Aus bleibt maßgeblich.'));
     }
 
@@ -124,13 +140,19 @@ final class TradingIntegrationController extends Controller
     {
         $this->owned($request, $connection);
         try {
-            if ($connection->provider === 'etoro') $etoro->test($connection);
-            elseif (data_get($connection->credentials, 'connection_type', 'openapi') === 'fix') $fix->test($connection);
-            else $ctrader->test($connection);
+            if ($connection->provider === 'etoro') {
+                $etoro->test($connection);
+            } elseif (data_get($connection->credentials, 'connection_type', 'openapi') === 'fix') {
+                $fix->test($connection);
+            } else {
+                $ctrader->test($connection);
+            }
             $connection->update(['last_connected_at' => now()]);
+
             return back()->with('status', __(':broker-Verbindung erfolgreich geprüft.', ['broker' => $connection->name]));
         } catch (Throwable $e) {
             report($e);
+
             return back()->withErrors(['broker' => __('Verbindung fehlgeschlagen: :message', ['message' => $e->getMessage()])]);
         }
     }
@@ -150,6 +172,7 @@ final class TradingIntegrationController extends Controller
         $url = 'https://id.ctrader.com/my/settings/openapi/grantingaccess/?'.http_build_query([
             'client_id' => $clientId, 'redirect_uri' => route('integrations.ctrader.callback'), 'scope' => 'trading', 'product' => 'web',
         ]);
+
         return redirect()->away($url);
     }
 
@@ -163,6 +186,7 @@ final class TradingIntegrationController extends Controller
             'redirect_uri' => route('integrations.ctrader.callback'), 'client_id' => $credentials['client_id'], 'client_secret' => $credentials['client_secret'],
         ])->throw()->json();
         $connection->update(['credentials' => array_merge($credentials, ['access_token' => $token['accessToken'], 'refresh_token' => $token['refreshToken']])]);
+
         return redirect()->route('integrations.index')->with('status', __('cTrader wurde autorisiert. Jetzt Konto-ID eintragen und Verbindung testen.'));
     }
 
@@ -192,11 +216,16 @@ final class TradingIntegrationController extends Controller
             'limit_price' => $data['limit_price'] ?? null, 'stop_loss' => $data['stop_loss'] ?? null, 'take_profit' => $data['take_profit'] ?? null,
             'request_payload' => collect($data)->except('confirmation')->all(),
         ]);
-        if (! $order->wasRecentlyCreated) return back()->withErrors(['order' => __('Doppelte Order wurde blockiert.')]);
+        if (! $order->wasRecentlyCreated) {
+            return back()->withErrors(['order' => __('Doppelte Order wurde blockiert.')]);
+        }
 
         try {
             $response = DB::transaction(function () use ($connection, $data, $etoro, $ctrader, $fix): array {
-                if ($connection->provider === 'etoro') return $etoro->place($connection, $data);
+                if ($connection->provider === 'etoro') {
+                    return $etoro->place($connection, $data);
+                }
+
                 return data_get($connection->credentials, 'connection_type', 'openapi') === 'fix'
                     ? $fix->place($connection, $data)
                     : $ctrader->place($connection, $data);
@@ -205,11 +234,19 @@ final class TradingIntegrationController extends Controller
             $order->update(['status' => 'submitted', 'broker_order_id' => $brokerOrderId, 'response_payload' => $response, 'submitted_at' => now()]);
             $message = "AktienKI: {$connection->name} {$connection->environment} · ".strtoupper($data['side'])." {$data['symbol']} · Order übermittelt";
             $messaging = MessagingConnection::query()->where('user_id', $request->user()->id)->where('provider', 'whatsapp_cloud')->first();
-            if ($messaging?->enabled) try { $whatsapp->send($messaging, $message); } catch (Throwable $notifyError) { report($notifyError); }
+            if ($messaging?->enabled) {
+                try {
+                    $whatsapp->send($messaging, $message);
+                } catch (Throwable $notifyError) {
+                    report($notifyError);
+                }
+            }
+
             return back()->with('status', __('Order wurde an :broker übermittelt.', ['broker' => $connection->name]));
         } catch (Throwable $e) {
             $order->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
             report($e);
+
             return back()->withErrors(['order' => __('Order abgelehnt: :message', ['message' => $e->getMessage()])]);
         }
     }
@@ -219,18 +256,32 @@ final class TradingIntegrationController extends Controller
         $data = $request->validate(['access_token' => ['nullable', 'string', 'max:3000'], 'phone_number_id' => ['nullable', 'string', 'max:80'], 'recipient' => ['required', 'string', 'max:40'], 'enabled' => ['nullable', 'boolean']]);
         $connection = MessagingConnection::query()->firstOrNew(['user_id' => $request->user()->id, 'provider' => 'whatsapp_cloud']);
         $credentials = $connection->credentials ?? [];
-        foreach (['access_token', 'phone_number_id'] as $key) if (filled($data[$key] ?? null)) $credentials[$key] = $data[$key];
+        foreach (['access_token', 'phone_number_id'] as $key) {
+            if (filled($data[$key] ?? null)) {
+                $credentials[$key] = $data[$key];
+            }
+        }
         $connection->fill(['credentials' => $credentials, 'recipient' => preg_replace('/[^0-9]/', '', $data['recipient']), 'enabled' => $request->boolean('enabled')])->save();
+
         return back()->with('status', __('WhatsApp-Einstellungen gespeichert.'));
     }
 
     public function testWhatsApp(Request $request, WhatsAppCloudService $whatsapp): RedirectResponse
     {
         $connection = MessagingConnection::query()->where('user_id', $request->user()->id)->where('provider', 'whatsapp_cloud')->firstOrFail();
-        try { $whatsapp->send($connection, __('AktienKI: WhatsApp-Verbindung erfolgreich eingerichtet.')); }
-        catch (Throwable $e) { report($e); return back()->withErrors(['whatsapp' => $e->getMessage()]); }
+        try {
+            $whatsapp->send($connection, __('AktienKI: WhatsApp-Verbindung erfolgreich eingerichtet.'));
+        } catch (Throwable $e) {
+            report($e);
+
+            return back()->withErrors(['whatsapp' => $e->getMessage()]);
+        }
+
         return back()->with('status', __('WhatsApp-Testnachricht wurde versendet.'));
     }
 
-    private function owned(Request $request, BrokerConnection $connection): void { abort_unless((int) $connection->user_id === (int) $request->user()->id, 404); }
+    private function owned(Request $request, BrokerConnection $connection): void
+    {
+        abort_unless((int) $connection->user_id === (int) $request->user()->id, 404);
+    }
 }

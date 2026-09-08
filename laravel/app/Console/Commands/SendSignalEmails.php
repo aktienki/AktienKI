@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 class SendSignalEmails extends Command
 {
     protected $signature = 'signals:send-emails {--since=1440 : Look-back window in minutes}';
+
     protected $description = 'Queue emails for new signal changes matching saved user strategies';
 
     public function handle(SignalEmailService $service): int

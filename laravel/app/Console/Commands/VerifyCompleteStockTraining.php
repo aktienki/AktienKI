@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 class VerifyCompleteStockTraining extends Command
 {
     protected $signature = 'training:verify-complete {symbols*} {--feature-version=triple_daily_macro_v1}';
+
     protected $description = 'Prüft Training, Horizon-Fusion und Walk-Forward für alle vier Horizonte.';
 
     private const HORIZONS = [5 => 7200, 10 => 14400, 15 => 21600, 20 => 28800];
@@ -22,6 +23,7 @@ class VerifyCompleteStockTraining extends Command
             $instrumentId = $instruments->get($symbol);
             if (! $instrumentId) {
                 $errors[] = "{$symbol}: Instrument fehlt";
+
                 continue;
             }
 
@@ -29,7 +31,9 @@ class VerifyCompleteStockTraining extends Command
                 $modelExists = DB::table('trained_models')->where('instrument_id', $instrumentId)
                     ->where('prediction_horizon_minutes', $minutes)->whereNull('deleted_at')
                     ->where('feature_set_version', (string) $this->option('feature-version'))->exists();
-                if (! $modelExists) $errors[] = "{$symbol}: {$days}d-Modell fehlt";
+                if (! $modelExists) {
+                    $errors[] = "{$symbol}: {$days}d-Modell fehlt";
+                }
 
                 $runId = DB::table('walk_forward_backtest_runs as run')
                     ->join('walk_forward_backtest_trades as trade', 'trade.run_id', '=', 'run.id')
@@ -56,10 +60,12 @@ class VerifyCompleteStockTraining extends Command
                 $this->error($error);
             }
             $this->error('Gesamtpipeline unvollständig.');
+
             return self::FAILURE;
         }
 
         $this->info("Gesamtpipeline vollständig: {$symbols->count()} Instrumente.");
+
         return self::SUCCESS;
     }
 }

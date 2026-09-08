@@ -137,6 +137,6 @@ SQL, $bindings);
             ->selectRaw("COALESCE(risk_status, 'unclassified') AS status, COUNT(*) AS aggregate")
             ->groupByRaw("COALESCE(risk_status, 'unclassified')")->pluck('aggregate', 'status')->map(fn ($count) => (int) $count)->all();
 
-        return array_replace(['defensive'=>0, 'balanced'=>0, 'opportunity'=>0, 'risk'=>0, 'sleep'=>0, 'unclassified'=>0], $counts);
+        return array_replace(['defensive' => 0, 'balanced' => 0, 'opportunity' => 0, 'risk' => 0, 'sleep' => 0, 'unclassified' => 0], $counts);
     }
 }

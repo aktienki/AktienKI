@@ -19,7 +19,7 @@ trait FormatsFinancialNumbers
             return '—';
         }
 
-        return number_format((float) $value, $decimals, ',', '.') . ' %';
+        return number_format((float) $value, $decimals, ',', '.').' %';
     }
 
     public function formatCurrency(null|int|float|string $value, string $currency = 'EUR', int $decimals = 2): string
@@ -28,6 +28,6 @@ trait FormatsFinancialNumbers
             return '—';
         }
 
-        return number_format((float) $value, $decimals, ',', '.') . ' ' . strtoupper($currency);
+        return number_format((float) $value, $decimals, ',', '.').' '.strtoupper($currency);
     }
 }

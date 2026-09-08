@@ -6,8 +6,8 @@ use App\Jobs\SendSignalEmailAfterReview;
 use App\Models\EasyAccessSubscriber;
 use App\Models\Prediction;
 use App\Models\SavedPredictionFilter;
-use App\Models\SmartSelectionLabel;
 use App\Models\SignalEmailDelivery;
+use App\Models\SmartSelectionLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +39,7 @@ final class SignalEmailService
 
                     if (! $previous || strtoupper((string) $previous->signal) === strtoupper((string) $prediction->signal)) {
                         $stats['skipped']++;
+
                         continue;
                     }
                     $stats['changes']++;
@@ -77,7 +78,9 @@ final class SignalEmailService
                                         'queued_at' => now(),
                                     ]);
                                 } catch (QueryException $exception) {
-                                    if (in_array((string) $exception->getCode(), ['23000', '23505'], true)) continue;
+                                    if (in_array((string) $exception->getCode(), ['23000', '23505'], true)) {
+                                        continue;
+                                    }
                                     throw $exception;
                                 }
 
@@ -141,9 +144,13 @@ final class SignalEmailService
     {
         $criteria = (array) $label->criteria;
         $score = (float) ($prediction->ai_score ?? $prediction->prediction_score ?? 0);
-        if ($score > 10) $score /= 10;
+        if ($score > 10) {
+            $score /= 10;
+        }
         $confidence = (float) ($prediction->confidence ?? 0);
-        if ($confidence <= 1) $confidence *= 100;
+        if ($confidence <= 1) {
+            $confidence *= 100;
+        }
         $current = (float) ($prediction->current_price ?? 0);
         $target = (float) ($prediction->predicted_price_20d ?? 0);
         $return = $current > 0 && $target > 0 ? (($target / $current) - 1) * 100 : null;
@@ -166,25 +173,49 @@ final class SignalEmailService
         $filters = (array) $strategy->filters;
         $instrument = $prediction->instrument;
 
-        if ($strategy->watchlist_id && ! DB::table('watchlist_items')->where('watchlist_id', $strategy->watchlist_id)->where('instrument_id', $prediction->instrument_id)->exists()) return false;
-        if ($strategy->portfolio_id && ! DB::table('portfolio_positions')->where('portfolio_id', $strategy->portfolio_id)->where('instrument_id', $prediction->instrument_id)->exists()) return false;
-        if (($filters['country'] ?? '') !== '' && strtoupper((string) $instrument->country) !== strtoupper((string) $filters['country'])) return false;
-        if (($filters['sector'] ?? '') !== '' && (string) $instrument->sector !== (string) $filters['sector']) return false;
-        if (($filters['exchange'] ?? '') !== '' && (string) $instrument->exchange_id !== (string) $filters['exchange']) return false;
-        if (($filters['signal'] ?? '') !== '' && strtoupper((string) $prediction->signal) !== strtoupper((string) $filters['signal'])) return false;
-        if (! empty($filters['model']) && ! in_array((int) $prediction->trained_model_id, array_map('intval', (array) $filters['model']), true)) return false;
+        if ($strategy->watchlist_id && ! DB::table('watchlist_items')->where('watchlist_id', $strategy->watchlist_id)->where('instrument_id', $prediction->instrument_id)->exists()) {
+            return false;
+        }
+        if ($strategy->portfolio_id && ! DB::table('portfolio_positions')->where('portfolio_id', $strategy->portfolio_id)->where('instrument_id', $prediction->instrument_id)->exists()) {
+            return false;
+        }
+        if (($filters['country'] ?? '') !== '' && strtoupper((string) $instrument->country) !== strtoupper((string) $filters['country'])) {
+            return false;
+        }
+        if (($filters['sector'] ?? '') !== '' && (string) $instrument->sector !== (string) $filters['sector']) {
+            return false;
+        }
+        if (($filters['exchange'] ?? '') !== '' && (string) $instrument->exchange_id !== (string) $filters['exchange']) {
+            return false;
+        }
+        if (($filters['signal'] ?? '') !== '' && strtoupper((string) $prediction->signal) !== strtoupper((string) $filters['signal'])) {
+            return false;
+        }
+        if (! empty($filters['model']) && ! in_array((int) $prediction->trained_model_id, array_map('intval', (array) $filters['model']), true)) {
+            return false;
+        }
 
         $score = (float) ($prediction->ai_score ?? 0);
-        if ($score > 10) $score /= 10;
+        if ($score > 10) {
+            $score /= 10;
+        }
         $confidence = (float) ($prediction->confidence ?? 0);
-        if ($confidence <= 1) $confidence *= 100;
+        if ($confidence <= 1) {
+            $confidence *= 100;
+        }
 
-        if ($score < (float) ($filters['score_min'] ?? 0) || $confidence < (float) ($filters['confidence_min'] ?? 0)) return false;
+        if ($score < (float) ($filters['score_min'] ?? 0) || $confidence < (float) ($filters['confidence_min'] ?? 0)) {
+            return false;
+        }
 
         $gate = $this->qualityGates->rules($strategy->user);
-        if ($gate === null) return true;
+        if ($gate === null) {
+            return true;
+        }
         $risk = (float) ($prediction->risk_score ?? 0);
-        if ($risk <= 1) $risk *= 100;
+        if ($risk <= 1) {
+            $risk *= 100;
+        }
         $current = (float) ($prediction->current_price ?? 0);
         $target = (float) ($prediction->predicted_price_20d ?? 0);
         $return = $current > 0 && $target > 0 ? (($target / $current) - 1) * 100 : null;

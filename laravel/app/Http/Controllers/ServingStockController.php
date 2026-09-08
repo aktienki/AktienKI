@@ -16,8 +16,7 @@ final class ServingStockController extends Controller
         string $symbol,
         ServingReadService $serving,
         ServingStockLegacyViewService $legacyView,
-    ): View
-    {
+    ): View {
         $stock = $serving->stock($symbol);
         abort_unless($stock, 404, __('Für diese Aktie gibt es in der Service Datenbank kein aktives Modell.'));
 
@@ -29,8 +28,7 @@ final class ServingStockController extends Controller
         ServingReadService $serving,
         ServingChartCacheService $charts,
         ServingStockLegacyViewService $legacyView,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $stock = $serving->stock($symbol);
         abort_unless($stock, 404);
 

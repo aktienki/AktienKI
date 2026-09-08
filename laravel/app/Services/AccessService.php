@@ -43,7 +43,7 @@ class AccessService
         return false;
     }
 
-    public function planIncludesLevel(SubscriptionPlan|string|null $plan, string|null $requiredLevel): bool
+    public function planIncludesLevel(SubscriptionPlan|string|null $plan, ?string $requiredLevel): bool
     {
         $level = $plan instanceof SubscriptionPlan ? $plan->level : ($plan ?: config('aktienki.default_plan', 'free'));
         $normalized = match (strtolower((string) $level)) {

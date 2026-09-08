@@ -13,7 +13,9 @@ class Index extends Component
     use WithPagination;
 
     public string $search = '';
+
     public string $direction = '';
+
     public string $sort = 'ai_score';
 
     public function updatingSearch(): void
@@ -39,7 +41,7 @@ class Index extends Component
                 $companyQuery->where('active', true);
 
                 if ($this->search !== '') {
-                    $term = '%' . trim($this->search) . '%';
+                    $term = '%'.trim($this->search).'%';
 
                     $companyQuery->where(function (Builder $q) use ($term): void {
                         $q->where('symbol', 'ilike', $term)
@@ -68,21 +70,25 @@ class Index extends Component
 
         if ($this->sort === 'return' && in_array('expected_return', $columns, true)) {
             $query->orderByDesc('expected_return');
+
             return;
         }
 
         if ($this->sort === 'date' && in_array('prediction_date', $columns, true)) {
             $query->orderByDesc('prediction_date');
+
             return;
         }
 
         if (in_array('prediction_score', $columns, true)) {
             $query->orderByDesc('prediction_score');
+
             return;
         }
 
         if (in_array('buy_probability', $columns, true)) {
             $query->orderByDesc('buy_probability');
+
             return;
         }
 

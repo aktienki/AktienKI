@@ -9,8 +9,11 @@ use Illuminate\Support\Facades\DB;
 final class NormalizedScoreExitService
 {
     public const VERSION = 'normalized-score-exit-v1';
+
     public const MIN_INSTRUMENT_HISTORY = 60;
+
     public const MIN_SECTOR_HISTORY = 200;
+
     public const MIN_MARKET_HISTORY = 500;
 
     public function __construct(private readonly DecisionProcessAuditService $audit) {}
@@ -67,7 +70,9 @@ final class NormalizedScoreExitService
         $inExitZone = $percentile < $regularExitPercentile;
         $streak = $inExitZone ? (int) $position->score_exit_streak + 1 : 0;
         $risk = is_numeric($latest->risk_score) ? (float) $latest->risk_score : null;
-        if ($risk !== null && $risk <= 1) $risk *= 100;
+        if ($risk !== null && $risk <= 1) {
+            $risk *= 100;
+        }
         $risk = $risk !== null ? max(0, min(100, $risk)) : null;
         $bearishConfirmation = strtoupper((string) $latest->signal) === 'SELL' || ($risk !== null && $risk >= 70);
         $immediate = $immediateExitPercentile !== null && $percentile < $immediateExitPercentile;
@@ -108,6 +113,7 @@ final class NormalizedScoreExitService
     public static function ratingQuality(?string $rating): ?int
     {
         $index = array_search($rating, ['5−', '5+', '4−', '4+', '3−', '3+', '2−', '2+', '1−', '1+'], true);
+
         return $index === false ? null : $index + 1;
     }
 
@@ -145,14 +151,18 @@ final class NormalizedScoreExitService
             ->where('policy_name', 'normalized_score_exit')->where('is_active', true)
             ->orderByDesc('evaluated_at')->first(['status', 'parameters']);
         $parameters = $row ? (is_string($row->parameters) ? json_decode($row->parameters, true) : (array) $row->parameters) : [];
+
         return [...$parameters, 'status' => $row?->status ?? 'default'];
     }
 
     private function rank(array $history, float $score): float
     {
-        if ($history === []) return max(0, min(100, $score));
+        if ($history === []) {
+            return max(0, min(100, $score));
+        }
         $below = count(array_filter($history, fn (float $value): bool => $value < $score));
         $equal = count(array_filter($history, fn (float $value): bool => $value === $score));
+
         return round((($below + .5 * $equal) / count($history)) * 100, 4);
     }
 }

@@ -49,9 +49,13 @@ final class TwelveDataPressReleaseImporter
                 $result['received'] += $releases->count();
                 $latest = null;
                 foreach ($releases as $release) {
-                    if (! is_array($release) || blank($release['id'] ?? null) || blank($release['title'] ?? null)) continue;
+                    if (! is_array($release) || blank($release['id'] ?? null) || blank($release['title'] ?? null)) {
+                        continue;
+                    }
                     $publishedAt = filled($release['datetime'] ?? null) ? CarbonImmutable::parse($release['datetime']) : null;
-                    if ($publishedAt && ($latest === null || $publishedAt->greaterThan($latest))) $latest = $publishedAt;
+                    if ($publishedAt && ($latest === null || $publishedAt->greaterThan($latest))) {
+                        $latest = $publishedAt;
+                    }
                     $body = (string) ($release['body'] ?? '');
                     $bodyText = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($body), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
                     $languages = collect((array) ($release['language'] ?? []))->filter()->implode(',');
@@ -97,7 +101,9 @@ final class TwelveDataPressReleaseImporter
             }
 
             $delayMs = max(0, (int) config('aktienki.news.twelve_data_request_delay_ms', 250));
-            if ($delayMs > 0) usleep($delayMs * 1000);
+            if ($delayMs > 0) {
+                usleep($delayMs * 1000);
+            }
         }
 
         return $result;

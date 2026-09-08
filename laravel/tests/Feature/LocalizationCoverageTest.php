@@ -33,6 +33,7 @@ class LocalizationCoverageTest extends TestCase
                     $key = stripcslashes($key);
                     if (! array_key_exists($key, $translations)) {
                         $missing[] = $file->getPathname().': '.$key;
+
                         continue;
                     }
 

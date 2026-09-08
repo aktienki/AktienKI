@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Notification;
 final class SendTrainingCompletedEmail extends Command
 {
     protected $signature = 'training:send-completion {symbol} {--duration= : Duration in seconds} {--source=worker-pool : Training source} {--user= : Recipient user ID} {--email= : Explicit recipient address}';
+
     protected $description = 'Send a branded completion report for a completed stock training';
 
     public function handle(): int
@@ -19,6 +20,7 @@ final class SendTrainingCompletedEmail extends Command
         $instrument = DB::table('instruments')->whereRaw('UPPER(symbol) = ?', [$symbol])->first();
         if (! $instrument) {
             $this->error("Unknown instrument: {$symbol}");
+
             return self::FAILURE;
         }
 
@@ -41,6 +43,7 @@ final class SendTrainingCompletedEmail extends Command
             $hitRate = (float) ($summary['hit_rate'] ?? 0);
             $profitFactor = (float) ($summary['profit_factor'] ?? 0);
             $averageReturn = (float) ($summary['average_return'] ?? 0) * 100;
+
             return [
                 'days' => (int) $run->horizon_days,
                 'trades' => (int) ($summary['signals'] ?? DB::table('walk_forward_backtest_trades')->where('run_id', $run->id)->count()),
@@ -95,6 +98,7 @@ final class SendTrainingCompletedEmail extends Command
         }
 
         $this->info("Training completion email sent for {$symbol}.");
+
         return self::SUCCESS;
     }
 }

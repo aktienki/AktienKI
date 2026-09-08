@@ -8,8 +8,8 @@ return new class extends Migration
     public function up(): void
     {
         $members = [
-            '^GSPC' => ['GOOGL','AMZN','AVGO','META','TSLA','LLY','JPM','MU','WMT','AMD','V','XOM','JNJ','MA','CSCO','INTC','ABBV','BAC','COST','AMAT','CVX','KO','UNH','CAT','ORCL','GE','LRCX','PG','HD','MS','MRK','GS','NFLX','PM','PLTR','RTX','PANW','DELL','WFC','TXN','KLAC','ANET','AXP','C','TMO','IBM','AMGN','APH','CRWD','MCD'],
-            '^GDAXI' => ['ADS.DE','AIR.DE','ALV.DE','BAS.DE','BAYN.DE','BEI.DE','BMW.DE','BNR.DE','CBK.DE','CON.DE','DB1.DE','DBK.DE','DHL.DE','DTE.DE','DTG.DE','ENR.DE','EOAN.DE','FRE.DE','G24.DE','HEI.DE','HEN3.DE','HNR1.DE','IFX.DE','MBG.DE','MRK.DE','MTX.DE','MUV2.DE','PAH3.DE','P911.DE','QIA.DE','RHM.DE','RWE.DE','SAP.DE','SHL.DE','SIE.DE','SRT3.DE','SY1.DE','VNA.DE','VOW3.DE','ZAL.DE'],
+            '^GSPC' => ['GOOGL', 'AMZN', 'AVGO', 'META', 'TSLA', 'LLY', 'JPM', 'MU', 'WMT', 'AMD', 'V', 'XOM', 'JNJ', 'MA', 'CSCO', 'INTC', 'ABBV', 'BAC', 'COST', 'AMAT', 'CVX', 'KO', 'UNH', 'CAT', 'ORCL', 'GE', 'LRCX', 'PG', 'HD', 'MS', 'MRK', 'GS', 'NFLX', 'PM', 'PLTR', 'RTX', 'PANW', 'DELL', 'WFC', 'TXN', 'KLAC', 'ANET', 'AXP', 'C', 'TMO', 'IBM', 'AMGN', 'APH', 'CRWD', 'MCD'],
+            '^GDAXI' => ['ADS.DE', 'AIR.DE', 'ALV.DE', 'BAS.DE', 'BAYN.DE', 'BEI.DE', 'BMW.DE', 'BNR.DE', 'CBK.DE', 'CON.DE', 'DB1.DE', 'DBK.DE', 'DHL.DE', 'DTE.DE', 'DTG.DE', 'ENR.DE', 'EOAN.DE', 'FRE.DE', 'G24.DE', 'HEI.DE', 'HEN3.DE', 'HNR1.DE', 'IFX.DE', 'MBG.DE', 'MRK.DE', 'MTX.DE', 'MUV2.DE', 'PAH3.DE', 'P911.DE', 'QIA.DE', 'RHM.DE', 'RWE.DE', 'SAP.DE', 'SHL.DE', 'SIE.DE', 'SRT3.DE', 'SY1.DE', 'VNA.DE', 'VOW3.DE', 'ZAL.DE'],
         ];
         $now = now();
 

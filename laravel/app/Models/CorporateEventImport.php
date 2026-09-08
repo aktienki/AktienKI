@@ -17,5 +17,8 @@ class CorporateEventImport extends Model
         'raw_payload' => 'array',
     ];
 
-    public function events(): HasMany { return $this->hasMany(CorporateEvent::class, 'import_id'); }
+    public function events(): HasMany
+    {
+        return $this->hasMany(CorporateEvent::class, 'import_id');
+    }
 }

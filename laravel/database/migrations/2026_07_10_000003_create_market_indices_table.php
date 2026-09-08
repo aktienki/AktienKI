@@ -10,10 +10,10 @@ return new class extends Migration
     {
         Schema::create('market_indices', function (Blueprint $table) {
             $table->id();
-            $table->string('symbol',30)->unique();
+            $table->string('symbol', 30)->unique();
             $table->string('name');
-            $table->string('country',2)->nullable()->index();
-            $table->string('currency',3)->nullable();
+            $table->string('country', 2)->nullable()->index();
+            $table->string('currency', 3)->nullable();
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestampsTz();

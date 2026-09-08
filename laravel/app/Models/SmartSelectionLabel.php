@@ -18,5 +18,4 @@ final class SmartSelectionLabel extends Model
     {
         return $this->belongsTo(User::class);
     }
-
 }

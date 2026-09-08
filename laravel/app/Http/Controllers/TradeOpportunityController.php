@@ -36,7 +36,10 @@ final class TradeOpportunityController extends Controller
     {
         $this->authorizePro($request, $plans);
         abort_unless($opportunity->user_id === $request->user()->id, 404);
-        if ($opportunity->status === 'open') $opportunity->update(['status' => 'viewed', 'viewed_at' => now()]);
+        if ($opportunity->status === 'open') {
+            $opportunity->update(['status' => 'viewed', 'viewed_at' => now()]);
+        }
+
         return redirect()->route('stocks.show', ['symbol' => $opportunity->instrument->symbol, 'prediction' => $opportunity->prediction_id, 'return_to' => route('opportunities.index')]);
     }
 
@@ -62,6 +65,7 @@ final class TradeOpportunityController extends Controller
                     ->update(['status' => 'disabled']);
             }
         }
+
         return back()->with('status', __('Chance aktualisiert.'));
     }
 
@@ -72,6 +76,7 @@ final class TradeOpportunityController extends Controller
         // Keep a temporary tombstone until expiry so the same prediction is not
         // recreated by the next automatic synchronization.
         $opportunity->update(['status' => 'dismissed', 'completed_at' => now()]);
+
         return back()->with('status', __('Chance entfernt.'));
     }
 }

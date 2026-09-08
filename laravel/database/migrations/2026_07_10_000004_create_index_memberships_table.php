@@ -12,11 +12,11 @@ return new class extends Migration
             $table->id();
             $table->foreignId('market_index_id')->constrained('market_indices')->cascadeOnDelete();
             $table->foreignId('instrument_id')->constrained('instruments')->cascadeOnDelete();
-            $table->decimal('weight',10,6)->nullable();
+            $table->decimal('weight', 10, 6)->nullable();
             $table->date('added_at')->nullable();
             $table->date('removed_at')->nullable();
             $table->timestampsTz();
-            $table->unique(['market_index_id','instrument_id']);
+            $table->unique(['market_index_id', 'instrument_id']);
         });
     }
 

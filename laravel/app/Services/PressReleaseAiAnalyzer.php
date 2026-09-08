@@ -11,7 +11,9 @@ final class PressReleaseAiAnalyzer
     public function analyzePending(int $limit = 500): array
     {
         $apiKey = (string) env('OPENAI_API_KEY');
-        if ($apiKey === '') throw new RuntimeException('OPENAI_API_KEY ist nicht konfiguriert.');
+        if ($apiKey === '') {
+            throw new RuntimeException('OPENAI_API_KEY ist nicht konfiguriert.');
+        }
 
         $rows = DB::table('news as news')->join('instruments as instrument', 'instrument.id', '=', 'news.instrument_id')
             ->where('news.provider', 'twelve_data')->whereNull('news.ai_analyzed_at')
@@ -32,14 +34,21 @@ final class PressReleaseAiAnalyzer
                 'max_output_tokens' => max(500, count($input) * 220),
                 'metadata' => ['feature' => 'press-release-analysis'],
             ]);
-            if ($response->failed()) throw new RuntimeException('OpenAI HTTP '.$response->status().': '.(string) data_get($response->json(), 'error.message', $response->body()));
+            if ($response->failed()) {
+                throw new RuntimeException('OpenAI HTTP '.$response->status().': '.(string) data_get($response->json(), 'error.message', $response->body()));
+            }
             $payload = $response->json();
             $raw = trim((string) ($payload['output_text'] ?? data_get($payload, 'output.0.content.0.text', '')));
-            $start = strpos($raw, '['); $end = strrpos($raw, ']');
-            if ($start === false || $end === false) throw new RuntimeException('OpenAI lieferte kein JSON-Array.');
+            $start = strpos($raw, '[');
+            $end = strrpos($raw, ']');
+            if ($start === false || $end === false) {
+                throw new RuntimeException('OpenAI lieferte kein JSON-Array.');
+            }
             $items = json_decode(substr($raw, $start, $end - $start + 1), true, flags: JSON_THROW_ON_ERROR);
             foreach ($items as $item) {
-                if (! is_array($item) || ! in_array((int) ($item['id'] ?? 0), $batch->pluck('id')->map(fn ($id) => (int) $id)->all(), true)) continue;
+                if (! is_array($item) || ! in_array((int) ($item['id'] ?? 0), $batch->pluck('id')->map(fn ($id) => (int) $id)->all(), true)) {
+                    continue;
+                }
                 DB::table('news')->where('id', (int) $item['id'])->update([
                     'summary' => trim((string) ($item['summary_de'] ?? '')) ?: null,
                     'ai_summary_de' => trim((string) ($item['summary_de'] ?? '')) ?: null,

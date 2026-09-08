@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Enums\PlanLevel;
+use App\Models\User;
 
 final class QualityGateAccessService
 {

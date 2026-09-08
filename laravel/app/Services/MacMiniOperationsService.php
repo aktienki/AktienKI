@@ -592,6 +592,7 @@ SQL);
             if (preg_match('/^---([A-Z]+)---$/', $line, $match)) {
                 $current = $match[1];
                 $sections[$current] = '';
+
                 continue;
             }
             if ($current !== null) {
@@ -612,8 +613,7 @@ SQL);
         array $applicationDatabase,
         array $servingDatabase,
         array $databaseStats,
-    ): array
-    {
+    ): array {
         return [
             'reachable' => false,
             'error' => $error,

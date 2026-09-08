@@ -235,18 +235,15 @@ final class StockPredictionsTable extends Component
             ->when($this->country !== '', fn (Builder $query) => $query->where('instrument.country', $this->country))
             ->when($this->sector !== '', fn (Builder $query) => $query->where('instrument.sector', $this->sector))
             ->when($this->exchange !== '', fn (Builder $query) => $query->where('exchange.code', $this->exchange))
-            ->when($this->signal !== '', fn (Builder $query) =>
-                $query->whereRaw("({$signalSql}) = ?", [$this->signal]))
-            ->when($this->minScore !== '' && is_numeric($this->minScore), fn (Builder $query) =>
-                $query->whereRaw(
-                    '(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END) >= ?',
-                    [(float) $this->minScore],
-                ))
-            ->when($this->maxScore !== '' && is_numeric($this->maxScore), fn (Builder $query) =>
-                $query->whereRaw(
-                    '(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END) <= ?',
-                    [(float) $this->maxScore],
-                ));
+            ->when($this->signal !== '', fn (Builder $query) => $query->whereRaw("({$signalSql}) = ?", [$this->signal]))
+            ->when($this->minScore !== '' && is_numeric($this->minScore), fn (Builder $query) => $query->whereRaw(
+                '(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END) >= ?',
+                [(float) $this->minScore],
+            ))
+            ->when($this->maxScore !== '' && is_numeric($this->maxScore), fn (Builder $query) => $query->whereRaw(
+                '(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END) <= ?',
+                [(float) $this->maxScore],
+            ));
 
         $sortColumn = $this->sortableColumns()[$this->sortField] ?? 'prediction.prediction_score';
         $direction = $this->sortDirection === 'asc' ? 'asc' : 'desc';
@@ -275,7 +272,7 @@ final class StockPredictionsTable extends Component
             : null;
         $paperPortfolios = DB::table('portfolios')->leftJoin('portfolio_cash_accounts as cash', 'cash.portfolio_id', '=', 'portfolios.id')
             ->where('portfolios.user_id', auth()->id())->where('portfolios.active', true)->where('portfolios.type', 'paper')
-            ->orderByDesc('portfolios.is_default')->get(['portfolios.id','portfolios.name','portfolios.currency','portfolios.meta',DB::raw('COALESCE(cash.balance - cash.reserved_balance, 0) AS available_capital')]);
+            ->orderByDesc('portfolios.is_default')->get(['portfolios.id', 'portfolios.name', 'portfolios.currency', 'portfolios.meta', DB::raw('COALESCE(cash.balance - cash.reserved_balance, 0) AS available_capital')]);
 
         return view('livewire.stocks.stock-predictions-table', [
             'rows' => $query->get(),
@@ -302,11 +299,9 @@ final class StockPredictionsTable extends Component
 
         return DB::table('instruments as instrument')
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
-            ->leftJoinSub($latestPredictions, 'latest', fn ($join) =>
-                $join->on('latest.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($latestPredictions, 'latest', fn ($join) => $join->on('latest.instrument_id', '=', 'instrument.id'))
             ->leftJoin('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
-            ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) =>
-                $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
+            ->leftJoinSub($latestQuotes, 'latest_quote', fn ($join) => $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
             ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\AiScore;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -38,10 +39,8 @@ class IndexAiScoreService
                     $join->on('instrument.symbol', '=', 'market_index.symbol')
                         ->where('instrument.type', '=', 'index');
                 })
-                ->joinSub($latestMoves, 'latest_move', fn ($join) =>
-                    $join->on('latest_move.instrument_id', '=', 'instrument.id'))
-                ->joinSub($dailyCloses, 'daily_close', fn ($join) =>
-                    $join->on('daily_close.instrument_id', '=', 'instrument.id'))
+                ->joinSub($latestMoves, 'latest_move', fn ($join) => $join->on('latest_move.instrument_id', '=', 'instrument.id'))
+                ->joinSub($dailyCloses, 'daily_close', fn ($join) => $join->on('daily_close.instrument_id', '=', 'instrument.id'))
                 ->where('market_index.is_active', true)
                 ->where('instrument.is_active', true)
                 ->whereNull('instrument.deleted_at')
@@ -71,8 +70,8 @@ class IndexAiScoreService
                 ->map(function ($countryIndices): array {
                     $representative = $countryIndices->first();
                     $changes = $countryIndices->map(function ($index): ?float {
-                        $latestDate = \Carbon\Carbon::parse($index->market_date)->toDateString();
-                        $dailyDate = \Carbon\Carbon::parse($index->latest_daily_date)->toDateString();
+                        $latestDate = Carbon::parse($index->market_date)->toDateString();
+                        $dailyDate = Carbon::parse($index->latest_daily_date)->toDateString();
                         $previousClose = $latestDate > $dailyDate
                             ? (float) $index->latest_daily_close
                             : (float) ($index->previous_daily_close ?? 0);
@@ -90,10 +89,10 @@ class IndexAiScoreService
                         'price' => round((float) $representative->latest_close, 2),
                         'currency' => (string) ($representative->currency ?? ''),
                         'market_date' => $representative->market_date
-                            ? \Carbon\Carbon::parse($representative->market_date)->format('d.m.Y')
+                            ? Carbon::parse($representative->market_date)->format('d.m.Y')
                             : null,
                         'latest_at' => $representative->observed_at
-                            ? \Carbon\Carbon::parse($countryIndices->max('observed_at'))->timezone(config('app.timezone'))->format('d.m.Y, H:i')
+                            ? Carbon::parse($countryIndices->max('observed_at'))->timezone(config('app.timezone'))->format('d.m.Y, H:i')
                             : null,
                     ];
                 })
@@ -124,42 +123,41 @@ class IndexAiScoreService
     public function scores(): array
     {
         return Cache::remember('dashboard_index_ai_scores', now()->addMinutes(2), function (): array {
-        $latestPredictions = DB::table('predictions')
-            ->selectRaw('instrument_id, MAX(id) AS prediction_id')
-            ->groupBy('instrument_id');
+            $latestPredictions = DB::table('predictions')
+                ->selectRaw('instrument_id, MAX(id) AS prediction_id')
+                ->groupBy('instrument_id');
 
-        $indexScores = DB::table('index_memberships as membership')
-            ->join('market_indices as market_index', 'market_index.id', '=', 'membership.market_index_id')
-            ->joinSub($latestPredictions, 'latest', fn ($join) =>
-                $join->on('latest.instrument_id', '=', 'membership.instrument_id'))
-            ->join('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
-            ->whereNull('membership.removed_at')
-            ->groupBy('market_index.id', 'market_index.symbol', 'market_index.name')
-            ->selectRaw('market_index.symbol, market_index.name, AVG(prediction.prediction_score) AS score, COUNT(*) AS companies')
-            ->get();
+            $indexScores = DB::table('index_memberships as membership')
+                ->join('market_indices as market_index', 'market_index.id', '=', 'membership.market_index_id')
+                ->joinSub($latestPredictions, 'latest', fn ($join) => $join->on('latest.instrument_id', '=', 'membership.instrument_id'))
+                ->join('predictions as prediction', 'prediction.id', '=', 'latest.prediction_id')
+                ->whereNull('membership.removed_at')
+                ->groupBy('market_index.id', 'market_index.symbol', 'market_index.name')
+                ->selectRaw('market_index.symbol, market_index.name, AVG(prediction.prediction_score) AS score, COUNT(*) AS companies')
+                ->get();
 
-        $scores = [];
+            $scores = [];
 
-        foreach ($indexScores as $index) {
-            $identity = strtoupper($index->symbol.' '.$index->name);
-            $dashboardName = match (true) {
-                str_contains($identity, 'DAX') || str_contains($identity, 'GDAXI') => 'DAX',
-                str_contains($identity, 'NASDAQ') || str_contains($identity, 'IXIC') => 'NASDAQ',
-                str_contains($identity, 'S&P') || str_contains($identity, 'SP500') || str_contains($identity, 'GSPC') => 'S&P 500',
-                str_contains($identity, 'NIKKEI') || str_contains($identity, 'N225') => 'Japan',
-                str_contains($identity, 'SHANGHAI') || str_contains($identity, 'SSE') || str_contains($identity, '000001') => 'China',
-                default => null,
-            };
+            foreach ($indexScores as $index) {
+                $identity = strtoupper($index->symbol.' '.$index->name);
+                $dashboardName = match (true) {
+                    str_contains($identity, 'DAX') || str_contains($identity, 'GDAXI') => 'DAX',
+                    str_contains($identity, 'NASDAQ') || str_contains($identity, 'IXIC') => 'NASDAQ',
+                    str_contains($identity, 'S&P') || str_contains($identity, 'SP500') || str_contains($identity, 'GSPC') => 'S&P 500',
+                    str_contains($identity, 'NIKKEI') || str_contains($identity, 'N225') => 'Japan',
+                    str_contains($identity, 'SHANGHAI') || str_contains($identity, 'SSE') || str_contains($identity, '000001') => 'China',
+                    default => null,
+                };
 
-            if ($dashboardName) {
-                $scores[$dashboardName] = [
-                    'score' => AiScore::toPercent($index->score),
-                    'companies' => (int) $index->companies,
-                ];
+                if ($dashboardName) {
+                    $scores[$dashboardName] = [
+                        'score' => AiScore::toPercent($index->score),
+                        'companies' => (int) $index->companies,
+                    ];
+                }
             }
-        }
 
-        return $scores;
+            return $scores;
         });
     }
 }

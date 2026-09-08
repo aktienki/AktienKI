@@ -1,9 +1,12 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration {
-    public function up(): void {
+return new class extends Migration
+{
+    public function up(): void
+    {
         DB::unprepared(<<<'SQL'
 ALTER TABLE trained_models ADD COLUMN position_side VARCHAR(8) NOT NULL DEFAULT 'long',
  ADD CONSTRAINT trained_models_position_side_chk CHECK (position_side IN ('long','short'));
@@ -19,7 +22,9 @@ CREATE UNIQUE INDEX predictions_source_bar_idempotency_idx ON predictions
  WHERE source_bar_time IS NOT NULL;
 SQL);
     }
-    public function down(): void {
+
+    public function down(): void
+    {
         DB::unprepared(<<<'SQL'
 DROP INDEX predictions_source_bar_idempotency_idx;
 CREATE UNIQUE INDEX predictions_source_bar_idempotency_idx ON predictions

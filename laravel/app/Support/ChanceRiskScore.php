@@ -35,7 +35,9 @@ final class ChanceRiskScore
                 ?? $horizonReturns[$horizon.'t']
                 ?? null;
 
-            if (! is_numeric($value) || ! is_finite((float) $value)) continue;
+            if (! is_numeric($value) || ! is_finite((float) $value)) {
+                continue;
+            }
 
             $values[$horizon] = (float) $value;
             $availableWeight += $weight;
@@ -59,8 +61,12 @@ final class ChanceRiskScore
         foreach ($values as $horizon => $value) {
             $normalWeight = $weights[$horizon] / $availableWeight;
             $weightedReturn += $value * $normalWeight;
-            if ($value > 0.25) $positiveWeight += $normalWeight;
-            if ($value < -0.25) $negativeWeight += $normalWeight;
+            if ($value > 0.25) {
+                $positiveWeight += $normalWeight;
+            }
+            if ($value < -0.25) {
+                $negativeWeight += $normalWeight;
+            }
         }
 
         $agreement = max($positiveWeight, $negativeWeight) * 100;
@@ -152,7 +158,9 @@ final class ChanceRiskScore
     private static function modifier(float $score, float $minimum, float $maximum, bool $lowerIsBetter): string
     {
         $position = ($score - $minimum) / max(0.0001, $maximum - $minimum);
-        if ($lowerIsBetter) $position = 1 - $position;
+        if ($lowerIsBetter) {
+            $position = 1 - $position;
+        }
 
         return match (true) {
             $position >= (2 / 3) => '+',
@@ -163,11 +171,16 @@ final class ChanceRiskScore
 
     private static function percent(mixed $value): ?float
     {
-        if (! is_numeric($value) || ! is_finite((float) $value)) return null;
+        if (! is_numeric($value) || ! is_finite((float) $value)) {
+            return null;
+        }
 
         $number = (float) $value;
-        if ($number >= 0 && $number <= 1) $number *= 100;
-        elseif ($number > 1 && $number <= 10) $number *= 10;
+        if ($number >= 0 && $number <= 1) {
+            $number *= 100;
+        } elseif ($number > 1 && $number <= 10) {
+            $number *= 10;
+        }
 
         return self::clamp($number);
     }

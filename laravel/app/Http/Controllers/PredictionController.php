@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\PlanLevel;
 use App\Jobs\RunFilteredBacktest;
 use App\Services\CorrelationAnalysisService;
+use App\Services\EuroPriceConverter;
 use App\Services\FreeRegionalStockUniverseService;
 use App\Services\HistoricalActionScoreService;
 use App\Services\HistoricalAreaEntryRotationService;
@@ -15,9 +16,9 @@ use App\Services\HistoricalPortfolioExecutionCalculator;
 use App\Services\PersonalizedSignalService;
 use App\Services\PlanAccessService;
 use App\Services\SavedFilterLimitService;
+use App\Services\StockRiskClassificationService;
 use App\Services\UserQualityGateService;
 use App\Services\YahooIndexService;
-use App\Support\AiScore;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Contracts\Pagination\Paginator;
@@ -927,10 +928,10 @@ final class PredictionController extends Controller
                 && ($filters['exit_strategy'] ?? 'fixed_20d') === 'fixed_20d'
                 ? 'close at each selected serving model horizon'
                 : match ($filters['exit_strategy'] ?? 'fixed_20d') {
-                'signal_change' => 'close on signal or MACD/stochastic market-phase change',
-                'forecast_below_price' => 'hold while the latest 20-day forecast is at or above current price; close when it falls below current price',
-                'buy_and_hold' => 'buy and hold',
-                default => 'close after 20 trading days',
+                    'signal_change' => 'close on signal or MACD/stochastic market-phase change',
+                    'forecast_below_price' => 'hold while the latest 20-day forecast is at or above current price; close when it falls below current price',
+                    'buy_and_hold' => 'buy and hold',
+                    default => 'close after 20 trading days',
                 },
             'selection_filters' => $filters,
             'selection_metrics' => [
@@ -2185,7 +2186,7 @@ final class PredictionController extends Controller
         $freeRegionalInstrumentIds = $isFreeRegional
             ? app(FreeRegionalStockUniverseService::class)->instrumentIds($request->user())
             : null;
-        $riskClassification = app(\App\Services\StockRiskClassificationService::class);
+        $riskClassification = app(StockRiskClassificationService::class);
         $showAllRiskClasses = $riskClassification->userLevel($request->user()) === 'risk';
         $visibleRiskClasses = $riskClassification->visibleStatuses($request->user());
 
@@ -2501,7 +2502,7 @@ final class PredictionController extends Controller
             $predictions = $predictionsPaginator
                 ? collect($predictionsPaginator->items())
                 : $query->get();
-            $euroConverter = app(\App\Services\EuroPriceConverter::class);
+            $euroConverter = app(EuroPriceConverter::class);
             $euroFactors = $predictions->pluck('currency')->filter()->map(fn ($currency): string => trim((string) $currency))
                 ->unique()->mapWithKeys(fn (string $currency): array => [$currency => $euroConverter->factor($currency)]);
             $predictionInstrumentIds = $predictions->pluck('instrument_id')->map(fn ($id): int => (int) $id)->unique()->values();
@@ -3270,16 +3271,22 @@ final class PredictionController extends Controller
         $heatmapSelections = is_array($heatmapSelections) ? $heatmapSelections : [];
         $selectedComparisonRows = $comparisonRows->filter(function (object $row) use ($heatmapSelections, $comparisonDefinitions): bool {
             foreach ($heatmapSelections as $map => $selectedCells) {
-                if (! is_array($selectedCells) || $selectedCells === [] || ! isset($comparisonDefinitions[$map])) continue;
+                if (! is_array($selectedCells) || $selectedCells === [] || ! isset($comparisonDefinitions[$map])) {
+                    continue;
+                }
                 $definition = $comparisonDefinitions[$map];
                 $xField = $definition['x_field'] ?? 'score';
                 $yField = $definition['y_field'] ?? $map;
-                if (! is_numeric($row->{$xField} ?? null) || ! is_numeric($row->{$yField} ?? null)) return false;
+                if (! is_numeric($row->{$xField} ?? null) || ! is_numeric($row->{$yField} ?? null)) {
+                    return false;
+                }
                 $xMin = $definition['x_min'] ?? 0.0;
                 $yMin = $definition['min'] ?? 0.0;
                 $xBucket = (int) max(0, min(9, floor((max($xMin, min($definition['x_max'] ?? 10.0, (float) $row->{$xField})) - $xMin) / ($definition['x_step'] ?? 1.0))));
                 $yBucket = (int) max(0, min(9, floor((max($yMin, min($definition['max'], (float) $row->{$yField})) - $yMin) / $definition['step'])));
-                if (in_array($xBucket.'-'.$yBucket, $selectedCells, true)) return false;
+                if (in_array($xBucket.'-'.$yBucket, $selectedCells, true)) {
+                    return false;
+                }
             }
 
             return true;
@@ -3483,49 +3490,49 @@ final class PredictionController extends Controller
                 );
                 $scoredTrades->chunk(500)->each(function ($chunk) use ($runId, $now): void {
                     DB::table('backtest_trades')->insertOrIgnore($chunk->map(function (object $trade) use ($runId, $now): array {
-                    $confidence = is_numeric($trade->validation_direction_accuracy ?? null)
-                        ? (float) $trade->validation_direction_accuracy * ((float) $trade->validation_direction_accuracy <= 1 ? 100 : 1)
-                        : 0.0;
-                    $metadata = is_array($trade->metadata)
-                        ? $trade->metadata
-                        : (json_decode((string) ($trade->metadata ?? '{}'), true) ?: []);
+                        $confidence = is_numeric($trade->validation_direction_accuracy ?? null)
+                            ? (float) $trade->validation_direction_accuracy * ((float) $trade->validation_direction_accuracy <= 1 ? 100 : 1)
+                            : 0.0;
+                        $metadata = is_array($trade->metadata)
+                            ? $trade->metadata
+                            : (json_decode((string) ($trade->metadata ?? '{}'), true) ?: []);
 
-                    return [
-                        'backtest_run_id' => $runId,
-                        'instrument_id' => $trade->instrument_id,
-                        'trained_model_id' => $trade->trained_model_id,
-                        'model_definition_id' => $trade->model_definition_id,
-                        'ai_type' => $trade->ai_type ?: 'horizon',
-                        'timeframe' => '1d',
-                        'horizon_days' => $trade->horizon_days,
-                        'signal' => $trade->historical_action_signal,
-                        'entry_date' => $trade->signal_date,
-                        'exit_date' => $trade->exit_date,
-                        'entry_price' => $trade->entry_price,
-                        'exit_price' => $trade->exit_price,
-                        'predicted_return' => $trade->predicted_return,
-                        'gross_return' => $trade->gross_return,
-                        'net_return' => $trade->net_return,
-                        'transaction_cost' => (float) $trade->gross_return - (float) $trade->net_return,
-                        'max_drawdown' => ((float) ($trade->historical_action_components['metrics']['drawdown'] ?? 0)) / 100,
-                        // The strategy tester deliberately uses the raw,
-                        // point-in-time model result on its score axis. The
-                        // composed final action score remains available in
-                        // signal_quality_score and metadata.
-                        'ki_score' => max(0, min(10,
-                            (float) ($trade->validation_direction_accuracy ?? 0)
-                            * ((float) ($trade->validation_direction_accuracy ?? 0) <= 1 ? 10 : 0.1)
-                        )),
-                        'confidence' => max(0, min(100, $confidence)),
-                        'quality_gate_score' => ($trade->historical_action_components['blocked'] ?? true) ? 0 : 1,
-                        'signal_quality_score' => $trade->historical_action_score,
-                        'metadata' => json_encode([
-                            ...$metadata,
-                            'action_score' => $trade->historical_action_components,
-                        ], JSON_THROW_ON_ERROR),
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ];
+                        return [
+                            'backtest_run_id' => $runId,
+                            'instrument_id' => $trade->instrument_id,
+                            'trained_model_id' => $trade->trained_model_id,
+                            'model_definition_id' => $trade->model_definition_id,
+                            'ai_type' => $trade->ai_type ?: 'horizon',
+                            'timeframe' => '1d',
+                            'horizon_days' => $trade->horizon_days,
+                            'signal' => $trade->historical_action_signal,
+                            'entry_date' => $trade->signal_date,
+                            'exit_date' => $trade->exit_date,
+                            'entry_price' => $trade->entry_price,
+                            'exit_price' => $trade->exit_price,
+                            'predicted_return' => $trade->predicted_return,
+                            'gross_return' => $trade->gross_return,
+                            'net_return' => $trade->net_return,
+                            'transaction_cost' => (float) $trade->gross_return - (float) $trade->net_return,
+                            'max_drawdown' => ((float) ($trade->historical_action_components['metrics']['drawdown'] ?? 0)) / 100,
+                            // The strategy tester deliberately uses the raw,
+                            // point-in-time model result on its score axis. The
+                            // composed final action score remains available in
+                            // signal_quality_score and metadata.
+                            'ki_score' => max(0, min(10,
+                                (float) ($trade->validation_direction_accuracy ?? 0)
+                                * ((float) ($trade->validation_direction_accuracy ?? 0) <= 1 ? 10 : 0.1)
+                            )),
+                            'confidence' => max(0, min(100, $confidence)),
+                            'quality_gate_score' => ($trade->historical_action_components['blocked'] ?? true) ? 0 : 1,
+                            'signal_quality_score' => $trade->historical_action_score,
+                            'metadata' => json_encode([
+                                ...$metadata,
+                                'action_score' => $trade->historical_action_components,
+                            ], JSON_THROW_ON_ERROR),
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
                     })->all());
                 });
                 unset($scoredTrades);
@@ -3603,7 +3610,9 @@ final class PredictionController extends Controller
                 'status.quality_gate_passed', 'instrument.symbol', 'instrument.name',
             ]);
 
-        if ($statuses->isEmpty()) return collect();
+        if ($statuses->isEmpty()) {
+            return collect();
+        }
 
         $predictions = $serving->table('serving_predictions')
             ->whereIn('instrument_id', $statuses->pluck('instrument_id')->unique())
@@ -3625,8 +3634,10 @@ final class PredictionController extends Controller
         $scorePercent = static function (mixed $score): float {
             if (is_numeric($score)) {
                 $value = (float) $score;
+
                 return max(0, min(100, $value <= 10 ? $value * 10 : $value));
             }
+
             return match (strtoupper(trim((string) $score))) {
                 '1+' => 95, '1-', '1−' => 85, '2+' => 75, '2-', '2−' => 65,
                 '3+' => 55, '3-', '3−' => 45, '4+' => 35, '4-', '4−' => 25,
@@ -3637,7 +3648,9 @@ final class PredictionController extends Controller
         return $statuses->map(function (object $status) use ($predictions, $qualityPercent, $scorePercent): ?object {
             $key = implode('|', [(int) $status->instrument_id, (string) $status->release_id, (int) $status->horizon, (string) $status->variant]);
             $prediction = $predictions->get($key);
-            if (! $prediction) return null;
+            if (! $prediction) {
+                return null;
+            }
             $performance = is_array($status->performance)
                 ? $status->performance
                 : (json_decode((string) $status->performance, true) ?: []);
@@ -3712,14 +3725,20 @@ final class PredictionController extends Controller
 
         return $rows->filter(function (object $row) use ($selections, $definitions): bool {
             foreach ($selections as $map => $cells) {
-                if (! is_array($cells) || $cells === [] || ! isset($definitions[$map])) continue;
+                if (! is_array($cells) || $cells === [] || ! isset($definitions[$map])) {
+                    continue;
+                }
                 $definition = $definitions[$map];
                 $x = $row->{$definition['x']} ?? null;
                 $y = $row->{$definition['y']} ?? null;
-                if (! is_numeric($x) || ! is_numeric($y)) return false;
+                if (! is_numeric($x) || ! is_numeric($y)) {
+                    return false;
+                }
                 $xb = (int) max(0, min(9, floor(max(0, min($definition['x_max'], (float) $x)) / $definition['x_step'])));
                 $yb = (int) max(0, min(9, floor((max($definition['y_min'], min($definition['y_max'], (float) $y)) - $definition['y_min']) / $definition['y_step'])));
-                if (in_array($xb.'-'.$yb, $cells, true)) return false;
+                if (in_array($xb.'-'.$yb, $cells, true)) {
+                    return false;
+                }
             }
 
             return true;
@@ -3822,8 +3841,7 @@ final class PredictionController extends Controller
     ): array {
         $basePositionCapital = $initialCapital / max(1, $maxPositions);
         $allCandidates = collect($candidates);
-        $eligibleCandidates = $allCandidates->filter(fn (object $trade): bool =>
-            ($periodStart === null || (string) $trade->entry_date >= $periodStart)
+        $eligibleCandidates = $allCandidates->filter(fn (object $trade): bool => ($periodStart === null || (string) $trade->entry_date >= $periodStart)
             && ($periodEnd === null || (string) $trade->exit_date <= $periodEnd)
         )->values();
         $execution = app(HistoricalPortfolioExecutionCalculator::class)->calculate(

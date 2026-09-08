@@ -12,35 +12,43 @@ final class HistoricalIndicatorMatrixService
 
     public function filterEntries(Collection $trades, array $filters): Collection
     {
-        if (($filters['indicator_matrix_usage'] ?? 'off') !== 'entry') return $trades;
+        if (($filters['indicator_matrix_usage'] ?? 'off') !== 'entry') {
+            return $trades;
+        }
         $this->load($trades->pluck('instrument_id')->map(fn ($id) => (int) $id)->unique());
 
         return $trades->filter(function (object $trade) use ($filters): bool {
             $point = $this->pointAt((int) $trade->instrument_id, (string) $trade->entry_date);
+
             return $point !== null && $this->matches($point, $filters);
         })->values();
     }
 
     public function applyExits(int $runId, array $filters): array
     {
-        if (($filters['indicator_matrix_usage'] ?? 'off') !== 'exit') return [];
+        if (($filters['indicator_matrix_usage'] ?? 'off') !== 'exit') {
+            return [];
+        }
         $trades = DB::table('backtest_trades')->where('backtest_run_id', $runId)->get();
         $this->load($trades->pluck('instrument_id')->map(fn ($id) => (int) $id)->unique());
         $changed = 0;
 
         foreach ($trades as $trade) {
             $points = $this->series[(int) $trade->instrument_id] ?? collect();
-            $match = $points->first(fn (object $point): bool =>
-                $point->date > (string) $trade->entry_date
+            $match = $points->first(fn (object $point): bool => $point->date > (string) $trade->entry_date
                 && $point->date <= (string) $trade->exit_date
                 && $this->matches($point, $filters));
-            if ($match === null || (float) $trade->entry_price <= 0) continue;
+            if ($match === null || (float) $trade->entry_price <= 0) {
+                continue;
+            }
 
             $bars = DB::table('price_bars')->where('instrument_id', $trade->instrument_id)
                 ->where('interval', '1d')->whereDate('bar_time', '>=', $trade->entry_date)
                 ->whereDate('bar_time', '<=', $match->date)->orderBy('bar_time')->get(['bar_time', 'low', 'close']);
             $exitBar = $bars->last();
-            if ($exitBar === null || (float) $exitBar->close <= 0) continue;
+            if ($exitBar === null || (float) $exitBar->close <= 0) {
+                continue;
+            }
             $entry = (float) $trade->entry_price;
             $exit = (float) $exitBar->close;
             $drawdown = $bars->min(fn (object $bar): float => ((float) $bar->low - $entry) / $entry);
@@ -68,7 +76,9 @@ final class HistoricalIndicatorMatrixService
     private function load(Collection $instrumentIds): void
     {
         $missing = $instrumentIds->filter(fn (int $id): bool => ! array_key_exists($id, $this->series))->values();
-        if ($missing->isEmpty()) return;
+        if ($missing->isEmpty()) {
+            return;
+        }
         $rows = DB::table('technical_indicators as ti')
             ->join('price_bars as pb', function ($join): void {
                 $join->on('pb.instrument_id', '=', 'ti.instrument_id')->on('pb.interval', '=', 'ti.interval')
@@ -79,7 +89,9 @@ final class HistoricalIndicatorMatrixService
             ->whereNotNull('ti.macd_histogram')->whereNotNull('ti.stochastic_k')->where('pb.close', '>', 0)
             ->orderBy('ti.instrument_id')->orderBy('ti.bar_time')
             ->get(['ti.instrument_id', 'ti.bar_time', 'ti.macd_histogram', 'ti.stochastic_k', 'pb.close']);
-        foreach ($missing as $id) $this->series[$id] = collect();
+        foreach ($missing as $id) {
+            $this->series[$id] = collect();
+        }
         foreach ($rows->groupBy('instrument_id') as $id => $group) {
             $previous = null;
             $this->series[(int) $id] = $group->map(function (object $row) use (&$previous): object {
@@ -91,6 +103,7 @@ final class HistoricalIndicatorMatrixService
                     'stochastic_k' => (float) $row->stochastic_k,
                 ];
                 $previous = $value;
+
                 return $point;
             })->values();
         }
@@ -107,7 +120,9 @@ final class HistoricalIndicatorMatrixService
         $macd = (float) $point->macd_percent;
         $previous = $point->previous_macd_percent;
         $stoch = (float) $point->stochastic_k;
-        if ($previous === null) return false;
+        if ($previous === null) {
+            return false;
+        }
 
         return match ($preset) {
             'oversold_recovery' => $stoch <= 25 && $macd > (float) $previous,
@@ -122,6 +137,7 @@ final class HistoricalIndicatorMatrixService
     private function manualMatch(float $macd, float $previous, float $stoch, array $filters): bool
     {
         $direction = (string) ($filters['indicator_matrix_macd_direction'] ?? 'any');
+
         return $macd >= (float) ($filters['indicator_matrix_macd_min'] ?? -100)
             && $macd <= (float) ($filters['indicator_matrix_macd_max'] ?? 100)
             && $stoch >= (float) ($filters['indicator_matrix_stoch_min'] ?? 0)

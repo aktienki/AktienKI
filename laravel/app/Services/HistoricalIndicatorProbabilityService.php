@@ -15,7 +15,9 @@ final class HistoricalIndicatorProbabilityService
      */
     public function filter(Collection $trades, float $minimum): Collection
     {
-        if ($minimum <= 0 || $trades->isEmpty()) return $trades;
+        if ($minimum <= 0 || $trades->isEmpty()) {
+            return $trades;
+        }
 
         $instrumentIds = $trades->pluck('instrument_id')->unique()->values();
         $rows = DB::table('technical_indicators as technical')
@@ -35,22 +37,30 @@ final class HistoricalIndicatorProbabilityService
             $history = $rows->get($trade->instrument_id, collect())->values();
             $date = substr((string) $trade->entry_date, 0, 10);
             $currentIndex = $history->search(fn (object $row): bool => substr((string) $row->bar_time, 0, 10) === $date);
-            if ($currentIndex === false || $currentIndex < 20) return false;
+            if ($currentIndex === false || $currentIndex < 20) {
+                return false;
+            }
 
             $current = $history[$currentIndex];
             // A 20T target is only known roughly 20 trading rows later.
             $evidence = $history->slice(0, max(0, $currentIndex - 20));
             $probabilities = collect(self::FIELDS)->map(function (string $field) use ($current, $evidence): ?float {
                 $value = $this->value($current, $field);
-                if ($value === null) return null;
+                if ($value === null) {
+                    return null;
+                }
                 $nearby = $evidence->filter(fn (object $row): bool => $this->value($row, $field) !== null)
                     ->sortBy(fn (object $row): float => abs($this->value($row, $field) - $value))
                     ->take(40);
-                if ($nearby->isEmpty()) return null;
+                if ($nearby->isEmpty()) {
+                    return null;
+                }
+
                 return ($nearby->filter(fn (object $row): bool => (float) $row->target_return_20d > 0)->count() / $nearby->count()) * 100;
             })->filter(fn ($value): bool => $value !== null);
 
             $trade->indicator_probability = $probabilities->isEmpty() ? null : $probabilities->avg();
+
             return $trade->indicator_probability !== null && $trade->indicator_probability >= $minimum;
         })->values();
     }
@@ -58,10 +68,14 @@ final class HistoricalIndicatorProbabilityService
     private function value(object $row, string $field): ?float
     {
         if ($field === 'momentum_10') {
-            if (! is_numeric($row->momentum_10) || ! is_numeric($row->close)) return null;
+            if (! is_numeric($row->momentum_10) || ! is_numeric($row->close)) {
+                return null;
+            }
             $denominator = (float) $row->close - (float) $row->momentum_10;
+
             return abs($denominator) > 0.000001 ? (float) $row->momentum_10 / $denominator : null;
         }
+
         return is_numeric($row->{$field} ?? null) ? (float) $row->{$field} : null;
     }
 }

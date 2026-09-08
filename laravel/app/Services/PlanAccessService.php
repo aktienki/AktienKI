@@ -10,8 +10,13 @@ final class PlanAccessService
 {
     public function allows(User $user, PlanLevel|string $required): bool
     {
-        if ((bool) $user->is_admin || strtolower((string) ($user->role ?? '')) === 'admin') return true;
-        if ((bool) $user->beta_access_exempt) return true;
+        if ((bool) $user->is_admin || strtolower((string) ($user->role ?? '')) === 'admin') {
+            return true;
+        }
+        if ((bool) $user->beta_access_exempt) {
+            return true;
+        }
+
         return $this->allowsTariff($user, $required);
     }
 
@@ -19,7 +24,9 @@ final class PlanAccessService
     public function allowsTariff(User $user, PlanLevel|string $required): bool
     {
         $requiredLevel = $required instanceof PlanLevel ? $required : PlanLevel::tryFrom(strtolower($required));
-        if (! $requiredLevel) return false;
+        if (! $requiredLevel) {
+            return false;
+        }
 
         return $this->level($user)->includes($requiredLevel);
     }
@@ -32,7 +39,9 @@ final class PlanAccessService
         if ($code && strtolower((string) $code) !== 'free') {
             $statusValid = in_array((string) ($user->tariff_status ?? ''), ['active', 'trialing'], true);
             $periodValid = $user->tariff_ends_at === null || $user->tariff_ends_at->isFuture();
-            if (! $statusValid || ! $periodValid) $code = null;
+            if (! $statusValid || ! $periodValid) {
+                $code = null;
+            }
         }
         if (! $code) {
             $code = DB::table('billing_subscriptions as subscription')
@@ -48,6 +57,7 @@ final class PlanAccessService
             'expert', 'ultimate' => 'premium',
             default => strtolower((string) ($code ?: 'free')),
         };
+
         return PlanLevel::tryFrom($normalized) ?? PlanLevel::Free;
     }
 }

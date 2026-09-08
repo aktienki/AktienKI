@@ -7,6 +7,7 @@ use App\Services\RecommendationEmailLogo;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\Mime\Email;
 
 final class RecommendationDigestNotification extends Notification
 {
@@ -46,17 +47,24 @@ final class RecommendationDigestNotification extends Notification
         return (new MailMessage)
             ->subject('Aktuelle Signale bei AktienKI.com')
             ->markdown('mail.recommendation-digest', ['recommendations' => $items])
-            ->withSymfonyMessage(function (\Symfony\Component\Mime\Email $email) use ($charts, $logo): void {
+            ->withSymfonyMessage(function (Email $email) use ($charts, $logo): void {
                 $email->embed($logo, 'aktienki-logo.png', 'image/png');
-                foreach ($charts as $name => $chart) $email->embed($chart, $name, 'image/png');
+                foreach ($charts as $name => $chart) {
+                    $email->embed($chart, $name, 'image/png');
+                }
             });
     }
 
     private function decodeList(mixed $value): array
     {
-        if (is_array($value)) return $value;
-        if (! is_string($value) || trim($value) === '') return [];
+        if (is_array($value)) {
+            return $value;
+        }
+        if (! is_string($value) || trim($value) === '') {
+            return [];
+        }
         $decoded = json_decode($value, true);
+
         return is_array($decoded) ? array_values($decoded) : [];
     }
 }

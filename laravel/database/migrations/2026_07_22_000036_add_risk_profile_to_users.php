@@ -13,10 +13,10 @@ return new class extends Migration
             $table->string('risk_profile', 24)->default('balanced')->index();
         });
         DB::statement(
-            "ALTER TABLE users ADD CONSTRAINT users_risk_profile_chk "
-            . "CHECK (risk_profile IN "
-            . "('standard_champion','conservative','balanced',"
-            . "'opportunity','aggressive'))"
+            'ALTER TABLE users ADD CONSTRAINT users_risk_profile_chk '
+            .'CHECK (risk_profile IN '
+            ."('standard_champion','conservative','balanced',"
+            ."'opportunity','aggressive'))"
         );
     }
 

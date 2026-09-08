@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 class SetBetaAccessExempt extends Command
 {
     protected $signature = 'beta:set-exempt {user : Nutzer-ID oder E-Mail-Adresse} {--revoke : Dauerhafte Freistellung entfernen}';
+
     protected $description = 'Markiert einen Beta-Nutzer als dauerhaft kostenfrei oder entfernt diese Markierung.';
 
     public function handle(): int
@@ -20,6 +21,7 @@ class SetBetaAccessExempt extends Command
 
         if (! $user) {
             $this->error('Nutzer nicht gefunden.');
+
             return self::FAILURE;
         }
 

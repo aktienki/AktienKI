@@ -2,12 +2,12 @@
 
 namespace App\Notifications;
 
+use App\Enums\PlanLevel;
 use App\Models\ExternalBuyReview;
 use App\Models\Prediction;
 use App\Models\SavedPredictionFilter;
 use App\Models\SignalEmailDelivery;
 use App\Models\User;
-use App\Enums\PlanLevel;
 use App\Services\PlanAccessService;
 use App\Services\SignalEmailDonutChart;
 use App\Services\SignalEmailMetrics;

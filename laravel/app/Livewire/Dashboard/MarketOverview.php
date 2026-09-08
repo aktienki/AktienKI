@@ -8,6 +8,7 @@ use Livewire\Component;
 class MarketOverview extends Component
 {
     public $quotes;
+
     public array $analysis = [];
 
     public function mount(DashboardService $dashboardService): void

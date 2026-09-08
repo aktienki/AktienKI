@@ -16,6 +16,7 @@ final class ActivateCompletedTrainingStocks extends Command
     protected $description = 'Aktiviert validierte Aktien mit 20T und mindestens einem weiteren Prognosehorizont.';
 
     private const HORIZONS = [7200, 14400, 21600, 28800];
+
     private const HORIZON_DAYS = [5, 10, 15, 20];
 
     public function handle(TrainingActivationQualityGate $qualityGate): int
@@ -62,6 +63,7 @@ final class ActivateCompletedTrainingStocks extends Command
 
         if ($this->option('dry-run')) {
             $this->info("{$stocks->count()} Aktien erfüllen das vollständige Quality-Gate und können aktiviert werden.");
+
             return self::SUCCESS;
         }
 
@@ -86,6 +88,7 @@ final class ActivateCompletedTrainingStocks extends Command
         }
 
         $this->info("{$stocks->count()} Aktien nach vollständigem Quality-Gate aktiviert.");
+
         return self::SUCCESS;
     }
 }

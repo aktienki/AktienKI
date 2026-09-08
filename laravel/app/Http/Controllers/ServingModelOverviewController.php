@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\ServingModelOverviewService;
 use App\Services\SavedFilterLimitService;
+use App\Services\ServingModelOverviewService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

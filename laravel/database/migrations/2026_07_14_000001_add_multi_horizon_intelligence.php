@@ -125,7 +125,7 @@ return new class extends Migration
     }
 
     /**
-     * @param array<int, string> $columns
+     * @param  array<int, string>  $columns
      */
     private function extendTable(string $tableName, array $columns): void
     {
@@ -156,7 +156,7 @@ return new class extends Migration
     }
 
     /**
-     * @param array<int, string> $columns
+     * @param  array<int, string>  $columns
      */
     private function dropColumnsIfPresent(string $tableName, array $columns): void
     {

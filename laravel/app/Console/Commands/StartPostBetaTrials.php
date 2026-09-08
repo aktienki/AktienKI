@@ -4,22 +4,26 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class StartPostBetaTrials extends Command
 {
     protected $signature = 'beta:start-post-phase-trials';
+
     protected $description = 'Startet das kostenlose Pro-Jahr für Betatester nach Ende der Beta.';
 
     public function handle(): int
     {
         if (! (bool) config('aktienki.beta.phase_ended', false)) {
             $this->error('Die Beta-Phase ist laut AKTIENKI_BETA_PHASE_ENDED noch nicht beendet.');
+
             return self::FAILURE;
         }
 
-        $proPlanId = \Illuminate\Support\Facades\DB::table('tariff_plans')->where('code', 'pro')->value('id');
+        $proPlanId = DB::table('tariff_plans')->where('code', 'pro')->value('id');
         if (! $proPlanId) {
             $this->error('Der Pro-Tarif ist nicht in tariff_plans vorhanden.');
+
             return self::FAILURE;
         }
 
@@ -49,6 +53,7 @@ class StartPostBetaTrials extends Command
             });
 
         $this->info("Pro-Testphasen gestartet: {$started}");
+
         return self::SUCCESS;
     }
 }

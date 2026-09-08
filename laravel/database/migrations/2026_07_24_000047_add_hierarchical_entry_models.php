@@ -30,12 +30,12 @@ return new class extends Migration
             $table->timestampsTz();
             $table->unique(
                 ['scope_type', 'scope_key', 'ai_type', 'timeframe',
-                 'prediction_horizon_minutes', 'version'],
+                    'prediction_horizon_minutes', 'version'],
                 'entry_scope_models_version_unique'
             );
             $table->index(
                 ['scope_type', 'scope_key', 'ai_type', 'timeframe',
-                 'prediction_horizon_minutes', 'status', 'eligible'],
+                    'prediction_horizon_minutes', 'status', 'eligible'],
                 'entry_scope_models_active_lookup_idx'
             );
         });
@@ -62,7 +62,7 @@ return new class extends Migration
             $table->timestampsTz();
             $table->unique(
                 ['instrument_id', 'ai_type', 'timeframe',
-                 'prediction_horizon_minutes'],
+                    'prediction_horizon_minutes'],
                 'instrument_entry_routes_scope_unique'
             );
         });

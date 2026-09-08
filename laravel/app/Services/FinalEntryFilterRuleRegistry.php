@@ -77,11 +77,12 @@ final class FinalEntryFilterRuleRegistry
         'serving_quality_symbols', 'optimized_backtest_run', 'display_icon',
         'display_color', 'trade_capacity',
     ];
+
     /**
      * Compile persisted settings into actual entry rules. Defaults, ranking,
      * execution and exit settings remain in the audit snapshot but never gate.
      *
-     * @param array<string,mixed> $filters
+     * @param  array<string,mixed>  $filters
      * @return array{active_rules:list<array<string,mixed>>,audit:array<string,mixed>}
      */
     public function compile(array $filters): array
@@ -180,10 +181,9 @@ final class FinalEntryFilterRuleRegistry
         return ['active_rules' => $rules, 'audit' => $filters];
     }
 
-
     /**
-     * @param list<array<string, mixed>> $activeRules
-     * @param array<string, mixed> $metrics
+     * @param  list<array<string, mixed>>  $activeRules
+     * @param  array<string, mixed>  $metrics
      * @return array{passed: bool, results: list<array<string, mixed>>, reasons: list<string>}
      */
     public function evaluate(array $activeRules, array $metrics): array
@@ -210,12 +210,14 @@ final class FinalEntryFilterRuleRegistry
         foreach ($activeRules as $rule) {
             if (! is_array($rule)) {
                 $reasons[] = 'INVALID_ENTRY_FILTER_DEFINITION';
+
                 continue;
             }
 
             $key = trim((string) ($rule['key'] ?? ''));
             if ($key === '' || isset($seen[$key])) {
                 $reasons[] = 'INVALID_ENTRY_FILTER_DEFINITION'.($key === '' ? '' : ':'.$key);
+
                 continue;
             }
             $seen[$key] = true;
@@ -227,12 +229,14 @@ final class FinalEntryFilterRuleRegistry
                     'evaluated' => false,
                     'passed' => null,
                 ];
+
                 continue;
             }
 
             $definition = self::ENTRY_RULES[$key] ?? null;
             if ($definition === null) {
                 $reasons[] = 'UNKNOWN_ENTRY_FILTER:'.$key;
+
                 continue;
             }
 
@@ -242,16 +246,19 @@ final class FinalEntryFilterRuleRegistry
                 : [$definition['operator']];
             if (! in_array($operator, $allowedOperators, true)) {
                 $reasons[] = 'FILTER_OPERATOR_INVALID:'.$key;
+
                 continue;
             }
             if (! array_key_exists('value', $rule)) {
                 $reasons[] = 'FILTER_CONFIG_INVALID:'.$key;
+
                 continue;
             }
             try {
                 $configuredValue = $this->normalizeConfiguredValue($key, $rule['value']);
             } catch (InvalidArgumentException) {
                 $reasons[] = 'FILTER_CONFIG_INVALID:'.$key;
+
                 continue;
             }
 
@@ -269,11 +276,13 @@ final class FinalEntryFilterRuleRegistry
                     'observed_value' => null,
                     'passed' => true,
                 ];
+
                 continue;
             }
 
             if (! array_key_exists($metric, $metrics) || $metrics[$metric] === null) {
                 $reasons[] = 'FILTER_INPUT_MISSING:'.$key;
+
                 continue;
             }
 
@@ -286,6 +295,7 @@ final class FinalEntryFilterRuleRegistry
                 );
             } catch (InvalidArgumentException) {
                 $reasons[] = 'FILTER_CONFIG_INVALID:'.$key;
+
                 continue;
             }
 

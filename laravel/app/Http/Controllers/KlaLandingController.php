@@ -11,7 +11,9 @@ use Illuminate\View\View;
 class KlaLandingController extends Controller
 {
     protected string $symbol = 'KLAC';
+
     protected string $view = 'landing.kla';
+
     protected string $cachePrefix = 'kla';
 
     public function show(): View
@@ -53,7 +55,9 @@ class KlaLandingController extends Controller
                 ->where(fn ($query) => $query->whereRaw('UPPER(symbol) = ?', [$this->symbol])->orWhereRaw('UPPER(provider_symbol) = ?', [$this->symbol]))
                 ->whereNull('deleted_at')->orderByDesc('is_active')->first(['id', 'symbol', 'currency']);
 
-            if (! $instrument) return $this->emptyQuote();
+            if (! $instrument) {
+                return $this->emptyQuote();
+            }
 
             $stream = Cache::get('twelve_data_stream_quote_'.sha1(strtoupper((string) $instrument->symbol)));
             if (is_numeric($stream['price'] ?? null)) {
@@ -68,7 +72,9 @@ class KlaLandingController extends Controller
 
             $stored = DB::table('current_stock_quotes')->where('instrument_id', $instrument->id)->where('status', 'current')
                 ->orderByDesc('quote_time')->orderByDesc('id')->first(['price', 'quote_time']);
-            if (! $stored || ! is_numeric($stored->price)) return $this->emptyQuote();
+            if (! $stored || ! is_numeric($stored->price)) {
+                return $this->emptyQuote();
+            }
 
             return [
                 'price' => (float) $stored->price,
@@ -91,7 +97,9 @@ class KlaLandingController extends Controller
             $instrumentId = DB::table('instruments')
                 ->where(fn ($query) => $query->whereRaw('UPPER(symbol) = ?', [$this->symbol])->orWhereRaw('UPPER(provider_symbol) = ?', [$this->symbol]))
                 ->whereNull('deleted_at')->orderByDesc('is_active')->value('id');
-            if (! $instrumentId) return $this->withGrades(ChanceRiskScore::calculate(null, []));
+            if (! $instrumentId) {
+                return $this->withGrades(ChanceRiskScore::calculate(null, []));
+            }
 
             $rows = DB::table('predictions')->where('instrument_id', $instrumentId)
                 ->orderByDesc('prediction_time')->orderByDesc('id')->limit(40)
@@ -101,7 +109,9 @@ class KlaLandingController extends Controller
             foreach ([5 => 7200, 10 => 14400, 15 => 21600, 20 => 28800] as $days => $minutes) {
                 $column = "predicted_price_{$days}d";
                 $row = $rows->first(fn ($item) => (int) $item->prediction_horizon_minutes === $minutes && is_numeric($item->{$column}) && is_numeric($item->current_price) && (float) $item->current_price > 0);
-                if ($row) $returns[$days] = (((float) $row->{$column} / (float) $row->current_price) - 1) * 100;
+                if ($row) {
+                    $returns[$days] = (((float) $row->{$column} / (float) $row->current_price) - 1) * 100;
+                }
             }
 
             $latest = $rows->first();

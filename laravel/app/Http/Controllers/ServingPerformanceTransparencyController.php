@@ -52,15 +52,33 @@ final class ServingPerformanceTransparencyController extends Controller
         $minimumProfitFactor = $request->filled('profit_factor') ? (float) $request->query('profit_factor') : null;
 
         $rows = $rows->filter(function (object $row) use ($search, $horizon, $variant, $quality, $status, $minimumHitRate, $minimumProfitFactor): bool {
-            if ($search !== '' && ! str_contains(mb_strtolower($row->name.' '.$row->symbol), $search)) return false;
-            if ($horizon > 0 && $row->horizon !== $horizon) return false;
-            if ($variant !== '' && $row->variant !== $variant) return false;
-            if ($quality !== '' && $row->horizon_quality !== $quality && $row->stock_quality !== $quality) return false;
-            if ($status === 'eligible' && ! $row->prediction_enabled) return false;
-            if ($status === 'blocked' && $row->prediction_enabled) return false;
-            if ($status === 'quality_gate' && ! $row->quality_gate_passed) return false;
-            if ($minimumHitRate !== null && (float) ($row->metrics->hit_rate ?? -INF) < $minimumHitRate) return false;
-            if ($minimumProfitFactor !== null && (float) ($row->metrics->profit_factor ?? -INF) < $minimumProfitFactor) return false;
+            if ($search !== '' && ! str_contains(mb_strtolower($row->name.' '.$row->symbol), $search)) {
+                return false;
+            }
+            if ($horizon > 0 && $row->horizon !== $horizon) {
+                return false;
+            }
+            if ($variant !== '' && $row->variant !== $variant) {
+                return false;
+            }
+            if ($quality !== '' && $row->horizon_quality !== $quality && $row->stock_quality !== $quality) {
+                return false;
+            }
+            if ($status === 'eligible' && ! $row->prediction_enabled) {
+                return false;
+            }
+            if ($status === 'blocked' && $row->prediction_enabled) {
+                return false;
+            }
+            if ($status === 'quality_gate' && ! $row->quality_gate_passed) {
+                return false;
+            }
+            if ($minimumHitRate !== null && (float) ($row->metrics->hit_rate ?? -INF) < $minimumHitRate) {
+                return false;
+            }
+            if ($minimumProfitFactor !== null && (float) ($row->metrics->profit_factor ?? -INF) < $minimumProfitFactor) {
+                return false;
+            }
 
             return true;
         })->sortBy([

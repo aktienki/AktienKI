@@ -42,13 +42,18 @@ final class PortfolioTradeEmailService
                         'transaction.meta as transaction_meta',
                         'prediction.predicted_price_20d', 'prediction.prediction_score', 'prediction.confidence',
                     ])->first();
-                if (! $execution) return null;
+                if (! $execution) {
+                    return null;
+                }
                 DB::table('portfolio_automation_executions')->where('id', $id)->update([
                     'email_status' => 'sending', 'updated_at' => now(),
                 ]);
+
                 return $execution;
             });
-            if (! $row) continue;
+            if (! $row) {
+                continue;
+            }
 
             $user = User::query()->find($row->user_id);
             $portfolioMeta = is_string($row->portfolio_meta ?? null)
@@ -62,6 +67,7 @@ final class PortfolioTradeEmailService
                     'email_status' => 'disabled', 'updated_at' => now(),
                 ]);
                 $stats['disabled']++;
+
                 continue;
             }
 
@@ -77,16 +83,22 @@ final class PortfolioTradeEmailService
                 $stats['failed']++;
             }
         }
+
         return $stats;
     }
 
     private function payload(object $row): array
     {
         $score = (float) ($row->prediction_score ?? 0);
-        if ($score <= 1) $score *= 100;
-        elseif ($score <= 10) $score *= 10;
+        if ($score <= 1) {
+            $score *= 100;
+        } elseif ($score <= 10) {
+            $score *= 10;
+        }
         $confidence = (float) ($row->confidence ?? 0);
-        if ($confidence <= 1) $confidence *= 100;
+        if ($confidence <= 1) {
+            $confidence *= 100;
+        }
         $price = (float) ($row->price ?? 0);
         $target = (float) ($row->predicted_price_20d ?? 0);
         $transactionMeta = is_string($row->transaction_meta ?? null)
@@ -112,6 +124,7 @@ final class PortfolioTradeEmailService
                 'position.average_buy_price', 'position.current_price',
             ])->map(function (object $position): array {
                 $marketPrice = (float) ($position->current_price ?? $position->average_buy_price);
+
                 return [
                     'symbol' => (string) $position->symbol,
                     'name' => (string) $position->name,

@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\SavedPredictionFilter;
 use App\Enums\PlanLevel;
+use App\Models\SavedPredictionFilter;
 use App\Services\PlanAccessService;
 use App\Services\SavedFilterLimitService;
 use App\Services\YahooIndexService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 final class SavedPredictionFilterController extends Controller
 {
@@ -66,7 +66,9 @@ final class SavedPredictionFilterController extends Controller
             ->reduce(function ($runs, object $run) {
                 $settings = is_string($run->settings) ? (json_decode($run->settings, true) ?: []) : (array) $run->settings;
                 $signature = $this->filterSignature((array) data_get($settings, 'selection_filters', []));
-                if (! $runs->has($signature)) $runs->put($signature, $run);
+                if (! $runs->has($signature)) {
+                    $runs->put($signature, $run);
+                }
 
                 return $runs;
             }, collect());
@@ -75,7 +77,9 @@ final class SavedPredictionFilterController extends Controller
                 return [$savedFilter->id => null];
             }
             $run = $runByFilterSignature->get($this->filterSignature((array) $savedFilter->filters));
-            if ($run === null) return [$savedFilter->id => null];
+            if ($run === null) {
+                return [$savedFilter->id => null];
+            }
 
             $metrics = Cache::remember(
                 'saved-filter-metrics:'.$run->id.':'.strtotime((string) $run->updated_at),
@@ -165,7 +169,9 @@ final class SavedPredictionFilterController extends Controller
         // Saving under an existing name means updating that user's filter.
         // This keeps the save flow predictable when the user opens a stored
         // setup without the saved_filter query parameter.
-        if ($editedFilter === null && $existing !== null) $editedFilter = $existing;
+        if ($editedFilter === null && $existing !== null) {
+            $editedFilter = $existing;
+        }
 
         if ($editedFilter === null && $user->savedPredictionFilters()->count() >= $limits->limitFor($user)) {
             return back()->withErrors(['saved_filter' => __('Das Limit für gespeicherte Filter in deinem Tarif ist erreicht.')]);

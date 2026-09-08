@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Enums\PlanLevel;
 use App\Models\Watchlist;
-use App\Services\PlanAccessService;
 use App\Services\PersonalCollectionLimitService;
 use App\Services\PersonalizedSignalService;
-use Illuminate\Http\RedirectResponse;
+use App\Services\PlanAccessService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -71,8 +71,7 @@ class WatchlistController extends Controller
         $currentPrices = $instrumentIds->isEmpty()
             ? collect()
             : DB::table('current_stock_quotes as quote')
-                ->joinSub($latestQuotes, 'latest', fn ($join) =>
-                    $join->on('latest.quote_id', '=', 'quote.id'))
+                ->joinSub($latestQuotes, 'latest', fn ($join) => $join->on('latest.quote_id', '=', 'quote.id'))
                 ->get([
                     'quote.instrument_id',
                     'quote.price as current_price',
@@ -142,10 +141,8 @@ class WatchlistController extends Controller
         $latestPredictions = $instrumentIds->isEmpty()
             ? collect()
             : DB::table('predictions as prediction')
-                ->joinSub($latestPredictionIds, 'latest', fn ($join) =>
-                    $join->on('latest.prediction_id', '=', 'prediction.id'))
-                ->leftJoinSub($latestQuoteIds, 'latest_quote', fn ($join) =>
-                    $join->on('latest_quote.instrument_id', '=', 'prediction.instrument_id'))
+                ->joinSub($latestPredictionIds, 'latest', fn ($join) => $join->on('latest.prediction_id', '=', 'prediction.id'))
+                ->leftJoinSub($latestQuoteIds, 'latest_quote', fn ($join) => $join->on('latest_quote.instrument_id', '=', 'prediction.instrument_id'))
                 ->leftJoin('current_stock_quotes as current_quote', 'current_quote.id', '=', 'latest_quote.quote_id')
                 ->select([
                     'prediction.id',
@@ -173,7 +170,9 @@ class WatchlistController extends Controller
                     ->selectRaw($signalSql.' AS personalized_signal')
                     ->orderByDesc('prediction.prediction_time')->orderByDesc('prediction.id')->limit(30)->get();
                 $latest = $history->first();
-                if (! $latest) return [$instrumentId => null];
+                if (! $latest) {
+                    return [$instrumentId => null];
+                }
                 $to = strtoupper((string) ($latest->personalized_signal ?: 'HOLD'));
                 $previous = $history->skip(1)->first(fn ($row) => strtoupper((string) ($row->personalized_signal ?: 'HOLD')) !== $to);
 
@@ -214,7 +213,9 @@ class WatchlistController extends Controller
         $performanceSeries = $watchlist->items->mapWithKeys(function ($item) use ($latestPredictions): array {
             $entryPrice = is_numeric($item->entry_price) && (float) $item->entry_price > 0
                 ? (float) $item->entry_price : null;
-            if ($entryPrice === null) return [$item->instrument_id => collect()];
+            if ($entryPrice === null) {
+                return [$item->instrument_id => collect()];
+            }
 
             $points = DB::table('price_bars')
                 ->where('instrument_id', $item->instrument_id)

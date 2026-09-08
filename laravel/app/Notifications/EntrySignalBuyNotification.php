@@ -8,7 +8,9 @@ use App\Support\AiScore;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\Part\DataPart;
 
 class EntrySignalBuyNotification extends Notification
@@ -17,7 +19,10 @@ class EntrySignalBuyNotification extends Notification
 
     public function __construct(public readonly Prediction $prediction, public readonly string $signal = 'BUY') {}
 
-    public function via(object $notifiable): array { return ['mail']; }
+    public function via(object $notifiable): array
+    {
+        return ['mail'];
+    }
 
     public function toMail(object $notifiable): MailMessage
     {
@@ -33,7 +38,7 @@ class EntrySignalBuyNotification extends Notification
             ->reverse()
             ->values()
             ->map(fn (object $bar): array => [
-                'x' => \Illuminate\Support\Carbon::parse($bar->bar_time)->getTimestampMs(),
+                'x' => Carbon::parse($bar->bar_time)->getTimestampMs(),
                 'y' => [(float) $bar->open, (float) $bar->high, (float) $bar->low, (float) $bar->close],
             ])->all();
         $horizonRows = DB::table('predictions')
@@ -45,6 +50,7 @@ class EntrySignalBuyNotification extends Notification
                 $targetField = 'predicted_price_'.$days.'d';
                 $target = is_numeric($row->{$targetField} ?? null) ? (float) $row->{$targetField} : null;
                 $current = (float) ($row->current_price ?? 0);
+
                 return [$days => [
                     'days' => $days,
                     'target' => $target,
@@ -75,7 +81,7 @@ class EntrySignalBuyNotification extends Notification
                 'assessment' => $assessment,
                 'assessmentSummary' => $assessmentSummary,
             ])
-            ->withSymfonyMessage(function (\Symfony\Component\Mime\Email $email) use ($chart): void {
+            ->withSymfonyMessage(function (Email $email) use ($chart): void {
                 $chartPart = (new DataPart($chart, 'aki-entry-signal-chart.png', 'image/png'))->asInline();
                 $chartPart->setContentId('aki-entry-signal-chart@aktienki.com');
                 $email->addPart($chartPart);

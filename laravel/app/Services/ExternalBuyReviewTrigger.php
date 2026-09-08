@@ -57,7 +57,9 @@ final class ExternalBuyReviewTrigger
             'country' => $instrument->country ?: $exchange?->country,
         ], static fn ($value): bool => $value !== null && $value !== '');
         $confidence = is_numeric($prediction->confidence) ? (float) $prediction->confidence : null;
-        if ($confidence !== null && $confidence <= 1) $confidence *= 100;
+        if ($confidence !== null && $confidence <= 1) {
+            $confidence *= 100;
+        }
         $expectedReturn = is_numeric($prediction->predicted_return)
             ? (float) $prediction->predicted_return * (abs((float) $prediction->predicted_return) <= 1 ? 100 : 1)
             : ($prediction->current_price && is_numeric($prediction->predicted_price)
@@ -122,7 +124,9 @@ final class ExternalBuyReviewTrigger
         try {
             $stock = $this->serving->stock($symbol);
             $prediction = $stock?->latest_prediction;
-            if (! $stock || ! $prediction) return [];
+            if (! $stock || ! $prediction) {
+                return [];
+            }
 
             $horizon = collect($stock->horizons ?? [])->first(
                 fn (array $item): bool => (int) ($item['horizon'] ?? 0) === (int) $prediction->horizon
