@@ -61,7 +61,7 @@ as_app "$APP" php artisan config:cache
 as_app "$APP" php artisan route:cache
 as_app "$APP" php artisan view:cache
 as_app "$APP" php artisan event:cache
-as_app "$APP" php artisan storage:link || true
+as_app "$APP" php artisan storage:link --force
 
 log "Permissions"
 chown -R "$APP_USER":www-data "$APP/storage" "$APP/bootstrap/cache"

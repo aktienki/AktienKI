@@ -99,3 +99,7 @@ storage/models/*
 /storage/backups/
 /storage/depot-tests/
 /storage/imports/
+
+# stray backup dirs with duplicate/mis-namespaced classes
+*_Backup/
+*_backup/
