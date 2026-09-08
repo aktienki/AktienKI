@@ -96,3 +96,6 @@ storage/models/*
 /laravel/storage/backups/
 /laravel/storage/depot-tests/
 /laravel/storage/imports/
+/storage/backups/
+/storage/depot-tests/
+/storage/imports/
