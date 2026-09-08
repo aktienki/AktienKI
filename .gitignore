@@ -84,3 +84,15 @@ storage/models/*
 /.workstation-debug/
 /python-engine/reports/
 /AktienKI_Nutzerprofile_DE.pptx
+
+# large model artifacts / data / backups kept only on the server
+/model-runtime/
+/model-releases/
+/python-engine-v2/
+/scripts/
+/.deploy-backups/
+/laravel/storage/deploy-backups/
+/laravel/storage/model-prune-backups/
+/laravel/storage/backups/
+/laravel/storage/depot-tests/
+/laravel/storage/imports/
