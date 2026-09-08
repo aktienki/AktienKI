@@ -44,3 +44,43 @@ storage/models/*
 *.tar
 *.tar.gz
 *.bak
+
+# --- Beta baseline cleanup (2026-09-08): manual backup files & scratch ---
+*.bak
+*.bak-*
+*.pre-*
+*.before-*
+*.three-month-window-*
+*.pre-eligible-scope-*
+*.pre-pytorch60-*
+
+# scratch copies dropped at the laravel/ root
+/laravel/*.php
+/laravel/*.blade.php
+/laravel/=
+/laravel/tmp_*.py
+/laravel/.tmp/
+/laravel/tmp/
+/laravel/output/
+/laravel/backups/
+/laravel/runtime/
+/laravel/tests/runtime/
+/laravel/.deploy-news/
+/laravel/.deploy-backups/
+/laravel/tmp-*/
+
+# environment-specific symlink (points at an absolute prod path)
+/laravel/public/storage
+
+# local machine / non-app working dirs
+/pipeline-next/
+/reports/
+/output/
+/tools/
+/tmp/
+/.venv/
+/.arima-audit/
+/.macbook-training/
+/.workstation-debug/
+/python-engine/reports/
+/AktienKI_Nutzerprofile_DE.pptx
