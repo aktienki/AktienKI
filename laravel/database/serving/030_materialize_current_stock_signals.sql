@@ -5,6 +5,12 @@ BEGIN;
 -- refreshing it after a batch becomes complete.
 SET LOCAL jit = off;
 
+-- PostgreSQL evaluates materialized-view population with a restricted
+-- search_path. This existing SQL function references serving tables by their
+-- unqualified names, so pin its safe lookup path before CREATE/REFRESH.
+ALTER FUNCTION serving_indicator_entry_allowed(bigint)
+    SET search_path = public, pg_temp;
+
 DROP TRIGGER IF EXISTS serving_refresh_current_stock_signals_after_insert
     ON serving_prediction_batches;
 DROP TRIGGER IF EXISTS serving_refresh_current_stock_signals_after_update
