@@ -162,12 +162,12 @@
             </section>
 
             <section class="ak-card overflow-hidden border-cyan-400/25">
-                <div class="overflow-hidden">
-                    <table class="w-full table-fixed border-collapse text-left">
+                <div class="overflow-x-auto">
+                    <table class="w-full table-fixed border-collapse text-left" style="min-width:1180px">
                         <colgroup>
-                            <col class="w-[15%]">
-                            <col class="w-[10%]">
-                            @foreach(range(1, 6) as $modelColumn)<col class="w-[12.5%]">@endforeach
+                            <col style="width:220px">
+                            <col style="width:120px">
+                            @foreach(range(1, 6) as $modelColumn)<col style="width:140px">@endforeach
                         </colgroup>
                         <thead class="bg-cyan-400/[.055] text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">
                             @php
