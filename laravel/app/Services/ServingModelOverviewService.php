@@ -44,7 +44,7 @@ final class ServingModelOverviewService
         $calibration = $this->json($release->score_calibration);
         $filterSummary = $this->json($release->filter_summary);
         $artifactManifest = $this->json($release->artifact_manifest);
-        $currentSignal = $connection->table('serving_current_stock_signals')
+        $currentSignal = $connection->table(ServingCurrentSignalSource::relation())
             ->where('instrument_id', $instrument->id)
             ->first();
         $predictions = $connection->table('serving_predictions')

@@ -19,7 +19,7 @@ final class ServingMarketSnapshotService
         return $this->cache()->remember('serving.market-snapshot.v1.'.$scope.'.'.app()->getLocale(), now()->addMinutes(2), function () use ($instrumentIds, $scope): array {
             try {
                 $rows = DB::connection('serving')
-                    ->table('serving_current_stock_signals as signal')
+                    ->table(ServingCurrentSignalSource::relation().' as signal')
                     ->join('serving_instruments as instrument', 'instrument.id', '=', 'signal.instrument_id')
                     ->where('instrument.instrument_type', 'stock')
                     ->where('instrument.is_active', true)

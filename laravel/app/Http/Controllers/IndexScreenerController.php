@@ -7,6 +7,7 @@ use App\Livewire\Dashboard\MarketData;
 use App\Services\FreeRegionalStockUniverseService;
 use App\Services\PersonalizedSignalService;
 use App\Services\PlanAccessService;
+use App\Services\ServingCurrentSignalSource;
 use App\Support\AiScore;
 use App\Support\DirectionalSignalRating;
 use Illuminate\Http\Request;
@@ -357,7 +358,7 @@ class IndexScreenerController extends Controller
             return;
         }
 
-        $currentBatches = DB::connection('serving')->table('serving_current_stock_signals')
+        $currentBatches = DB::connection('serving')->table(ServingCurrentSignalSource::relation())
             ->whereIn('instrument_id', $instrumentIds)
             ->pluck('batch_id', 'instrument_id');
         $predictions = DB::connection('serving')->table('serving_predictions')

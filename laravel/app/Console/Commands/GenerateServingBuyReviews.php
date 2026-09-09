@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\GenerateExternalBuyReview;
 use App\Models\ExternalBuyReview;
 use App\Models\Instrument;
+use App\Services\ServingCurrentSignalSource;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -16,7 +17,7 @@ final class GenerateServingBuyReviews extends Command
 
     public function handle(): int
     {
-        $rows = DB::connection('serving')->table('serving_current_stock_signals as signal')
+        $rows = DB::connection('serving')->table(ServingCurrentSignalSource::relation().' as signal')
             ->join('serving_instruments as instrument', 'instrument.id', '=', 'signal.instrument_id')
             ->join('serving_active_models as active', 'active.instrument_id', '=', 'instrument.id')
             ->where('instrument.instrument_type', 'stock')->where('instrument.is_active', true)

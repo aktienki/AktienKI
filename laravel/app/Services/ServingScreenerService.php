@@ -308,7 +308,7 @@ final class ServingScreenerService
             ? ['points' => [], 'currency' => $currency, 'provider_symbol' => $providerSymbol, 'cached_at' => null, 'cache_hit' => false]
             : $this->charts->load($instrumentId, $providerSymbol, $currency);
 
-        $signal = DB::connection('serving')->table('serving_current_stock_signals')
+        $signal = DB::connection('serving')->table(ServingCurrentSignalSource::relation())
             ->where('instrument_id', $instrumentId)
             ->first();
         abort_unless($signal, 404);
@@ -355,7 +355,7 @@ final class ServingScreenerService
 
     private function servingRows(): Collection
     {
-        return Cache::store('file')->remember('screener.serving.rows.v1', now()->addMinutes(5), fn () => DB::connection('serving')->table('serving_current_stock_signals as current_signal')
+        return Cache::store('file')->remember('screener.serving.rows.v1', now()->addMinutes(5), fn () => DB::connection('serving')->table(ServingCurrentSignalSource::relation().' as current_signal')
             ->join('serving_instruments as instrument', 'instrument.id', '=', 'current_signal.instrument_id')
             ->leftJoin('serving_instrument_fundamentals as fundamental', 'fundamental.instrument_id', '=', 'instrument.id')
             ->where('instrument.instrument_type', 'stock')
