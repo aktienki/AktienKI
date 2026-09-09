@@ -12,11 +12,11 @@
 <x-dashboard.card class="ak-standard-card ak-card-static ak-dashboard-card ak-dashboard-market-card ak-dashboard-overall flex min-h-[260px] flex-col lg:min-h-0">
     <div class="ak-standard-card-head flex items-start justify-between gap-4">
         <div>
-            <p class="flex items-center gap-2 text-xs font-black uppercase tracking-[.18em] text-cyan-300">
-                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-[10px] tracking-normal">AKI</span>
+            <p class="flex items-center gap-2 text-xs font-black uppercase tracking-[.18em]" style="color:#334155!important;opacity:1!important">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border text-[10px] tracking-normal" style="border-color:#64748b!important;background:#475569!important;color:#fff!important;opacity:1!important">AKI</span>
                 {{ __('Market Regime') }}
             </p>
-            <p class="mt-1 text-xs text-slate-400">{{ __('Breite, Bewegung und Risiko in einer Einordnung') }}</p>
+            <p class="mt-1 text-xs" style="color:#475569!important;opacity:1!important">{{ __('Breite, Bewegung und Risiko in einer Einordnung') }}</p>
         </div>
     </div>
 

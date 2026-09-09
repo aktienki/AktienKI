@@ -137,16 +137,15 @@ final class DashboardMobileOrderTest extends TestCase
         $this->assertStringNotContainsString("__('Meine Handelschancen')", $view);
     }
 
-    public function test_champion_reason_is_expandable_and_risk_always_has_a_level(): void
+    public function test_three_factor_champion_reason_is_expandable(): void
     {
         $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php');
         $controller = (string) file_get_contents(dirname(__DIR__, 2).'/app/Http/Controllers/DashboardController.php');
 
         $this->assertStringContainsString('dashboard-champion-reason group', $view);
         $this->assertStringContainsString('[&::-webkit-details-marker]:hidden', $view);
-        $this->assertStringContainsString('default => 50.0', $view);
-        $this->assertStringContainsString(':score="$rankRisk" :display="$rankRiskLevel"', $view);
-        $this->assertStringContainsString('$stock->risk_percent', $controller);
+        $this->assertStringContainsString(':score="$rankQualityPercent" :display="$rankQualityGrade"', $view);
+        $this->assertStringContainsString('$this->threeFactorChampion($externalConfirmedBuys)', $controller);
         $this->assertStringContainsString('ServingScreenerService::class', $controller);
     }
 }

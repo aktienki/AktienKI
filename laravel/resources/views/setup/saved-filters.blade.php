@@ -147,20 +147,24 @@
                         @endif
                         <div class="mt-2 flex flex-wrap content-start gap-1.5">
                             @foreach (collect(array_replace($defaults, $savedFilter->filters ?? []))->filter(function ($value, $key) use ($defaults, $servingConfigurations) {
-                                if ($key === 'serving_model_configurations') return false;
+                                if (in_array($key, ['serving_model_configurations', 'optimizer_result'], true)) return false;
                                 if ($key === 'exit_strategy' && $servingConfigurations->isNotEmpty()) return false;
                                 if ($key === 'exit_strategy') return true;
                                 if (is_array($value)) return $value !== [];
-                                return (string) $value !== (string) ($defaults[$key] ?? '') && $value !== '' && $value !== null;
+                                return (! array_key_exists($key, $defaults) || $value != $defaults[$key]) && $value !== '' && $value !== null;
                             }) as $key => $value)
                                 @php
-                                    $displayValue = $key === 'model' && is_array($value)
+                                    $displayValue = $key === 'model' && is_array($value) && collect($value)->every(fn ($id) => is_scalar($id))
                                         ? collect($value)->map(fn ($id) => $modelAliases[(int) $id] ?? '#'.$id)->implode(', ')
-                                        : ($key === 'exit_strategy'
+                                        : ($key === 'exit_strategy' && is_scalar($value)
                                             ? (['fixed_20d' => __('20 Tage'), 'signal_change' => __('Signal- oder Marktphasenwechsel'), 'forecast_below_price' => __('Prognose unter Kurs'), 'winner_runner' => __('Winner Runner'), 'prediction_target' => __('Prognoseziel'), 'buy_and_hold' => __('Buy and Hold')][$value] ?? $value)
-                                        : (in_array($key, ['sector_score_rotation', 'index_score_rotation'], true)
+                                        : (in_array($key, ['sector_score_rotation', 'index_score_rotation'], true) && is_scalar($value)
                                             ? ((int) $value === 1 ? __('Aktiv') : __('Inaktiv'))
-                                            : (is_array($value) ? implode(', ', $value) : $value)));
+                                            : (is_array($value)
+                                                ? (collect($value)->every(fn ($item) => is_scalar($item) || $item === null)
+                                                    ? collect($value)->map(fn ($item) => (string) $item)->implode(', ')
+                                                    : json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))
+                                                : $value)));
                                 @endphp
                                 <span class="rounded-md border border-teal-300/15 bg-teal-400/[.055] px-2 py-1 text-[10px] text-slate-200"><b class="text-teal-300/70">{{ $labels[$key] ?? $key }}:</b> {{ $displayValue }}{{ $suffixes[$key] ?? '' }}</span>
                             @endforeach

@@ -16,13 +16,13 @@
 
 <x-dashboard.card class="ak-standard-card ak-signal-overview-card ak-card-static ak-dashboard-card flex min-h-[240px] w-full flex-col p-4 lg:min-h-[255px]">
     <div class="ak-standard-card-head flex items-start gap-2.5">
-        <span class="ak-transition-icon grid h-9 w-9 shrink-0 place-items-center rounded-xl border">
+        <span class="ak-transition-icon grid h-9 w-9 shrink-0 place-items-center rounded-xl border" style="border-color:#64748b!important;background:#475569!important;color:#fff!important;opacity:1!important">
             <x-heroicon-o-scale class="h-4.5 w-4.5" />
         </span>
         <div>
-            <p class="text-[10px] font-black uppercase tracking-[.18em] text-orange-400">{{ __('Signale') }}</p>
-            <h3 class="mt-0.5 text-sm font-black text-[var(--ak-text)]">{{ __('Signal Bias & aktuelle Verteilung') }}</h3>
-            <p class="mt-0.5 text-[9px] text-[var(--ak-muted)]">{{ ($stats['source'] ?? null) === 'serving' ? __('Richtungswechsel und Signalverteilung des aktuellen Serving-Laufs') : __('Richtungswechsel der letzten 5 Tage und KI-Score-Verteilung des aktiven Portfolios') }}</p>
+            <p class="text-[10px] font-black uppercase tracking-[.18em]" style="color:#334155!important;opacity:1!important">{{ __('Signale') }}</p>
+            <h3 class="mt-0.5 text-sm font-black" style="color:#0f172a!important;opacity:1!important">{{ __('Signal Bias & aktuelle Verteilung') }}</h3>
+            <p class="mt-0.5 text-[9px]" style="color:#475569!important;opacity:1!important">{{ ($stats['source'] ?? null) === 'serving' ? __('Richtungswechsel und Signalverteilung des aktuellen Serving-Laufs') : __('Richtungswechsel der letzten 5 Tage und KI-Score-Verteilung des aktiven Portfolios') }}</p>
         </div>
     </div>
 

@@ -55,9 +55,9 @@
         <article @if($collapsible) x-data="{ expanded: false }" @endif class="ak-card-static ak-standard-card min-w-0 overflow-hidden rounded-2xl border border-teal-500/25 bg-[var(--ak-surface)] p-0 shadow-[0_12px_28px_rgba(15,23,42,.08)]">
             <header class="ak-macro-card-head relative flex items-start justify-between gap-3 border-b border-teal-500/20 bg-gradient-to-r from-teal-500/[.12] via-transparent to-amber-400/[.08] px-4 py-3 {{ $collapsible ? 'pr-24' : '' }}">
                 <div class="ak-macro-card-copy min-w-0">
-                    <p class="text-[9px] font-black uppercase tracking-[.18em] text-teal-500">{{ __('Makroindikator') }}</p>
-                    <h2 class="ak-macro-card-title mt-1 flex min-w-0 items-center gap-1.5 text-base font-black text-[var(--ak-text)]">@if($macroFlag)<span class="shrink-0" aria-hidden="true">{{ $macroFlag }}</span>@endif<span class="truncate">{{ $macroCard['title'] }}</span></h2>
-                    <p class="ak-macro-card-subtitle mt-0.5 truncate text-[10px] text-[var(--ak-muted)]">{{ $macroCard['subtitle'] }}</p>
+                    <p class="text-[9px] font-black uppercase tracking-[.18em]" style="color:#334155!important;opacity:1!important">{{ __('Makroindikator') }}</p>
+                    <h2 class="ak-macro-card-title mt-1 flex min-w-0 items-center gap-1.5 text-base font-black" style="color:#0f172a!important;opacity:1!important">@if($macroFlag)<span class="shrink-0" aria-hidden="true">{{ $macroFlag }}</span>@endif<span class="truncate" style="color:#0f172a!important;-webkit-text-fill-color:#0f172a!important;opacity:1!important">{{ $macroCard['title'] }}</span></h2>
+                    <p class="ak-macro-card-subtitle mt-0.5 truncate text-[10px]" style="color:#475569!important;opacity:1!important">{{ $macroCard['subtitle'] }}</p>
                 </div>
                 <div class="flex min-w-0 shrink-0 items-start gap-2">
                 @if (in_array($macroCard['key'] ?? null, ['rates', 'vdax', 'ai-dax', 'dax-backtest', 'sp500-backtest', 'nasdaq-backtest', 'dax-ai-score', 'sp500-ai-score', 'global-ai-score'], true))
@@ -125,9 +125,9 @@
                             <line x1="8" y1="{{ number_format($zeroY, 1, '.', '') }}" x2="312" y2="{{ number_format($zeroY, 1, '.', '') }}" stroke="currentColor" stroke-opacity=".34" stroke-dasharray="5 4" />
                         @endif
                         @if (in_array($macroCard['key'] ?? null, ['dax-backtest', 'sp500-backtest'], true) && collect($macroCard['series'])->contains(fn (array $series): bool => ($series['axis'] ?? null) === 'score'))
-                            <text x="312" y="10" text-anchor="end" fill="#a78bfa" fill-opacity=".9" font-size="7">7</text>
-                            <text x="312" y="48" text-anchor="end" fill="#a78bfa" fill-opacity=".75" font-size="7">5</text>
-                            <text x="312" y="88" text-anchor="end" fill="#a78bfa" fill-opacity=".9" font-size="7">3</text>
+                            <text x="312" y="10" text-anchor="end" fill="#64748b" fill-opacity=".9" font-size="7">7</text>
+                            <text x="312" y="48" text-anchor="end" fill="#64748b" fill-opacity=".75" font-size="7">5</text>
+                            <text x="312" y="88" text-anchor="end" fill="#64748b" fill-opacity=".9" font-size="7">3</text>
                         @endif
                         @foreach ($macroCard['series'] as $series)
                             @if (count($series['points'] ?? []) > 0)
@@ -163,7 +163,7 @@
                     @elseif (($macroCard['key'] ?? null) === 'bonds')
                         <p class="mt-0.5 text-right text-[8px] font-bold text-[var(--ak-muted)]">{{ __('Tageswert in USD') }}</p>
                     @elseif (in_array($macroCard['key'] ?? null, ['dax-backtest', 'sp500-backtest'], true))
-                        <p class="mt-0.5 text-right text-[8px] font-bold text-[var(--ak-muted)]">{{ __('Gleiches 20T-Prognosefenster · Orange erwartete Rendite · Cyan realisierte Rendite · Violett Modellscore 3–7') }}</p>
+                        <p class="mt-0.5 text-right text-[8px] font-bold text-[var(--ak-muted)]">{{ __('Gleiches 20T-Prognosefenster · Slate-Blau erwartete Rendite · Graphit realisierte Rendite · Slate-Grau Modellscore 3–7') }}</p>
                     @endif
                     @if (!empty($macroCard['forecast_band']))
                         @php

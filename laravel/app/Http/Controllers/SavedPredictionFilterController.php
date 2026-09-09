@@ -128,6 +128,8 @@ final class SavedPredictionFilterController extends Controller
             'automation_trade_cost' => ['nullable', 'numeric', 'between:0,1000'],
             'transaction_email_enabled' => ['nullable', 'boolean'],
             'backtest_run' => ['nullable', 'uuid'],
+            'return_to_models' => ['nullable', 'boolean'],
+            'models_return_token' => ['nullable', 'string', 'size:40', 'regex:/^[A-Za-z0-9]+$/'],
             'heatmap_selection' => ['nullable', 'string', 'max:4000'],
             'score_min' => ['nullable', 'numeric', 'between:0,10'],
             'confidence_min' => ['nullable', 'numeric', 'between:0,100'],
@@ -207,12 +209,18 @@ final class SavedPredictionFilterController extends Controller
             $filters['serving_model_configurations'] = $servingModelConfigurations;
         }
         if (! empty($validated['backtest_run'])) {
-            $optimizedRun = DB::table('backtest_runs')->where('public_id', $validated['backtest_run'])
+            $sourceRun = DB::table('backtest_runs')->where('public_id', $validated['backtest_run'])
                 ->whereRaw("(settings->>'initiated_by_user_id')::bigint = ?", [$user->id])
                 ->whereIn('status', ['completed', 'completed_with_errors'])->first(['settings']);
-            $optimizedSettings = is_string($optimizedRun?->settings) ? (json_decode($optimizedRun->settings, true) ?: []) : [];
-            if (data_get($optimizedSettings, 'selection_filters.automatic_optimization', false)) {
-                $filters['entry_wait_5d_enabled'] = (int) (bool) data_get($optimizedSettings, 'selection_filters.entry_wait_5d_enabled', false);
+            $sourceSettings = is_string($sourceRun?->settings) ? (json_decode($sourceRun->settings, true) ?: []) : [];
+            $runServingConfigurations = data_get($sourceSettings, 'selection_filters.serving_model_configurations', []);
+            if (is_array($runServingConfigurations) && $runServingConfigurations !== []) {
+                // New strategies created from /setup/models inherit the exact
+                // immutable model selection used by their completed backtest.
+                $filters['serving_model_configurations'] = $runServingConfigurations;
+            }
+            if (data_get($sourceSettings, 'selection_filters.automatic_optimization', false)) {
+                $filters['entry_wait_5d_enabled'] = (int) (bool) data_get($sourceSettings, 'selection_filters.entry_wait_5d_enabled', false);
                 $filters['optimized_backtest_run'] = $validated['backtest_run'];
             }
         }
@@ -319,6 +327,15 @@ final class SavedPredictionFilterController extends Controller
             $savedFilter->forceFill(['automatic_portfolio_enabled' => true])->save();
         }
         $request->session()->put('setup_filter_state', $filters);
+
+        if ($request->boolean('return_to_models')) {
+            $returnParameters = ! empty($validated['models_return_token'])
+                ? ['restore_selection' => $validated['models_return_token']]
+                : [];
+
+            return redirect()->route('setup.models', $returnParameters)
+                ->with('status', __('Strategie gespeichert. Du bist zurück in der Modellübersicht.'));
+        }
 
         return redirect()->route('setup.saved-filters.index', ['highlight' => $savedFilter->id])
             ->with('status', __('Filter gespeichert.'));

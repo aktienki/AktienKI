@@ -6,8 +6,11 @@ use App\Services\ServingChartCacheService;
 use App\Services\ServingReadService;
 use App\Services\ServingStockLegacyViewService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Throwable;
 
 final class ServingStockController extends Controller
 {
@@ -16,11 +19,34 @@ final class ServingStockController extends Controller
         string $symbol,
         ServingReadService $serving,
         ServingStockLegacyViewService $legacyView,
-    ): View {
-        $stock = $serving->stock($symbol);
-        abort_unless($stock, 404, __('Für diese Aktie gibt es in der Service Datenbank kein aktives Modell.'));
+    ): View|RedirectResponse {
+        $returnTo = $request->query('return_to');
+        $returnTo = is_string($returnTo) && Str::startsWith($returnTo, '/') && ! Str::startsWith($returnTo, '//')
+            ? $returnTo
+            : null;
 
-        return view('stocks.show', $legacyView->data($request, $stock));
+        try {
+            $stock = $serving->stock($symbol);
+            if (! $stock) {
+                if ($returnTo) {
+                    return redirect()->to($returnTo)
+                        ->with('error', __('Für diese Aktie gibt es derzeit kein aktives Modell für die Detailansicht.'));
+                }
+
+                abort(404, __('Für diese Aktie gibt es in der Service Datenbank kein aktives Modell.'));
+            }
+
+            return view('stocks.show', $legacyView->data($request, $stock));
+        } catch (Throwable $exception) {
+            if (! $returnTo) {
+                throw $exception;
+            }
+
+            report($exception);
+
+            return redirect()->to($returnTo)
+                ->with('error', __('Die Detaildaten dieser Aktie sind momentan unvollständig. Die Chartsignaltabelle bleibt verfügbar.'));
+        }
     }
 
     public function chartData(

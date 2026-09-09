@@ -614,9 +614,15 @@ final class DepotController extends Controller
             : 0.0;
         $initialCapital = max(0.0, (float) data_get($portfolio->meta, 'automation.initial_capital', 0));
         $performance = $initialCapital > 0 ? (($totalValue - $initialCapital) / $initialCapital) * 100 : 0.0;
-        $returnToPaper = $portfolio->type === 'paper' && $request->query('return_to') === 'paper';
-        $backUrl = $returnToPaper ? route('paper-depots.index') : route('depots.index');
-        $backLabel = $returnToPaper ? __('Zurück zu Musterdepots') : __('Zurück zu Depots');
+        $requestedReturnTo = $request->query('return_to');
+        $safeReturnTo = is_string($requestedReturnTo)
+            && Str::startsWith($requestedReturnTo, '/')
+            && ! Str::startsWith($requestedReturnTo, '//')
+                ? $requestedReturnTo
+                : null;
+        $returnToPaper = $portfolio->type === 'paper' && $requestedReturnTo === 'paper';
+        $backUrl = $safeReturnTo ?: ($returnToPaper ? route('paper-depots.index') : route('depots.index'));
+        $backLabel = $returnToPaper ? __('Zurück zu Musterdepots') : __('Zurück');
         $availableStrategies = $request->user()->savedPredictionFilters()
             ->orderBy('name')
             ->get(['id', 'name', 'filters']);

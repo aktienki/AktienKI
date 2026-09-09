@@ -184,13 +184,22 @@ class StockController extends Controller
         $providerSymbol = $chartCache->providerSymbol($stock);
         $chartPayload = $chartCache->peek((int) $stock->instrument_id, $providerSymbol)
             ?? $chartCache->load((int) $stock->instrument_id, $providerSymbol, (string) $stock->currency);
-        $chartForecasts = $horizons->mapWithKeys(fn (object $horizon, int|string $days): array => [
-            (int) $days => is_numeric($horizon->prediction?->target_price) ? (float) $horizon->prediction->target_price : null,
-        ])->filter(fn ($price): bool => $price !== null)->all();
-        $chartData = $this->servingReportChart((array) ($chartPayload['points'] ?? []), $chartForecasts);
+        $chartForecasts = $horizons->mapWithKeys(function (object $horizon, int|string $days): array {
+            $prediction = $horizon->prediction;
+
+            return [(int) $days => [
+                'price' => is_numeric($prediction?->target_price) ? (float) $prediction->target_price : null,
+                'confidence' => is_numeric($prediction?->confidence_percent) ? (float) $prediction->confidence_percent : null,
+            ]];
+        })->filter(fn (array $forecast): bool => $forecast['price'] !== null)->all();
+        $chartPanelScores = $this->panelChartHistory((int) $stock->instrument_id, (array) ($chartPayload['points'] ?? []));
+        $chartData = $this->servingReportChart((array) ($chartPayload['points'] ?? []), $chartForecasts, $chartPanelScores->all());
         $detail = app(ServingStockLegacyViewService::class)->data($request, $stock);
         $indicators = collect($detail['indicatorCards'] ?? []);
         $indicatorMatrices = $this->stockReportIndicatorMatrices($indicators);
+        $externalBuyReview = $detail['externalBuyReview'] ?? null;
+        $externalBuyReviewPositiveFactors = collect($detail['externalBuyReviewPositiveFactors'] ?? [])->values()->all();
+        $externalBuyReviewRiskFactors = collect($detail['externalBuyReviewRiskFactors'] ?? [])->values()->all();
         $patterns = collect($detail['chartPatternStats'] ?? [])->filter(
             fn (array $pattern): bool => filled($pattern['latest_at'] ?? null)
                 && CarbonImmutable::parse($pattern['latest_at'])->gte(now()->subDays(5)->startOfDay())
@@ -207,7 +216,8 @@ class StockController extends Controller
         $pdf = new Dompdf($options);
         $pdf->loadHtml(view('stocks.serving-report', compact(
             'stock', 'horizons', 'latestPrediction', 'logoData', 'chartData',
-            'indicators', 'indicatorMatrices', 'patterns', 'opportunities', 'risks'
+            'indicators', 'indicatorMatrices', 'patterns', 'opportunities', 'risks',
+            'externalBuyReview', 'externalBuyReviewPositiveFactors', 'externalBuyReviewRiskFactors'
         ))->render(), 'UTF-8');
         $pdf->setPaper('a4', 'portrait');
         $pdf->render();
@@ -290,49 +300,129 @@ class StockController extends Controller
         return $items->take(5)->values()->all();
     }
 
-    private function servingReportChart(array $points, array $forecasts): string
+    private function servingReportChart(array $points, array $forecasts, array $panelHistory = []): string
     {
         $history = collect($points)->filter(fn (array $point): bool => is_numeric($point['close'] ?? null))->take(-66)->values();
         if ($history->isEmpty()) {
-            return 'data:image/svg+xml;base64,'.base64_encode('<svg xmlns="http://www.w3.org/2000/svg" width="720" height="260"><rect width="100%" height="100%" fill="#122034"/><text x="360" y="135" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="14">Keine Kursdaten verfügbar</text></svg>');
+            return 'data:image/svg+xml;base64,'.base64_encode('<svg xmlns="http://www.w3.org/2000/svg" width="720" height="280"><rect width="100%" height="100%" fill="#f8fafc"/><text x="360" y="145" text-anchor="middle" fill="#64748b" font-family="sans-serif" font-size="14">Keine Kursdaten verfügbar</text></svg>');
         }
 
-        $forecastValues = collect($forecasts)->filter(fn ($value): bool => is_numeric($value));
-        $prices = $history->pluck('close')->map(fn ($value): float => (float) $value)->concat($forecastValues)->values();
+        $forecastRows = collect($forecasts)->map(function (mixed $forecast, int|string $days): array {
+            $row = is_array($forecast) ? $forecast : ['price' => $forecast];
+
+            return [
+                'days' => (int) $days,
+                'price' => is_numeric($row['price'] ?? null) ? (float) $row['price'] : null,
+                'confidence' => is_numeric($row['confidence'] ?? null) ? max(0.0, min(100.0, (float) $row['confidence'])) : null,
+            ];
+        })->filter(fn (array $row): bool => $row['days'] > 0 && $row['price'] !== null)->sortBy('days')->values();
+        $ohlcPrices = $history->flatMap(fn (array $point): array => [
+            $point['open'] ?? $point['close'], $point['high'] ?? $point['close'],
+            $point['low'] ?? $point['close'], $point['close'],
+        ])->filter(fn ($value): bool => is_numeric($value))->map(fn ($value): float => (float) $value);
+        $prices = $ohlcPrices->concat($forecastRows->pluck('price'))->values();
         $min = (float) $prices->min();
         $max = (float) $prices->max();
-        $padding = max(($max - $min) * .12, max(abs($max), 1) * .015);
+        $padding = max(($max - $min) * .10, max(abs($max), 1) * .012);
         $min -= $padding;
         $max += $padding;
         $range = max(.00001, $max - $min);
         $width = 720;
-        $height = 260;
-        $left = 42;
-        $right = 26;
-        $top = 20;
+        $height = 280;
+        $left = 48;
+        $right = 70;
+        $top = 22;
         $bottom = 34;
         $plotHeight = $height - $top - $bottom;
-        $historyRight = 465;
+        $plotRight = $width - $right;
+        $historyRight = 455;
         $toY = fn (float $price): float => $top + (($max - $price) / $range) * $plotHeight;
         $toX = fn (int $index): float => $left + ($index / max(1, $history->count() - 1)) * ($historyRight - $left);
-        $line = $history->map(fn (array $point, int $index): string => number_format($toX($index), 1, '.', '').','.number_format($toY((float) $point['close']), 1, '.', ''))->implode(' ');
         $grid = '';
         for ($index = 0; $index <= 4; $index++) {
             $y = $top + ($index / 4) * $plotHeight;
             $value = $max - ($index / 4) * $range;
-            $grid .= '<line x1="'.$left.'" y1="'.$y.'" x2="'.($width - $right).'" y2="'.$y.'" stroke="#365069" stroke-width="0.7"/><text x="'.($left - 5).'" y="'.($y + 3).'" text-anchor="end" fill="#94a3b8" font-size="8">'.number_format($value, 0, ',', '.').'</text>';
+            $grid .= '<line x1="'.$left.'" y1="'.$y.'" x2="'.$plotRight.'" y2="'.$y.'" stroke="#cbd5e1" stroke-width="0.7" stroke-dasharray="4 5"/><text x="'.($left - 5).'" y="'.($y + 3).'" text-anchor="end" fill="#64748b" font-size="8">'.number_format($value, 2, ',', '.').'</text>';
+        }
+        $candles = '';
+        $candleWidth = max(2.0, min(5.0, (($historyRight - $left) / max(1, $history->count())) * .58));
+        foreach ($history as $index => $point) {
+            $open = (float) ($point['open'] ?? $point['close']);
+            $high = (float) ($point['high'] ?? $point['close']);
+            $low = (float) ($point['low'] ?? $point['close']);
+            $close = (float) $point['close'];
+            $x = $toX($index);
+            $color = $close >= $open ? '#22c55e' : '#ef4444';
+            $bodyY = min($toY($open), $toY($close));
+            $bodyHeight = max(1.4, abs($toY($open) - $toY($close)));
+            $candles .= '<line x1="'.$x.'" y1="'.$toY($high).'" x2="'.$x.'" y2="'.$toY($low).'" stroke="'.$color.'" stroke-width="1"/><rect x="'.($x - $candleWidth / 2).'" y="'.$bodyY.'" width="'.$candleWidth.'" height="'.$bodyHeight.'" rx="0.6" fill="'.$color.'"/>';
         }
         $current = (float) $history->last()['close'];
         $forecastLine = number_format($historyRight, 1, '.', '').','.number_format($toY($current), 1, '.', '');
-        $labels = '';
-        $maxDays = max(40, (int) ($forecastValues->keys()->max() ?? 40));
-        foreach ($forecastValues->sortKeys() as $days => $target) {
-            $x = $historyRight + (($width - $right - $historyRight) * ((int) $days / $maxDays));
-            $y = $toY((float) $target);
+        $forecastArea = '';
+        $forecastLabels = '';
+        $maxDays = max(40, (int) ($forecastRows->max('days') ?? 40));
+        $previousX = $historyRight;
+        $previousY = $toY($current);
+        $previousPrice = $current;
+        $forecastIndex = 0;
+        foreach ($forecastRows as $forecast) {
+            $days = $forecast['days'];
+            $target = $forecast['price'];
+            $x = $historyRight + (($plotRight - $historyRight) * ($days / $maxDays));
+            $y = $toY($target);
             $forecastLine .= ' '.number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
-            $labels .= '<circle cx="'.$x.'" cy="'.$y.'" r="4" fill="#22d3ee"/><text x="'.$x.'" y="'.($y - 9).'" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold">'.(int) $days.'T</text>';
+            $color = $target >= $previousPrice ? '#22c55e' : '#ef4444';
+            $forecastArea .= '<polygon points="'.$previousX.','.$previousY.' '.$x.','.$y.' '.$x.','.max($previousY, $y).'" fill="'.$color.'" fill-opacity="0.08" stroke="'.$color.'" stroke-opacity="0.35" stroke-width="0.8"/>';
+            $badgeWidth = 28;
+            $labelY = max($top + 14, $y - 12);
+            $forecastLabels .= '<line x1="'.$x.'" y1="'.$top.'" x2="'.$x.'" y2="'.($top + $plotHeight).'" stroke="'.$color.'" stroke-opacity="0.24" stroke-dasharray="3 5"/><circle cx="'.$x.'" cy="'.$y.'" r="4" fill="#172033" stroke="'.$color.'" stroke-width="2"/><rect x="'.($x - $badgeWidth / 2).'" y="'.($labelY - 11).'" width="'.$badgeWidth.'" height="15" rx="5" fill="'.$color.'"/><text x="'.$x.'" y="'.$labelY.'" text-anchor="middle" fill="#ffffff" font-size="8" font-weight="bold">'.$days.'T</text>';
+            if ($forecast['confidence'] !== null) {
+                $probabilityWidth = 104;
+                $requestedX = $x - $probabilityWidth / 2;
+                $probabilityX = max($left, min($plotRight - $probabilityWidth, $requestedX));
+                $probabilityLabelY = $y < $top + ($plotHeight / 2)
+                    ? $top + $plotHeight - 8 - ($forecastIndex * 18)
+                    : $top + 18 + ($forecastIndex * 18);
+                $probabilityCenterX = $probabilityX + $probabilityWidth / 2;
+                $guideStartY = $y + ($probabilityLabelY > $y ? 6 : -6);
+                $guideEndY = $probabilityLabelY + ($probabilityLabelY > $y ? -12 : 5);
+                $forecastLabels .= '<line x1="'.$x.'" y1="'.$guideStartY.'" x2="'.$probabilityCenterX.'" y2="'.$guideEndY.'" stroke="'.$color.'" stroke-width="0.8" stroke-dasharray="2 3" stroke-opacity="0.45"/><rect x="'.$probabilityX.'" y="'.($probabilityLabelY - 11).'" width="'.$probabilityWidth.'" height="15" rx="5" fill="#172033" stroke="'.$color.'" stroke-width="1"/><text x="'.$probabilityCenterX.'" y="'.$probabilityLabelY.'" text-anchor="middle" fill="#ffffff" font-size="7.3" font-weight="bold">Wahrscheinlichkeit '.number_format($forecast['confidence'], 0, ',', '.').' %</text>';
+            }
+            $previousX = $x;
+            $previousY = $y;
+            $previousPrice = $target;
+            $forecastIndex++;
         }
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'.$width.'" height="'.$height.'" viewBox="0 0 '.$width.' '.$height.'"><rect width="100%" height="100%" rx="10" fill="#122034"/>'.$grid.'<polyline points="'.$line.'" fill="none" stroke="#22d3ee" stroke-width="2"/><line x1="'.$historyRight.'" y1="'.$top.'" x2="'.$historyRight.'" y2="'.($height - $bottom).'" stroke="#f59e0b" stroke-dasharray="5 4"/><polyline points="'.$forecastLine.'" fill="none" stroke="#34d399" stroke-width="2.3" stroke-dasharray="7 4"/>'.$labels.'<text x="'.$left.'" y="'.($height - 10).'" fill="#94a3b8" font-size="9">3 Monate Kursverlauf</text><text x="'.($width - $right).'" y="'.($height - 10).'" text-anchor="end" fill="#34d399" font-size="9">Remote-Prognose</text></svg>';
+        $panelAxis = '<line x1="'.($plotRight + 8).'" y1="'.$top.'" x2="'.($plotRight + 8).'" y2="'.($top + $plotHeight).'" stroke="#b45309" stroke-opacity="0.55"/><text x="'.($width - 4).'" y="'.($top + 7).'" text-anchor="end" fill="#b45309" font-size="8" font-weight="bold">PANEL</text>';
+        foreach ([10, 8, 6, 4, 2, 0] as $panelValue) {
+            $panelY = $top + $plotHeight - ($panelValue / 10) * $plotHeight;
+            $panelAxis .= '<text x="'.($width - 4).'" y="'.($panelY + 3).'" text-anchor="end" fill="#b45309" font-size="8">D'.$panelValue.'</text>';
+        }
+        $firstTimestamp = (int) ($history->first()['timestamp'] ?? 0);
+        $lastTimestamp = (int) ($history->last()['timestamp'] ?? $firstTimestamp);
+        $timestampSpan = max(1, $lastTimestamp - $firstTimestamp);
+        $panelPoints = collect($panelHistory)->filter(fn (array $point): bool => is_numeric($point['x'] ?? null) && is_numeric($point['y'] ?? null))
+            ->map(function (array $point) use ($left, $historyRight, $top, $plotHeight, $firstTimestamp, $timestampSpan): array {
+                $timestamp = (float) $point['x'];
+                if ($timestamp > 10_000_000_000) $timestamp /= 1000;
+
+                return [
+                    $left + (($timestamp - $firstTimestamp) / $timestampSpan) * ($historyRight - $left),
+                    $top + $plotHeight - (max(0, min(10, (float) $point['y'])) / 10) * $plotHeight,
+                    max(0, min(10, (float) $point['y'])),
+                ];
+            })->filter(fn (array $point): bool => $point[0] >= $left && $point[0] <= $historyRight)->values();
+        $panelLine = $panelPoints->count() >= 2
+            ? '<polyline points="'.$panelPoints->map(fn (array $point): string => $point[0].','.$point[1])->implode(' ').'" fill="none" stroke="#b45309" stroke-width="1.7" stroke-dasharray="4 3"/>'
+            : '';
+        if ($panelPoints->isNotEmpty()) {
+            [$panelX, $panelY, $panelValue] = $panelPoints->last();
+            $panelLine .= '<circle cx="'.$panelX.'" cy="'.$panelY.'" r="3" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/><text x="'.($panelX + 5).'" y="'.($panelY - 5).'" fill="#92400e" font-size="7" font-weight="bold">D'.number_format($panelValue, 1, ',', '.').'</text>';
+        }
+        $firstDate = isset($history[0]['timestamp']) ? date('d.m.', (int) $history[0]['timestamp']) : '';
+        $lastDate = isset($history[$history->count() - 1]['timestamp']) ? date('d.m.', (int) $history[$history->count() - 1]['timestamp']) : '';
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'.$width.'" height="'.$height.'" viewBox="0 0 '.$width.' '.$height.'"><defs><clipPath id="plot"><rect x="'.$left.'" y="'.$top.'" width="'.($plotRight - $left).'" height="'.$plotHeight.'"/></clipPath></defs><rect width="100%" height="100%" rx="10" fill="#f8fafc"/>'.$grid.'<g clip-path="url(#plot)">'.$candles.$forecastArea.'<line x1="'.$historyRight.'" y1="'.$top.'" x2="'.$historyRight.'" y2="'.($height - $bottom).'" stroke="#f59e0b" stroke-dasharray="5 4"/><polyline points="'.$forecastLine.'" fill="none" stroke="#16a34a" stroke-width="2.2"/>'.$panelLine.'</g>'.$forecastLabels.$panelAxis.'<text x="'.$left.'" y="'.($height - 10).'" fill="#64748b" font-size="8">'.$firstDate.'</text><text x="'.$historyRight.'" y="'.($height - 10).'" text-anchor="end" fill="#64748b" font-size="8">'.$lastDate.'</text><text x="'.$plotRight.'" y="'.($height - 10).'" text-anchor="end" fill="#15803d" font-size="8">Prognose</text></svg>';
 
         return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
@@ -1051,6 +1141,7 @@ class StockController extends Controller
             'x' => $point['x'],
             'y' => $point['y'],
         ]);
+        $historicalPanelScores = $this->panelChartHistory((int) $instrument->id, $chartCandles->all());
         $historicalSignalTransitions = $historicalAiHistory
             ->values()
             ->filter(fn (array $point, int $index): bool => $index > 0 && $point['signal'] !== $historicalAiHistory->values()->get($index - 1)['signal'])
@@ -1199,6 +1290,7 @@ class StockController extends Controller
             ->orderBy('maturity_date')
             ->limit(150)
             ->get();
+        $panelSector = $this->panelSectorSnapshot($instrument);
 
         return view('stocks.show', compact(
             'instrument',
@@ -1233,6 +1325,7 @@ class StockController extends Controller
             'chartPatterns',
             'chartPatternStats',
             'historicalAiScores',
+            'historicalPanelScores',
             'historicalSignalTransitions',
             'latestSignalTransition',
             'chartFocusAt',
@@ -1252,6 +1345,7 @@ class StockController extends Controller
             'stockNewsCount',
             'stockEtfs',
             'linkedSecurities',
+            'panelSector',
             'canViewRealtime',
             'canUseChartIndicators',
             'canViewChartPatterns',
@@ -1262,6 +1356,119 @@ class StockController extends Controller
             'horizonTargets',
             'horizonStability',
         ));
+    }
+
+    private function panelSectorSnapshot(object $instrument): array
+    {
+        $empty = ['percentile' => null, 'decile' => null, 'sector' => $instrument->sector ?? null, 'as_of' => null, 'peer_count' => 0];
+
+        if (! Schema::hasTable('panel_predictions') || ! filled($instrument->sector ?? null)) {
+            return $empty;
+        }
+
+        return Cache::remember('stocks.panel-sector.v1.'.(int) $instrument->id, now()->addMinutes(5), function () use ($instrument, $empty): array {
+            try {
+                $panelVersion = 'panel-price-risk-freeze-2026-09-07';
+                $peakCount = (int) DB::table('panel_predictions')
+                    ->where('model_version', $panelVersion)
+                    ->groupBy('as_of_date')
+                    ->orderByDesc(DB::raw('count(*)'))
+                    ->value(DB::raw('count(*)'));
+                $panelAsOf = DB::table('panel_predictions')
+                    ->where('model_version', $panelVersion)
+                    ->groupBy('as_of_date')
+                    ->havingRaw('count(*) >= ?', [max(50, (int) ($peakCount * 0.85))])
+                    ->orderByDesc('as_of_date')
+                    ->value('as_of_date');
+
+                if (! $panelAsOf) {
+                    return $empty;
+                }
+
+                $stockScore = DB::table('panel_predictions')
+                    ->where('model_version', $panelVersion)
+                    ->where('as_of_date', $panelAsOf)
+                    ->where('instrument_id', (int) $instrument->id)
+                    ->value('raw_score');
+
+                if (! is_numeric($stockScore)) {
+                    return $empty;
+                }
+
+                $sectorScores = DB::table('panel_predictions as panel')
+                    ->join('instruments as peer', 'peer.id', '=', 'panel.instrument_id')
+                    ->where('panel.model_version', $panelVersion)
+                    ->where('panel.as_of_date', $panelAsOf)
+                    ->where('peer.sector', (string) $instrument->sector)
+                    ->whereNotNull('panel.raw_score')
+                    ->pluck('panel.raw_score')
+                    ->map(fn ($score): float => (float) $score);
+                $peerCount = $sectorScores->count();
+
+                if ($peerCount === 0) {
+                    return $empty;
+                }
+
+                $score = (float) $stockScore;
+                $below = $sectorScores->filter(fn (float $peerScore): bool => $peerScore < $score)->count();
+                $equal = $sectorScores->filter(fn (float $peerScore): bool => abs($peerScore - $score) < 0.0000001)->count();
+                $percentile = $peerCount === 1
+                    ? 100.0
+                    : (($below + max(0, $equal - 1) / 2) / ($peerCount - 1)) * 100;
+                $percentile = round(max(0, min(100, $percentile)), 1);
+
+                return [
+                    'percentile' => $percentile,
+                    'decile' => max(1, min(10, (int) ceil(max(0.1, $percentile) / 10))),
+                    'sector' => (string) $instrument->sector,
+                    'as_of' => $panelAsOf,
+                    'peer_count' => $peerCount,
+                ];
+            } catch (Throwable) {
+                return $empty;
+            }
+        });
+    }
+
+    /** @return \Illuminate\Support\Collection<int, array{x:int,y:float}> */
+    private function panelChartHistory(int $instrumentId, array $chartPoints): \Illuminate\Support\Collection
+    {
+        if (! Schema::hasTable('panel_predictions') || $chartPoints === []) {
+            return collect();
+        }
+
+        $timestamps = collect($chartPoints)->map(function (array $point): ?int {
+            $timestamp = $point['timestamp'] ?? $point['x'] ?? null;
+            if (! is_numeric($timestamp)) return null;
+            $timestamp = (int) $timestamp;
+
+            return $timestamp > 10_000_000_000 ? (int) floor($timestamp / 1000) : $timestamp;
+        })->filter()->values();
+        if ($timestamps->isEmpty()) return collect();
+
+        try {
+            return DB::table('panel_predictions')
+                ->where('model_version', 'panel-price-risk-freeze-2026-09-07')
+                ->where('instrument_id', $instrumentId)
+                ->whereBetween('as_of_date', [
+                    CarbonImmutable::createFromTimestamp((int) $timestamps->min())->toDateString(),
+                    CarbonImmutable::createFromTimestamp((int) $timestamps->max())->toDateString(),
+                ])
+                ->orderBy('as_of_date')
+                ->get(['as_of_date', 'xsec_pctile', 'decile'])
+                ->map(function (object $row): array {
+                    $score = is_numeric($row->xsec_pctile)
+                        ? (float) $row->xsec_pctile * 10
+                        : (is_numeric($row->decile) ? (float) $row->decile : 0.0);
+
+                    return [
+                        'x' => CarbonImmutable::parse($row->as_of_date)->getTimestampMs(),
+                        'y' => max(0.0, min(10.0, $score)),
+                    ];
+                });
+        } catch (Throwable) {
+            return collect();
+        }
     }
 
     public function liveQuote(Request $request, string $symbol, PlanAccessService $planAccess, TwelveDataService $marketData): JsonResponse

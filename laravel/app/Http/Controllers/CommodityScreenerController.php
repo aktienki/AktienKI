@@ -65,11 +65,27 @@ final class CommodityScreenerController extends Controller
             ->groupBy('instrument_id');
         $commodities->each(function (object $commodity) use ($localInstruments, $chartBars): void {
             $instrument = $localInstruments->get(strtoupper((string) $commodity->symbol));
+            $commodity->local_instrument_id = $instrument?->id;
             $commodity->chart_points = $instrument
                 ? collect($chartBars->get($instrument->id, collect()))->take(-132)->values()
                 : collect();
         });
 
-        return view('commodities.index', compact('commodities'));
+        $userWatchlists = DB::table('watchlists')
+            ->where('user_id', $request->user()->id)
+            ->where('active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get(['id', 'name', 'is_default']);
+        $watchlistMemberships = $userWatchlists->isEmpty()
+            ? collect()
+            : DB::table('watchlist_items')
+                ->whereIn('watchlist_id', $userWatchlists->pluck('id'))
+                ->whereIn('instrument_id', $localInstruments->pluck('id'))
+                ->get(['instrument_id', 'watchlist_id'])
+                ->groupBy('instrument_id')
+                ->map(fn ($items) => $items->pluck('watchlist_id')->map(fn ($id) => (int) $id));
+
+        return view('commodities.index', compact('commodities', 'userWatchlists', 'watchlistMemberships'));
     }
 }

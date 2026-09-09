@@ -8,6 +8,7 @@ use App\Models\Portfolio;
 use App\Models\SmartSelectionLabel;
 use App\Models\User;
 use App\Services\PlanAccessService;
+use App\Services\ServingDashboardService;
 use App\Services\ServingMarketSnapshotService;
 use App\Services\ServingReadService;
 use App\Services\ServingScreenerService;
@@ -18,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -138,8 +140,6 @@ class DashboardController extends Controller
         ];
         $marketFactorSnapshot = ['current' => collect(), 'history' => collect($servingMarketSnapshot['daily_scores'] ?? [])];
         $continentPredictions = $this->continentPredictions();
-        $recentSignalOverview = $this->recentSignalOverview();
-        $signalCockpit = $this->signalCockpit();
         $profileUniverseStats = $this->profileUniverseStats($user);
         // Earnings are hidden until they are published to a serving table.
         // Local fundamentals must not silently leak into a remote-backed view.
@@ -160,9 +160,38 @@ class DashboardController extends Controller
                 $stock->horizon_fusion_consensus_return = $stock->expected_return_20d;
                 $stock->market_return_20d = $stock->expected_return_20d;
             });
+        $externalConfirmedBuys = $this->externalConfirmedBuys($remoteDashboardStocks);
+        $threeFactorRanked = $this->threeFactorRanking($externalConfirmedBuys);
+        $panelRankedBuys = $this->threeFactorRanking(
+            $remoteDashboardStocks
+                ->filter(fn (object $stock): bool => strtoupper((string) ($stock->personalized_signal ?? '')) === 'BUY')
+                ->values()
+        );
+        $threeFactorEligible = $threeFactorRanked
+            ->filter(fn (object $stock): bool => (int) ($stock->panel_decile ?? 0) >= 6)
+            ->values();
         $topStockToday = $remoteDashboardStocks->firstWhere('personalized_signal', 'BUY');
         $topWatchStock = $remoteDashboardStocks->firstWhere('personalized_signal', 'WATCH');
-        $topRankedStocks = $remoteDashboardStocks->take(1)->values();
+        $topRankedStocks = $threeFactorEligible->take(1)->values();
+        $championInstrumentId = $topRankedStocks->first()?->instrument_id;
+        $panelAlternativePool = $panelRankedBuys
+            ->reject(fn (object $stock): bool => $championInstrumentId !== null
+                && (int) $stock->instrument_id === (int) $championInstrumentId)
+            ->values();
+        $threeFactorAlternatives = $panelAlternativePool
+            ->take(2)
+            ->values()
+            ->map(function (object $stock, int $index): object {
+                $alternative = clone $stock;
+                $alternative->alternative_category = 'rank';
+                $alternative->alternative_rank = $index + 2;
+
+                return $alternative;
+            });
+        $usedAlternativeInstrumentIds = $threeFactorAlternatives
+            ->pluck('instrument_id')
+            ->map(fn ($instrumentId): int => (int) $instrumentId)
+            ->all();
         // There is deliberately no local market-data fallback. The former
         // ChartView daily-tip query read local predictions and therefore could
         // disagree with the serving-backed dashboard cards.
@@ -207,6 +236,43 @@ class DashboardController extends Controller
                 })
                 ->values()
             : collect();
+        $additionalAlternative = $remoteDashboardStocks
+            ->filter(fn (object $stock): bool => in_array(strtoupper((string) ($stock->personalized_signal ?? '')), ['BUY', 'WATCH'], true))
+            ->reject(fn (object $stock): bool => in_array((int) $stock->instrument_id, array_merge(
+                $usedAlternativeInstrumentIds,
+                $championInstrumentId !== null ? [(int) $championInstrumentId] : [],
+            ), true))
+            ->sortByDesc(function (object $stock): array {
+                $hasPullbackOpportunity = is_numeric($stock->expected_return_10d)
+                    && (float) $stock->expected_return_10d < 0
+                    && ((is_numeric($stock->expected_return_20d) && (float) $stock->expected_return_20d > 0)
+                        || (is_numeric($stock->expected_return_40d) && (float) $stock->expected_return_40d > 0));
+
+                return [
+                    $hasPullbackOpportunity ? 1 : 0,
+                    max(
+                        is_numeric($stock->expected_return_20d) ? (float) $stock->expected_return_20d : -999.0,
+                        is_numeric($stock->expected_return_40d) ? (float) $stock->expected_return_40d : -999.0,
+                    ),
+                    (float) ($stock->ranking_score ?? 0),
+                ];
+            })
+            ->first();
+        if ($additionalAlternative) {
+            $additionalAlternative = clone $additionalAlternative;
+            $additionalAlternative->alternative_category = 'alternative';
+            $threeFactorAlternatives->push($additionalAlternative);
+        }
+        $scoreRiser = $canUsePro ? $this->strongestScoreRiser($remoteDashboardStocks) : null;
+        $topIndicatorStock = $canUsePro ? $this->topIndicatorScoreStock($remoteDashboardStocks) : null;
+        $bestNewStock = $canUsePro
+            ? $this->bestNewBuyStock($remoteDashboardStocks, collect([
+                $championInstrumentId,
+                $scoreRiser?->instrument_id,
+                $topIndicatorStock?->instrument_id,
+                ...$usedAlternativeInstrumentIds,
+            ])->filter()->map(fn ($instrumentId): int => (int) $instrumentId)->unique()->all())
+            : null;
         $messageReminders = collect()
             ->merge(
                 DB::table('prediction_purchase_reminders as reminder')
@@ -275,8 +341,8 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'riskProfile', 'strategyPortfolio', 'overview', 'marketSituation', 'continentPredictions',
             'marketFactorSnapshot',
-            'recentSignalOverview',
-            'signalCockpit',
+            'externalConfirmedBuys',
+            'threeFactorAlternatives',
             'profileUniverseStats',
             'recentEarnings',
             'communityOverview',
@@ -293,8 +359,182 @@ class DashboardController extends Controller
             'topRankedStocks',
             'dailyTips',
             'dashboardOpportunities',
+            'scoreRiser',
+            'topIndicatorStock',
+            'bestNewStock',
             'newsCenterItems',
         ));
+    }
+
+    /**
+     * Best current BUY that has only recently changed to BUY. Candidates which
+     * already appear in the adjacent dashboard selections stay excluded.
+     */
+    private function bestNewBuyStock(Collection $stocks, array $excludedInstrumentIds = []): ?object
+    {
+        $currentBuys = $stocks
+            ->filter(fn (object $stock): bool => strtoupper((string) ($stock->personalized_signal ?? $stock->model_signal ?? '')) === 'BUY')
+            ->reject(fn (object $stock): bool => in_array((int) $stock->instrument_id, $excludedInstrumentIds, true))
+            ->values();
+        if ($currentBuys->isEmpty()) {
+            return null;
+        }
+
+        $buyChanges = collect(app(ServingDashboardService::class)->signalChanges())
+            ->filter(fn (array $change): bool => strtoupper((string) ($change['to'] ?? '')) === 'BUY')
+            ->keyBy(fn (array $change): string => strtoupper((string) ($change['symbol'] ?? '')));
+
+        $newBuy = $currentBuys
+            ->filter(fn (object $stock): bool => $buyChanges->has(strtoupper((string) $stock->symbol)))
+            ->sortByDesc(fn (object $stock): array => [
+                strtotime((string) data_get($buyChanges->get(strtoupper((string) $stock->symbol)), 'at', '1970-01-01')),
+                (float) ($stock->ranking_score ?? 0),
+            ])
+            ->first();
+        $stock = $newBuy ?: $currentBuys
+            ->sortByDesc(fn (object $candidate): array => [
+                strtotime((string) ($candidate->prediction_time ?? '1970-01-01')),
+                (float) ($candidate->ranking_score ?? 0),
+            ])
+            ->first();
+        if (! $stock) {
+            return null;
+        }
+
+        $stock = clone $stock;
+        $change = $buyChanges->get(strtoupper((string) $stock->symbol));
+        $stock->new_buy_at = $change['at'] ?? $stock->prediction_time ?? null;
+        $stock->new_buy_from = $change['from'] ?? null;
+        $stock->is_fresh_buy = $newBuy !== null;
+
+        return $stock;
+    }
+
+    /**
+     * The stock whose AI score climbed the most over roughly the last five
+     * trading days without yet turning BUY. This reads local prediction history
+     * on purpose — the serving store only keeps the latest state per instrument,
+     * so it has no score time series to compare against.
+     */
+    private function strongestScoreRiser(Collection $stocks): ?object
+    {
+        $universeIds = $stocks->pluck('instrument_id')->filter()->map(fn ($id): int => (int) $id)->unique()->all();
+        if ($universeIds === []) {
+            return null;
+        }
+        $currentSignal = $stocks->mapWithKeys(fn (object $stock): array => [
+            (int) $stock->instrument_id => strtoupper((string) ($stock->personalized_signal ?: $stock->model_signal ?: 'HOLD')),
+        ]);
+
+        $rows = DB::table('predictions')
+            ->whereIn('instrument_id', $universeIds)
+            ->where('prediction_time', '>=', now()->subDays(21))
+            ->whereNotNull('ai_score')
+            ->orderBy('prediction_time')
+            ->get(['instrument_id', 'prediction_time', 'ai_score']);
+
+        $best = null;
+        foreach ($rows->groupBy('instrument_id') as $instrumentId => $series) {
+            $instrumentId = (int) $instrumentId;
+            if (($currentSignal[$instrumentId] ?? 'HOLD') === 'BUY') {
+                continue;
+            }
+            $latest = $series->last();
+            $cutoff = Carbon::parse($latest->prediction_time)->subDays(5);
+            $prior = $series->filter(fn (object $row): bool => Carbon::parse($row->prediction_time)->lessThanOrEqualTo($cutoff))->last();
+            if (! $prior) {
+                continue;
+            }
+            $delta = (float) $latest->ai_score - (float) $prior->ai_score;
+            if ($delta <= 0.0) {
+                continue;
+            }
+            if ($best === null || $delta > $best['delta']) {
+                $best = [
+                    'instrument_id' => $instrumentId,
+                    'delta' => $delta,
+                    'now' => (float) $latest->ai_score,
+                    'prev' => (float) $prior->ai_score,
+                    'days' => Carbon::parse($prior->prediction_time)->diffInDays(Carbon::parse($latest->prediction_time)),
+                ];
+            }
+        }
+        if ($best === null) {
+            return null;
+        }
+        $stock = $stocks->firstWhere('instrument_id', $best['instrument_id']);
+        if (! $stock) {
+            return null;
+        }
+        $stock = clone $stock;
+        $stock->score_rise_delta = round($best['delta'], 1);
+        $stock->score_rise_now = round($best['now'], 1);
+        $stock->score_rise_prev = round($best['prev'], 1);
+        $stock->score_rise_days = max(1, (int) $best['days']);
+
+        return $stock;
+    }
+
+    /**
+     * The stock with the strongest bullish ChartView statistic — a sample-size
+     * weighted average of the "price rose afterwards" probability across its
+     * positive-tone technical events (20-day horizon).
+     */
+    private function topIndicatorScoreStock(Collection $stocks): ?object
+    {
+        $universeIds = $stocks->pluck('instrument_id')->filter()->map(fn ($id): int => (int) $id)->unique()->all();
+        if ($universeIds === []) {
+            return null;
+        }
+        $positiveKeys = DB::table('chartview_signal_statistics')
+            ->where('tone', 'positive')
+            ->distinct()
+            ->pluck('event_key')
+            ->all();
+        if ($positiveKeys === []) {
+            return null;
+        }
+
+        $aggregate = DB::table('chartview_instrument_signal_statistics')
+            ->whereIn('instrument_id', $universeIds)
+            ->whereIn('event_key', $positiveKeys)
+            ->where('horizon_days', 20)
+            ->where('sample_size', '>=', 15)
+            ->groupBy('instrument_id')
+            ->havingRaw('sum(sample_size) >= 40')
+            ->havingRaw('count(*) >= 2')
+            ->orderByDesc(DB::raw('sum(rise_probability * sample_size) / nullif(sum(sample_size), 0)'))
+            ->first([
+                'instrument_id',
+                DB::raw('sum(rise_probability * sample_size) / nullif(sum(sample_size), 0) as weighted_prob'),
+                DB::raw('sum(sample_size) as samples'),
+                DB::raw('count(*) as events'),
+            ]);
+        if (! $aggregate) {
+            return null;
+        }
+
+        $topEvent = DB::table('chartview_instrument_signal_statistics as stat')
+            ->join('chartview_signal_statistics as label', 'label.event_key', '=', 'stat.event_key')
+            ->where('stat.instrument_id', (int) $aggregate->instrument_id)
+            ->where('stat.horizon_days', 20)
+            ->where('stat.sample_size', '>=', 15)
+            ->whereIn('stat.event_key', $positiveKeys)
+            ->orderByDesc('stat.rise_probability')
+            ->first(['stat.rise_probability', 'label.label_de']);
+
+        $stock = $stocks->firstWhere('instrument_id', (int) $aggregate->instrument_id);
+        if (! $stock) {
+            return null;
+        }
+        $stock = clone $stock;
+        $stock->indicator_score = round((float) $aggregate->weighted_prob, 0);
+        $stock->indicator_samples = (int) $aggregate->samples;
+        $stock->indicator_events = (int) $aggregate->events;
+        $stock->indicator_top_label = $topEvent?->label_de;
+        $stock->indicator_top_prob = $topEvent ? round((float) $topEvent->rise_probability, 0) : null;
+
+        return $stock;
     }
 
     private function strategyPortfolio(int $userId): mixed
@@ -378,29 +618,97 @@ class DashboardController extends Controller
         };
     }
 
-    private function recentSignalOverview(): array
+    private function externalConfirmedBuys(Collection $stocks): Collection
     {
-        return Cache::remember('dashboard.personal.recent-signal-overview-serving-v1', now()->addMinutes(2), function (): array {
-            $recommendations = app(ServingReadService::class)->signalTransitions()
-                ->filter(fn (object $row): bool => Carbon::parse($row->changed_at)->gte(now()->subHours(48)))
-                ->map(function (object $row): object {
-                    $row->signal = $row->to_signal;
-                    $row->prediction_time = $row->changed_at;
+        $currentBuys = $stocks
+            ->filter(fn (object $stock): bool => strtoupper((string) ($stock->personalized_signal ?? '')) === 'BUY'
+                && filled($stock->serving_batch_id ?? null))
+            ->values();
 
-                    return $row;
-                });
+        if ($currentBuys->isEmpty()) {
+            return collect();
+        }
 
-            return [
-                'buy_count' => $recommendations->where('signal', 'BUY')->count(),
-                'wait_count' => $recommendations->where('signal', 'WAIT')->count(),
-                'hold_count' => $recommendations->where('signal', 'HOLD')->count(),
-                'sell_count' => $recommendations->where('signal', 'SELL')->count(),
-                'buy_symbols' => $recommendations->where('signal', 'BUY')->take(4)->pluck('symbol')->all(),
-                'wait_symbols' => $recommendations->where('signal', 'WAIT')->take(4)->pluck('symbol')->all(),
-                'hold_symbols' => $recommendations->where('signal', 'HOLD')->take(4)->pluck('symbol')->all(),
-                'sell_symbols' => $recommendations->where('signal', 'SELL')->take(4)->pluck('symbol')->all(),
-            ];
-        });
+        $reviews = DB::table('external_buy_reviews')
+            ->where('status', 'completed')
+            ->where('verdict', 'NO_OBJECTION')
+            ->whereIn('serving_instrument_id', $currentBuys->pluck('instrument_id')->all())
+            ->whereIn('serving_batch_id', $currentBuys->pluck('serving_batch_id')->all())
+            ->get(['serving_instrument_id', 'serving_batch_id', 'confidence', 'summary', 'researched_at'])
+            ->keyBy(fn (object $review): string => $review->serving_instrument_id.'|'.$review->serving_batch_id);
+
+        return $currentBuys
+            ->filter(fn (object $stock): bool => $reviews->has($stock->instrument_id.'|'.$stock->serving_batch_id))
+            ->each(function (object $stock) use ($reviews): void {
+                $review = $reviews->get($stock->instrument_id.'|'.$stock->serving_batch_id);
+                $stock->external_confirmation_confidence = is_numeric($review->confidence) ? (int) $review->confidence : null;
+                $stock->external_confirmation_summary = $review->summary;
+                $stock->external_confirmation_researched_at = $review->researched_at;
+            })
+            ->sortByDesc(fn (object $stock): array => [
+                (int) ($stock->external_confirmation_confidence ?? 0),
+                (float) ($stock->ranking_score ?? 0),
+            ])
+            ->values();
+    }
+
+    private function threeFactorRanking(Collection $confirmedBuys): Collection
+    {
+        if ($confirmedBuys->isEmpty()) {
+            return collect();
+        }
+
+        try {
+            $panelVersion = 'panel-price-risk-freeze-2026-09-07';
+            $peakCount = (int) DB::table('panel_predictions')
+                ->where('model_version', $panelVersion)
+                ->groupBy('as_of_date')
+                ->orderByDesc(DB::raw('count(*)'))
+                ->value(DB::raw('count(*)'));
+            $panelAsOf = DB::table('panel_predictions')
+                ->where('model_version', $panelVersion)
+                ->groupBy('as_of_date')
+                ->havingRaw('count(*) >= ?', [max(50, (int) ($peakCount * 0.85))])
+                ->orderByDesc('as_of_date')
+                ->value('as_of_date');
+
+            if (! $panelAsOf) {
+                return collect();
+            }
+
+            $panelRows = DB::table('panel_predictions as panel')
+                ->join('instruments as instrument', 'instrument.id', '=', 'panel.instrument_id')
+                ->where('panel.model_version', $panelVersion)
+                ->where('panel.as_of_date', $panelAsOf)
+                ->whereIn('instrument.symbol', $confirmedBuys->pluck('symbol')->all())
+                ->get(['instrument.symbol', 'panel.xsec_pctile', 'panel.decile', 'panel.as_of_date'])
+                ->keyBy(fn (object $row): string => strtoupper((string) $row->symbol));
+
+            return $confirmedBuys
+                ->filter(fn (object $stock): bool => $panelRows->has(strtoupper((string) $stock->symbol)))
+                ->each(function (object $stock) use ($panelRows): void {
+                    $panel = $panelRows->get(strtoupper((string) $stock->symbol));
+                    $stock->panel_decile = (int) $panel->decile;
+                    $stock->panel_percentile = is_numeric($panel->xsec_pctile)
+                        ? max(0.0, min(100.0, (float) $panel->xsec_pctile * 100.0))
+                        : (float) $stock->panel_decile * 10.0;
+                    $stock->panel_as_of = $panel->as_of_date;
+                    $stock->three_factor_buy_score = (float) ($stock->serving_buy_rating_percent ?? 0);
+                    $stock->three_factor_external_confirmed = is_numeric($stock->external_confirmation_confidence ?? null);
+                    $stock->three_factor_external_score = (float) ($stock->external_confirmation_confidence ?? 0);
+                    $stock->three_factor_panel_score = $stock->panel_percentile;
+                    $stock->three_factor_score = round((
+                        $stock->three_factor_buy_score
+                        + $stock->three_factor_external_score
+                        + $stock->three_factor_panel_score
+                    ) / 3, 1);
+                    $stock->dashboard_ranking_score = $stock->three_factor_score;
+                })
+                ->sortByDesc('three_factor_score')
+                ->values();
+        } catch (\Throwable) {
+            return collect();
+        }
     }
 
     public function signalCockpit(): array

@@ -14,6 +14,7 @@ window.Alpine = Alpine;
 const navigationCurrentKey = 'aktienki.navigation.current';
 const navigationPreviousKey = 'aktienki.navigation.previous';
 const currentLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+const contextualDestination = /^\/(?:watchlists(?:\/\d+)?|musterdepots|depots(?:\/\d+)?)\/?$/;
 
 try {
     const rememberedCurrent = window.sessionStorage.getItem(navigationCurrentKey);
@@ -25,11 +26,39 @@ try {
     // The server-rendered fallback URL remains usable without session storage.
 }
 
+// Carry the exact calling page into personal collection/depot pages. Nested
+// return paths deliberately preserve chains such as dashboard -> list -> detail.
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href]');
+    if (!link || link.matches('[data-back-link]') || event.defaultPrevented || event.button !== 0) return;
+
+    try {
+        const destination = new URL(link.href, window.location.origin);
+        if (destination.origin !== window.location.origin || !contextualDestination.test(destination.pathname)) return;
+        if (destination.searchParams.has('return_to') || destination.pathname === window.location.pathname) return;
+
+        destination.searchParams.set('return_to', currentLocation);
+        link.href = `${destination.pathname}${destination.search}${destination.hash}`;
+    } catch (_) {
+        // Keep the original link untouched when it cannot be parsed.
+    }
+}, true);
+
 document.addEventListener('click', (event) => {
     const backLink = event.target.closest('a[data-back-link]');
     if (!backLink || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
     try {
+        const explicitReturnTo = new URL(window.location.href).searchParams.get('return_to');
+        if (explicitReturnTo && explicitReturnTo.startsWith('/') && !explicitReturnTo.startsWith('//')) {
+            const destination = new URL(explicitReturnTo, window.location.origin);
+            if (destination.origin === window.location.origin && `${destination.pathname}${destination.search}${destination.hash}` !== currentLocation) {
+                event.preventDefault();
+                window.location.assign(`${destination.pathname}${destination.search}${destination.hash}`);
+                return;
+            }
+        }
+
         const rememberedPrevious = window.sessionStorage.getItem(navigationPreviousKey);
         if (!rememberedPrevious || rememberedPrevious === currentLocation) return;
 
@@ -88,6 +117,7 @@ const enhanceScreenerFilterSelects = () => {
 };
 
 document.addEventListener('DOMContentLoaded', enhanceScreenerFilterSelects);
+
 document.addEventListener('click', (event) => {
     if (!event.target.closest?.('.screener-custom-select')) {
         document.querySelectorAll('.screener-custom-select-menu.is-open').forEach((menu) => menu.classList.remove('is-open'));

@@ -258,6 +258,7 @@ final class PredictionController extends Controller
         $request->session()->put('setup_filter_state', $filterState);
 
         $request->attributes->set('heatmap_only', true);
+        $request->attributes->set('serving_selection_configurations', $this->servingSelectionConfigurations($request));
         $request->attributes->set('serving_quality_symbols', $this->servingQualitySymbols($request));
         $predictionView = $this->index($request);
         $predictionData = $predictionView->getData();
@@ -761,6 +762,7 @@ final class PredictionController extends Controller
             'quality_horizons_present' => ['nullable', 'boolean'],
             'quality_horizons' => ['nullable', 'array', 'max:3'],
             'quality_horizons.*' => ['integer', 'in:10,20,40', 'distinct'],
+            'serving_selection' => ['nullable', 'string', 'size:40'],
             'signal' => ['nullable', 'in:BUY,WAIT,WATCH,HOLD,SELL'],
             'score_min' => ['nullable', 'numeric', 'between:0,10'],
             'confidence_min' => ['nullable', 'numeric', 'between:0,100'],
@@ -818,6 +820,7 @@ final class PredictionController extends Controller
             'position_factor' => ['required', 'integer', 'between:1,50', 'lte:max_positions'],
             'dynamic_capital_weighting' => ['nullable', 'boolean'],
             'trade_cost' => ['required', 'numeric', 'between:0,1000'],
+            'backtest_return_to' => ['nullable', 'string', 'max:2048'],
         ]);
         $returnRoute = ! empty($filters['quality_setup']) ? 'setup.quality' : 'setup.filter';
         if (($filters['gate_mode'] ?? 'system') === 'personal') {
@@ -828,14 +831,20 @@ final class PredictionController extends Controller
         $initialCapital = (float) $filters['initial_capital'];
         $filters['minimum_trades'] = max(1, (int) ($filters['minimum_trades'] ?? 1));
         $filters['serving_quality_symbols'] = $this->servingQualitySymbols($request);
-        $servingHeatmapRows = $this->selectedServingHeatmapRows($request);
-        $filters['serving_model_configurations'] = $servingHeatmapRows
-            ->map(fn (object $row): array => [
-                'symbol' => (string) $row->symbol,
-                'release_id' => (string) $row->release_id,
-                'horizon' => (int) $row->horizon_days,
-                'variant' => (string) $row->variant,
-            ])->unique(fn (array $row): string => implode('|', $row))->values()->all();
+        $lockedServingConfigurations = $this->servingSelectionConfigurations($request);
+        if ($request->filled('serving_selection')) {
+            abort_if($lockedServingConfigurations === [], 422, __('Die übernommene Modellauswahl ist nicht mehr verfügbar. Bitte öffne sie erneut über die Predictions-Seite.'));
+            $filters['serving_model_configurations'] = $lockedServingConfigurations;
+        } else {
+            $servingHeatmapRows = $this->selectedServingHeatmapRows($request);
+            $filters['serving_model_configurations'] = $servingHeatmapRows
+                ->map(fn (object $row): array => [
+                    'symbol' => (string) $row->symbol,
+                    'release_id' => (string) $row->release_id,
+                    'horizon' => (int) $row->horizon_days,
+                    'variant' => (string) $row->variant,
+                ])->unique(fn (array $row): string => implode('|', $row))->values()->all();
+        }
         // These resolved Service-DB identifiers belong to the immutable run
         // settings, not to the browser URL. Including them in the redirect
         // can produce URLs large enough for the result page to fail loading.
@@ -990,7 +999,20 @@ final class PredictionController extends Controller
         // and synchronously during development; production keeps using its
         // dedicated asynchronous worker.
         if (app()->environment('local')) {
-            RunFilteredBacktest::dispatchSync($runId, (int) $sourceRun->id, $filters);
+            try {
+                RunFilteredBacktest::dispatchSync($runId, (int) $sourceRun->id, $filters);
+            } catch (\RuntimeException $exception) {
+                DB::table('backtest_runs')->where('id', $runId)->update([
+                    'status' => 'failed',
+                    'finished_at' => now(),
+                    'error_message' => mb_substr($exception->getMessage(), 0, 4000),
+                    'updated_at' => now(),
+                ]);
+
+                return back()
+                    ->withInput()
+                    ->withErrors(['backtest' => $exception->getMessage()]);
+            }
         } else {
             RunFilteredBacktest::dispatch($runId, (int) $sourceRun->id, $filters);
         }
@@ -1816,7 +1838,13 @@ final class PredictionController extends Controller
                 ]);
         }
 
-        $query = $request->except(['_token', 'backtest_run']);
+        $returnTo = (string) $request->input('backtest_return_to', '');
+        if (str_starts_with($returnTo, '/') && ! str_starts_with($returnTo, '//')) {
+            return redirect()->to($returnTo)
+                ->with('status', __('Der Backtest wurde abgebrochen.'));
+        }
+
+        $query = $request->except(['_token', 'backtest_run', 'backtest_return_to']);
 
         return redirect()->route($request->boolean('quality_setup') ? 'setup.quality' : 'setup.filter', $query)
             ->with('status', __('Der Backtest wurde abgebrochen.'));
@@ -3581,6 +3609,10 @@ final class PredictionController extends Controller
     private function servingHeatmapRows(Request $request): Collection
     {
         $serving = DB::connection('serving');
+        $lockedConfigurations = $request->attributes->get('serving_selection_configurations');
+        if (! is_array($lockedConfigurations)) {
+            $lockedConfigurations = $this->servingSelectionConfigurations($request);
+        }
         $statuses = $serving->table('serving_model_horizon_status as status')
             ->join('serving_active_models as active', function ($join): void {
                 $join->on('active.instrument_id', '=', 'status.instrument_id')
@@ -3592,6 +3624,23 @@ final class PredictionController extends Controller
             ->where('instrument.is_active', true)
             ->where('instrument.is_tradeable', true)
             ->where('instrument.instrument_type', 'stock')
+            ->when($request->filled('serving_selection'), function ($query) use ($lockedConfigurations): void {
+                if ($lockedConfigurations === []) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->where(function ($selection) use ($lockedConfigurations): void {
+                    foreach ($lockedConfigurations as $configuration) {
+                        $selection->orWhere(function ($model) use ($configuration): void {
+                            $model->where('instrument.symbol', $configuration['symbol'])
+                                ->where('status.release_id', $configuration['release_id'])
+                                ->where('status.horizon', $configuration['horizon'])
+                                ->where('status.variant', $configuration['variant']);
+                        });
+                    }
+                });
+            })
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $term = '%'.mb_strtolower(trim((string) $request->input('q'))).'%';
                 $query->where(fn ($nested) => $nested
@@ -3709,6 +3758,39 @@ final class PredictionController extends Controller
                 return $minimum > 0 ? $rows->where('model_quality', '>=', $minimum) : $rows;
             })
             ->values();
+    }
+
+    /**
+     * Resolve a session-scoped, immutable selection created by the Service
+     * prediction table. The browser only carries an opaque token, never the
+     * model identifiers themselves.
+     */
+    private function servingSelectionConfigurations(Request $request): array
+    {
+        $token = (string) $request->input('serving_selection', '');
+        if (! preg_match('/^[A-Za-z0-9]{40}$/', $token)) {
+            return [];
+        }
+
+        return collect((array) $request->session()->get("serving_strategy_selections.{$token}", []))
+            ->filter(fn (mixed $row): bool => is_array($row)
+                && filled($row['symbol'] ?? null)
+                && filled($row['release_id'] ?? null)
+                && in_array((int) ($row['horizon'] ?? 0), [10, 20, 40], true)
+                && filled($row['variant'] ?? null))
+            ->map(fn (array $row): array => [
+                'source' => (string) ($row['source'] ?? 'serving_prediction_table'),
+                'symbol' => strtoupper(trim((string) $row['symbol'])),
+                'release_id' => (string) $row['release_id'],
+                'source_release_id' => (string) ($row['source_release_id'] ?? $row['release_id']),
+                'release_policy' => (string) ($row['release_policy'] ?? 'fixed'),
+                'horizon' => (int) $row['horizon'],
+                'horizon_days' => (int) ($row['horizon_days'] ?? $row['horizon']),
+                'variant' => (string) $row['variant'],
+            ])
+            ->unique(fn (array $row): string => implode('|', $row))
+            ->values()
+            ->all();
     }
 
     private function selectedServingHeatmapRows(Request $request): Collection

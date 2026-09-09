@@ -495,7 +495,7 @@
 
         #stock-detail-page .stock-serving-rating-layout {
             display: grid !important;
-            grid-template-columns: minmax(132px, 168px) minmax(0, 1fr) !important;
+            grid-template-columns: minmax(210px, 235px) minmax(0, 1fr) !important;
             align-items: center;
             gap: .5rem;
         }
@@ -544,11 +544,12 @@
 
         @media (max-width: 480px) {
             #stock-detail-page .stock-serving-rating-layout {
-                grid-template-columns: 126px minmax(0, 1fr) !important;
+                grid-template-columns: minmax(0, 1fr) !important;
                 gap: .45rem;
             }
 
             #stock-detail-page .stock-serving-rating-layout .stock-analysis-donuts {
+                justify-content: center !important;
                 gap: .35rem !important;
                 padding-inline: 0 !important;
             }
@@ -1028,6 +1029,138 @@
             color: #00656f;
             background: rgba(0, 101, 111, .08);
         }
+
+        /* Match the shared Market Overview chrome in light mode. This final
+           layer intentionally replaces the older cyan glass treatment. */
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin {
+            --stock-detail-accent: var(--ak-overview-accent);
+            --stock-detail-accent-bright: var(--ak-overview-copy);
+            background-color: var(--ak-overview-page);
+            background-image:
+                radial-gradient(circle at 86% 8%, rgba(100,116,139,.07), transparent 25%),
+                radial-gradient(circle at 8% 82%, rgba(100,116,139,.04), transparent 28%),
+                linear-gradient(rgba(71,85,105,.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(71,85,105,.035) 1px, transparent 1px);
+            background-size: auto, auto, 32px 32px, 32px 32px;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-detail-header {
+            position: relative;
+            overflow: hidden;
+            align-items: center;
+            border: 1px solid var(--ak-overview-border) !important;
+            border-radius: 1rem;
+            padding: 1rem 1.1rem !important;
+            background: var(--ak-overview-card) !important;
+            box-shadow: var(--ak-overview-shadow) !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-detail-header::before {
+            content: '';
+            position: absolute;
+            inset: 0 18% auto;
+            height: 2px;
+            border-radius: 0 0 999px 999px;
+            background: linear-gradient(90deg, transparent, var(--ak-overview-border-strong), var(--ak-overview-accent), transparent);
+            opacity: .42;
+            pointer-events: none;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-company-mark {
+            border-color: var(--ak-overview-border-strong) !important;
+            background: var(--ak-overview-header) !important;
+            color: var(--ak-overview-copy) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin :is(.stock-company-title,.stock-company-symbol) {
+            color: var(--ak-overview-title) !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-company-symbol {
+            border-color: var(--ak-overview-border) !important;
+            background: var(--ak-overview-subcard) !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-company-meta,
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-company-copy > p {
+            color: var(--ak-overview-copy) !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-detail-panel {
+            border-color: var(--ak-overview-border) !important;
+            border-bottom-color: var(--ak-overview-border) !important;
+            border-radius: 1rem !important;
+            background: var(--ak-overview-card) !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            box-shadow: var(--ak-overview-shadow) !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-detail-panel:hover {
+            border-color: var(--ak-overview-border) !important;
+            background: var(--ak-overview-card-hover) !important;
+            box-shadow: var(--ak-overview-shadow-hover) !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-detail-panel::before {
+            inset: 0 18% auto !important;
+            width: auto !important;
+            height: 2px !important;
+            border-radius: 0 0 999px 999px !important;
+            background: linear-gradient(90deg, transparent, var(--ak-overview-border-strong), var(--ak-overview-accent), transparent) !important;
+            box-shadow: none !important;
+            opacity: .42;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-detail-card-head {
+            border-bottom: 1px solid var(--ak-overview-border) !important;
+            background: var(--ak-overview-header) !important;
+            box-shadow: none !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-detail-card-head :is(h1,h2,h3,strong) {
+            color: var(--ak-overview-title) !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-detail-card-head :is(p,small) {
+            color: var(--ak-overview-copy) !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin :is(.stock-collapsible-toggle,.stock-indicator-card-head) {
+            border-color: var(--ak-overview-border) !important;
+            background: var(--ak-overview-header) !important;
+            background-image: none !important;
+            color: var(--ak-overview-copy) !important;
+            box-shadow: none !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin :is(.stock-collapsible-icon,.stock-mobile-indicators,.stock-serving-forecast-row) {
+            border-color: var(--ak-overview-border) !important;
+            background: var(--ak-overview-subcard) !important;
+            color: var(--ak-overview-copy) !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-header-actions :is(button,a),
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-header-back {
+            border-color: var(--ak-overview-border-strong) !important;
+            background: var(--ak-overview-subcard) !important;
+            color: var(--ak-overview-copy) !important;
+            box-shadow: none !important;
+        }
+
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-header-actions :is(button,a):hover,
+        :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-header-back:hover {
+            border-color: var(--ak-overview-accent) !important;
+            background: var(--ak-overview-header) !important;
+            color: var(--ak-overview-title) !important;
+        }
+
+        @media (max-width: 767px) {
+            :root[data-theme="light"] body:not(.welcome-background) #stock-detail-page.ak-market-overview-skin .stock-detail-header {
+                padding: .75rem !important;
+            }
+        }
     </style>
     @php
         $servingMode = $servingMode ?? false;
@@ -1175,7 +1308,7 @@
 
     <div
         id="stock-detail-page"
-        class="mx-auto flex h-[calc(100vh-73px)] min-h-0 w-full max-w-screen-2xl flex-col py-4 supports-[height:100dvh]:h-[calc(100dvh-73px)]"
+        class="ak-market-overview-skin mx-auto flex h-[calc(100vh-73px)] min-h-0 w-full max-w-screen-2xl flex-col py-4 supports-[height:100dvh]:h-[calc(100dvh-73px)]"
     >
         <header class="stock-detail-header mb-4 flex shrink-0 flex-col justify-between gap-4 border-b border-[var(--ak-border)] pb-3 sm:flex-row sm:items-end">
             <div class="stock-company-summary flex min-w-0 items-center gap-4">
@@ -1453,6 +1586,15 @@
                         <svg id="stock-indicator-overlay" class="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible" aria-hidden="true"></svg>
                         <div id="stock-chart-zoom-selection" class="pointer-events-none absolute bottom-8 top-4 z-20 hidden rounded border border-cyan-300 bg-cyan-300/10 shadow-[0_0_12px_rgba(34,211,238,.22)]" aria-hidden="true"></div>
                     </div>
+                    @if (($historicalPanelScores ?? collect())->isNotEmpty())
+                        <div id="stock-panel-history-panel" class="mt-2 shrink-0 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-transparent px-2 pb-1 pt-1.5">
+                            <div class="flex items-center justify-between px-1">
+                                <span class="text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Panel · historisches Dezil') }}</span>
+                                <span id="stock-panel-history-value" class="text-[10px] font-black text-amber-600 dark:text-amber-400">—</span>
+                            </div>
+                            <div id="stock-detail-panel-history" class="h-20 min-w-0" aria-label="{{ __('Historischer Panelwert') }} {{ $instrument->symbol }}"></div>
+                        </div>
+                    @endif
                     <div id="stock-rsi-panel" class="mt-2 hidden shrink-0 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-transparent px-2 pb-1 pt-1.5">
                         <div class="flex items-center justify-between px-1">
                             <span class="text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">RSI 14</span>
@@ -1707,6 +1849,9 @@
                         $qualityGrade = static fn (?float $quality): string => \App\Support\QualityGrade::fromPercent($quality) ?? '—';
                         $analysisRiskLevel = \App\Support\QualityGrade::riskLevel($riskPercent);
                         $riskGrade = $analysisRiskLevel ?? '—';
+                        $panelSectorPercent = is_numeric($panelSector['percentile'] ?? null) ? (float) $panelSector['percentile'] : null;
+                        $panelSectorDecile = is_numeric($panelSector['decile'] ?? null) ? (int) $panelSector['decile'] : null;
+                        $panelSectorName = filled($panelSector['sector'] ?? null) ? __((string) $panelSector['sector']) : __('Sektor');
                         $featuredHorizon = collect($displayHorizons)
                             ->filter(fn (int $days): bool => is_numeric(data_get($horizonTargets, $days.'.return')))
                             ->sortByDesc(fn (int $days): float => (float) data_get($horizonTargets, $days.'.return'))
@@ -1727,7 +1872,7 @@
                     <div class="mt-2 space-y-2">
                         <div class="rounded-xl border border-[var(--ak-border)] bg-transparent {{ $servingMode ? 'p-2' : 'p-3' }}">
                             <p class="{{ $servingMode ? 'mb-1' : 'mb-2' }} text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Bewertung') }}</p>
-                            <div class="{{ $servingMode ? 'stock-serving-rating-layout grid grid-cols-[minmax(145px,auto)_minmax(0,1fr)] items-center gap-3' : '' }}">
+                            <div class="{{ $servingMode ? 'stock-serving-rating-layout grid grid-cols-[minmax(210px,auto)_minmax(0,1fr)] items-center gap-3' : '' }}">
                                 <div class="stock-analysis-donuts flex {{ $servingMode ? 'min-h-[64px] justify-start gap-3 px-0' : 'min-h-[76px] w-full justify-center gap-10' }} flex-nowrap items-center overflow-visible">
                                     <div class="stock-analysis-donut-item stock-analysis-donut-item-primary" title="{{ __('Modellqualität') }}: {{ $scorePercent !== null ? number_format($scorePercent, 0, ',', '.').'/100' : '—' }}">
                                         <x-segmented-score-donut :score="$scorePercent ?? 0" :display="$qualityGrade($scorePercent)" type="chance" :label="__('Signalqualität')" />
@@ -1736,6 +1881,10 @@
                                     <div class="stock-analysis-donut-item" title="{{ __('Rohwert') }}: {{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.').' %' : '—' }}">
                                         <x-segmented-score-donut :score="$riskPercent ?? 0" :display="$analysisRiskLevel" :level="$analysisRiskLevel" type="risk" :label="__('Risiko')" />
                                         <small class="stock-analysis-donut-label">{{ __('Risiko') }}</small>
+                                    </div>
+                                    <div class="stock-analysis-donut-item" title="{{ __('Panel-Sektorrang') }}: {{ $panelSectorPercent !== null ? number_format($panelSectorPercent, 1, ',', '.').' %' : '—' }} · {{ $panelSectorName }}">
+                                        <x-segmented-score-donut :score="$panelSectorPercent ?? 0" :display="$panelSectorDecile !== null ? 'D'.$panelSectorDecile : '—'" type="chance" :label="__('Panel Sektor')" />
+                                        <small class="stock-analysis-donut-label">{{ __('Panel Sektor') }}</small>
                                     </div>
                                 </div>
                                 @if($servingMode)
@@ -2448,11 +2597,12 @@
                         'INSUFFICIENT_EVIDENCE', 'failed' => __('BUY nicht bestätigt'),
                         default => __('Prüfung offen'),
                     };
-                    $externalReviewAdjustmentTone = in_array($externalBuyReview->verdict, ['CAUTION', 'OBJECTION'], true)
-                        ? 'border-amber-400/35 bg-amber-400/10 text-amber-400'
-                        : ($externalReviewIsYes
-                            ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400'
-                            : 'border-slate-400/25 bg-slate-400/10 text-slate-400');
+                    $externalReviewAdjustmentTone = match ($externalBuyReview->status === 'completed' ? $externalBuyReview->verdict : $externalBuyReview->status) {
+                        'NO_OBJECTION' => 'border-emerald-500/35 bg-emerald-500/10 text-emerald-600',
+                        'CAUTION', 'OBJECTION' => 'border-rose-500/40 bg-rose-500/12 text-rose-600',
+                        'INSUFFICIENT_EVIDENCE', 'failed' => 'border-amber-500/45 bg-amber-500/14 text-amber-700',
+                        default => 'border-slate-400/30 bg-slate-400/10 text-slate-500',
+                    };
                     $externalReviewSignalScope = is_array($externalBuyReview->signal_scope ?? null)
                         ? $externalBuyReview->signal_scope
                         : (json_decode((string) ($externalBuyReview->signal_scope ?? '{}'), true) ?: []);
@@ -2460,7 +2610,7 @@
                 @endphp
                 <div class="mt-4 rounded-2xl border bg-cyan-400/[.025] p-4 {{ $externalReviewBorder }}">
                     <div class="mb-3 flex flex-wrap items-center gap-2">
-                        <span class="inline-flex min-w-16 items-center justify-center rounded-xl border px-3 py-1.5 text-xl font-black {{ $externalReviewDecisionTone }}">{{ $externalReviewDecision }}</span>
+                        <span class="inline-flex min-w-11 items-center justify-center rounded-lg border px-2 py-1 text-sm font-black {{ $externalReviewDecisionTone }}">{{ $externalReviewDecision }}</span>
                         <span class="rounded-lg border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide {{ $externalReviewAdjustmentTone }}">{{ $externalReviewAdjustment }}</span>
                     </div>
                     <div class="flex flex-wrap items-start justify-between gap-3">
@@ -3321,6 +3471,7 @@
 
                 const initialCandles = @json($chartCandles->values());
                 const historicalAiScores = @json($historicalAiScores->values());
+                const historicalPanelScores = @json(($historicalPanelScores ?? collect())->values());
                 const historicalSignalTransitions = @json($historicalSignalTransitions->values());
                 const initialWatchlistEntry = @json($watchlistEntry);
                 const initialChartPatterns = @json($chartPatterns);
@@ -3353,6 +3504,8 @@
                 const dataUrl = @json($chartDataUrl);
                 const updatedElement = document.querySelector('#stock-chart-updated');
                 const changeElement = document.querySelector('#stock-chart-change');
+                const panelHistoryElement = document.querySelector('#stock-detail-panel-history');
+                const panelHistoryValueElement = document.querySelector('#stock-panel-history-value');
                 const rsiElement = document.querySelector('#stock-detail-rsi');
                 const rsiPanel = document.querySelector('#stock-rsi-panel');
                 const rsiValueElement = document.querySelector('#stock-rsi-value');
@@ -3368,6 +3521,7 @@
                 const canUseChartIndicators = @json($canUseChartIndicators);
                 const canUseChartZoom = @json($canUseChartZoom);
                 let chart;
+                let panelHistoryChart;
                 let rsiChart;
                 const secondaryCharts = new Map();
                 let currentCandles = initialCandles;
@@ -3909,6 +4063,105 @@
                     };
                 };
 
+                const panelHistoryData = () => historicalPanelScores
+                    .map(point => ({ x: new Date(point.x).getTime(), y: Number(point.y) }))
+                    .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+
+                const panelHistoryOptions = () => {
+                    const light = document.documentElement.dataset.theme === 'light';
+                    const range = chartTimeRange();
+
+                    return {
+                        chart: {
+                            type: 'area',
+                            height: 80,
+                            background: 'transparent',
+                            toolbar: { show: false },
+                            zoom: { enabled: false, allowMouseWheelZoom: false },
+                            selection: { enabled: false },
+                            pan: { enabled: false },
+                            animations: { enabled: true, speed: 250 },
+                            parentHeightOffset: 0,
+                        },
+                        series: [{ name: 'Panel', data: panelHistoryData() }],
+                        colors: [light ? '#b45309' : '#f59e0b'],
+                        stroke: { width: 2, curve: 'smooth' },
+                        fill: {
+                            type: 'gradient',
+                            gradient: { shadeIntensity: 0.15, opacityFrom: 0.2, opacityTo: 0.02, stops: [0, 100] },
+                        },
+                        markers: { size: 0 },
+                        dataLabels: { enabled: false },
+                        states: {
+                            hover: { filter: { type: 'none' } },
+                            active: { filter: { type: 'none' } },
+                        },
+                        grid: {
+                            borderColor: light ? 'rgba(51,65,85,.12)' : 'rgba(148,163,184,.09)',
+                            strokeDashArray: 4,
+                            padding: { top: -7, right: 8, bottom: -10, left: 2 },
+                        },
+                        annotations: {
+                            yaxis: [{
+                                y: 5,
+                                borderColor: light ? 'rgba(100,116,139,.38)' : 'rgba(148,163,184,.32)',
+                                strokeDashArray: 4,
+                            }],
+                        },
+                        xaxis: {
+                            type: 'datetime',
+                            min: range.min,
+                            max: range.max,
+                            labels: { show: false },
+                            axisBorder: { show: false },
+                            axisTicks: { show: false },
+                            tooltip: { enabled: false },
+                        },
+                        yaxis: {
+                            min: 0,
+                            max: 10,
+                            tickAmount: 5,
+                            opposite: true,
+                            labels: {
+                                formatter: value => `D${Math.round(value)}`,
+                                style: { colors: [light ? '#92400e' : '#fbbf24'], fontSize: '9px', fontWeight: 700 },
+                            },
+                        },
+                        tooltip: {
+                            theme: light ? 'light' : 'dark',
+                            x: { format: 'dd.MM.yyyy' },
+                            y: {
+                                formatter: value => Number.isFinite(Number(value))
+                                    ? `Panel D${Number(value).toFixed(1).replace('.', ',')}`
+                                    : '—',
+                            },
+                        },
+                        theme: { mode: light ? 'light' : 'dark' },
+                    };
+                };
+
+                const updatePanelHistoryValue = () => {
+                    if (!panelHistoryValueElement) return;
+                    const range = chartTimeRange();
+                    const latestPanel = panelHistoryData()
+                        .filter(point => point.x >= range.min && point.x <= range.max)
+                        .at(-1)?.y;
+                    panelHistoryValueElement.textContent = Number.isFinite(latestPanel)
+                        ? `D${Number(latestPanel).toFixed(1).replace('.', ',')}`
+                        : '—';
+                };
+
+                const renderPanelHistoryChart = async () => {
+                    if (!panelHistoryElement) return;
+                    if (!panelHistoryChart) {
+                        panelHistoryChart = new window.ApexCharts(panelHistoryElement, panelHistoryOptions());
+                        await panelHistoryChart.render();
+                    } else {
+                        await panelHistoryChart.updateOptions(panelHistoryOptions(), false, true);
+                    }
+                    updatePanelHistoryValue();
+                };
+
                 const updateRsiValue = () => {
                     if (!rsiValueElement) return;
                     const latestRsi = rsiData().at(-1)?.y;
@@ -4174,14 +4427,28 @@
 
                             if (Number.isFinite(point.confidence)) {
                                 const probabilityWidth = 106;
-                                const probabilityOnLeft = point.days === maximumForecastDays;
-                                const probabilityX = probabilityOnLeft
-                                    ? x - (badgeWidth / 2) - probabilityWidth - 4
-                                    : x + (badgeWidth / 2) + 4;
+                                const requestedProbabilityX = x - (probabilityWidth / 2);
+                                const probabilityX = Math.max(
+                                    left,
+                                    Math.min(left + plotWidth - probabilityWidth, requestedProbabilityX),
+                                );
                                 const probabilityCenterX = probabilityX + (probabilityWidth / 2);
+                                const probabilityLabelY = y < top + (plotHeight / 2)
+                                    ? top + plotHeight - 8 - (pointIndex * 18)
+                                    : top + 18 + (pointIndex * 18);
+                                const probabilityGuide = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                                probabilityGuide.setAttribute('x1', x);
+                                probabilityGuide.setAttribute('x2', probabilityCenterX);
+                                probabilityGuide.setAttribute('y1', y + (probabilityLabelY > y ? 6 : -6));
+                                probabilityGuide.setAttribute('y2', probabilityLabelY + (probabilityLabelY > y ? -12 : 5));
+                                probabilityGuide.setAttribute('stroke', pointColor);
+                                probabilityGuide.setAttribute('stroke-width', '.8');
+                                probabilityGuide.setAttribute('stroke-dasharray', '2 3');
+                                probabilityGuide.setAttribute('stroke-opacity', '.45');
+                                indicatorOverlay.appendChild(probabilityGuide);
                                 const probabilityBadge = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
                                 probabilityBadge.setAttribute('x', probabilityX);
-                                probabilityBadge.setAttribute('y', labelY - 11);
+                                probabilityBadge.setAttribute('y', probabilityLabelY - 11);
                                 probabilityBadge.setAttribute('width', probabilityWidth);
                                 probabilityBadge.setAttribute('height', '15');
                                 probabilityBadge.setAttribute('rx', '5');
@@ -4194,7 +4461,7 @@
 
                                 const probabilityLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                                 probabilityLabel.setAttribute('x', probabilityCenterX);
-                                probabilityLabel.setAttribute('y', labelY);
+                                probabilityLabel.setAttribute('y', probabilityLabelY);
                                 probabilityLabel.setAttribute('fill', '#f8fafc');
                                 probabilityLabel.setAttribute('font-size', '7.5');
                                 probabilityLabel.setAttribute('font-weight', '750');
@@ -4203,6 +4470,7 @@
                                 indicatorOverlay.appendChild(probabilityLabel);
                             }
                         });
+
                     }
 
                     [
@@ -4329,7 +4597,7 @@
                         }));
                         const label = svgNode('text', {
                             x: left + plotWidth + 10, y: y + 3,
-                            fill: labelColor, 'font-size': '10', 'font-family': 'inherit',
+                            fill: labelColor, 'font-size': '9', 'font-family': 'inherit',
                         });
                         label.textContent = `${price.toFixed(2)} ${currency}`;
                         svg.appendChild(label);
@@ -4660,6 +4928,7 @@
 
                 const rerenderAllCharts = async () => {
                     renderMainChart();
+                    await renderPanelHistoryChart();
                     if (activeIndicators.has('rsi') && rsiElement && !rsiChart) {
                         rsiChart = new window.ApexCharts(rsiElement, rsiOptions());
                         await rsiChart.render();
@@ -4798,6 +5067,7 @@
                 document.addEventListener('webkitfullscreenchange', syncFullscreenButton);
 
                 renderMainChart();
+                renderPanelHistoryChart();
                 if (indicatorOverlay && window.ResizeObserver) {
                     new ResizeObserver(() => renderMainChart()).observe(element);
                 }
@@ -4993,6 +5263,7 @@
                             chartPatterns = nextChartPatterns;
                             watchlistEntry = payload.watchlist_entry || null;
                             renderMainChart();
+                            await renderPanelHistoryChart();
                             if (rsiChart) {
                                 await rsiChart.updateOptions(rsiOptions(), false, true);
                                 updateRsiValue();

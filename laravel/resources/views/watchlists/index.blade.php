@@ -4,7 +4,7 @@
     <x-detail-page-theme />
     @php $watchlistLimitReached = $watchlistLimit !== null && $watchlists->where('active', true)->count() >= $watchlistLimit; @endphp
     <div
-        x-data="{ setupOpen: @js(! $watchlistLimitReached && $errors->any()) }"
+        x-data="{ setupOpen: @js(! $watchlistLimitReached && ($errors->any() || request()->boolean('create'))) }"
         @keydown.escape.window="setupOpen = false"
         class="ak-detail-design mx-auto w-full max-w-screen-2xl space-y-5 py-5"
     >
@@ -27,6 +27,9 @@
                 @endif
                 <a href="{{ route('stocks.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 text-xs font-bold text-[var(--ak-muted)] transition hover:border-violet-400/30 hover:text-[var(--ak-text)]">
                     <x-heroicon-o-table-cells class="h-4 w-4" />{{ __('Zur Aktienliste') }}
+                </a>
+                <a href="{{ route('dashboard') }}" data-back-link class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-[var(--ak-border-strong)] hover:text-[var(--ak-text)]">
+                    <x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Zurück') }}
                 </a>
             </div>
         </header>
@@ -72,6 +75,7 @@
 
             <form method="POST" action="{{ route('watchlists.store') }}" class="mt-6 space-y-5">
                 @csrf
+                @if(request()->filled('return_to'))<input type="hidden" name="return_to" value="{{ request('return_to') }}">@endif
                 <div>
                     <label for="watchlist-name" class="ak-label">{{ __('Name') }}</label>
                     <input id="watchlist-name" name="name" value="{{ old('name') }}" maxlength="80" required class="ak-input mt-2" placeholder="{{ __('Zum Beispiel: Technologie') }}">

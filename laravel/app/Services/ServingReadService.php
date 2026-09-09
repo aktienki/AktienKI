@@ -198,8 +198,7 @@ final class ServingReadService
 
         $horizons = $configuredHorizons->mapWithKeys(function (int $horizon) use ($compact, $calibration, $predictionByHorizon): array {
             $prefix = "horizons.{$horizon}";
-            $variant = strtolower((string) data_get($compact, "{$prefix}.active_variant", data_get($compact, "active_models.{$horizon}.variant", 'standard')));
-            $variantKey = $variant === 'pure_tcn' ? 'pure_tcn' : 'standard';
+            $variantKey = ServingVariantSelector::select((array) data_get($compact, $prefix, []));
             $activeMetrics = (array) data_get($compact, "{$prefix}.{$variantKey}.metrics", []);
             $standardMetrics = (array) data_get($compact, "{$prefix}.standard.metrics", []);
             $tcnMetrics = (array) data_get($compact, "{$prefix}.pure_tcn.metrics", []);
@@ -210,10 +209,8 @@ final class ServingReadService
                 []
             );
             $qualityGate = (array) data_get($predictionStatusPayload, 'quality_gate', []);
-            $status = (string) ($activeConfig['prediction_status']
-                ?? ($predictionStatusPayload['status'] ?? 'not_evaluated'));
-            $enabled = (bool) ($activeConfig['prediction_enabled']
-                ?? ($predictionStatusPayload['prediction_enabled'] ?? false));
+            $status = (string) ($predictionStatusPayload['status'] ?? 'not_evaluated');
+            $enabled = (bool) ($predictionStatusPayload['prediction_enabled'] ?? false);
             // A previously published row may still exist after the active
             // model's quality gate has been closed. It must no longer be
             // exposed as a current signal for that blocked model.

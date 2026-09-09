@@ -5,6 +5,9 @@
                 <div><p class="text-[10px] font-black uppercase tracking-[.2em] text-cyan-400">PRO · ChartView</p><h1 class="mt-1 text-3xl font-black text-[var(--ak-text)]">{{ __('ChartView-Signale') }}</h1><p class="mt-2 text-xs text-[var(--ak-muted)]">{{ __('Technische Signale und Chartmuster der letzten drei Handelstage mit globaler und aktienspezifischer 3-Jahres-Statistik.') }}</p></div>
                 <div class="rounded-xl border border-cyan-400/20 bg-cyan-400/[.06] px-4 py-2 text-xs text-[var(--ak-muted)]">{{ __('Handelstage') }}: <b class="text-cyan-300">{{ $tradingDays->reverse()->map(fn($day) => \Illuminate\Support\Carbon::parse($day)->format('d.m.Y'))->implode(' · ') }}</b></div>
             </header>
+            @if(session('error'))
+                <div class="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-700">{{ session('error') }}</div>
+            @endif
             <details class="chartview-filter group mb-4 rounded-xl border border-cyan-400/20 bg-[var(--ak-card)] shadow-[var(--ak-shadow)]">
                 <summary class="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-xs font-black text-cyan-300 marker:content-none">
                     <span class="inline-flex items-center gap-2"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" />{{ __('Filter anzeigen') }}</span>

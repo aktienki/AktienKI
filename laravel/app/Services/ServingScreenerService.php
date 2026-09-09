@@ -402,7 +402,9 @@ final class ServingScreenerService
         $metrics = $this->json($primaryStatus?->performance);
         $context = $this->json($primaryPrediction?->compact_context);
         $currentPrice = $this->currentPrice($primaryPrediction, $context);
-        $rating = (string) (($row->buy_rating ?? null) ?: ($row->underlying_buy_rating ?? null) ?: '3');
+        $rawRating = (string) (($row->buy_rating ?? null) ?: ($row->underlying_buy_rating ?? null) ?: '3');
+        $rawRatingPercent = $this->ratingPercent($rawRating);
+        $rating = $rawRating;
         if ($rating === '1++') {
             $rating = '1+';
         }
@@ -434,6 +436,7 @@ final class ServingScreenerService
             'data_source' => 'serving',
             'id' => is_numeric($primaryPrediction?->id) ? (int) $primaryPrediction->id : (int) $row->instrument_id,
             'instrument_id' => (int) $row->instrument_id,
+            'serving_batch_id' => (string) $row->batch_id,
             'symbol' => (string) $row->symbol,
             'name' => (string) $row->name,
             'country' => strtoupper(trim((string) $row->country_code)),
@@ -451,6 +454,9 @@ final class ServingScreenerService
             'model_signal' => strtoupper((string) ($row->underlying_signal ?: $row->signal ?: 'HOLD')),
             'personalized_signal' => strtoupper((string) ($row->signal === 'NEUTRAL' ? 'HOLD' : $row->signal)),
             'serving_buy_rating' => $rating,
+            'serving_buy_rating_raw' => $rawRating,
+            'serving_buy_rating_percent' => $rawRatingPercent,
+            'serving_buy_confirmations' => (int) ($row->buy_confirmations ?? 0),
             'serving_best_buy_quality' => $row->best_buy_quality,
             'serving_quality_gate_buy' => (bool) $row->has_quality_gate_buy,
             'ranking_score' => $ratingPercent,

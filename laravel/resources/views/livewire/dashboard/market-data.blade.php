@@ -30,6 +30,13 @@
     $analysisMetrics = collect($marketAnalysis['metrics'] ?? []);
     $reportSources = collect($marketAnalysis['sources'] ?? []);
     $isExternalAiReport = (bool) ($marketAnalysis['is_external_ai'] ?? false);
+    $marketFlags = [
+        '^GDAXI' => '🇩🇪',
+        '^IXIC' => '🇺🇸',
+        '^GSPC' => '🇺🇸',
+        '^N225' => '🇯🇵',
+        '000001.SS' => '🇨🇳',
+    ];
     $analysisItemText = function (mixed $item): string {
         if (is_string($item) || is_numeric($item)) return (string) $item;
         if (!is_array($item)) return '';
@@ -109,12 +116,15 @@
         @foreach ($markets as $market)
             @php $change = $market['change'] ?? null; @endphp
             <div class="ak-market-tape-item">
-                <div class="min-w-0">
-                    <p class="truncate text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ $market['name'] }}</p>
-                    <p class="mt-1 truncate text-sm font-extrabold text-[var(--ak-text)]">
-                        {{ is_numeric($market['price'] ?? null) ? number_format($market['price'], 2, ',', '.') : '—' }}
-                        <small class="font-semibold text-[var(--ak-muted)]">{{ $market['currency'] ?? '' }}</small>
-                    </p>
+                <div class="flex min-w-0 items-center gap-2.5">
+                    <span class="ak-market-index-flag" aria-hidden="true">{{ $marketFlags[$market['symbol'] ?? ''] ?? '🌐' }}</span>
+                    <div class="min-w-0">
+                        <p class="truncate text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ $market['name'] }}</p>
+                        <p class="mt-1 truncate text-sm font-extrabold text-[var(--ak-text)]">
+                            {{ is_numeric($market['price'] ?? null) ? number_format($market['price'], 2, ',', '.') : '—' }}
+                            <small class="font-semibold text-[var(--ak-muted)]">{{ $market['currency'] ?? '' }}</small>
+                        </p>
+                    </div>
                 </div>
                 <span class="ak-market-change {{ ($change ?? 0) >= 0 ? 'is-positive' : 'is-negative' }}">
                     {{ $change !== null ? (($change >= 0 ? '+' : '').number_format($change, 2, ',', '.').' %') : '—' }}
@@ -138,7 +148,7 @@
     <x-dashboard.macro-indicator-cards :cards="$macroCards" />
 
     <article x-data="{ marketReportOpen: window.innerWidth >= 768 }" class="ak-market-briefing ak-detail-panel ak-standard-card mt-4">
-        <div class="flex items-center justify-between gap-3">
+        <div class="ak-market-section-head flex items-center justify-between gap-3">
             <button type="button" @click="marketReportOpen = ! marketReportOpen" :aria-expanded="marketReportOpen.toString()" class="min-w-0 flex-1 text-left"><p class="ak-market-eyebrow">{{ $isExternalAiReport ? __('Externer Marktbericht') : __('Regelbasierter Marktbericht') }}</p><h2 class="mt-1 truncate text-xl font-black tracking-[-.025em] text-[var(--ak-text)] sm:text-2xl">{{ $analysisHeadline }}</h2></button>
             <span class="flex shrink-0 items-center gap-2"><span class="hidden rounded-lg border border-cyan-400/20 bg-cyan-400/[.06] px-2.5 py-1 text-[9px] font-black uppercase tracking-[.1em] text-cyan-400 sm:inline-flex">{{ $isExternalAiReport ? __('Aktuelle Web-Recherche') : __('Datenbasierte Auswertung') }}</span><button type="button" @click="marketReportOpen = ! marketReportOpen" class="grid h-9 w-9 place-items-center rounded-lg border border-cyan-400/25 text-cyan-500" aria-label="{{ __('Marktbericht aufklappen') }}"><x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="marketReportOpen && 'rotate-180'" /></button></span>
         </div>
@@ -203,7 +213,7 @@
 
     @if ($reportSources->isNotEmpty())
         <section class="mt-4" aria-labelledby="report-sources-title">
-            <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div class="ak-market-section-head mb-3 flex flex-wrap items-end justify-between gap-2">
                 <div>
                     <p class="ak-market-eyebrow">{{ __('Quellennachweis') }}</p>
                     <h2 id="report-sources-title" class="mt-1 text-xl font-black text-[var(--ak-text)]">{{ __('Im Marktbericht verwendete Quellen') }}</h2>
@@ -228,7 +238,7 @@
     @endif
 
     <section class="mt-4" aria-labelledby="official-market-sources-title">
-        <div class="mb-3">
+        <div class="ak-market-section-head mb-3">
             <p class="ak-market-eyebrow">{{ __('Externer Kontext') }}</p>
             <h2 id="official-market-sources-title" class="mt-1 text-xl font-black text-[var(--ak-text)]">{{ __('Offizielle Markt- und Konjunkturberichte') }}</h2>
             <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Originalquellen für Geldpolitik, Inflation und Konjunktur.') }}</p>

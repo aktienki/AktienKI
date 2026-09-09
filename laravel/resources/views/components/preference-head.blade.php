@@ -19,3 +19,5 @@
             document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
     })();
 </script>
+
+<x-global-light-theme />

@@ -54,21 +54,23 @@
         ];
         $dashboardMainCardLabels = [
             'strategy' => __('Strategiedepot'), 'personal' => __('Persönlicher Bereich'),
-            'community' => __('Community'), 'market' => __('Aktuelle Marktlage'),
-            'models' => __('Letzte Prognosen'), 'signals' => __('Empfehlungen & Signalübergänge'),
+            'community' => __('Community'), 'market' => __('Aktuelle Remote-Aktien'),
+            'models' => __('Letzte Prognosen'), 'signals' => __('Extern bestätigte BUY-Signale'),
             'earnings' => __('Aktuelle Quartalszahlen'),
             'market-summary' => __('Kompakter Marktbericht'),
-            'schedule' => __('Termine & Erinnerungen'), 'signal-cockpit' => __('Signal-Cockpit'),
-            'mobile-view' => __('Mobile Ansicht'),
+            'schedule' => __('Termine & Erinnerungen'), 'signal-cockpit' => __('Beste Alternativen'),
+            'mobile-view' => __('Mobile Ansicht'), 'champion' => __('Drei-Faktoren-Champion'),
+            'center-combined' => __('Champion & beste Alternativen'),
+            'daily-tips' => __('Aufsteiger & Technik'),
         ];
         $dashboardMainCardDescriptions = [
             'strategy' => __('Depotwert, Kapital und Performance.'), 'personal' => __('Deine persönlichen Schnellzugriffe.'),
             'community' => __('Aktivität seit deinem letzten Login.'), 'market' => __('Ausblick und aktueller Marktbericht.'),
-            'models' => __('Globale Modellläufe nach Regionen.'), 'signals' => __('Neue Empfehlungen und Signalwechsel.'),
+            'models' => __('Globale Modellläufe nach Regionen.'), 'signals' => __('Aktuelle BUY-Signale ohne wesentlichen externen Einwand.'),
             'earnings' => __('Aktuelle Quartalszahlen aus dem Portfolio.'),
             'market-summary' => __('Aktuelle Marktlage kompakt zusammengefasst.'),
             'schedule' => __('Anstehende E-Mails und Aktionen.'),
-            'signal-cockpit' => __('Kauf- und Watch-Signalwechsel, technische Signale und Chartmuster der letzten drei Handelstage.'),
+            'signal-cockpit' => __('Die Ranking-Plätze 2 bis 4 plus eine zusätzliche Alternativaktie.'),
             'mobile-view' => __('Lege fest, welche Karten auf dem Smartphone erscheinen.'),
         ];
         $dashboardMinimumHeights = [
@@ -87,6 +89,40 @@
             'market-summary' => ['width' => 1, 'height' => 1],
             'signal-cockpit' => ['width' => 1, 'height' => 6],
             'mobile-view' => ['width' => 1, 'height' => 1],
+        ];
+        // Help text per card, shown in the top-right "?" modal. Each value is a
+        // list of paragraphs; the modal title comes from $dashboardMainCardLabels.
+        $dashboardCardHelp = [
+            'signal-cockpit' => [
+                __('Gezeigt werden die Plätze 2 bis 4 hinter dem Champion sowie eine zusätzliche Alternativaktie mit kurzfristigem Rücksetzer und positivem längerfristigem Ausblick.'),
+                __('Das Ranking folgt dem gleichgewichteten Mittel aus KI-Rating, externer Bestätigung und Panel-Perzentil; fehlende externe Werte werden als nicht bestätigt ausgewiesen.'),
+                __('Ein Klick auf eine Zeile öffnet die Aktienanalyse.'),
+            ],
+            'personal' => [
+                __('Deine persönlichen Schnellzugriffe: Watchlists, Strategien, Labels, Erinnerungen, Chart-Ansicht und Community.'),
+                __('Welche Kacheln hier erscheinen, legst du über „Kacheln verwalten" fest.'),
+            ],
+            'strategy' => [
+                __('Überblick über dein automatisiertes Strategiedepot: aktueller Depotwert, eingesetztes Kapital und Wertentwicklung.'),
+                __('Nur mit Pro-Tarif aktiv.'),
+            ],
+            'market' => [__('Größe deines aktiven Remote-Universums: wie viele Aktien eine aktuelle Prediction haben und wie viele noch ausstehen, plus die KI-Rating-Verteilung.')],
+            'market-summary' => [__('Die aktuelle Marktlage in einem Satz zusammengefasst, plus kurzer Ausblick.')],
+            'daily-tips' => [
+                __('Zwei Zusatzkandidaten neben dem Champion. Oben: die Aktie mit dem stärksten Anstieg des KI-Scores über die letzten rund fünf Handelstage, die noch kein BUY-Signal hat (aus der lokalen Prognosehistorie).'),
+                __('Unten: die Aktie mit der besten ChartView-Statistik – ein nach Fallzahl gewichteter Mittelwert der „Kurs danach gestiegen"-Wahrscheinlichkeit über ihre bullischen technischen Ereignisse (20-Tage-Horizont).'),
+            ],
+            'models' => [__('Status der globalen Modellläufe nach Regionen und die zuletzt erzeugten Prognosen.')],
+            'signals' => [__('Aktuelle BUY-Signale, für deren exakte Serving-Version die externe Prüfung keinen wesentlichen Einwand gefunden hat.')],
+            'earnings' => [__('Anstehende Quartalszahlen für Aktien aus deinem Portfolio und deinen Watchlists.')],
+            'schedule' => [__('Anstehende E-Mails, Erinnerungen und geplante Aktionen mit Datum.')],
+            'community' => [__('Neue Beiträge, Mitglieder und Aktivität in der Community seit deinem letzten Login.')],
+            'mobile-view' => [__('Lege fest, welche Karten auf dem Smartphone angezeigt werden.')],
+            'champion' => [__('Die beste Aktie im gleichgewichteten Mittel aus BUY-Rating, externer Bestätigung und Panel-Perzentil. Berücksichtigt werden nur extern bestätigte BUYs in den Panel-Dezilen 6 bis 10.')],
+            'center-combined' => [
+                __('Oben steht der Drei-Faktoren-Champion aus BUY-Rating, externer Bestätigung und Panel-Perzentil.'),
+                __('Darunter folgen die Ranking-Plätze 2 bis 4 und eine zusätzliche Alternativaktie.'),
+            ],
         ];
         $storedDashboardCards = data_get(auth()->user()->preferences, 'dashboard.cards');
         $dashboardCardsCustomized = is_array($storedDashboardCards) && count($storedDashboardCards) > 0;
@@ -152,6 +188,15 @@
         #personal-dashboard .dashboard-champion-donut .segmented-score b { position:relative; font-size:15px; font-weight:950; color:var(--ak-text); text-shadow:0 0 10px rgba(255,255,255,.12); }
         :root:not([data-theme="light"]) #personal-dashboard .dashboard-champion-donut .segmented-score-sector[stroke="#dfe8ea"] { stroke:#40536a !important; opacity:.62 !important; }
         :root[data-theme="light"] #personal-dashboard .dashboard-champion-donut .segmented-score-sector[stroke="#dfe8ea"] { stroke:#b5c5cb !important; opacity:.85 !important; }
+        /* Champion (#1) — a hint of gold, nothing loud */
+        #personal-dashboard .dashboard-champion-entry {
+            background: transparent;
+            box-shadow: inset 0 0 0 1px rgba(251, 191, 36, .10), 0 6px 22px -12px rgba(217, 160, 30, .35);
+        }
+        :root[data-theme="light"] #personal-dashboard .dashboard-champion-entry {
+            background: transparent;
+            box-shadow: inset 0 0 0 1px rgba(212, 160, 30, .16), 0 8px 22px -12px rgba(212, 160, 30, .28);
+        }
         #personal-dashboard .dashboard-profile-badge {
             color: #075985;
             border-color: #38bdf8;
@@ -236,31 +281,15 @@
                 $marketRiskIsHigh = strtolower(trim((string) ($marketSituation?->risk_level ?? ''))) === 'high';
                 $marketRiskBadgeClass = $marketRiskIsHigh ? 'border-rose-400/30 text-rose-400' : 'border-amber-400/30 text-amber-400';
             @endphp
-            <article x-data="{ reportOpen: false }" class="dashboard-expanded-market-report ak-card mb-2 min-h-0 shrink-0 overflow-hidden border-orange-400/35 px-3 py-1.5" style="min-height:0;padding-top:.375rem;padding-bottom:.375rem">
-                <div class="flex min-w-0 items-center gap-2">
-                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400"><x-heroicon-o-globe-europe-africa class="h-4 w-4" /></span>
-                    <div class="min-w-0 flex-1"><p class="text-[8px] font-black uppercase tracking-[.15em] text-orange-400">{{ __('Aktuelle Marktlage') }}</p><h2 class="mt-0.5 truncate text-sm font-black text-[var(--ak-text)]">{{ $marketSituation?->headline ?: __('Marktüberblick') }}</h2></div>
-                    <div class="hidden shrink-0 items-center gap-2 lg:flex">
-                        @foreach ([[__('Ausblick'),$marketSituation?->market_outlook ? __($marketSituation->market_outlook) : '—',$marketOutlookBadgeClass],[__('Konfidenz'),is_numeric($marketSituation?->confidence) ? number_format((float)$marketSituation->confidence,0,',','.').' %' : '—','border-cyan-400/25 text-[var(--ak-text)]'],[__('Risiko'),$marketSituation?->risk_level ? __($marketSituation->risk_level) : '—',$marketRiskBadgeClass]] as [$label,$value,$class])
-                            <span class="inline-flex h-8 min-w-[68px] items-center justify-center gap-1.5 rounded-lg border bg-transparent px-2 {{ $class }}"><small class="text-[7px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $label }}</small><b class="text-[10px] font-black">{{ $value }}</b></span>
-                        @endforeach
-                    </div>
-                    @if($marketSituation?->analysis_date)<time class="hidden shrink-0 text-[8px] font-bold tabular-nums text-[var(--ak-muted)] sm:block">{{ \Illuminate\Support\Carbon::parse($marketSituation->analysis_date)->format('d.m.Y') }}</time>@endif
-                    <button type="button" @click="reportOpen = ! reportOpen" :aria-expanded="reportOpen.toString()" class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/25 text-orange-400 transition hover:bg-orange-400/10" title="{{ __('Marktbericht ein- oder ausklappen') }}"><x-heroicon-o-chevron-down class="h-4 w-4 transition" x-bind:class="reportOpen && 'rotate-180'" /></button>
-                </div>
-                <div x-show="reportOpen" x-cloak class="border-t border-orange-400/15 pt-3 mt-3"><div class="grid grid-cols-3 gap-2 lg:hidden">@foreach ([[__('Ausblick'),$marketSituation?->market_outlook ? __($marketSituation->market_outlook) : '—'],[__('Konfidenz'),is_numeric($marketSituation?->confidence) ? number_format((float)$marketSituation->confidence,0,',','.').' %' : '—'],[__('Risiko'),$marketSituation?->risk_level ? __($marketSituation->risk_level) : '—']] as [$label,$value])<div class="flex min-h-14 min-w-0 flex-col justify-center rounded-lg border border-orange-400/15 px-2 py-1.5"><small class="block truncate text-[7px] font-black uppercase text-[var(--ak-muted)]">{{ $label }}</small><b class="mt-1 truncate text-xs text-[var(--ak-text)]">{{ $value }}</b></div>@endforeach</div><p class="mt-3 text-sm leading-6 text-[var(--ak-muted)]">{{ $marketSituation?->executive_summary ?: __('Noch keine aktuelle Marktanalyse verfügbar.') }}</p><a href="{{ route('daily-market-analysis') }}" class="mt-3 inline-flex items-center gap-1 text-[10px] font-black text-orange-400 hover:text-orange-300">{{ __('Vollständiger Bericht') }} <x-heroicon-o-arrow-right class="h-3.5 w-3.5" /></a></div>
-            </article>
-
             <section class="dashboard-bento grid gap-3 sm:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-12" data-dashboard-card-layout="{{ $dashboardCardsCustomized ? 'custom' : 'default' }}">
                 <div class="dashboard-personal-column contents sm:col-span-2">
                 @if ($strategyPortfolio)
                     @php
-                        $strategyPerformance = (float) $strategyPortfolio->dashboard_performance;
                         $strategyPortfolioActive = (bool) data_get($strategyPortfolio->meta, 'automation.live_enabled', false);
                         $strategyEmailActive = $strategyPortfolioActive
                             && (bool) data_get($strategyPortfolio->meta, 'automation.transaction_email_enabled', false);
                     @endphp
-                    <article x-data="{ strategyOpen: false }" data-dashboard-card="strategy" data-dashboard-width="1" data-dashboard-height="1" data-dashboard-size="1" style="--dashboard-card-order:{{ $dashboardCardOrder('strategy') }}" class="dashboard-bento-strategy ak-card ak-dashboard-card group relative flex min-h-[94px] overflow-hidden p-3 transition {{ $dashboardCardVisible('strategy') ? '' : 'hidden' }} {{ !$canUsePro ? 'dashboard-plan-locked' : ($strategyPortfolioActive ? 'border-orange-200/90 ring-1 ring-inset ring-orange-200/30 shadow-[0_0_35px_rgba(251,146,60,.24)] hover:border-orange-100' : 'border-orange-200/45 hover:border-orange-100/70') }}">
+                    <article data-dashboard-card="strategy" data-dashboard-top-row-card data-dashboard-width="1" data-dashboard-height="1" data-dashboard-size="1" style="--dashboard-card-order:{{ $dashboardCardOrder('strategy') }}" class="dashboard-bento-strategy ak-card ak-dashboard-card group relative flex min-h-[94px] overflow-hidden p-3 transition {{ $dashboardCardVisible('strategy') ? '' : 'hidden' }} {{ !$canUsePro ? 'dashboard-plan-locked' : ($strategyPortfolioActive ? 'border-orange-200/90 ring-1 ring-inset ring-orange-200/30 shadow-[0_0_35px_rgba(251,146,60,.24)] hover:border-orange-100' : 'border-orange-200/45 hover:border-orange-100/70') }}">
                         @unless($canUsePro)<span class="dashboard-plan-badge ak-plan-badge ak-plan-badge--pro">{{ __('Ab Pro') }}</span>@endunless
                         <span class="pointer-events-none absolute -left-8 -top-10 h-28 w-28 rounded-full {{ $strategyPortfolioActive ? 'bg-orange-400/35' : 'bg-orange-400/15' }} blur-2xl"></span>
                         <div class="relative flex w-full min-w-0 flex-col justify-between">
@@ -268,7 +297,7 @@
                                 <div class="flex min-w-0 flex-1 items-center gap-2">
                                     <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-200/45 bg-orange-400/20 text-orange-200"><x-heroicon-o-bolt class="h-4 w-4" /></span>
                                     <span class="min-w-0 flex-1">
-                                        <a href="{{ $canUsePro ? route('depots.show', ['portfolio' => $strategyPortfolio, 'return_to' => 'paper']) : route('pricing') }}" class="block truncate text-base font-bold text-[var(--ak-text)]">{{ $strategyPortfolio->name }}</a>
+                                        <a href="{{ $canUsePro ? route('depots.show', ['portfolio' => $strategyPortfolio, 'return_to' => request()->getRequestUri()]) : route('pricing') }}" class="block truncate text-base font-bold text-[var(--ak-text)]">{{ $strategyPortfolio->name }}</a>
                                         <span class="mt-1 flex min-w-0 items-center gap-1 overflow-hidden">
                                             <small class="hidden shrink-0 rounded bg-orange-400/20 px-1.5 py-0.5 text-[7px] font-black text-orange-600 sm:inline-flex">{{ __('STRATEGIEDEPOT') }}</small>
                                             @foreach ($strategyPortfolio->strategies as $strategy)
@@ -282,43 +311,16 @@
                                     @if ($strategyPortfolioActive)
                                         <span class="hidden items-center gap-1.5 rounded-md border border-orange-200 bg-orange-400 px-2 py-1 text-[9px] font-black uppercase text-slate-950 shadow-[0_0_15px_rgba(251,146,60,.35)] sm:flex"><i class="h-1.5 w-1.5 rounded-full bg-slate-950"></i>{{ __('Aktiv') }}</span>
                                     @endif
-                                    <button type="button" @click="strategyOpen = ! strategyOpen" :aria-expanded="strategyOpen.toString()" class="grid h-8 w-8 place-items-center rounded-lg border border-cyan-400/25 text-cyan-500" aria-label="{{ __('Offene Positionen anzeigen') }}"><x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="strategyOpen && 'rotate-180'" /></button>
                                 </span>
                             </div>
-                            <div class="strategy-summary-metrics mt-2 grid grid-cols-4 gap-1 border-t border-orange-400/15 pt-2 text-center">
-                                @foreach ([
-                                    [__('Depotwert'), $strategyPortfolio->dashboard_positions_value, $strategyPortfolio->currency, 'text-[var(--ak-text)]'],
-                                    [__('Kapital'), $strategyPortfolio->dashboard_cash, $strategyPortfolio->currency, 'text-[var(--ak-text)]'],
-                                    [__('Gesamtwert'), $strategyPortfolio->dashboard_total_value, $strategyPortfolio->currency, 'text-orange-400'],
-                                    [__('Performance'), $strategyPerformance, '%', $strategyPerformance >= 0 ? 'text-orange-400' : 'text-rose-300'],
-                                ] as [$label, $value, $suffix, $valueClass])
-                                    <span class="min-w-0"><small class="block truncate text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ $label }}</small><b class="block truncate text-xs tabular-nums {{ $valueClass }}">{{ $label === __('Performance') && $value >= 0 ? '+' : '' }}{{ number_format((float) $value, $suffix === '%' ? 1 : 0, ',', '.') }} {{ $suffix === 'EUR' ? '€' : $suffix }}</b></span>
-                                @endforeach
-                            </div>
-                            <div x-show="strategyOpen" x-cloak x-transition.opacity class="mt-3 border-t border-cyan-400/15 pt-2">
-                                @php
-                                    $strategyDisplayPositions = $strategyPortfolio->positions->map(function ($position): array {
-                                        $buyPrice = (float) $position->average_buy_price;
-                                        $currentPrice = (float) ($position->current_price ?? $position->average_buy_price);
-                                        $quantity = (float) $position->quantity;
-                                        $profit = ($currentPrice - $buyPrice) * $quantity;
-                                        return ['name' => $position->instrument?->name ?: $position->instrument?->symbol ?: __('Position'), 'symbol' => $position->instrument?->symbol, 'quantity' => $quantity, 'buy_date' => $position->opened_at_date?->format('d.m.Y') ?: '—', 'value' => $currentPrice * $quantity, 'profit' => $profit, 'performance' => $buyPrice > 0 ? (($currentPrice / $buyPrice) - 1) * 100 : 0, 'simulated' => false];
-                                    })->sortByDesc('value')->take(5)->values();
-                                @endphp
-                                <div class="mb-2 flex items-center justify-between"><b class="text-[9px] font-black uppercase tracking-[.12em] text-cyan-600">{{ __('Offene Positionen') }}</b><span class="rounded-md border border-cyan-400/25 px-1.5 py-0.5 text-[8px] font-black text-cyan-600">{{ $strategyDisplayPositions->count() }}</span></div>
-                                <div class="grid gap-1.5">
-                                    @forelse($strategyDisplayPositions as $position)
-                                        <div class="rounded-lg border border-cyan-400/15 px-2.5 py-2"><div class="flex items-center justify-between gap-2"><span class="min-w-0"><b class="block truncate text-[10px] text-[var(--ak-text)]">{{ $position['name'] }}</b><small class="text-[8px] font-bold text-[var(--ak-muted)]">{{ $position['symbol'] }} · {{ number_format((float) $position['quantity'], 2, ',', '.') }} {{ __('Stück') }}</small></span><b class="shrink-0 text-[10px] tabular-nums text-cyan-600">{{ number_format((float) $position['value'], 0, ',', '.') }} {{ $strategyPortfolio->currency }}</b></div><div class="mt-1.5 grid grid-cols-3 gap-2 border-t border-cyan-400/10 pt-1.5"><span><small class="block text-[7px] font-black uppercase text-[var(--ak-muted)]">{{ __('Kaufdatum') }}</small><b class="text-[8px] tabular-nums text-[var(--ak-text)]">{{ $position['buy_date'] }}</b></span><span><small class="block text-[7px] font-black uppercase text-[var(--ak-muted)]">{{ __('Gewinn') }}</small><b class="text-[9px] tabular-nums {{ $position['profit'] >= 0 ? 'text-emerald-600' : 'text-rose-500' }}">{{ $position['profit'] >= 0 ? '+' : '' }}{{ number_format((float) $position['profit'], 2, ',', '.') }} {{ $strategyPortfolio->currency }}</b></span><span class="text-right"><small class="block text-[7px] font-black uppercase text-[var(--ak-muted)]">{{ __('Performance') }}</small><b class="inline-flex rounded-md border px-1.5 py-0.5 text-[9px] tabular-nums {{ $position['performance'] >= 0 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-600' : 'border-rose-400/30 bg-rose-400/10 text-rose-500' }}">{{ $position['performance'] >= 0 ? '+' : '' }}{{ number_format((float) $position['performance'], 2, ',', '.') }}%</b></span></div></div>
-                                    @empty
-                                        <p class="rounded-lg border border-dashed border-cyan-400/20 p-3 text-center text-[9px] text-[var(--ak-muted)]">{{ __('Aktuell sind keine Positionen geöffnet.') }}</p>
-                                    @endforelse
-                                </div>
-                                <a href="{{ $canUsePro ? route('depots.show', ['portfolio' => $strategyPortfolio, 'return_to' => 'paper']) : route('pricing') }}" class="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-cyan-600">{{ __('Strategiedepot öffnen') }} →</a>
+                            <div class="strategy-summary-metrics mt-2 border-t border-orange-400/15 pt-2 text-center">
+                                <small class="block text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Depotwert') }}</small>
+                                <b class="mt-0.5 block truncate text-lg font-black tabular-nums text-[var(--ak-text)]">{{ number_format((float) $strategyPortfolio->dashboard_positions_value, 0, ',', '.') }} {{ strtoupper((string) $strategyPortfolio->currency) === 'EUR' ? '€' : $strategyPortfolio->currency }}</b>
                             </div>
                         </div>
                     </article>
                 @else
-                    <article data-dashboard-card="strategy" data-dashboard-width="1" data-dashboard-height="1" data-dashboard-size="1" style="--dashboard-card-order:{{ $dashboardCardOrder('strategy') }}" class="dashboard-bento-strategy ak-card ak-dashboard-card relative flex min-h-[94px] flex-col justify-between overflow-hidden border-orange-400/35 p-4 {{ $dashboardCardVisible('strategy') ? '' : 'hidden' }} {{ $canUsePro ? '' : 'dashboard-plan-locked' }}">
+                    <article data-dashboard-card="strategy" data-dashboard-top-row-card data-dashboard-width="1" data-dashboard-height="1" data-dashboard-size="1" style="--dashboard-card-order:{{ $dashboardCardOrder('strategy') }}" class="dashboard-bento-strategy ak-card ak-dashboard-card relative flex min-h-[94px] flex-col justify-between overflow-hidden border-orange-400/35 p-4 {{ $dashboardCardVisible('strategy') ? '' : 'hidden' }} {{ $canUsePro ? '' : 'dashboard-plan-locked' }}">
                         @unless($canUsePro)<span class="dashboard-plan-badge ak-plan-badge ak-plan-badge--pro">{{ __('Ab Pro') }}</span>@endunless
                         <div class="flex items-center gap-2">
                             <span class="grid h-8 w-8 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400"><x-heroicon-o-bolt class="h-4 w-4" /></span>
@@ -330,19 +332,18 @@
                         <a href="{{ $canUsePro ? route('paper-depots.index') : route('pricing') }}" class="mt-3 text-[10px] font-black text-orange-400 hover:text-orange-200">{{ $canUsePro ? __('Depot einrichten') : __('Pro entdecken') }} →</a>
                     </article>
                 @endif
-                    <article x-data="{ personalOpen: window.innerWidth >= 768 }" data-dashboard-card="personal" data-dashboard-size="{{ $dashboardCardSize('personal') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('personal') }}" class="dashboard-bento-personal ak-card ak-dashboard-card shrink-0 overflow-hidden p-4 {{ $dashboardCardVisible('personal') ? '' : 'hidden' }}">
-                        <div class="dashboard-collapsible-header flex items-center justify-between gap-3" :class="personalOpen ? 'mb-1.5' : ''">
-                            <button type="button" @click="personalOpen = ! personalOpen" :aria-expanded="personalOpen.toString()" class="flex min-w-0 flex-1 items-start gap-2.5 text-left">
+                    <article x-data="{ personalOpen: true }" data-dashboard-card="personal" data-dashboard-size="{{ $dashboardCardSize('personal') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('personal') }}" class="dashboard-bento-personal ak-card ak-dashboard-card shrink-0 overflow-hidden p-4 {{ $dashboardCardVisible('personal') ? '' : 'hidden' }}">
+                        <div class="dashboard-collapsible-header flex items-center justify-between gap-3 mb-1.5">
+                            <div class="flex min-w-0 flex-1 items-start gap-2.5 text-left">
                                 <span class="grid h-9 w-9 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/10 text-orange-400"><x-heroicon-o-squares-2x2 class="h-4.5 w-4.5" /></span>
                                 <span class="min-w-0 pt-1"><span class="block text-[9px] font-black uppercase tracking-[.18em] text-orange-400">{{ __('Persönlicher Bereich') }}</span></span>
-                            </button>
-                            <div class="flex shrink-0 items-center gap-1.5">
+                            </div>
+                            <div class="flex shrink-0 items-center gap-1.5" data-help-anchor="personal">
                                 @if ($canUsePro)
                                     <button type="button" data-dashboard-layout-open class="hidden h-9 w-9 place-items-center rounded-lg border border-orange-400/25 bg-orange-400/[.08] text-orange-400 transition hover:border-orange-300/50 hover:bg-orange-400/[.16] md:grid" title="{{ __('Persönlichen Bereich anpassen') }}" aria-label="{{ __('Persönlichen Bereich anpassen') }}"><x-heroicon-o-cog-6-tooth class="h-4.5 w-4.5" /></button>
                                 @else
                                     <a href="{{ route('pricing') }}" class="relative hidden h-9 w-9 place-items-center rounded-lg border border-slate-500/25 bg-slate-500/[.06] text-slate-500 transition hover:border-amber-400/40 hover:text-amber-300 md:grid" title="{{ __('Dashboard-Konfiguration ab Pro') }}" aria-label="{{ __('Dashboard-Konfiguration ab Pro') }}"><x-heroicon-o-cog-6-tooth class="h-4.5 w-4.5" /><span class="absolute -right-2 -top-2 rounded border border-amber-400/35 bg-[var(--ak-card)] px-1 py-0.5 text-[6px] font-black text-amber-300">PRO</span></a>
                                 @endif
-                                <button type="button" @click="personalOpen = ! personalOpen" class="grid h-9 w-9 place-items-center rounded-lg border border-orange-400/25 text-orange-400" aria-label="{{ __('Persönlichen Bereich aufklappen') }}"><x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="personalOpen && 'rotate-180'" /></button>
                             </div>
                         </div>
                         <div x-show="personalOpen" x-cloak x-transition.opacity class="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -466,17 +467,13 @@
                     }
                 </style>
                 <div id="dashboard-middle-column" data-dashboard-card="market" data-dashboard-size="{{ $dashboardCardSize('market') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('market') }}" class="dashboard-bento-market dashboard-market-overview-grid min-h-0 sm:col-span-2 {{ $dashboardMarketVisible ? '' : 'hidden' }}">
-                    <article class="ak-card min-h-[150px] shrink-0 rounded-xl border-cyan-400/30 p-4" aria-labelledby="profile-universe-title">
+                    <article id="dashboard-market-overview-card" data-dashboard-top-row-card data-help-card="market" class="ak-card min-h-[150px] shrink-0 rounded-xl border-cyan-400/30 p-4" aria-labelledby="profile-universe-title">
                         <div class="aki-profile-universe-grid grid gap-3">
                             <div class="flex min-w-0 items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <p id="profile-universe-title" class="text-[10px] font-black uppercase tracking-[.12em] text-cyan-400">{{ __('Aktuelle Remote-Aktien') }}</p>
                                     <div class="mt-1 flex items-end gap-1.5"><strong class="text-2xl font-black leading-none tabular-nums text-[var(--ak-text)]">{{ number_format((int) ($profileUniverseStats['active_count'] ?? 0), 0, ',', '.') }}</strong><span class="pb-0.5 text-[10px] font-bold text-[var(--ak-muted)]">{{ __('Aktien') }}</span></div>
                                     <p class="mt-1 text-[8px] font-black uppercase tracking-wide text-cyan-400">{{ __('Remote-Serving') }} · {{ number_format((int) ($profileUniverseStats['current_signal_count'] ?? 0), 0, ',', '.') }} {{ __('mit aktueller Prediction') }} · {{ number_format((int) ($profileUniverseStats['open_count'] ?? 0), 0, ',', '.') }} {{ __('ausstehend') }}</p>
-                                </div>
-                                <div class="flex shrink-0 items-center gap-2">
-                                    <span class="inline-flex h-10 min-w-[86px] items-center justify-between gap-2 rounded-lg border bg-transparent px-3 {{ $trendBadge[2] }}" title="{{ __('Trendwert') }}: {{ $trendBadge[1] }}"><small class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Trend') }}</small><b class="text-base leading-none">{{ $trendBadge[0] }}</b></span>
-                                    <span class="inline-flex h-10 min-w-[96px] items-center justify-between gap-2 rounded-lg border bg-transparent px-3 {{ $timingBadge[2] }}" title="{{ __('Stimmungswert') }}: {{ $timingBadge[1] }}"><small class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Stimmung') }}</small><b class="text-base leading-none">{{ $timingBadge[0] }}</b></span>
                                 </div>
                             </div>
                             <div class="aki-profile-universe-score min-w-0">
@@ -503,50 +500,121 @@
                         $compactBuyFlag = $dashboardCountryFlags[strtoupper((string) ($topStockToday->country ?? ''))] ?? '🌐';
                         $compactWatchFlag = $dashboardCountryFlags[strtoupper((string) ($topWatchStock->country ?? ''))] ?? '🌐';
                     @endphp
-                    <article id="dashboard-daily-tips-card" x-data="{ opportunitiesOpen: window.innerWidth >= 768 }" class="dashboard-daily-tips ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden rounded-xl border-cyan-400/30 p-4" aria-labelledby="dashboard-daily-tips-title">
+                    <article id="dashboard-daily-tips-card" data-help-card="daily-tips" x-data="{ opportunitiesOpen: true }" class="dashboard-daily-tips ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden rounded-xl border-cyan-400/30 p-4" aria-labelledby="dashboard-daily-tips-title">
                         <div class="dashboard-collapsible-header flex items-center justify-between gap-3" :class="opportunitiesOpen ? 'mb-3' : ''">
-                            <button type="button" @click="opportunitiesOpen = ! opportunitiesOpen" :aria-expanded="opportunitiesOpen.toString()" class="flex min-w-0 flex-1 items-center gap-3 text-left"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-600"><x-heroicon-o-arrow-trending-up class="h-5 w-5" /></span><span class="min-w-0"><span class="block whitespace-nowrap text-[9px] font-black uppercase tracking-[.16em] text-cyan-600">{{ __('Handelschancen') }}</span><span class="mt-1 flex min-w-0 items-center gap-2"><span id="dashboard-daily-tips-title" class="truncate text-base font-black text-[var(--ak-text)]">{{ __('Meine Handelschancen') }}</span><span class="shrink-0 rounded-md border border-cyan-400/25 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide text-cyan-500">Top 5</span></span><span class="mt-1 flex flex-wrap gap-1.5 text-[8px] font-black"><span class="text-cyan-600">{{ collect($dashboardOpportunities)->take(5)->count() }} {{ __('Chancen') }}</span><span class="text-[var(--ak-muted)]">· {{ __('positiver 20-Tage-Ausblick') }}</span></span></span></button>
-                            <span class="flex shrink-0 items-center gap-2">@if($canUsePro)<a href="{{ route('opportunities.index') }}" class="text-[8px] font-black text-cyan-600">{{ __('Alle') }} →</a>@else<x-heroicon-o-sparkles class="h-5 w-5 text-cyan-500" />@endif<button type="button" @click="opportunitiesOpen = ! opportunitiesOpen" class="grid h-8 w-8 place-items-center rounded-lg border border-cyan-400/25 text-cyan-600" :aria-label="opportunitiesOpen ? '{{ __('Handelschancen einklappen') }}' : '{{ __('Handelschancen ausklappen') }}'"><x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="opportunitiesOpen && 'rotate-180'" /></button></span>
+                            <div class="flex min-w-0 flex-1 items-center gap-3 text-left"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-600"><x-heroicon-o-bolt class="h-5 w-5" /></span><span class="min-w-0"><span class="block whitespace-nowrap text-[9px] font-black uppercase tracking-[.16em] text-cyan-600">{{ __('Zusätzliche Kandidaten') }}</span><span class="mt-1 flex min-w-0 items-center gap-2"><span id="dashboard-daily-tips-title" class="truncate text-base font-black text-[var(--ak-text)]">{{ __('Aufsteiger, Technik & Neu') }}</span></span><span class="mt-1 flex flex-wrap gap-1.5 text-[8px] font-black"><span class="text-cyan-600">{{ __('Score-Anstieg (5 Tage)') }}</span><span class="text-[var(--ak-muted)]">· {{ __('ChartView') }} · {{ __('neues BUY') }}</span></span></span></div>
                         </div>
-                        <div id="dashboard-best-stocks-row" x-show="opportunitiesOpen" x-cloak x-transition.opacity class="grid min-h-0 flex-1 grid-cols-1 content-start gap-1.5 overflow-y-auto pr-1" aria-label="{{ __('Heutige Handelschancen') }}">
-                            @forelse(collect($dashboardOpportunities)->take(5) as $opportunity)
-                                @php
-                                    $snapshot = $opportunity->snapshot ?: [];
-                                    $opportunityReturns = data_get($snapshot, 'returns', []);
-                                    $opportunityShortHorizon = (int) data_get($snapshot, 'short_horizon', 10);
-                                    $opportunityLongHorizon = (int) data_get($snapshot, 'long_horizon', 20);
-                                    $opportunityShortReturn = $opportunityReturns[$opportunityShortHorizon] ?? $opportunityReturns[(string) $opportunityShortHorizon] ?? null;
-                                    $opportunityLongReturn = $opportunityReturns[$opportunityLongHorizon] ?? $opportunityReturns[(string) $opportunityLongHorizon] ?? null;
-                                    $opportunityScore = data_get($snapshot, 'score');
-                                    $opportunityConfidence = data_get($snapshot, 'confidence');
-                                    $opportunityRisk = data_get($snapshot, 'risk');
-                                    $opportunityScorePercent = \App\Support\AiScore::toPercent($opportunityScore);
-                                    $opportunityScoreGrade = \App\Support\QualityGrade::fromPercent($opportunityScorePercent);
-                                    $opportunityRiskPercent = is_numeric($opportunityRisk) ? (float) $opportunityRisk : null;
-                                    $opportunityRiskLevel = \App\Support\QualityGrade::riskLevel($opportunityRiskPercent);
-                                    $opportunityFlag = $dashboardCountryFlags[strtoupper((string) $opportunity->instrument->country)] ?? '🌐';
-                                @endphp
-                                <a href="{{ route('stocks.show', ['symbol' => $opportunity->instrument->symbol, 'prediction' => $opportunity->prediction_id, 'return_to' => '/dashboard']) }}" class="group flex min-w-0 items-center gap-2.5 rounded-xl border border-amber-400/25 bg-amber-400/[.055] px-3 py-2 transition hover:border-amber-400/55 hover:bg-amber-400/[.09]" title="{{ $opportunity->instrument->name }} · {{ __('Handelschance') }}">
-                                    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-amber-400/35 bg-amber-400/10 text-amber-500">
-                                        <x-heroicon-o-arrow-trending-up class="h-5 w-5" />
-                                    </span>
-                                    <span class="min-w-0 flex-1"><span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $opportunity->instrument->name ?: $opportunity->instrument->symbol }}</b><em class="shrink-0 rounded-md border border-amber-400/30 px-1.5 py-0.5 text-[8px] font-black not-italic text-amber-500">{{ __($opportunity->status) }}</em></span><small class="mt-0.5 block truncate text-[9px] font-black text-amber-500">{{ __('Kurzfristiger Rücksetzer · längerfristig positiver Ausblick') }}</small><small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $opportunityFlag }} {{ $opportunity->instrument->symbol }}</span>@if($opportunityScoreGrade !== null)<span class="text-cyan-500" title="{{ __('Rohwert') }}: {{ number_format(($opportunityScorePercent ?? 0) / 10, 1, ',', '.') }}/10">KI {{ $opportunityScoreGrade }}</span>@endif @if(is_numeric($opportunityConfidence))<span>{{ __('Konf.') }} {{ number_format((float)$opportunityConfidence, 0, ',', '.') }}%</span>@endif @if($opportunityRiskLevel !== null)<span class="text-amber-500" title="{{ __('Rohwert') }}: {{ number_format($opportunityRiskPercent ?? 0, 0, ',', '.') }} %">{{ __('Risiko') }} {{ $opportunityRiskLevel }}</span>@endif @if(is_numeric($opportunityShortReturn))<span class="text-rose-400">{{ $opportunityShortHorizon }}T {{ sprintf('%+.1f', $opportunityShortReturn) }}%</span>@endif @if(is_numeric($opportunityLongReturn))<span class="text-emerald-500">{{ $opportunityLongHorizon }}T {{ sprintf('%+.1f', $opportunityLongReturn) }}%</span>@endif</small></span>
-                                </a>
-                            @empty
-                                <div class="col-span-2 rounded-xl border border-amber-400/15 p-3 text-center text-[10px] font-bold text-[var(--ak-muted)]">{{ $canUsePro ? __('Aktuell liegen keine persönlichen Handelschancen vor.') : __('Meine Handelschancen sind im Pro-Tarif verfügbar.') }}</div>
-                            @endforelse
+                        <div id="dashboard-best-stocks-row" x-show="opportunitiesOpen" x-cloak x-transition.opacity class="grid min-h-0 flex-1 grid-cols-1 content-start gap-1.5 overflow-y-auto pr-1" aria-label="{{ __('Aufsteiger und technische Auswahl') }}">
+                            @if(! $canUsePro)
+                                <div class="rounded-xl border border-cyan-400/15 p-3 text-center text-[10px] font-bold text-[var(--ak-muted)]">{{ __('Diese Auswahl ist im Pro-Tarif verfügbar.') }}</div>
+                            @else
+                                @if($bestNewStock)
+                                    @php
+                                        $newStockFlag = $dashboardCountryFlags[strtoupper((string) ($bestNewStock->country ?? ''))] ?? '🌐';
+                                        $newStockDate = $bestNewStock->new_buy_at ? \Illuminate\Support\Carbon::parse($bestNewStock->new_buy_at)->timezone('Europe/Berlin')->format('d.m.Y') : null;
+                                    @endphp
+                                    <a href="{{ route('stocks.show', ['symbol' => $bestNewStock->symbol, 'return_to' => '/dashboard']) }}" class="dashboard-opportunity-card group flex min-w-0 items-center gap-2.5 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-2 transition hover:border-orange-300/45 hover:bg-orange-400/[.10]" title="{{ $bestNewStock->name }}">
+                                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-amber-400/35 bg-amber-400/[.12] text-amber-500"><x-heroicon-o-sparkles class="h-5 w-5" /></span>
+                                        <span class="min-w-0 flex-1">
+                                            <span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $newStockFlag }} {{ $bestNewStock->name ?: $bestNewStock->symbol }}</b><em class="shrink-0 rounded-md border border-amber-400/35 bg-amber-400/[.12] px-1.5 py-0.5 text-[9px] font-black not-italic tabular-nums text-amber-500">KI {{ number_format((float) ($bestNewStock->score_10 ?? 0), 1, ',', '.') }}</em></span>
+                                            <small class="mt-0.5 block truncate text-[9px] font-black text-amber-500">{{ $bestNewStock->is_fresh_buy ? __('Beste neue BUY-Aktie') : __('Neueste Aktie') }}@if($newStockDate) · {{ $newStockDate }}@endif</small>
+                                            <small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $bestNewStock->symbol }}</span><span class="text-emerald-500">BUY</span>@if(is_numeric($bestNewStock->panel_decile ?? null))<span class="text-cyan-500">Panel D{{ (int) $bestNewStock->panel_decile }}</span>@endif@if(is_numeric($bestNewStock->expected_return_20d ?? null))<span class="{{ (float) $bestNewStock->expected_return_20d >= 0 ? 'text-emerald-500' : 'text-rose-400' }}">20T {{ sprintf('%+.1f %%', (float) $bestNewStock->expected_return_20d) }}</span>@endif</small>
+                                        </span>
+                                    </a>
+                                @else
+                                    <div class="rounded-xl border border-dashed border-orange-400/20 p-3 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Keine weitere neue BUY-Aktie verfügbar.') }}</div>
+                                @endif
+
+                                @if($scoreRiser)
+                                    @php
+                                        $riserFlag = $dashboardCountryFlags[strtoupper((string) ($scoreRiser->country ?? ''))] ?? '🌐';
+                                        $riserSignal = strtoupper((string) ($scoreRiser->personalized_signal ?: $scoreRiser->model_signal ?: 'HOLD'));
+                                        $riserSignalTone = match($riserSignal) { 'WATCH' => 'text-lime-500', 'SELL' => 'text-rose-400', 'WAIT' => 'text-orange-500', default => 'text-amber-500' };
+                                    @endphp
+                                    <a href="{{ route('stocks.show', ['symbol' => $scoreRiser->symbol, 'return_to' => '/dashboard']) }}" class="dashboard-opportunity-card group flex min-w-0 items-center gap-2.5 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-2 transition hover:border-orange-300/45 hover:bg-orange-400/[.10]" title="{{ $scoreRiser->name }}">
+                                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-emerald-400/35 bg-emerald-400/[.12] text-emerald-500"><x-heroicon-o-arrow-trending-up class="h-5 w-5" /></span>
+                                        <span class="min-w-0 flex-1">
+                                            <span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $riserFlag }} {{ $scoreRiser->name ?: $scoreRiser->symbol }}</b><em class="shrink-0 rounded-md border border-emerald-400/35 bg-emerald-400/[.12] px-1.5 py-0.5 text-[9px] font-black not-italic tabular-nums text-emerald-500">+{{ number_format($scoreRiser->score_rise_delta, 1, ',', '.') }}</em></span>
+                                            <small class="mt-0.5 block truncate text-[9px] font-black text-emerald-500">{{ __('Score-Aufsteiger · :days Tage · noch kein BUY', ['days' => $scoreRiser->score_rise_days]) }}</small>
+                                            <small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $scoreRiser->symbol }}</span><span class="{{ $riserSignalTone }}">{{ $riserSignal }}</span><span class="text-emerald-500">KI {{ number_format($scoreRiser->score_rise_prev, 1, ',', '.') }} → {{ number_format($scoreRiser->score_rise_now, 1, ',', '.') }}</span></small>
+                                        </span>
+                                    </a>
+                                @else
+                                    <div class="rounded-xl border border-dashed border-orange-400/20 p-3 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Kein Score-Aufsteiger der letzten Tage ohne BUY.') }}</div>
+                                @endif
+
+                                @if($topIndicatorStock)
+                                    @php
+                                        $indicatorFlag = $dashboardCountryFlags[strtoupper((string) ($topIndicatorStock->country ?? ''))] ?? '🌐';
+                                        $indicatorSignal = strtoupper((string) ($topIndicatorStock->personalized_signal ?: $topIndicatorStock->model_signal ?: 'HOLD'));
+                                    @endphp
+                                    <a href="{{ route('stocks.show', ['symbol' => $topIndicatorStock->symbol, 'return_to' => '/dashboard']) }}" class="dashboard-opportunity-card group flex min-w-0 items-center gap-2.5 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-2 transition hover:border-orange-300/45 hover:bg-orange-400/[.10]" title="{{ $topIndicatorStock->name }}">
+                                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-cyan-400/35 bg-cyan-400/[.12] text-cyan-500"><x-heroicon-o-chart-bar class="h-5 w-5" /></span>
+                                        <span class="min-w-0 flex-1">
+                                            <span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $indicatorFlag }} {{ $topIndicatorStock->name ?: $topIndicatorStock->symbol }}</b><em class="shrink-0 rounded-md border border-cyan-400/35 bg-cyan-400/[.12] px-1.5 py-0.5 text-[9px] font-black not-italic tabular-nums text-cyan-500">{{ number_format($topIndicatorStock->indicator_score, 0, ',', '.') }}%</em></span>
+                                            <small class="mt-0.5 block truncate text-[9px] font-black text-cyan-500">{{ __('Bester Indikatorscore · :events Signale, :n Fälle', ['events' => $topIndicatorStock->indicator_events, 'n' => $topIndicatorStock->indicator_samples]) }}</small>
+                                            <small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $topIndicatorStock->symbol }}</span><span>{{ $indicatorSignal }}</span>@if($topIndicatorStock->indicator_top_label)<span class="truncate text-cyan-500" title="{{ $topIndicatorStock->indicator_top_label }}">{{ $topIndicatorStock->indicator_top_label }}{{ $topIndicatorStock->indicator_top_prob !== null ? ' · '.number_format($topIndicatorStock->indicator_top_prob, 0, ',', '.').'%' : '' }}</span>@endif</small>
+                                        </span>
+                                    </a>
+                                @else
+                                    <div class="rounded-xl border border-dashed border-orange-400/20 p-3 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Keine technische ChartView-Statistik verfügbar.') }}</div>
+                                @endif
+                            @endif
                         </div>
                     </article>
                 </div>
 
-                @php $champion = $topRankedStocks->first(); @endphp
-                <article id="dashboard-newscenter-card" data-mobile-dashboard-card="champion" class="dashboard-newscenter ak-card flex min-h-0 flex-col overflow-hidden rounded-xl border-cyan-400/30 p-4" aria-labelledby="dashboard-champion-title">
+                <script>
+                    (() => {
+                        document.addEventListener('DOMContentLoaded', () => {
+                            if (!window.matchMedia('(min-width: 1280px)').matches) return;
+                            const marketShell = document.getElementById('dashboard-middle-column');
+                            const marketOverview = document.getElementById('dashboard-market-overview-card');
+                            const dailyTips = document.getElementById('dashboard-daily-tips-card');
+                            const dashboardGrid = marketShell?.closest('.dashboard-bento');
+                            if (!marketShell || !marketOverview || !dailyTips || !dashboardGrid) return;
+
+                            // Preserve the original, independent cards in the right column.
+                            dashboardGrid.appendChild(dailyTips);
+                            dashboardGrid.appendChild(marketOverview);
+                            marketShell.classList.add('dashboard-market-shell-empty');
+
+                            const rankingRows = document.getElementById('dashboard-ranking-stocks-row');
+                            const opportunityRows = document.getElementById('dashboard-best-stocks-row');
+                            const alignStockRows = () => {
+                                if (!rankingRows || !opportunityRows) return;
+                                if (!window.matchMedia('(min-width: 1280px)').matches) {
+                                    rankingRows.style.paddingTop = '';
+                                    opportunityRows.style.paddingTop = '';
+                                    return;
+                                }
+
+                                rankingRows.style.paddingTop = '0px';
+                                opportunityRows.style.paddingTop = '0px';
+                                window.requestAnimationFrame(() => {
+                                    const rankingTop = rankingRows.getBoundingClientRect().top;
+                                    const opportunityTop = opportunityRows.getBoundingClientRect().top;
+                                    const targetTop = Math.max(rankingTop, opportunityTop);
+                                    rankingRows.style.paddingTop = `${Math.max(0, targetTop - rankingTop)}px`;
+                                    opportunityRows.style.paddingTop = `${Math.max(0, targetTop - opportunityTop)}px`;
+                                });
+                            };
+
+                            alignStockRows();
+                            window.addEventListener('load', alignStockRows, { once: true });
+                            window.addEventListener('resize', alignStockRows, { passive: true });
+                            document.fonts?.ready.then(alignStockRows);
+                        });
+                    })();
+                </script>
+
+                <section id="dashboard-center-combined-card" data-help-card="center-combined" class="dashboard-center-combined-card ak-card min-h-0 overflow-hidden rounded-xl border-cyan-400/35">
+                <article id="dashboard-newscenter-card" data-mobile-dashboard-card="champion" class="dashboard-newscenter flex min-h-0 flex-col p-4" aria-labelledby="dashboard-champion-title">
                     <div class="mb-2 flex items-center justify-between gap-3">
                         <span class="flex min-w-0 items-center gap-2.5">
                             <span class="relative grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-amber-400/45 bg-amber-400/10 text-amber-400 shadow-[0_0_18px_rgba(251,191,36,.13)]"><x-heroicon-o-trophy class="h-7 w-7" /><span class="absolute -right-1 -top-1 rounded-full border border-amber-300/40 bg-[var(--ak-panel)] px-1 text-[8px] font-black text-amber-400">#1</span></span>
-                            <span class="min-w-0"><span class="block text-[10px] font-black uppercase tracking-[.16em] text-amber-500">{{ __('Champion') }}</span><span id="dashboard-champion-title" class="mt-1 block truncate text-lg font-black text-[var(--ak-text)]">{{ __('Aktie des Tages') }}</span></span>
+                            <span class="min-w-0"><span class="block text-[10px] font-black uppercase tracking-[.16em] text-amber-500">{{ __('Champion') }}</span><span id="dashboard-champion-title" class="mt-1 block truncate text-lg font-black text-[var(--ak-text)]">{{ __('Drei-Faktoren-Champion') }}</span></span>
                         </span>
-                        @if($champion)<a href="{{ route('stocks.show', ['symbol' => $champion->symbol, 'return_to' => '/dashboard']) }}" class="text-[9px] font-black text-amber-500">{{ __('Analyse') }} →</a>@endif
                     </div>
                     <div class="grid min-h-0 flex-1 gap-1.5 overflow-hidden">
                         @forelse($topRankedStocks as $rankIndex => $rankedStock)
@@ -556,46 +624,34 @@
                                 $rankScore = is_numeric($rankedStock->dashboard_ranking_score ?? null)
                                     ? (float) $rankedStock->dashboard_ranking_score / 10
                                     : \App\Support\AiScore::toTen(is_numeric($rankedStock->ai_score) ? $rankedStock->ai_score : $rankedStock->prediction_score);
-                                $rankRisk = \App\Support\RiskScore::toPercent(
-                                    $rankedStock->risk_score,
-                                    $rankedStock->drawdown_risk_factor,
-                                    $rankedStock->risk_max_drawdown,
-                                ) ?? match (strtolower((string) ($rankedStock->risk_status ?? ''))) {
-                                    'defensive' => 20.0,
-                                    'balanced' => 40.0,
-                                    'opportunity' => 60.0,
-                                    'risk' => 80.0,
-                                    'sleep' => 100.0,
-                                    default => 50.0,
-                                };
                                 $rankReturn = is_numeric($rankedStock->current_price) && (float) $rankedStock->current_price !== 0.0 && is_numeric($rankedStock->predicted_price_20d)
                                     ? (((float) $rankedStock->predicted_price_20d / (float) $rankedStock->current_price) - 1) * 100
                                     : (is_numeric($rankedStock->market_return_20d ?? null) ? (float) $rankedStock->market_return_20d : null);
                                 $rankSignal = strtoupper((string) ($rankedStock->personalized_signal ?: 'HOLD'));
                                 $rankSignalTone = match($rankSignal) { 'BUY' => 'text-emerald-400 border-emerald-400/30', 'WATCH' => 'text-lime-400 border-lime-400/30', 'SELL' => 'text-rose-400 border-rose-400/30', 'WAIT' => 'text-orange-400 border-orange-400/30', default => 'text-amber-400 border-amber-400/30' };
-                                $rankQualityPercent = is_numeric($rankScore) ? max(0, min(100, (float) $rankScore * 10)) : 0;
-                                $rankQualityGrade = \App\Support\QualityGrade::fromPercent($rankQualityPercent) ?: '—';
-                                $rankQualityLevel = is_numeric(substr($rankQualityGrade, 0, 1)) ? 6 - (int) substr($rankQualityGrade, 0, 1) : 0;
-                                $rankRiskLevel = \App\Support\QualityGrade::riskLevel($rankRisk);
+                                $rankQualityPercent = is_numeric($rankedStock->three_factor_score ?? null) ? (float) $rankedStock->three_factor_score : 0;
+                                $rankQualityGrade = number_format($rankQualityPercent, 0, ',', '.');
+                                $rankQualityLevel = max(0, min(5, (int) ceil($rankQualityPercent / 20)));
                                 $rankCurrency = strtoupper((string) ($rankedStock->currency ?: 'EUR'));
                                 $rankCurrencyLabel = match($rankCurrency) { 'EUR' => '€', 'USD' => '$', 'GBP' => '£', 'JPY' => '¥', default => $rankCurrency };
                                 $rankDailyChange = is_numeric($rankedStock->daily_change_percent ?? null) ? (float) $rankedStock->daily_change_percent : null;
-                                $rankReason = collect([
-                                    __('höchster aktueller Modellscore im aktiven Portfolio'),
-                                    $rankSignal === 'BUY' ? __('aktives BUY-Signal') : __('Signalstatus :signal', ['signal' => $rankSignal]),
-                                    is_numeric($rankedStock->confidence) ? __(':value % Konfidenz', ['value' => number_format((float) $rankedStock->confidence, 0, ',', '.')]) : null,
-                                    is_numeric($rankReturn) ? __('20T-Ausblick :value %', ['value' => sprintf('%+.1f', $rankReturn)]) : null,
-                                ])->filter()->implode(' · ');
+                                $rankReason = __('Gleichgewichtetes Mittel :average % aus BUY :buy %, extern :external % und Panel :panel % (Dezil :decile)', [
+                                    'average' => number_format((float) ($rankedStock->three_factor_score ?? 0), 1, ',', '.'),
+                                    'buy' => number_format((float) ($rankedStock->three_factor_buy_score ?? 0), 0, ',', '.'),
+                                    'external' => number_format((float) ($rankedStock->three_factor_external_score ?? 0), 0, ',', '.'),
+                                    'panel' => number_format((float) ($rankedStock->three_factor_panel_score ?? 0), 1, ',', '.'),
+                                    'decile' => (int) ($rankedStock->panel_decile ?? 0),
+                                ]);
                             @endphp
                             @if($rank === 1)
-                                <div class="dashboard-champion-entry group grid h-full min-h-0 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] content-center items-center gap-3 overflow-y-auto rounded-xl border border-cyan-400/25 bg-white/[.018] px-4 py-3 transition hover:border-cyan-400/45">
+                                <div class="dashboard-champion-entry group grid min-h-0 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] content-center items-center gap-3 overflow-y-auto rounded-xl border border-amber-400/35 px-4 py-3 transition hover:border-amber-400/60">
                                     <a href="{{ route('stocks.show', ['symbol' => $rankedStock->symbol, 'return_to' => '/dashboard']) }}" class="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
                                         <span class="min-w-0"><b class="flex min-w-0 items-center gap-2"><span class="truncate text-sm font-black text-[var(--ak-text)]">{{ $rankFlag }} {{ $rankedStock->name ?: $rankedStock->symbol }}</span>@if($rankedStock->external_review_ranking_downgraded ?? false)<span class="shrink-0 rounded-md border border-rose-400/35 bg-rose-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-rose-400" title="{{ __('Externer KI-Widerspruch: Ranking um einen Punkt reduziert') }}">KI −1</span>@endif</b><small class="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $rankedStock->symbol }}</span><span class="{{ $rankSignalTone }}">{{ $rankSignal }}</span><span>{{ ($rankedStock->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($rankedStock->display_price ?? null) ? number_format((float) $rankedStock->display_price, 2, ',', '.').' '.$rankCurrencyLabel : '—' }}</span><span class="{{ $rankDailyChange === null ? '' : ($rankDailyChange >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ __('Tag') }} {{ $rankDailyChange !== null ? sprintf('%+.2f%%', $rankDailyChange) : '—' }}</span></small></span>
-                                        <span class="flex items-center gap-2"><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankQualityPercent" :display="$rankQualityGrade" :level="$rankQualityLevel" type="chance" :label="__('Signalqualität')" /></span><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankRisk" :display="$rankRiskLevel" :level="$rankRiskLevel" type="risk" :label="__('Risiko')" /></span></span>
+                                        <span class="flex items-center gap-2"><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankQualityPercent" :display="$rankQualityGrade" :level="$rankQualityLevel" type="chance" :label="__('Drei-Faktoren-Mittel')" /></span><span class="grid h-[66px] min-w-[66px] place-items-center rounded-full border border-emerald-400/30 bg-emerald-400/[.07] text-center"><span><b class="block text-sm font-black text-emerald-400">D{{ (int) ($rankedStock->panel_decile ?? 0) }}</b><small class="block text-[7px] font-black uppercase text-[var(--ak-muted)]">Panel</small></span></span></span>
                                     </a>
-                                    <details class="dashboard-champion-reason group col-span-2 min-w-0 border-t border-cyan-400/15 pt-2">
+                                    <details class="dashboard-champion-reason group col-span-2 min-w-0 border-t border-amber-400/15 pt-2">
                                         <summary class="flex cursor-pointer list-none items-center gap-2 text-[9px] font-bold leading-4 text-[var(--ak-muted)] [&::-webkit-details-marker]:hidden">
-                                            <span class="min-w-0 flex-1 truncate"><b class="text-amber-500">{{ __('Warum Tipp des Tages?') }}</b> {{ ucfirst($rankReason) }}.</span>
+                                            <span class="min-w-0 flex-1 truncate"><b class="text-amber-500">{{ __('Warum Champion?') }}</b> {{ ucfirst($rankReason) }}.</span>
                                             <x-heroicon-o-chevron-down class="h-3.5 w-3.5 shrink-0 text-amber-500 transition-transform duration-200 group-open:rotate-180" />
                                         </summary>
                                         <p class="mt-2 text-[9px] font-bold leading-4 text-[var(--ak-muted)]">{{ ucfirst($rankReason) }}.</p>
@@ -613,92 +669,10 @@
                     </div>
                 </article>
 
-                <script>
-                    (() => {
-                        document.addEventListener('DOMContentLoaded', () => {
-                            if (!window.matchMedia('(min-width: 1280px)').matches) return;
-                            const middleColumn = document.getElementById('dashboard-middle-column');
-                            const dailyTipsCard = document.getElementById('dashboard-daily-tips-card');
-                            const signalCockpit = document.querySelector('[data-dashboard-card="signal-cockpit"]');
-                            const championCard = document.getElementById('dashboard-newscenter-card');
-                            const portfolioCard = middleColumn?.querySelector(':scope > article:first-of-type');
-                            const dashboardGrid = middleColumn?.closest('.dashboard-bento');
-                            if (!middleColumn || !dailyTipsCard || !signalCockpit || !dashboardGrid) return;
-                            dashboardGrid.appendChild(dailyTipsCard);
-                            middleColumn.appendChild(signalCockpit);
-                            if (championCard && portfolioCard) {
-                                const portfolioContent = portfolioCard.innerHTML;
-                                portfolioCard.innerHTML = championCard.innerHTML;
-                                championCard.innerHTML = portfolioContent;
-                                portfolioCard.classList.remove('border-cyan-400/30');
-                                portfolioCard.classList.add('border-amber-400/30');
-                                championCard.classList.remove('border-amber-400/30');
-                                championCard.classList.add('border-cyan-400/30');
-                            }
-                        });
-                    })();
-                </script>
-
-                @php
-                    $displayBuySignalChanges = collect($signalCockpit['signalChanges'])
-                        ->filter(fn (array $change): bool => strtoupper((string) ($change['to'] ?? '')) === 'BUY')
-                        ->sortByDesc(fn (array $change): float => (float) ($change['score'] ?? 0))->take(3)
-                        ->map(fn (array $change): array => [...$change, '_cockpit_group' => 'buy'])->values();
-                    $displaySellSignalChanges = collect($signalCockpit['signalChanges'])
-                        ->filter(fn (array $change): bool => strtoupper((string) ($change['to'] ?? '')) === 'SELL'
-                            && (! is_numeric(data_get($change, 'horizons.20')) || (float) data_get($change, 'horizons.20') <= 0))
-                        ->sortBy(fn (array $change): float => (float) ($change['score'] ?? 10))->take(1)
-                        ->map(fn (array $change): array => [...$change, '_cockpit_group' => 'sell'])->values();
-                    $displaySignalChanges = $displayBuySignalChanges->concat($displaySellSignalChanges)->values();
-                    $cockpitAverageScore = $displaySignalChanges->whereNotNull('score')->avg('score');
-                    $cockpitAverageRisk = $displaySignalChanges->whereNotNull('risk')->avg('risk');
-                    $cockpitAverageScoreGrade = \App\Support\QualityGrade::fromPercent(\App\Support\AiScore::toPercent($cockpitAverageScore)) ?? '—';
-                    $cockpitAverageRiskLevel = \App\Support\QualityGrade::riskLevel(is_numeric($cockpitAverageRisk) ? (float) $cockpitAverageRisk : null) ?? '—';
-
-                    // Cross-sectional panel model: 10 strongest stocks on the most recent
-                    // full cross-section (frozen research table, linked to instruments).
-                    $panelTopStocks = collect();
-                    $panelTopAsOf = null;
-                    try {
-                        $panelVersion = 'panel-price-risk-freeze-2026-09-07';
-                        // The last ~20 trading days carry a shrinking cross-section
-                        // (the 20d forward target is not yet observable), so pick the
-                        // latest date whose universe is close to the model's fullest.
-                        $panelPeakCount = (int) \Illuminate\Support\Facades\DB::table('panel_predictions')
-                            ->where('model_version', $panelVersion)
-                            ->groupBy('as_of_date')
-                            ->orderByDesc(\Illuminate\Support\Facades\DB::raw('count(*)'))
-                            ->value(\Illuminate\Support\Facades\DB::raw('count(*)'));
-                        $panelTopAsOf = \Illuminate\Support\Facades\DB::table('panel_predictions')
-                            ->where('model_version', $panelVersion)
-                            ->groupBy('as_of_date')
-                            ->havingRaw('count(*) >= ?', [max(50, (int) ($panelPeakCount * 0.85))])
-                            ->orderByDesc('as_of_date')
-                            ->value('as_of_date');
-                        if ($panelTopAsOf) {
-                            // Keep the list investable: tradable stocks with a
-                            // market cap floor, so micro-caps the low-vol tilt
-                            // favours do not crowd out the ranking.
-                            $panelTopStocks = \Illuminate\Support\Facades\DB::table('panel_predictions as p')
-                                ->join('instruments as i', 'i.id', '=', 'p.instrument_id')
-                                ->where('p.model_version', $panelVersion)
-                                ->where('p.as_of_date', $panelTopAsOf)
-                                ->where('i.type', 'stock')
-                                ->where('i.is_active', true)
-                                ->whereNull('i.deleted_at')
-                                ->where('i.market_cap', '>=', 1_000_000_000)
-                                ->orderByDesc('p.raw_score')
-                                ->limit(10)
-                                ->get(['i.symbol', 'i.name', 'i.country', 'p.raw_score', 'p.xsec_pctile', 'p.decile', 'p.ret_20', 'p.ret_120', 'p.beta_60']);
-                        }
-                    } catch (\Throwable $e) {
-                        $panelTopStocks = collect();
-                    }
-                    $panelFlag = fn (?string $c): string => ['DE' => '🇩🇪', 'US' => '🇺🇸', 'AT' => '🇦🇹', 'CH' => '🇨🇭', 'GB' => '🇬🇧', 'FR' => '🇫🇷', 'NL' => '🇳🇱', 'DK' => '🇩🇰', 'SE' => '🇸🇪', 'NO' => '🇳🇴', 'FI' => '🇫🇮', 'IT' => '🇮🇹', 'ES' => '🇪🇸'][strtoupper((string) $c)] ?? '🌐';
-                @endphp
-                <article x-data="{ cockpitOpen: window.innerWidth >= 768 }" data-dashboard-card="signal-cockpit" data-dashboard-width="1" data-dashboard-height="6" data-dashboard-size="6" style="--dashboard-card-order:{{ $dashboardCardOrder('signal-cockpit') }}" class="dashboard-bento-signal-cockpit ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-cyan-400/35 p-4 {{ $dashboardCardVisible('signal-cockpit') ? '' : 'hidden' }}">
-                    <div class="dashboard-collapsible-header flex items-center justify-between gap-3" :class="cockpitOpen ? 'mb-3' : ''">
-                        <button type="button" @click="cockpitOpen = ! cockpitOpen" :aria-expanded="cockpitOpen.toString()" class="flex min-w-0 flex-1 items-center gap-2.5 text-left sm:gap-3">
+                @if(false)
+                <article x-data="{ cockpitOpen: true }" data-dashboard-card="signal-cockpit" data-dashboard-width="1" data-dashboard-height="6" data-dashboard-size="6" style="--dashboard-card-order:{{ $dashboardCardOrder('signal-cockpit') }}" class="dashboard-bento-signal-cockpit flex min-h-0 flex-col overflow-hidden p-4 {{ $dashboardCardVisible('signal-cockpit') ? '' : 'hidden' }}">
+                    <div class="dashboard-collapsible-header flex items-center justify-between gap-3 mb-3">
+                        <div class="flex min-w-0 flex-1 items-center gap-2.5 text-left sm:gap-3">
                             <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 sm:h-10 sm:w-10"><x-heroicon-o-signal class="h-5 w-5" /></span>
                             <span class="min-w-0 flex-1">
                                 <span class="block whitespace-nowrap text-[9px] font-black uppercase tracking-[.16em] text-cyan-600">PRO · 5 {{ __('Handelstage') }}</span>
@@ -712,8 +686,8 @@
                                     <span class="text-amber-600" title="{{ __('Rohwert') }}: {{ is_numeric($cockpitAverageRisk) ? number_format((float) $cockpitAverageRisk, 0, ',', '.').' %' : '—' }}">Ø {{ __('Risiko') }} {{ $cockpitAverageRiskLevel }}</span>
                                 </span>
                             </span>
-                        </button>
-                        <span class="flex shrink-0 items-center gap-2"><a href="{{ route('predictions.index') }}" class="hidden text-[9px] font-black text-cyan-600 sm:inline">{{ __('Alle') }} →</a><button type="button" @click="cockpitOpen = ! cockpitOpen" class="grid h-8 w-8 place-items-center rounded-lg border border-cyan-400/25 text-cyan-600" aria-label="{{ __('Signal-Cockpit aufklappen') }}"><x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="cockpitOpen && 'rotate-180'" /></button></span>
+                        </div>
+                        <span class="flex shrink-0 items-center gap-2"><a href="{{ route('predictions.index') }}" class="hidden text-[9px] font-black text-cyan-600 sm:inline">{{ __('Alle') }} →</a></span>
                     </div>
                     <div x-show="cockpitOpen" x-cloak x-transition.opacity class="grid min-h-0 flex-1 gap-2" style="grid-template-rows:{{ $panelTopStocks->isNotEmpty() ? 'auto minmax(0,1fr)' : 'minmax(0,1fr)' }}">
                         @if(false)
@@ -843,6 +817,81 @@
                         @endif
                     </div>
                 </article>
+                @endif
+                <article data-dashboard-card="signal-cockpit" data-dashboard-width="1" data-dashboard-height="6" data-dashboard-size="6" style="--dashboard-card-order:{{ $dashboardCardOrder('signal-cockpit') }}" class="dashboard-bento-signal-cockpit flex min-h-0 flex-col overflow-hidden p-4 {{ $dashboardCardVisible('signal-cockpit') ? '' : 'hidden' }}">
+                    <div class="dashboard-collapsible-header mb-3 flex items-center gap-3">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-500"><x-heroicon-o-arrows-right-left class="h-5 w-5" /></span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block text-[9px] font-black uppercase tracking-[.16em] text-cyan-600">{{ __('Drei-Faktoren-Auswahl') }}</span>
+                            <span class="mt-1 flex items-center gap-2"><b class="truncate text-base font-black text-[var(--ak-text)]">{{ __('Beste Alternativen') }}</b><small class="rounded-md border border-cyan-400/25 px-1.5 py-0.5 text-[7px] font-black uppercase text-cyan-500">{{ $threeFactorAlternatives->count() }}</small></span>
+                        </span>
+                    </div>
+                    <div class="min-h-0 flex-1 overflow-y-auto">
+                        <div id="dashboard-ranking-stocks-row" class="grid content-start gap-2">
+                            @forelse($threeFactorAlternatives as $alternative)
+                                @php
+                                    $alternativeFlag = $dashboardCountryFlags[strtoupper((string) ($alternative->country ?? ''))] ?? '🌐';
+                                    $alternativeRating = (string) ($alternative->serving_buy_rating_raw ?? $alternative->serving_buy_rating ?? '—');
+                                    $alternativeExternal = ($alternative->three_factor_external_confirmed ?? false) && is_numeric($alternative->three_factor_external_score ?? null) ? (float) $alternative->three_factor_external_score : null;
+                                    $alternativeDecile = is_numeric($alternative->panel_decile ?? null) ? (int) $alternative->panel_decile : null;
+                                    $alternativePanelTone = $alternativeDecile === null ? 'border-slate-400/25 text-[var(--ak-muted)]' : ($alternativeDecile >= 6 ? 'border-emerald-400/35 bg-emerald-400/[.08] text-emerald-500' : ($alternativeDecile >= 4 ? 'border-amber-400/35 bg-amber-400/[.08] text-amber-500' : 'border-rose-400/35 bg-rose-400/[.08] text-rose-500'));
+                                    $alternativeCategory = (string) ($alternative->alternative_category ?? 'score');
+                                    $alternativeCategoryLabel = match($alternativeCategory) {
+                                        'panel' => __('Panel-Bewertung'),
+                                        'external' => __('Externe Bewertung'),
+                                        'alternative' => __('Vielleicht in ein paar Tagen interessant'),
+                                        'rank' => __('Ranking · Platz :rank', ['rank' => (int) ($alternative->alternative_rank ?? 0)]),
+                                        default => __('KI-Bewertung'),
+                                    };
+                                    $alternativeConfidence = is_numeric($alternative->confidence_percent ?? null) ? (float) $alternative->confidence_percent : null;
+                                    $alternativeRisk = is_numeric($alternative->risk_percent ?? null) ? (float) $alternative->risk_percent : null;
+                                    $alternativeReturn10 = is_numeric($alternative->expected_return_10d ?? null) ? (float) $alternative->expected_return_10d : null;
+                                    $alternativeLongDays = is_numeric($alternative->expected_return_40d ?? null) && (float) $alternative->expected_return_40d > 0 ? 40 : 20;
+                                    $alternativeLongReturn = is_numeric($alternative->{'expected_return_'.$alternativeLongDays.'d'} ?? null) ? (float) $alternative->{'expected_return_'.$alternativeLongDays.'d'} : null;
+                                    $alternativeReturn20 = is_numeric($alternative->expected_return_20d ?? null) ? (float) $alternative->expected_return_20d : null;
+                                    $alternativeScore = is_numeric($alternative->three_factor_score ?? null) ? (float) $alternative->three_factor_score : 0.0;
+                                    $alternativeScoreGrade = number_format($alternativeScore, 0, ',', '.');
+                                    $alternativeScoreLevel = max(0, min(5, (int) ceil($alternativeScore / 20)));
+                                    $alternativeSignal = strtoupper((string) ($alternative->personalized_signal ?: 'BUY'));
+                                    $alternativeSignalTone = match($alternativeSignal) { 'BUY' => 'text-emerald-500', 'WATCH' => 'text-lime-500', 'SELL' => 'text-rose-400', 'WAIT' => 'text-orange-500', default => 'text-amber-500' };
+                                    $alternativeCurrency = strtoupper((string) ($alternative->currency ?: 'EUR'));
+                                    $alternativeCurrencyLabel = match($alternativeCurrency) { 'EUR' => '€', 'USD' => '$', 'GBP' => '£', 'JPY' => '¥', default => $alternativeCurrency };
+                                    $alternativeDaily = is_numeric($alternative->daily_change_percent ?? null) ? (float) $alternative->daily_change_percent : null;
+                                    $alternativeRankBadge = $alternativeCategory === 'alternative' ? '★' : '#'.((int) ($alternative->alternative_rank ?? 0));
+                                @endphp
+                                <a href="{{ route('stocks.show', ['symbol' => $alternative->symbol, 'return_to' => '/dashboard']) }}" @class(['dashboard-alternative-entry group', 'dashboard-alternative-entry--soon' => $alternativeCategory === 'alternative', 'dashboard-alternative-entry--silver' => $alternativeCategory !== 'alternative' && (int) ($alternative->alternative_rank ?? 0) === 2, 'dashboard-alternative-entry--bronze' => $alternativeCategory !== 'alternative' && (int) ($alternative->alternative_rank ?? 0) === 3]) title="{{ $alternative->name }}">
+                                    <span class="dashboard-alternative-rank" aria-hidden="true">{{ $alternativeRankBadge }}</span>
+                                    <span class="min-w-0 flex-1">
+                                        <small class="block text-[8px] font-black uppercase tracking-[.14em] {{ $alternativeCategory === 'alternative' ? 'text-amber-600' : 'text-cyan-600' }}">{{ $alternativeCategoryLabel }}</small>
+                                        <b class="mt-0.5 flex min-w-0 items-center gap-1.5"><span class="truncate text-[13px] font-black text-[var(--ak-text)]">{{ $alternativeFlag }} {{ $alternative->name ?: $alternative->symbol }}</span></b>
+                                        <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                            <span>{{ $alternative->symbol }}</span>
+                                            <span class="{{ $alternativeSignalTone }}">{{ $alternativeSignal }}</span>
+                                            <span>{{ ($alternative->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($alternative->display_price ?? null) ? number_format((float) $alternative->display_price, 2, ',', '.').' '.$alternativeCurrencyLabel : '—' }}</span>
+                                            <span class="{{ $alternativeDaily === null ? '' : ($alternativeDaily >= 0 ? 'text-emerald-500' : 'text-rose-400') }}">{{ __('Tag') }} {{ $alternativeDaily !== null ? sprintf('%+.2f%%', $alternativeDaily) : '—' }}</span>
+                                        </small>
+                                        @if($alternativeCategory === 'alternative')
+                                            <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span class="text-emerald-500">KI {{ $alternativeRating }}</span><span>CONF. {{ $alternativeConfidence !== null ? number_format($alternativeConfidence, 0, ',', '.').'%' : '—' }}</span><span class="text-amber-500">RISK {{ $alternativeRisk !== null ? number_format($alternativeRisk, 0, ',', '.') : '—' }}</span><span class="{{ $alternativeReturn10 !== null && $alternativeReturn10 < 0 ? 'text-rose-400' : 'text-emerald-500' }}">10T {{ $alternativeReturn10 !== null ? sprintf('%+.1f%%', $alternativeReturn10) : '—' }}</span><span class="{{ $alternativeLongReturn !== null && $alternativeLongReturn >= 0 ? 'text-emerald-500' : 'text-rose-400' }}">{{ $alternativeLongDays }}T {{ $alternativeLongReturn !== null ? sprintf('%+.1f%%', $alternativeLongReturn) : '—' }}</span></small>
+                                        @else
+                                            <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                <span class="text-emerald-500">KI {{ $alternativeRating }}</span>
+                                                <span class="text-cyan-500">{{ __('Extern') }} {{ $alternativeExternal !== null ? number_format($alternativeExternal, 0, ',', '.').'%' : '—' }}</span>
+                                                <span class="{{ $alternativeReturn20 !== null && $alternativeReturn20 < 0 ? 'text-rose-400' : 'text-emerald-500' }}">20T {{ $alternativeReturn20 !== null ? sprintf('%+.1f%%', $alternativeReturn20) : '—' }}</span>
+                                            </small>
+                                        @endif
+                                    </span>
+                                    <span class="dashboard-alternative-scores">
+                                        <span class="dashboard-champion-donut"><x-segmented-score-donut :score="$alternativeScore" :display="$alternativeScoreGrade" :level="$alternativeScoreLevel" type="chance" :label="__('Drei-Faktoren-Mittel')" /></span>
+                                        <span class="dashboard-alternative-panel {{ $alternativeDecile === null ? 'is-empty' : ($alternativeDecile >= 6 ? 'is-strong' : ($alternativeDecile >= 4 ? 'is-mid' : 'is-weak')) }}"><b>{{ $alternativeDecile !== null ? 'D'.$alternativeDecile : '—' }}</b><small>Panel</small></span>
+                                    </span>
+                                </a>
+                            @empty
+                                <div class="grid min-h-28 place-items-center px-4 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Aktuell gibt es neben dem Champion keine weitere extern bestätigte BUY-Alternative mit Panel-Wert.') }}</div>
+                            @endforelse
+                        </div>
+                    </div>
+                </article>
+                </section>
 
                 <div class="contents sm:col-span-2">
                 <article data-dashboard-card="models" data-dashboard-size="{{ $dashboardCardSize('models') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('models') }}" class="dashboard-bento-models ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-orange-400/40 p-4 {{ $dashboardCardVisible('models') ? '' : 'hidden' }}">
@@ -881,31 +930,28 @@
                 <article data-dashboard-card="signals" data-dashboard-size="{{ $dashboardCardSize('signals') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('signals') }}" class="dashboard-bento-signals ak-card ak-dashboard-card flex min-h-[250px] flex-1 flex-col overflow-hidden border-orange-400/35 p-4 {{ $dashboardCardVisible('signals') ? '' : 'hidden' }}">
                     <div class="mb-3 flex items-center justify-between gap-3">
                         <div>
-                            <p class="text-[9px] font-black uppercase tracking-[.16em] text-orange-400">{{ __('Letzte 48 Stunden') }}</p>
-                            <h2 class="mt-1 text-base font-black text-[var(--ak-text)]">{{ __('Empfehlungen & Signalübergänge') }}</h2>
+                            <p class="text-[9px] font-black uppercase tracking-[.16em] text-emerald-400">{{ __('Extern geprüft') }}</p>
+                            <h2 class="mt-1 text-base font-black text-[var(--ak-text)]">{{ __('Bestätigte BUY-Signale') }}</h2>
                         </div>
-                        <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5 text-orange-400" />
+                        <span class="inline-flex items-center gap-1 rounded-md border border-emerald-400/25 bg-emerald-400/[.08] px-2 py-1 text-[9px] font-black text-emerald-400"><x-heroicon-o-check-badge class="h-4 w-4" />{{ $externalConfirmedBuys->count() }}</span>
                     </div>
-                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        <a href="{{ route('predictions.index', ['signal' => 'BUY']) }}" class="rounded-lg border border-orange-400/20 bg-orange-400/[.06] p-2.5 transition hover:bg-orange-400/[.11]">
-                            <span class="flex items-center justify-between gap-2"><small class="font-black uppercase text-orange-400">{{ __('BUY') }}</small><b class="text-lg tabular-nums text-[var(--ak-text)]">{{ $recentSignalOverview['buy_count'] }}</b></span>
-                            <small class="mt-1 block truncate text-[8px] text-[var(--ak-muted)]">{{ __('Neue Kaufempfehlungen') }} · {{ implode(' · ', $recentSignalOverview['buy_symbols']) ?: __('Keine neuen Signale') }}</small>
-                        </a>
-                        <a href="{{ route('predictions.index', ['signal' => 'WAIT']) }}" class="rounded-lg border border-cyan-400/20 bg-cyan-400/[.06] p-2.5 transition hover:bg-cyan-400/[.11]">
-                            <span class="flex items-center justify-between gap-2"><small class="font-black uppercase text-cyan-300">{{ __('WAIT') }}</small><b class="text-lg tabular-nums text-[var(--ak-text)]">{{ $recentSignalOverview['wait_count'] }}</b></span>
-                            <small class="mt-1 block truncate text-[8px] text-[var(--ak-muted)]">{{ __('Neue WAIT-Signale') }} · {{ implode(' · ', $recentSignalOverview['wait_symbols']) ?: __('Keine neuen Signale') }}</small>
-                        </a>
-                        <a href="{{ route('predictions.index', ['signal' => 'SELL']) }}" class="rounded-lg border border-rose-400/20 bg-rose-400/[.06] p-2.5 transition hover:bg-rose-400/[.11]">
-                            <span class="flex items-center justify-between gap-2"><small class="font-black uppercase text-rose-300">{{ __('SELL') }}</small><b class="text-lg tabular-nums text-[var(--ak-text)]">{{ $recentSignalOverview['sell_count'] }}</b></span>
-                            <small class="mt-1 block truncate text-[8px] text-[var(--ak-muted)]">{{ __('Neue Verkaufssignale') }} · {{ implode(' · ', $recentSignalOverview['sell_symbols']) ?: __('Keine neuen Signale') }}</small>
-                        </a>
-                        <a href="{{ route('predictions.index', ['signal' => 'HOLD']) }}" class="rounded-lg border border-slate-400/20 bg-slate-400/[.06] p-2.5 transition hover:bg-slate-400/[.11]">
-                            <div class="flex items-center justify-between gap-2">
-                                <span class="truncate text-[9px] font-black uppercase text-slate-300">{{ __('HOLD') }}</span>
-                                <b class="text-lg tabular-nums text-[var(--ak-text)]">{{ $recentSignalOverview['hold_count'] }}</b>
-                            </div>
-                            <small class="mt-1 block truncate text-[8px] text-[var(--ak-muted)]">{{ __('Neue Haltesignale') }} · {{ implode(' · ', $recentSignalOverview['hold_symbols']) ?: __('Keine neuen Signale') }}</small>
-                        </a>
+                    <div class="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-0.5">
+                        @forelse($externalConfirmedBuys as $stock)
+                            @php
+                                $confirmedFlag = $dashboardCountryFlags[strtoupper((string) ($stock->country ?? ''))] ?? '🌐';
+                                $confirmedRating = (string) ($stock->serving_buy_rating_raw ?? $stock->serving_buy_rating ?? '—');
+                                $confirmedConfidence = $stock->external_confirmation_confidence ?? null;
+                            @endphp
+                            <a href="{{ route('stocks.show', ['symbol' => $stock->symbol, 'return_to' => '/dashboard']) }}" class="group grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-emerald-400/25 bg-emerald-400/[.045] px-3 py-2 transition hover:border-emerald-400/55 hover:bg-emerald-400/[.08]">
+                                <span class="min-w-0">
+                                    <b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $confirmedFlag }} {{ $stock->name ?: $stock->symbol }}</b>
+                                    <small class="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide"><span class="text-[var(--ak-muted)]">{{ $stock->symbol }}</span><span class="text-emerald-400">BUY {{ $confirmedRating }}</span><span class="text-cyan-500">{{ (int) ($stock->serving_buy_confirmations ?? 0) }} {{ __('Modellbestätigungen') }}</span></small>
+                                </span>
+                                <span class="text-right"><b class="block text-base font-black tabular-nums text-emerald-400">{{ is_numeric($confirmedConfidence) ? number_format((int) $confirmedConfidence, 0, ',', '.').' %' : '—' }}</b><small class="block text-[7px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Extern') }}</small></span>
+                            </a>
+                        @empty
+                            <div class="grid min-h-24 place-items-center rounded-lg border border-dashed border-emerald-400/25 px-4 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Aktuell ist kein BUY-Signal für denselben Serving-Batch extern bestätigt.') }}</div>
+                        @endforelse
                     </div>
                 </article>
                 <article data-dashboard-card="earnings" data-dashboard-width="1" data-dashboard-height="6" data-dashboard-size="6" style="--dashboard-card-order:{{ $dashboardCardOrder('earnings') }}" class="dashboard-bento-earnings ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-emerald-400/30 p-4 {{ $dashboardCardVisible('earnings') ? '' : 'hidden' }}">
@@ -950,8 +996,8 @@
                     <a href="{{ route('daily-market-analysis') }}" class="mt-3 inline-flex items-center gap-1 text-[9px] font-black text-orange-400 hover:text-orange-200">{{ __('Marktbericht öffnen') }} <x-heroicon-o-arrow-right class="h-3.5 w-3.5" /></a>
                 </article>
                 </div>
-                <article x-data="{ scheduleOpen: window.innerWidth >= 768 }" data-dashboard-card="schedule" data-dashboard-size="{{ $dashboardCardSize('schedule') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('schedule') }}" class="ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-cyan-400/35 p-4 {{ $dashboardCardVisible('schedule') ? '' : 'hidden' }}">
-                    <div class="dashboard-collapsible-header flex items-center justify-between gap-3" :class="scheduleOpen ? 'mb-3' : ''"><button type="button" @click="scheduleOpen = ! scheduleOpen" :aria-expanded="scheduleOpen.toString()" class="flex min-w-0 flex-1 items-center gap-3 text-left"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-600"><x-heroicon-o-calendar-days class="h-5 w-5" /></span><span class="min-w-0"><span class="block text-[9px] font-black uppercase tracking-[.16em] text-cyan-600">{{ __('Planung') }}</span><span class="mt-1 block truncate text-base font-black text-[var(--ak-text)]">{{ __('Termine & Erinnerungen') }}</span><span class="mt-1 flex items-center gap-1 text-[8px] font-black text-amber-500"><x-heroicon-o-envelope class="h-3 w-3 text-amber-500" />{{ $dashboardScheduleItems->count() }} {{ __('Termine') }}</span></span></button><button type="button" @click="scheduleOpen = ! scheduleOpen" class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/25 text-cyan-600" aria-label="{{ __('Termine aufklappen') }}"><x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="scheduleOpen && 'rotate-180'" /></button></div>
+                <article x-data="{ scheduleOpen: true }" data-dashboard-card="schedule" data-dashboard-size="{{ $dashboardCardSize('schedule') }}" style="--dashboard-card-order:{{ $dashboardCardOrder('schedule') }}" class="ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-cyan-400/35 p-4 {{ $dashboardCardVisible('schedule') ? '' : 'hidden' }}">
+                    <div class="dashboard-collapsible-header flex items-center justify-between gap-3 mb-3"><div class="flex min-w-0 flex-1 items-center gap-3 text-left"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-600"><x-heroicon-o-calendar-days class="h-5 w-5" /></span><span class="min-w-0"><span class="block text-[9px] font-black uppercase tracking-[.16em] text-cyan-600">{{ __('Planung') }}</span><span class="mt-1 block truncate text-base font-black text-[var(--ak-text)]">{{ __('Termine & Erinnerungen') }}</span><span class="mt-1 flex items-center gap-1 text-[8px] font-black text-amber-500"><x-heroicon-o-envelope class="h-3 w-3 text-amber-500" />{{ $dashboardScheduleItems->count() }} {{ __('Termine') }}</span></span></div></div>
                     <div x-show="scheduleOpen" x-cloak x-transition.opacity class="grid min-h-0 flex-1 gap-2 overflow-hidden">
                         @forelse ($dashboardScheduleItems->take(4) as $reminder)
                             @php
@@ -981,9 +1027,9 @@
         </div>
 
         @if ($canUsePro)
-        <div id="dashboard-cards-modal" class="fixed inset-0 z-[180] hidden place-items-center overflow-y-auto bg-slate-950/75 p-2 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-labelledby="dashboard-cards-title">
-            <section class="flex w-full max-w-[1200px] flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl" style="height:min(720px,78vh);max-height:calc(100vh - 1rem)">
-                <header class="flex shrink-0 items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-4 py-3">
+        <div id="dashboard-cards-modal" class="ak-modal-overlay fixed inset-0 z-[180] hidden place-items-center overflow-y-auto bg-slate-950/75 p-2 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-labelledby="dashboard-cards-title">
+            <section class="ak-modal-panel dashboard-modal-panel flex w-full max-w-[1200px] flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl" style="height:min(720px,78vh);max-height:calc(100vh - 1rem)">
+                <header class="dashboard-modal-header flex shrink-0 items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-4 py-3">
                     <div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-300"><x-heroicon-o-view-columns class="h-5 w-5" /></span><div><p class="text-[9px] font-black uppercase tracking-[.18em] text-cyan-300">PRO · {{ __('12-Spalten-Raster') }}</p><h2 id="dashboard-cards-title" class="mt-1 text-lg font-black">{{ __('Gesamtes Dashboard anpassen') }}</h2></div></div>
                     <button type="button" data-dashboard-cards-close class="grid h-9 w-9 place-items-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)]"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
                 </header>
@@ -1001,11 +1047,11 @@
         @endif
 
         @if ($canUsePro)
-        <div id="dashboard-layout-modal" class="fixed inset-0 z-[185] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="dashboard-layout-title">
-            <form method="POST" action="{{ route('dashboard.layout.update') }}" class="flex h-[calc(100vh-2rem)] max-h-[820px] w-full max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
+        <div id="dashboard-layout-modal" class="ak-modal-overlay fixed inset-0 z-[185] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="dashboard-layout-title">
+            <form method="POST" action="{{ route('dashboard.layout.update') }}" class="ak-modal-panel dashboard-modal-panel flex h-[calc(100vh-2rem)] max-h-[820px] w-full max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
                 @csrf
                 @method('PATCH')
-                <header class="flex shrink-0 items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-5 py-4">
+                <header class="dashboard-modal-header flex shrink-0 items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-5 py-4">
                     <div class="flex min-w-0 items-center gap-3">
                         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-300"><x-heroicon-o-cog-6-tooth class="h-5 w-5" /></span>
                         <div><p class="text-[9px] font-black uppercase tracking-[.18em] text-cyan-300">{{ __('Persönlicher Bereich') }}</p><h2 id="dashboard-layout-title" class="mt-1 text-lg font-black">{{ __('Dashboard anpassen') }}</h2></div>
@@ -1034,9 +1080,9 @@
         @endif
 
         @if ($canManageMessages)
-            <div id="message-settings-modal" class="fixed inset-0 z-[190] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="message-settings-title">
-                <section class="flex max-h-[min(720px,90dvh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
-                    <header class="flex items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-5 py-4">
+            <div id="message-settings-modal" class="ak-modal-overlay fixed inset-0 z-[190] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="message-settings-title">
+                <section class="ak-modal-panel dashboard-modal-panel flex max-h-[min(720px,90dvh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
+                    <header class="dashboard-modal-header flex items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-5 py-4">
                         <div class="flex min-w-0 items-center gap-3"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-400"><x-heroicon-o-bell class="h-5 w-5" /></span><div><p><span class="ak-plan-badge ak-plan-badge--pro">PRO</span></p><h2 id="message-settings-title" class="mt-1 text-lg font-black">{{ __('Termine & Erinnerungen verwalten') }}</h2></div></div>
                         <button type="button" data-message-settings-close class="grid h-9 w-9 place-items-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)]"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
                     </header>
@@ -1100,9 +1146,9 @@
                 </section>
             </div>
 
-            <div id="message-preview-modal" class="fixed inset-0 z-[205] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="message-preview-title">
-                <section class="flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
-                    <header class="flex items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-5 py-4">
+            <div id="message-preview-modal" class="ak-modal-overlay fixed inset-0 z-[205] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="message-preview-title">
+                <section class="ak-modal-panel dashboard-modal-panel flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] text-[var(--ak-text)] shadow-2xl">
+                    <header class="dashboard-modal-header flex items-center justify-between gap-3 border-b border-cyan-400/20 bg-cyan-400/[.06] px-5 py-4">
                         <div class="flex min-w-0 items-center gap-3"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-400"><x-heroicon-o-envelope-open class="h-5 w-5" /></span><div><p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-400">{{ __('E-Mail-Vorschau') }}</p><h2 id="message-preview-title" data-preview-title class="mt-1 truncate text-lg font-black"></h2></div></div>
                         <button type="button" data-message-preview-close class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)]"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
                     </header>
@@ -1116,9 +1162,9 @@
             </div>
         @endif
 
-        <div id="dashboard-aki-modal" class="fixed inset-0 z-[200] hidden place-items-center bg-slate-950/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="dashboard-aki-title">
-            <section class="w-full max-w-2xl overflow-hidden rounded-2xl border border-teal-300/45 text-slate-100 shadow-2xl" style="background:linear-gradient(145deg,rgba(14,38,57,.98),rgba(8,25,42,.98)) !important;max-height:calc(100dvh - 2rem);display:flex;flex-direction:column;">
-                <header class="flex items-center justify-between border-b border-teal-300/25 px-4 py-3" style="background:linear-gradient(110deg,rgba(6, 182, 212,.18),rgba(245,158,11,.12)) !important;">
+        <div id="dashboard-aki-modal" class="ak-modal-overlay fixed inset-0 z-[200] hidden place-items-center bg-slate-950/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="dashboard-aki-title">
+            <section class="ak-modal-panel dashboard-modal-panel w-full max-w-2xl overflow-hidden rounded-2xl border border-teal-300/45 bg-[#0d1b2d] text-slate-100 shadow-2xl" style="max-height:calc(100dvh - 2rem);display:flex;flex-direction:column;">
+                <header class="dashboard-modal-header flex items-center justify-between border-b border-teal-300/25 px-4 py-3">
                     <div><p class="text-[10px] font-black uppercase tracking-[.16em] text-amber-500">{{ __('Assistent') }}</p><h2 id="dashboard-aki-title" class="text-base font-black text-slate-100">{{ __('AKI fragen') }}</h2></div>
                     <button type="button" data-dashboard-aki-close class="rounded-lg p-2 text-slate-300 hover:bg-slate-700/60" aria-label="{{ __('Chat schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
                 </header>
@@ -1129,7 +1175,79 @@
                 </form>
             </section>
         </div>
+
+        <div id="dashboard-card-help-modal" class="ak-modal-overlay fixed inset-0 z-[215] hidden place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="dashboard-card-help-title">
+            <section class="ak-modal-panel dashboard-modal-panel w-full max-w-md overflow-hidden rounded-2xl border border-cyan-300/45 bg-[#0d1b2d] shadow-2xl">
+                <header class="dashboard-modal-header flex items-center justify-between gap-3 border-b border-cyan-300/25 px-4 py-3">
+                    <div>
+                        <p class="dashboard-card-help-eyebrow text-[10px] font-black uppercase tracking-[.16em]">{{ __('Hilfe') }}</p>
+                        <h2 id="dashboard-card-help-title" class="text-base font-black"></h2>
+                    </div>
+                    <button type="button" data-dashboard-card-help-close class="rounded-lg p-2 hover:bg-white/10" aria-label="{{ __('Schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
+                </header>
+                <div id="dashboard-card-help-body" class="space-y-2 p-5 text-[13px] leading-6"></div>
+            </section>
+        </div>
     </main>
+    <script>
+        (() => {
+            const help = @json($dashboardCardHelp);
+            const titles = @json($dashboardMainCardLabels);
+            const modal = document.getElementById('dashboard-card-help-modal');
+            if (!modal) return;
+            const titleEl = document.getElementById('dashboard-card-help-title');
+            const bodyEl = document.getElementById('dashboard-card-help-body');
+
+            const helpLabel = @json(__('Hilfe'));
+
+            const open = (id) => {
+                const paragraphs = help[id];
+                if (!paragraphs) return;
+                titleEl.textContent = titles[id] || '';
+                bodyEl.replaceChildren(...paragraphs.map((text) => {
+                    const p = document.createElement('p');
+                    p.textContent = text;
+                    return p;
+                }));
+                modal.classList.remove('hidden');
+                modal.classList.add('grid');
+            };
+            const close = () => { modal.classList.add('hidden'); modal.classList.remove('grid'); };
+
+            const mount = () => {
+                const done = new Set([...document.querySelectorAll('.dashboard-card-help-btn')].map((b) => b.dataset.helpFor));
+                const add = (id, card) => {
+                    if (!id || !help[id] || done.has(id) || !card) return;
+                    // Prefer an explicit inline slot inside the card header, if one exists.
+                    const anchor = document.querySelector('[data-help-anchor="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+                    const host = anchor || card;
+                    if (host.querySelector(':scope > .dashboard-card-help-btn')) { done.add(id); return; }
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = anchor ? 'dashboard-card-help-btn dashboard-card-help-btn--inline' : 'dashboard-card-help-btn';
+                    btn.dataset.helpFor = id;
+                    btn.textContent = '?';
+                    btn.setAttribute('aria-label', (titles[id] || id) + ' – ' + helpLabel);
+                    btn.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); open(id); });
+                    anchor ? anchor.prepend(btn) : card.appendChild(btn);
+                    done.add(id);
+                };
+                document.querySelectorAll('[data-help-card]').forEach((c) => add(c.dataset.helpCard, c));
+                document.querySelectorAll('[data-dashboard-card], [data-mobile-dashboard-card]').forEach((c) => add(c.dataset.dashboardCard || c.dataset.mobileDashboardCard, c));
+            };
+            mount();
+            window.addEventListener('load', mount);
+            document.querySelectorAll('.dashboard-bento, #personal-dashboard').forEach((grid) => {
+                new MutationObserver(mount).observe(grid, { childList: true });
+            });
+
+            modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+            modal.querySelector('[data-dashboard-card-help-close]')?.addEventListener('click', close);
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) close();
+            });
+        })();
+    </script>
     <script>
         (() => {
             const modal = document.getElementById('dashboard-cards-modal');
@@ -1899,6 +2017,14 @@
                 height: 100% !important;
                 min-height: 0;
             }
+            #personal-dashboard [data-dashboard-top-row-card] {
+                box-sizing: border-box;
+                align-self: stretch;
+                height: 100% !important;
+                min-height: 0 !important;
+                max-height: 100%;
+                overflow: hidden;
+            }
             .dashboard-personal-column {
                 scrollbar-width: thin;
                 scrollbar-color: rgba(34, 211, 238, .7) rgba(15, 23, 42, .25);
@@ -1967,6 +2093,7 @@
             .dashboard-bento-personal [data-dashboard-tile="best-wait"] { display: none !important; }
             .dashboard-bento-personal > div:last-child { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
             .dashboard-bento-market { grid-column: 5 / span 4; grid-row: 1 / -1; align-self: stretch; height: 100%; }
+            .dashboard-bento > #dashboard-market-overview-card { grid-column: 9 / span 4; grid-row: 1 / span 2; }
             .dashboard-bento-models { grid-column: 9 / span 4; grid-row: 1 / span 3; }
             .dashboard-bento-signal-cockpit { grid-column: 9 / span 4; grid-row: 1 / -1; align-self: stretch; height: 100%; }
             .dashboard-right-column { display: none; }
@@ -2181,11 +2308,13 @@
                 align-self: stretch !important;
                 height: 100% !important;
             }
-            .dashboard-bento > .dashboard-newscenter {
+            .dashboard-bento > #dashboard-market-overview-card {
                 grid-column: 9 / span 4 !important;
                 grid-row: 1 / span 2 !important;
                 align-self: stretch !important;
                 height: 100% !important;
+                min-height: 0 !important;
+                overflow: hidden;
             }
             #dashboard-middle-column > [data-dashboard-card="signal-cockpit"] {
                 grid-column: auto !important;
@@ -2210,11 +2339,222 @@
         @media (max-width: 1279px) {
             .dashboard-bento [data-dashboard-card] { order: var(--dashboard-card-order); }
         }
+        #personal-dashboard .dashboard-center-combined-card {
+            position: relative;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: auto auto;
+            min-width: 0;
+        }
+        #personal-dashboard .dashboard-center-combined-card > #dashboard-newscenter-card,
+        #personal-dashboard .dashboard-center-combined-card > [data-dashboard-card="signal-cockpit"] {
+            grid-column: 1 !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+            #personal-dashboard .dashboard-center-combined-card > #dashboard-newscenter-card {
+                grid-row: 1 !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                border-bottom: 1px solid var(--ak-border) !important;
+        }
+        #personal-dashboard .dashboard-center-combined-card > [data-dashboard-card="signal-cockpit"] {
+            grid-row: 2 !important;
+        }
+        #personal-dashboard .dashboard-center-combined-card > article > .dashboard-card-help-btn {
+            display: none !important;
+        }
+        #personal-dashboard .dashboard-alternative-entry {
+            display: flex;
+            min-height: 4.75rem;
+            min-width: 0;
+            align-items: center;
+            gap: .75rem;
+            border: 1px solid rgba(34, 211, 238, .25);
+            border-radius: .9rem;
+            background: rgba(255, 255, 255, .018);
+            padding: .7rem .8rem;
+            transition: border-color .15s ease, background .15s ease, transform .15s ease;
+        }
+        #personal-dashboard .dashboard-alternative-entry:hover {
+            border-color: rgba(34, 211, 238, .5);
+            transform: translateY(-1px);
+        }
+        :root[data-theme="light"] #personal-dashboard .dashboard-alternative-entry {
+            background: rgba(255, 255, 255, .5);
+        }
+        :root[data-theme="light"] #personal-dashboard .dashboard-alternative-entry:hover {
+            background: rgba(255, 255, 255, .78);
+        }
+        /* Match the middle-column stock cards (.dashboard-alternative-entry): ranked
+           entries render ~6.5rem tall once their meta line wraps in the narrow column. */
+        #personal-dashboard .dashboard-opportunity-card {
+            min-height: 6.5rem;
+            box-sizing: border-box;
+            gap: .75rem;
+            border-radius: .9rem;
+            padding: .7rem .8rem;
+        }
+        #personal-dashboard #dashboard-ranking-stocks-row,
+        #personal-dashboard #dashboard-best-stocks-row {
+            row-gap: .5rem !important;
+        }
+        #personal-dashboard .dashboard-alternative-rank {
+            display: grid;
+            width: 2.1rem;
+            height: 2.1rem;
+            flex: 0 0 2.1rem;
+            place-items: center;
+            border: 1px solid rgba(34, 211, 238, .4);
+            border-radius: .65rem;
+            background: rgba(34, 211, 238, .1);
+            color: #0891b2;
+            font-size: .78rem;
+            font-weight: 950;
+            line-height: 1;
+        }
+        /* Medal hints: #2 silver, #3 bronze — subtle, mirrors the champion's gold */
+        #personal-dashboard .dashboard-alternative-entry--silver {
+            border-color: rgba(148, 163, 184, .45);
+            background-image: linear-gradient(135deg, rgba(203, 213, 225, .10), rgba(203, 213, 225, .02) 60%);
+            box-shadow: inset 0 0 0 1px rgba(203, 213, 225, .12), 0 6px 20px -12px rgba(148, 163, 184, .35);
+        }
+        #personal-dashboard .dashboard-alternative-entry--silver:hover {
+            border-color: rgba(148, 163, 184, .7);
+        }
+        :root[data-theme="light"] #personal-dashboard .dashboard-alternative-entry--silver {
+            background-image: linear-gradient(135deg, rgba(148, 163, 184, .14), rgba(148, 163, 184, .04) 60%);
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, .18), 0 8px 20px -12px rgba(100, 116, 139, .25);
+        }
+        #personal-dashboard .dashboard-alternative-entry--silver .dashboard-alternative-rank {
+            border-color: rgba(148, 163, 184, .5);
+            background: rgba(148, 163, 184, .16);
+            color: #64748b;
+        }
+        #personal-dashboard .dashboard-alternative-entry--bronze {
+            border-color: rgba(180, 120, 70, .45);
+            background-image: linear-gradient(135deg, rgba(205, 127, 50, .10), rgba(205, 127, 50, .02) 60%);
+            box-shadow: inset 0 0 0 1px rgba(205, 127, 50, .12), 0 6px 20px -12px rgba(160, 100, 50, .35);
+        }
+        #personal-dashboard .dashboard-alternative-entry--bronze:hover {
+            border-color: rgba(180, 120, 70, .7);
+        }
+        :root[data-theme="light"] #personal-dashboard .dashboard-alternative-entry--bronze {
+            background-image: linear-gradient(135deg, rgba(180, 100, 50, .13), rgba(180, 100, 50, .03) 60%);
+            box-shadow: inset 0 0 0 1px rgba(180, 100, 50, .18), 0 8px 20px -12px rgba(150, 90, 45, .26);
+        }
+        #personal-dashboard .dashboard-alternative-entry--bronze .dashboard-alternative-rank {
+            border-color: rgba(180, 120, 70, .55);
+            background: rgba(205, 127, 50, .16);
+            color: #b45309;
+        }
+        /* "Vielleicht in ein paar Tagen interessant" — set apart from the ranked alternatives */
+        #personal-dashboard .dashboard-alternative-entry--soon,
+        #personal-dashboard .dashboard-alternative-entry--soon:hover {
+            margin-top: 1rem;
+            border-style: solid;
+            border-width: 3px;
+            border-color: #07111f;
+            background: transparent;
+        }
+        :root[data-theme="light"] #personal-dashboard .dashboard-alternative-entry--soon,
+        :root[data-theme="light"] #personal-dashboard .dashboard-alternative-entry--soon:hover {
+            border-color: #e7edf3;
+            background: transparent;
+        }
+        #personal-dashboard .dashboard-alternative-entry--soon .dashboard-alternative-rank {
+            border-color: rgba(251, 191, 36, .5);
+            background: rgba(251, 191, 36, .14);
+            color: #d97706;
+        }
+        #personal-dashboard .dashboard-alternative-scores {
+            display: flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: .5rem;
+        }
+        #personal-dashboard .dashboard-alternative-scores .dashboard-champion-donut .segmented-score {
+            width: 52px;
+            height: 52px;
+        }
+        #personal-dashboard .dashboard-alternative-scores .dashboard-champion-donut .segmented-score b {
+            font-size: 12px;
+        }
+        #personal-dashboard .dashboard-alternative-panel {
+            display: grid;
+            width: 52px;
+            min-width: 52px;
+            height: 52px;
+            place-items: center;
+            border: 1px solid rgba(148, 163, 184, .3);
+            border-radius: 999px;
+            text-align: center;
+        }
+        #personal-dashboard .dashboard-alternative-panel b { display: block; font-size: .78rem; font-weight: 950; line-height: 1; }
+        #personal-dashboard .dashboard-alternative-panel small { display: block; font-size: 7px; font-weight: 900; text-transform: uppercase; color: var(--ak-muted); }
+        #personal-dashboard .dashboard-alternative-panel.is-strong { border-color: rgba(52, 211, 153, .45); background: rgba(52, 211, 153, .1); color: #059669; }
+        #personal-dashboard .dashboard-alternative-panel.is-mid { border-color: rgba(251, 191, 36, .45); background: rgba(251, 191, 36, .1); color: #d97706; }
+        #personal-dashboard .dashboard-alternative-panel.is-weak { border-color: rgba(251, 113, 133, .45); background: rgba(251, 113, 133, .1); color: #e11d48; }
+        #personal-dashboard .dashboard-alternative-panel.is-empty { color: var(--ak-muted); }
+        @media (max-width: 420px) {
+            #personal-dashboard .dashboard-alternative-panel { display: none; }
+        }
+        @media (min-width: 1280px) {
+            #personal-dashboard .dashboard-center-combined-card {
+                grid-column: 5 / span 4 !important;
+                grid-row: 1 / -1 !important;
+                grid-template-rows: auto minmax(0, 1fr);
+                align-self: stretch;
+                height: 100%;
+            }
+            #personal-dashboard #dashboard-middle-column.dashboard-market-shell-empty { display: none !important; }
+            .dashboard-bento[data-dashboard-card-layout="custom"] .dashboard-center-combined-card > [data-dashboard-card="signal-cockpit"] {
+                grid-column: 1 !important;
+                grid-row: 2 !important;
+                height: 100% !important;
+            }
+        }
         .dashboard-aki-dots { display: inline-block; min-width: 1.6em; letter-spacing: .12em; animation: dashboard-aki-pulse 1.1s steps(4, end) infinite; }
         @@keyframes dashboard-aki-pulse { 0%,20% { opacity: .25; } 40% { opacity: .65; } 60%,100% { opacity: 1; } }
         #dashboard-aki-messages { scrollbar-width: thin; scrollbar-color: rgba(34, 211, 238,.7) rgba(15,23,42,.45); }
         #dashboard-aki-messages::-webkit-scrollbar { width: 8px; }
         #dashboard-aki-messages::-webkit-scrollbar-track { background: rgba(15,23,42,.45); border-radius: 999px; }
         #dashboard-aki-messages::-webkit-scrollbar-thumb { background: rgba(34, 211, 238,.7); border-radius: 999px; }
+        .ak-dashboard-card, [data-dashboard-card], [data-mobile-dashboard-card], [data-help-card] { position: relative; }
+        .dashboard-card-help-btn {
+            position: absolute; top: .35rem; right: .35rem; z-index: 60;
+            display: grid; place-items: center;
+            width: 2.25rem; height: 2.25rem; padding: 0; margin: 0;
+            border-radius: .5rem;
+            border: 1px solid rgba(148, 163, 184, .55);
+            background: rgba(15, 23, 42, .45);
+            color: #cbd5e1;
+            font-size: .7rem; font-weight: 900; line-height: 1;
+            cursor: pointer; opacity: .8;
+            transition: opacity .12s ease, color .12s ease, border-color .12s ease, background .12s ease;
+        }
+        :root[data-theme="light"] .dashboard-card-help-btn { background: rgba(255,255,255,.85); color: #475569; border-color: rgba(100,116,139,.5); }
+        .dashboard-card-help-btn:hover,
+        .dashboard-card-help-btn:focus-visible { opacity: 1; color: #fff; background: #0891b2; border-color: #22d3ee; outline: none; }
+        @media (max-width: 640px) { .dashboard-card-help-btn { width: 2rem; height: 2rem; font-size: .62rem; } }
+        /* Inline "?" placed inside a card header's control cluster (e.g. next to the cog) */
+        .dashboard-card-help-btn--inline {
+            position: static;
+        }
+        :root[data-theme="light"] .dashboard-card-help-btn--inline { background: rgba(255,255,255,.85); }
+        /* Help modal: force readable white text over the dark panel */
+        :root:not([data-theme="light"]) #dashboard-card-help-modal,
+        :root:not([data-theme="light"]) #dashboard-card-help-modal h2,
+        :root:not([data-theme="light"]) #dashboard-card-help-modal p,
+        :root:not([data-theme="light"]) #dashboard-card-help-modal button,
+        :root:not([data-theme="light"]) #dashboard-card-help-modal #dashboard-card-help-body { color: #ffffff !important; }
+        :root:not([data-theme="light"]) #dashboard-card-help-modal .dashboard-card-help-eyebrow { color: #67e8f9 !important; }
+        :root:not([data-theme="light"]) #dashboard-card-help-modal #dashboard-card-help-body p { color: #f1f5f9 !important; }
+
     </style>
 </x-app-layout>

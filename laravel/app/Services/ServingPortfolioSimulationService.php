@@ -314,7 +314,7 @@ final class ServingPortfolioSimulationService
         $filters = $this->json($assignment->filters ?? null);
         $explicit = collect(data_get($filters, 'serving_model_configurations', []))
             ->filter(fn (mixed $configuration): bool => is_array($configuration)
-                && ($configuration['source'] ?? null) === 'serving_model_overview')
+                && in_array(($configuration['source'] ?? null), ['serving_model_overview', 'serving_prediction_table'], true))
             ->values()
             ->all();
         if ($explicit !== []) {
@@ -476,7 +476,9 @@ final class ServingPortfolioSimulationService
             $releaseId = (string) ($configuration['release_id'] ?? '');
             $horizon = (int) ($configuration['horizon_days'] ?? 0);
             $variant = (string) ($configuration['variant'] ?? '');
-            if ($symbol === '' || $releaseId === '' || ! in_array($horizon, [10, 20, 40], true)
+            $releasePolicy = (string) ($configuration['release_policy'] ?? 'fixed');
+            if ($symbol === '' || ! in_array($releasePolicy, ['fixed', 'active'], true)
+                || ($releasePolicy === 'fixed' && $releaseId === '') || ! in_array($horizon, [10, 20, 40], true)
                 || ! in_array($variant, ['standard', 'pure_tcn'], true)) {
                 throw new RuntimeException('Eine persönliche Serving-Modellkonfiguration ist unvollständig.');
             }
@@ -485,6 +487,7 @@ final class ServingPortfolioSimulationService
                 ...$request,
                 'symbol' => $symbol,
                 'release_id' => $releaseId,
+                'release_policy' => $releasePolicy,
                 'horizon_days' => $horizon,
                 'variant' => $variant,
             ];
@@ -505,6 +508,34 @@ final class ServingPortfolioSimulationService
                 throw new RuntimeException("Die Serving-Aktie {$symbol} wurde nicht gefunden.");
             }
         }
+
+        $activeReleases = $serving->table('serving_model_horizon_status as status')
+            ->join('serving_active_models as active', function ($join): void {
+                $join->on('active.instrument_id', '=', 'status.instrument_id')
+                    ->on('active.release_id', '=', 'status.release_id');
+            })
+            ->join('serving_instruments as instrument', 'instrument.id', '=', 'status.instrument_id')
+            ->whereIn(DB::raw('UPPER(instrument.symbol)'), $symbols->all())
+            ->where('status.selected_for_prediction', true)
+            ->where('status.prediction_enabled', true)
+            ->get(['instrument.symbol', 'status.release_id', 'status.horizon', 'status.variant'])
+            ->keyBy(fn (object $status): string => implode('|', [
+                strtoupper((string) $status->symbol), (int) $status->horizon, (string) $status->variant,
+            ]));
+        $descriptors = $descriptors->map(function (array $descriptor) use ($activeReleases): array {
+            if ($descriptor['release_policy'] !== 'active') {
+                return $descriptor;
+            }
+            $key = implode('|', [$descriptor['symbol'], $descriptor['horizon_days'], $descriptor['variant']]);
+            $active = $activeReleases->get($key);
+            if ($active === null) {
+                throw new RuntimeException("Für {$descriptor['symbol']} ist diese Modellkonfiguration nicht mehr aktiv.");
+            }
+            $descriptor['release_id'] = (string) $active->release_id;
+            $descriptor['configuration']['release_id'] = (string) $active->release_id;
+
+            return $descriptor;
+        });
 
         $localInstruments = DB::table('instruments')
             ->whereIn(DB::raw('UPPER(symbol)'), $symbols->all())

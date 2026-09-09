@@ -3,10 +3,10 @@
 <x-dashboard.card id="market-atlas" class="ak-standard-card ak-card-static ak-dashboard-card ak-dashboard-atlas flex min-h-[260px] flex-col scroll-mt-24 p-4 lg:min-h-0">
     <div class="ak-standard-card-head flex flex-wrap items-start justify-between gap-2">
         <div>
-            <p class="text-xs font-black uppercase tracking-[.18em] text-cyan-300">{{ __('Global Market Map') }}</p>
-            <p class="mt-1 text-xs text-slate-400">{{ __('Tagesentwicklung der verfügbaren Indizes nach Land') }}</p>
+            <p class="text-xs font-black uppercase tracking-[.18em]" style="color:#334155!important;opacity:1!important">{{ __('Global Market Map') }}</p>
+            <p class="mt-1 text-xs" style="color:#475569!important;opacity:1!important">{{ __('Tagesentwicklung der verfügbaren Indizes nach Land') }}</p>
         </div>
-        <span class="rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-bold text-cyan-300">
+        <span class="rounded-lg border px-2.5 py-1 text-[10px] font-bold" style="border-color:#64748b!important;background:#475569!important;color:#fff!important;opacity:1!important">
             {{ count($countryAiScores) }} {{ __('Länder') }}
         </span>
     </div>

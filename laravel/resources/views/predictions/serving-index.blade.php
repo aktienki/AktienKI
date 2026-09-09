@@ -6,8 +6,39 @@
                     <p class="text-[10px] font-black uppercase tracking-[.22em] text-cyan-500">{{ __('Service Datenbank') }}</p>
                     <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)] sm:text-3xl">Aktien, Modelle und Predictions</h1>
                     <p class="mt-2 max-w-4xl text-sm leading-6 text-[var(--ak-muted)]">
-                        {{ __('Angezeigt werden ausschließlich aktive Releases und freigegebene Predictions der Service Datenbank. Nicht geeignete Modell-/Horizont-Kombinationen erzeugen bewusst keine Prediction.') }}
+                        {{ __('Angezeigt werden die Standard- und TCN-Backtests der aktiven Releases. Der grüne Status kennzeichnet das aktuell aktive Modell.') }}
                     </p>
+                    <div class="mt-3 flex flex-wrap items-center gap-2 text-[8px] font-black uppercase tracking-[.1em]">
+                        <span class="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/55 bg-emerald-500/15 px-2 py-1 text-emerald-600"><i class="h-1.5 w-1.5 rounded-full bg-emerald-500"></i>{{ __('Aktives Modell') }}</span>
+                        <span class="inline-flex items-center gap-1.5 rounded-md border border-slate-400/30 bg-transparent px-2 py-1 text-[var(--ak-muted)]"><i class="h-1.5 w-1.5 rounded-full bg-slate-400"></i>{{ __('Weiteres verfügbares Modell') }}</span>
+                        @if($strategySelectionToken)
+                            <label id="serving-select-all-badge" class="serving-select-all-badge ml-auto inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-[9px] font-black normal-case tracking-normal">
+                                <input
+                                    id="serving-select-all"
+                                    form="serving-model-selection-form"
+                                    type="checkbox"
+                                    name="select_all"
+                                    value="1"
+                                    data-total="{{ $bulkSelectableModelKeys->count() }}"
+                                    class="peer sr-only"
+                                    @checked($bulkSelectableModelKeys->isNotEmpty() && $initialSelectedModelKeys->sort()->values()->all() === $bulkSelectableModelKeys->sort()->values()->all())
+                                >
+                                <span class="serving-selection-checkbox" aria-hidden="true">
+                                    <svg viewBox="0 0 16 16" fill="none"><path d="m3.25 8.25 3 3 6.5-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                                </span>
+                                <span id="serving-select-all-label">{{ __('Alle auswählen') }}</span>
+                            </label>
+                            <button type="submit" form="serving-model-selection-form" class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-[9px] font-black normal-case tracking-normal text-white shadow-sm transition hover:bg-slate-800">
+                                <x-heroicon-o-calculator class="h-4 w-4" />
+                                <span>{{ __('Strategie berechnen') }}</span>
+                                <small class="rounded bg-white/15 px-1.5 py-0.5 text-[8px] tabular-nums"><span id="serving-selected-model-count">{{ $initialSelectedModelKeys->count() }}</span> {{ __('Modelle') }}</small>
+                            </button>
+                        @else
+                            <span class="ml-auto inline-flex min-h-9 cursor-not-allowed items-center gap-2 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-3 py-2 text-[9px] normal-case tracking-normal text-[var(--ak-muted)] opacity-60" title="{{ __('Die aktuelle Auswahl enthält keine Modelle mit Backtestdaten.') }}">
+                                <x-heroicon-o-calculator class="h-4 w-4" />{{ __('Keine Strategie berechenbar') }}
+                            </span>
+                        @endif
+                    </div>
                 </div>
                 <div class="grid w-full grid-cols-2 gap-1.5 xl:w-[31rem]">
                     @foreach ([
@@ -27,6 +58,14 @@
                 </div>
             </header>
 
+            @if($strategySelectionToken)
+                <form id="serving-model-selection-form" method="POST" action="{{ route('setup.models.strategy') }}" class="hidden">
+                    @csrf
+                    <input type="hidden" name="selection_token" value="{{ $strategySelectionToken }}">
+                </form>
+            @endif
+            @error('models')<p class="mb-3 rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs font-bold text-rose-600">{{ $message }}</p>@enderror
+
             @php
                 $activeFilterCount = collect(request()->except(['page', 'sort', 'direction']))
                     ->filter(fn ($value) => $value !== null && $value !== '')
@@ -43,7 +82,7 @@
                     </span>
                     <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-[var(--ak-border)] text-cyan-400 transition" :class="open ? 'rotate-180 bg-cyan-400/[.08]' : ''"><x-heroicon-o-chevron-down class="h-3.5 w-3.5" /></span>
                 </button>
-                <form method="GET" x-cloak x-show="open" x-transition x-data="{ submitting: false }" @submit="submitting = true" @change="if ($event.target.matches('select')) $el.requestSubmit()" class="mt-2 grid gap-2 border-t border-[var(--ak-border)] pt-2 md:grid-cols-3 xl:grid-cols-9">
+                <form method="GET" x-cloak x-show="open" x-transition x-data="{ submitting: false }" @submit="submitting = true" @change="if ($event.target.matches('select')) $el.requestSubmit()" class="mt-2 grid gap-2 border-t border-[var(--ak-border)] pt-2 md:grid-cols-3 xl:grid-cols-11">
                     <input name="q" value="{{ request('q') }}" @input.debounce.450ms="$el.form.requestSubmit()" placeholder="Name, Symbol oder ISIN" class="ak-input xl:col-span-2" />
                     <select name="country" class="ak-input"><option value="">Alle Länder</option>@foreach($countries as $item)<option value="{{ $item }}" @selected(request('country') === $item)>{{ $item }}</option>@endforeach</select>
                     <select name="exchange" class="ak-input"><option value="">Alle Börsen</option>@foreach($exchanges as $item)<option value="{{ $item }}" @selected(request('exchange') === $item)>{{ $item }}</option>@endforeach</select>
@@ -61,6 +100,17 @@
                         <option value="published" @selected(request('status') === 'published')>Prediction vorhanden</option>
                         <option value="waiting" @selected(request('status') === 'waiting')>Noch keine Prediction</option>
                     </select>
+                    <select name="variant" class="ak-input">
+                        <option value="">{{ __('Standard und TCN') }}</option>
+                        <option value="standard" @selected(request('variant') === 'standard')>{{ __('Nur Standard') }}</option>
+                        <option value="pure_tcn" @selected(request('variant') === 'pure_tcn')>{{ __('Nur TCN') }}</option>
+                    </select>
+                    <select name="panel" class="ak-input">
+                        <option value="">{{ __('Alle Panel-Dezile') }}</option>
+                        @foreach(range(10, 1) as $decile)
+                            <option value="{{ $decile }}" @selected(request('panel') == $decile)>Panel D{{ $decile }}</option>
+                        @endforeach
+                    </select>
                     <select name="horizon" class="ak-input">
                         <option value="">{{ __('Alle Horizonte') }}</option>
                         @foreach([10, 20, 40] as $days)<option value="{{ $days }}" @selected(request('horizon') == $days)>{{ $days }}T</option>@endforeach
@@ -73,7 +123,7 @@
                     </select>
                     <div class="col-span-full grid grid-cols-3 gap-2">
                     <label class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]/45 px-3 py-2" x-data="{ value: {{ (float) request('profit_per_trade_min', $metricRanges->profit_per_trade->min) }} }">
-                        <span class="block text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('PF pro Trade ab') }}</span>
+                        <span class="block text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('Median pro Trade ab') }}</span>
                         <div class="relative mt-2 h-2.5 rounded-full border border-slate-400/25 shadow-inner" style="background:linear-gradient(90deg,rgba(244,63,94,.30),rgba(251,191,36,.27) 50%,rgba(16,185,129,.32))">
                             <span class="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-cyan-500 shadow-[0_1px_5px_rgba(15,23,42,.35)]" :style="`left:${Math.max(0,Math.min(100,((value-({{ $metricRanges->profit_per_trade->min }}))/(({{ $metricRanges->profit_per_trade->max }})-({{ $metricRanges->profit_per_trade->min }})))*100))}%`"></span>
                             <input type="range" name="profit_per_trade_min" value="{{ request('profit_per_trade_min', $metricRanges->profit_per_trade->min) }}" @input="value = Number($event.target.value)" @change="$el.form.requestSubmit()" min="{{ $metricRanges->profit_per_trade->min }}" max="{{ $metricRanges->profit_per_trade->max }}" step="{{ $metricRanges->profit_per_trade->step }}" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
@@ -103,7 +153,7 @@
                             <x-heroicon-o-magnifying-glass class="h-4 w-4" />
                             <span>Suchen</span>
                         </button>
-                        <a href="{{ route('predictions.index') }}" class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 text-[10px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)] transition hover:border-slate-400/45 hover:text-[var(--ak-text)]">
+                        <a href="{{ route($indexRoute) }}" class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-4 text-[10px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)] transition hover:border-slate-400/45 hover:text-[var(--ak-text)]">
                             <x-heroicon-o-arrow-path class="h-4 w-4" />
                             <span>Zurücksetzen</span>
                         </a>
@@ -112,21 +162,27 @@
             </section>
 
             <section class="ak-card overflow-hidden border-cyan-400/25">
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[1320px] border-collapse text-left">
+                <div class="overflow-hidden">
+                    <table class="w-full table-fixed border-collapse text-left">
+                        <colgroup>
+                            <col class="w-[15%]">
+                            <col class="w-[10%]">
+                            @foreach(range(1, 6) as $modelColumn)<col class="w-[12.5%]">@endforeach
+                        </colgroup>
                         <thead class="bg-cyan-400/[.055] text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">
                             @php
-                                $sortUrl = fn(string $column) => route('predictions.index', array_merge(request()->except('page'), [
+                                $sortUrl = fn(string $column) => route($indexRoute, array_merge(request()->except('page'), [
                                     'sort' => $column,
                                     'direction' => $sort === $column && $direction === 'asc' ? 'desc' : 'asc',
                                 ]));
                             @endphp
                             <tr>
-                                <th class="px-4 py-3"><a href="{{ $sortUrl('stock') }}">Aktie {{ $sort === 'stock' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</a></th>
-                                <th class="px-3 py-3"><a href="{{ $sortUrl('quality') }}">Qualität {{ $sort === 'quality' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</a></th>
-                                @foreach([10,20,40] as $horizon)<th class="px-3 py-3">{{ $horizon }}T · Champion / Backtest</th>@endforeach
-                                <th class="px-3 py-3"><a href="{{ $sortUrl('predictions') }}">Letzte Prediction {{ $sort === 'predictions' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</a></th>
-                                <th class="px-3 py-3"><a href="{{ $sortUrl('released') }}">Release {{ $sort === 'released' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</a></th>
+                                <th class="px-3 py-3"><a href="{{ $sortUrl('stock') }}">Aktie {{ $sort === 'stock' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</a></th>
+                                <th class="px-2 py-3"><a href="{{ $sortUrl('quality') }}">Qualität {{ $sort === 'quality' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</a></th>
+                                @foreach([10,20,40] as $horizon)
+                                    <th class="px-2 py-3 leading-4">{{ $horizon }}T · Standard</th>
+                                    <th class="px-2 py-3 leading-4">{{ $horizon }}T · TCN</th>
+                                @endforeach
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-[var(--ak-border)]">
@@ -140,73 +196,85 @@
                                     default => 'border-slate-400/30 text-slate-400',
                                 };
                             @endphp
-                            <tr
-                                x-data
-                                data-detail-url="{{ route('stocks.models', ['symbol' => $stock->symbol]) }}"
-                                @click="if (!$event.target.closest('a, button, input, select')) window.location.href = $el.dataset.detailUrl"
-                                @keydown.enter.prevent="window.location.href = $el.dataset.detailUrl"
-                                role="link"
-                                tabindex="0"
-                                aria-label="{{ __('Modelldetails für :stock öffnen', ['stock' => $stock->name ?: $stock->symbol]) }}"
-                                class="cursor-pointer align-top text-xs text-[var(--ak-text)] transition hover:bg-cyan-400/[.06] focus-visible:bg-cyan-400/[.08] focus-visible:outline-none"
-                            >
-                                <td class="px-4 py-3">
-                                    <a href="{{ route('stocks.models', ['symbol' => $stock->symbol]) }}" class="flex max-w-64 items-center gap-2 font-black hover:text-cyan-400">
+                            <tr class="align-top text-xs text-[var(--ak-text)] transition hover:bg-slate-400/[.035]">
+                                <td class="px-3 py-3">
+                                    <div class="flex max-w-64 items-center gap-2 font-black">
                                         <span class="shrink-0 text-base leading-none" aria-label="{{ $stock->country_code ?: __('Land') }}" title="{{ $stock->country_code ?: __('Land') }}">{{ \App\Support\CountryFlag::emoji($stock->country_code) }}</span>
                                         <span class="min-w-0 truncate">{{ $stock->name ?: $stock->symbol }}</span>
-                                    </a>
+                                    </div>
                                     <small class="mt-1 block text-[9px] text-[var(--ak-muted)]">{{ $stock->country_code }} · {{ $stock->exchange }} · {{ $stock->symbol }}</small>
                                     <small class="block text-[8px] text-[var(--ak-muted)]">{{ $stock->sector_code ?: '—' }}</small>
+                                    <a href="{{ route('stocks.models', ['symbol' => $stock->symbol]) }}" class="mt-2 inline-flex items-center gap-1 rounded-md border border-slate-400/40 bg-slate-400/[.06] px-2 py-1 text-[8px] font-black uppercase tracking-wide text-slate-600 transition hover:border-slate-500 hover:bg-slate-400/[.12] hover:text-slate-800">
+                                        {{ __('Details') }} <span aria-hidden="true">→</span>
+                                    </a>
                                 </td>
-                                <td class="px-3 py-3">
+                                <td class="px-2 py-3">
                                     <span class="inline-flex rounded-md border px-2 py-1 text-[9px] font-black uppercase {{ $qualityTone }}">{{ $stock->quality_class === 'underperform' ? 'Nicht qual.' : $stock->quality_class }}</span>
                                     <small class="mt-2 block text-[8px] text-[var(--ak-muted)]">{{ $stock->eligible_horizon_count }}/{{ count($stock->completed_horizons) }} Horizonte freigegeben</small>
                                 </td>
                                 @foreach([10,20,40] as $horizon)
+                                @foreach(['standard', 'pure_tcn'] as $variantKey)
                                     @php
                                         $scope = $stock->horizons->get($horizon);
-                                        $hasCurrentBuy = ($scope?->prediction_enabled ?? false) && $scope?->prediction?->signal === 'BUY';
-                                        $matchesModelFilter = $scope?->matches_active_filter ?? true;
+                                        $model = $scope?->model_variants?->get($variantKey);
+                                        $modelIsActive = (bool) ($model?->is_active ?? false);
+                                        $matchesModelFilter = $model?->matches_active_filter ?? true;
                                         $modelCellTone = $modelFilterActive && ! $matchesModelFilter
-                                            ? 'opacity-25 grayscale'
-                                            : ($hasCurrentBuy
-                                                ? 'bg-emerald-400/[.10] shadow-[inset_0_0_0_1px_rgba(52,211,153,.38)]'
-                                                : ($modelFilterActive ? 'bg-cyan-400/[.09] shadow-[inset_0_0_0_1px_rgba(34,211,238,.32)]' : ''));
+                                            ? 'is-filtered-out'
+                                            : '';
+                                        $modelSelectable = $model
+                                            && $matchesModelFilter
+                                            && $model->strategy_selectable;
+                                        $modelSelectionKey = $model
+                                            ? strtoupper((string) $stock->symbol).'|'.$horizon.'|'.$model->variant
+                                            : null;
                                     @endphp
-                                    <td class="px-3 py-3 transition-all {{ $modelCellTone }}">
-                                        @if($scope)
+                                    <td data-model-active="{{ $modelIsActive && ($model?->strategy_selectable ?? false) ? 'true' : 'false' }}" data-model-variant="{{ $model?->variant }}" class="serving-model-cell px-2 py-3 transition-all {{ $modelCellTone }}" @if($modelIsActive && $model?->strategy_selectable && $model?->variant === 'pure_tcn') style="background:rgba(6,182,212,.08)!important;border-color:rgba(8,145,178,.42)!important;box-shadow:inset 0 0 0 1px rgba(8,145,178,.26),inset 4px 0 0 #0891b2!important" @endif>
+                                        @if($model && $model->strategy_selectable)
                                             <div class="flex items-center gap-2">
-                                                <b class="{{ $scope->variant === 'pure_tcn' ? 'text-violet-400' : 'text-cyan-400' }}">{{ $scope->variant_label }}</b>
-                                                <span class="rounded border px-1.5 py-0.5 text-[8px] font-black uppercase {{ $scope->prediction_enabled ? 'border-emerald-400/35 text-emerald-400' : 'border-rose-400/30 text-rose-400' }}">{{ $scope->prediction_enabled ? 'aktiv' : 'gesperrt' }}</span>
-                                                @if($modelFilterActive && $matchesModelFilter)
-                                                    <span class="rounded border px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide {{ $hasCurrentBuy ? 'border-emerald-400/50 bg-emerald-400/15 text-emerald-300' : 'border-cyan-400/45 bg-cyan-400/12 text-cyan-300' }}">{{ __('Treffer') }}</span>
+                                                @if($modelSelectable)
+                                                    <label class="inline-flex shrink-0 cursor-pointer items-center">
+                                                        <input
+                                                            form="serving-model-selection-form"
+                                                            type="checkbox"
+                                                            name="models[]"
+                                                            value="{{ $modelSelectionKey }}"
+                                                            data-serving-model-checkbox
+                                                            data-serving-select-all-eligible="{{ $modelIsActive ? 'true' : 'false' }}"
+                                                            class="peer sr-only"
+                                                            @checked($initialSelectedModelKeys->contains($modelSelectionKey))
+                                                            aria-label="{{ __('Modell auswählen') }}: {{ $stock->symbol }} · {{ $horizon }}T · {{ $model->variant_label }}"
+                                                        >
+                                                        <span class="serving-selection-checkbox" aria-hidden="true">
+                                                            <svg viewBox="0 0 16 16" fill="none"><path d="m3.25 8.25 3 3 6.5-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                                                        </span>
+                                                    </label>
+                                                @else
+                                                    <span class="inline-flex shrink-0 cursor-not-allowed items-center" title="{{ __('Dieses Modell entspricht nicht den aktuell gesetzten Modellfiltern.') }}">
+                                                        <input type="checkbox" disabled class="peer sr-only" aria-label="{{ __('Modell nicht für Strategieberechnung verfügbar') }}: {{ $stock->symbol }} · {{ $horizon }}T · {{ $model->variant_label }}">
+                                                        <span class="serving-selection-checkbox is-disabled" aria-hidden="true">
+                                                            <svg viewBox="0 0 16 16" fill="none"><path d="m3.25 8.25 3 3 6.5-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                                                        </span>
+                                                    </span>
+                                                @endif
+                                                <b class="text-[var(--ak-text)]">{{ $model->variant_label }}</b>
+                                                @if($modelIsActive)
+                                                    <a href="{{ route('stocks.models', ['symbol' => $stock->symbol, 'horizon' => $horizon, 'variant' => $model->variant]) }}" class="serving-model-state rounded border px-1.5 py-0.5 text-[8px] font-black uppercase {{ $model->variant === 'pure_tcn' ? 'is-active-tcn' : 'is-active-standard' }}" style="border-color:#64748b!important;background:#475569!important;color:#fff!important">{{ __('Details') }}</a>
+                                                @else
+                                                    <span class="serving-model-state rounded border border-slate-400/40 bg-slate-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-slate-600">{{ __('Verfügbar') }}</span>
                                                 @endif
                                             </div>
-                                            <small class="mt-1 block text-[9px] text-[var(--ak-muted)]">HR {{ is_numeric($scope->metrics->hit_rate) ? number_format($scope->metrics->hit_rate, 1, ',', '.').' %' : '—' }} · PF {{ is_numeric($scope->metrics->profit_factor) ? number_format($scope->metrics->profit_factor, 2, ',', '.') : '—' }}</small>
-                                            <small class="block text-[8px] text-[var(--ak-muted)]">{{ $scope->metrics->trades }} Trades · Ø {{ is_numeric($scope->metrics->average_return) ? sprintf('%+.2f %%', $scope->metrics->average_return) : '—' }}</small>
+                                            <small class="mt-1 block text-[9px] text-[var(--ak-muted)]">HR {{ is_numeric($model->metrics->hit_rate) ? number_format($model->metrics->hit_rate, 1, ',', '.').' %' : '—' }} · PF {{ is_numeric($model->metrics->profit_factor) ? number_format($model->metrics->profit_factor, 2, ',', '.') : '—' }}</small>
+                                            <small class="block text-[8px] text-[var(--ak-muted)]">{{ $model->metrics->trades }} Trades · Ø {{ is_numeric($model->metrics->average_return) ? sprintf('%+.2f %%', $model->metrics->average_return) : '—' }}</small>
                                         @else
-                                            <span class="text-[var(--ak-muted)]">—</span>
+                                            <span class="text-slate-500">Keine Daten</span>
                                         @endif
                                     </td>
                                 @endforeach
-                                <td class="px-3 py-3">
-                                    @if($stock->latest_prediction)
-                                        @php $prediction = $stock->latest_prediction; @endphp
-                                        <b class="{{ $prediction->signal === 'BUY' ? 'text-emerald-400' : ($prediction->signal === 'SELL' ? 'text-rose-400' : 'text-amber-400') }}">{{ $prediction->signal }} · {{ $prediction->horizon }}T</b>
-                                        <small class="mt-1 block text-[9px] text-[var(--ak-muted)]">{{ is_numeric($prediction->expected_return_percent) ? sprintf('%+.2f %%', $prediction->expected_return_percent) : '—' }} · {{ \Illuminate\Support\Carbon::parse($prediction->as_of)->format('d.m.Y H:i') }}</small>
-                                    @else
-                                        <b class="text-[var(--ak-muted)]">Keine Prediction</b>
-                                        <small class="mt-1 block max-w-48 text-[8px] leading-4 text-[var(--ak-muted)]">Kein freigegebener Horizont oder noch kein neuer Prediction-Lauf.</small>
-                                    @endif
-                                </td>
-                                <td class="px-3 py-3">
-                                    <b class="block text-[10px]">{{ $stock->pipeline_version }}</b>
-                                    <small class="mt-1 block text-[8px] text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($stock->released_at)->format('d.m.Y H:i') }}</small>
-                                    <small class="block text-[8px] text-[var(--ak-muted)]">Cutoff {{ \Illuminate\Support\Carbon::parse($stock->dataset_cutoff)->format('d.m.Y') }}</small>
-                                </td>
+                                @endforeach
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="px-6 py-14 text-center text-sm text-[var(--ak-muted)]">Keine aktiven Releases mit diesen Filtern vorhanden.</td></tr>
+                            <tr><td colspan="8" class="px-6 py-14 text-center text-sm text-[var(--ak-muted)]">Keine aktiven Releases mit diesen Filtern vorhanden.</td></tr>
                         @endforelse
                         </tbody>
                     </table>
@@ -216,4 +284,59 @@
             <p class="mt-3 text-[9px] text-[var(--ak-muted)]">Quelle: aktienki_serving_next · kein Fallback auf die alte Predictions-Tabelle.</p>
         </div>
     </main>
+    @once
+        <script>
+            (() => {
+                const initialiseModelSelection = () => {
+                    const selectAll = document.getElementById('serving-select-all');
+                    const selectAllBadge = document.getElementById('serving-select-all-badge');
+                    const selectAllLabel = document.getElementById('serving-select-all-label');
+                    const counter = document.getElementById('serving-selected-model-count');
+                    const modelCheckboxes = [...document.querySelectorAll('[data-serving-model-checkbox]')];
+                    const bulkCheckboxes = modelCheckboxes.filter((checkbox) => checkbox.dataset.servingSelectAllEligible === 'true');
+
+                    if (!selectAll || !counter || selectAll.dataset.bound === 'true') return;
+                    selectAll.dataset.bound = 'true';
+
+                    const total = Number(selectAll.dataset.total || modelCheckboxes.length);
+                    const renderSelectAllState = () => {
+                        const allSelected = selectAll.checked && !selectAll.indeterminate;
+                        selectAllBadge?.classList.toggle('is-selected', allSelected);
+                        if (selectAllLabel) {
+                            selectAllLabel.textContent = allSelected
+                                ? @js(__('Alle abwählen'))
+                                : @js(__('Alle auswählen'));
+                        }
+                    };
+                    const updateFromModels = () => {
+                        const checked = modelCheckboxes.filter((checkbox) => checkbox.checked).length;
+                        const checkedBulk = bulkCheckboxes.filter((checkbox) => checkbox.checked).length;
+                        const checkedOutsideBulk = modelCheckboxes.some((checkbox) => checkbox.checked && checkbox.dataset.servingSelectAllEligible !== 'true');
+                        selectAll.checked = total > 0 && checkedBulk === total && !checkedOutsideBulk;
+                        selectAll.indeterminate = checked > 0 && !selectAll.checked;
+                        counter.textContent = String(checked);
+                        renderSelectAllState();
+                    };
+
+                    selectAll.addEventListener('change', () => {
+                        modelCheckboxes.forEach((checkbox) => {
+                            checkbox.checked = selectAll.checked && checkbox.dataset.servingSelectAllEligible === 'true';
+                        });
+                        selectAll.indeterminate = false;
+                        counter.textContent = String(selectAll.checked ? total : 0);
+                        renderSelectAllState();
+                    });
+
+                    modelCheckboxes.forEach((checkbox) => {
+                        checkbox.addEventListener('change', updateFromModels);
+                    });
+                    renderSelectAllState();
+                };
+
+                initialiseModelSelection();
+                document.addEventListener('DOMContentLoaded', initialiseModelSelection, { once: true });
+                document.addEventListener('livewire:navigated', initialiseModelSelection);
+            })();
+        </script>
+    @endonce
 </x-app-layout>

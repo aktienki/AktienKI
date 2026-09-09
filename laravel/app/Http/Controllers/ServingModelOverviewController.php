@@ -14,6 +14,15 @@ final class ServingModelOverviewController extends Controller
     public function __invoke(Request $request, string $symbol, ServingModelOverviewService $models): View
     {
         $data = $models->data($symbol);
+        $requestedHorizon = $request->integer('horizon');
+        if (in_array($requestedHorizon, [10, 20, 40], true)
+            && $data['horizons']->contains(fn (array $horizon): bool => (int) $horizon['days'] === $requestedHorizon)) {
+            $data['initialHorizon'] = $requestedHorizon;
+        }
+        $requestedVariant = (string) $request->query('variant', '');
+        $data['initialVariant'] = in_array($requestedVariant, ['standard', 'pure_tcn'], true)
+            ? $requestedVariant
+            : null;
         $data['personalModelConfigurationKeys'] = $request->user()->savedPredictionFilters()
             ->get(['filters'])
             ->flatMap(fn ($strategy) => collect(data_get($strategy->filters, 'serving_model_configurations', []))

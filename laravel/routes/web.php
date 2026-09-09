@@ -297,6 +297,8 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::patch('/profile/schedule-email-visibility', [ProfileController::class, 'updateScheduleEmailVisibility'])->name('profile.schedule-email-visibility.update');
     Route::delete('/profile/dashboard-schedule-events/{event}', [ProfileController::class, 'dismissDashboardScheduleEvent'])->name('profile.dashboard-schedule-events.destroy');
     Route::get('/setup/filter', [PredictionController::class, 'filterSetup'])->name('setup.filter');
+    Route::get('/setup/models', ServingPredictionTableController::class)->middleware('plan:pro')->name('setup.models');
+    Route::post('/setup/models/strategy', [ServingPredictionTableController::class, 'storeStrategySelection'])->middleware('plan:pro')->name('setup.models.strategy');
     Route::get('/setup/quality', [PredictionController::class, 'qualitySetup'])->name('setup.quality');
     Route::get('/setup/labels', [SmartSelectionLabelController::class, 'index'])->name('setup.labels.index');
     Route::post('/setup/quality/labels', [SmartSelectionLabelController::class, 'store'])->middleware('plan:plus')->name('setup.quality.labels.store');

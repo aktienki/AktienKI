@@ -69,7 +69,9 @@ final class ServingModelOverviewService
             $artifactManifest,
         ): array {
             $active = (array) ($activeModels->get((string) $days) ?? $activeModels->get($days) ?? []);
-            $activeVariant = (string) ($payload['active_variant'] ?? $active['variant'] ?? 'standard');
+            $activeVariant = ServingVariantSelector::select($payload);
+            $selectedPayload = (array) ($payload[$activeVariant] ?? []);
+            $selectedStatus = (array) ($selectedPayload['prediction_status'] ?? []);
             $recommendation = (array) ($payload['recommendation'] ?? []);
             $variants = collect(self::VARIANTS)->mapWithKeys(function (string $variant) use (
                 $payload,
@@ -132,8 +134,8 @@ final class ServingModelOverviewService
             return [
                 'days' => $days,
                 'active_variant' => $activeVariant,
-                'active_prediction_enabled' => (bool) ($active['prediction_enabled'] ?? false),
-                'active_prediction_status' => (string) ($active['prediction_status'] ?? 'not_evaluated'),
+                'active_prediction_enabled' => (bool) ($selectedStatus['prediction_enabled'] ?? false),
+                'active_prediction_status' => (string) ($selectedStatus['status'] ?? 'not_evaluated'),
                 'preferred_variant' => (string) ($recommendation['preferred_variant'] ?? $activeVariant),
                 'automatically_activated' => (bool) ($recommendation['automatically_activated'] ?? false),
                 'recommendation_gates' => (array) ($recommendation['gates'] ?? []),

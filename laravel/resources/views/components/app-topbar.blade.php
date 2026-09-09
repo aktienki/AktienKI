@@ -91,6 +91,7 @@
                     </div>
                 </template>
             </div>
+            @if (config('aktienki.navigation.show_tables_menu'))
             <div
                 x-data="{
                     open: false,
@@ -145,6 +146,7 @@
                     </div>
                 </template>
             </div>
+            @endif
             @auth
                 @php
                     $akiDepotAccess = app(\App\Services\PlanAccessService::class)
@@ -160,7 +162,7 @@
                             ->first(fn (\App\Models\Portfolio $portfolio): bool => (bool) data_get($portfolio->meta, 'automation.live_enabled', false))
                         : null;
                     $strategyDepotUrl = $activeStrategyDepot
-                        ? route('depots.show', ['portfolio' => $activeStrategyDepot, 'return_to' => 'paper'])
+                        ? route('depots.show', ['portfolio' => $activeStrategyDepot, 'return_to' => request()->getRequestUri()])
                         : route('paper-depots.index');
                 @endphp
                 <div
@@ -234,7 +236,7 @@
                     </template>
                 </div>
             @endauth
-            @if (auth()->user()?->is_admin)
+            @if (auth()->user()?->is_admin && config('aktienki.navigation.show_accounts_menu'))
                 <a data-nav-key="accounts" href="{{ route('accounts.index') }}" class="{{ request()->routeIs('accounts.*') ? 'ak-top-link-active' : 'ak-top-link' }}">
                     <x-heroicon-o-building-library /><span>{{ __('Konten') }}</span>
                 </a>
@@ -283,7 +285,7 @@
                             @endphp
                             <a href="{{ route('setup.quality') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-amber-500/10 hover:text-amber-300">
                                 <x-heroicon-o-shield-check class="h-5 w-5 text-amber-400" />
-                                {{ __('Smart Selection') }}
+                                {{ __('Labels') }}
                             </a>
                             <a href="{{ route('setup.labels.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-amber-500/10 hover:text-amber-300">
                                 <x-heroicon-o-tag class="h-5 w-5 text-amber-400" />
@@ -297,6 +299,22 @@
                                 <x-heroicon-o-bookmark-square class="h-5 w-5 text-amber-400" />
                                 {{ __('Strategie Manager') }}
                             </a>
+                            @if($canUseStrategies)
+                                <a href="{{ route('setup.models') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-slate-500/10 hover:text-slate-700">
+                                    <x-heroicon-o-cpu-chip class="h-5 w-5 text-slate-600" />
+                                    {{ __('Modelle & Predictions') }}
+                                </a>
+                                <a href="{{ route('setup.models') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-slate-500/10 hover:text-slate-700">
+                                    <x-heroicon-o-cpu-chip class="h-5 w-5 text-slate-600" />
+                                    {{ __('Modellübersicht') }}
+                                </a>
+                            @else
+                                <span class="{{ $lockedMenuClass }}" title="{{ __('Ab Pro verfügbar') }}">
+                                    <x-heroicon-o-cpu-chip class="h-5 w-5" />{{ __('Modelle & Predictions') }}
+                                    <small class="ml-auto text-[8px] font-black">PRO</small>
+                                </span>
+                                <span class="{{ $lockedMenuClass }}"><x-heroicon-o-cpu-chip class="h-5 w-5" />{{ __('Modellübersicht') }} <small class="ml-auto">PRO</small></span>
+                            @endif
                         </div>
                     </template>
                 </div>

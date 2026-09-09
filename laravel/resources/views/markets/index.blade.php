@@ -848,6 +848,10 @@
                 box-shadow: 0 8px 22px rgba(35,72,67,.065), inset 3px 0 0 rgba(6,182,212,.58) !important;
                 backdrop-filter: blur(10px);
             }
+            :root[data-theme="light"] #markets-page .ak-dashboard-card:hover {
+                border-color: #6b4a36 !important;
+                box-shadow: inset 4px 0 0 #3f6f5e, 0 17px 34px rgba(38,49,63,.14), 0 1px 2px rgba(38,49,63,.06) !important;
+            }
             :root[data-theme="light"] #markets-page [class*="text-orange-"] { color: #0e7490 !important; }
             :root[data-theme="light"] #markets-page [class*="bg-orange-"] { background-color: rgba(34,211,238,.10) !important; }
             :root[data-theme="light"] #markets-page [class*="border-orange-"] { border-color: rgba(6,182,212,.20) !important; }

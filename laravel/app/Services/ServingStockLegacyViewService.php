@@ -224,6 +224,7 @@ final class ServingStockLegacyViewService
             ];
         })->values();
         $chartPatternData = $this->chartPatternData($chartCandles);
+        $historicalPanelScores = $this->panelChartHistory((int) $stock->instrument_id, $chartCandles);
 
         $fundamental = (object) [
             'snapshot_date' => $stock->fundamental_snapshot_date ?? null,
@@ -337,6 +338,7 @@ final class ServingStockLegacyViewService
             'chartPatterns' => $chartPatternData['recent'],
             'chartPatternStats' => $chartPatternData['statistics'],
             'historicalAiScores' => collect(),
+            'historicalPanelScores' => $historicalPanelScores,
             'historicalSignalTransitions' => collect(),
             'latestSignalTransition' => null,
             'chartFocusAt' => $prediction?->prediction_time ? CarbonImmutable::parse($prediction->prediction_time) : null,
@@ -675,6 +677,41 @@ final class ServingStockLegacyViewService
     private function number(mixed $value): ?float
     {
         return is_numeric($value) ? (float) $value : null;
+    }
+
+    /** @return Collection<int, array{x:int,y:float}> */
+    private function panelChartHistory(int $instrumentId, Collection $candles): Collection
+    {
+        if (! Schema::hasTable('panel_predictions') || $candles->isEmpty()) {
+            return collect();
+        }
+
+        $timestamps = $candles->pluck('x')->filter(fn ($value): bool => is_numeric($value));
+        if ($timestamps->isEmpty()) return collect();
+
+        try {
+            return DB::table('panel_predictions')
+                ->where('model_version', 'panel-price-risk-freeze-2026-09-07')
+                ->where('instrument_id', $instrumentId)
+                ->whereBetween('as_of_date', [
+                    CarbonImmutable::createFromTimestampMs((int) $timestamps->min())->toDateString(),
+                    CarbonImmutable::createFromTimestampMs((int) $timestamps->max())->toDateString(),
+                ])
+                ->orderBy('as_of_date')
+                ->get(['as_of_date', 'xsec_pctile', 'decile'])
+                ->map(function (object $row): array {
+                    $score = is_numeric($row->xsec_pctile)
+                        ? (float) $row->xsec_pctile * 10
+                        : (is_numeric($row->decile) ? (float) $row->decile : 0.0);
+
+                    return [
+                        'x' => CarbonImmutable::parse($row->as_of_date)->getTimestampMs(),
+                        'y' => max(0.0, min(10.0, $score)),
+                    ];
+                });
+        } catch (\Throwable) {
+            return collect();
+        }
     }
 
     private function currentPrice(?array $prediction, object $stock): ?float

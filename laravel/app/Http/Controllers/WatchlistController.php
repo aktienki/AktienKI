@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -265,6 +266,7 @@ class WatchlistController extends Controller
                 Rule::unique('watchlists')->where('user_id', $request->user()->id),
             ],
             'description' => ['nullable', 'string', 'max:500'],
+            'return_to' => ['nullable', 'string', 'max:2048'],
         ]);
 
         DB::transaction(function () use ($request, $validated): void {
@@ -280,6 +282,11 @@ class WatchlistController extends Controller
                 'active' => true,
             ]);
         });
+
+        $returnTo = $validated['return_to'] ?? null;
+        if (is_string($returnTo) && Str::startsWith($returnTo, '/') && ! Str::startsWith($returnTo, '//')) {
+            return redirect($returnTo)->with('status', 'watchlist-created');
+        }
 
         return redirect()->route('watchlists.index')->with('status', 'watchlist-created');
     }

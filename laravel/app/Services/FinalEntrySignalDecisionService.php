@@ -483,6 +483,7 @@ class FinalEntrySignalDecisionService
             }
             $symbol = strtoupper(trim((string) ($configuration['symbol'] ?? '')));
             $release = trim((string) ($configuration['release_id'] ?? ''));
+            $releasePolicy = (string) ($configuration['release_policy'] ?? 'fixed');
             $horizon = filter_var(
                 $configuration['horizon'] ?? $configuration['horizon_days'] ?? null,
                 FILTER_VALIDATE_INT,
@@ -491,14 +492,15 @@ class FinalEntrySignalDecisionService
                 ? filter_var($configuration['horizon_days'], FILTER_VALIDATE_INT)
                 : $horizon;
             $variant = trim((string) ($configuration['variant'] ?? ''));
-            if ($symbol === '' || $release === '' || $horizon === false
+            if ($symbol === '' || ! in_array($releasePolicy, ['fixed', 'active'], true)
+                || ($releasePolicy === 'fixed' && $release === '') || $horizon === false
                 || $horizon <= 0 || $horizonDays === false
                 || (int) $horizonDays !== (int) $horizon || $variant === '') {
                 $valid = false;
                 break;
             }
             if ($symbol === $sourceSymbol
-                && $release === $sourceRelease
+                && ($releasePolicy === 'active' || $release === $sourceRelease)
                 && (int) $horizon === $sourceHorizon
                 && $variant === $sourceVariant) {
                 $matched = $configuration;

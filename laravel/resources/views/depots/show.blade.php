@@ -8,7 +8,7 @@
             ? $simulationSummary['model_references'][0]
             : null;
     @endphp
-    <div id="strategy-depot-page" x-data="{ simulationOpen: {{ request()->boolean('test') && !$errors->has('simulation') ? 'true' : 'false' }}, simulationSubmitting: false, automationOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false }" class="ak-detail-design flex min-h-[calc(100dvh-89px)] flex-col py-4 text-[var(--ak-text)]">
+    <div id="strategy-depot-page" x-data="{ simulationOpen: {{ request()->boolean('test') && !$errors->has('simulation') ? 'true' : 'false' }}, simulationSubmitting: false, automationOpen: false, strategyConfirmOpen: false, capitalOpen: false, resetOpen: false, deleteOpen: false, deleteConfirmed: false }" class="ak-detail-design flex min-h-[calc(100dvh-89px)] flex-col py-4 text-[var(--ak-text)]">
         <div class="ak-depot-detail-hero ak-detail-hero mb-4 flex shrink-0 flex-col gap-3 rounded-2xl border border-[var(--ak-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 items-center gap-3">
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/[.08] text-amber-300">
@@ -28,7 +28,7 @@
             @if($portfolio->type === 'paper')<button type="button" @click="simulationOpen=true" title="{{ $liveSimulationEnabled ? __('Simulation starten und mitlaufendes Strategiedepot deaktivieren') : __('Simulation starten') }}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/[.09] px-4 text-xs font-black text-amber-200 shadow-sm shadow-amber-950/15"><x-heroicon-o-play class="h-4 w-4" />{{ __('Simulation') }}</button>@endif
             @if($portfolio->type === 'paper')<button type="button" @click="capitalOpen=true" class="inline-flex h-10 items-center gap-2 rounded-xl border border-teal-300/20 bg-teal-400/[.07] px-3 text-xs font-black text-teal-200"><x-heroicon-o-banknotes class="h-4 w-4" />{{ __('Kapital') }}</button>@endif
             @if($portfolio->type === 'paper')<button type="button" @click="resetOpen=true" class="inline-flex h-10 items-center gap-2 rounded-xl border border-orange-400/20 bg-orange-400/[.07] px-3 text-xs font-black text-orange-400"><x-heroicon-o-arrow-path class="h-4 w-4" />{{ __('Zurücksetzen') }}</button>@endif
-            @if($portfolio->type === 'paper')<button type="button" @click="deleteOpen=true" class="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-300/20 bg-rose-400/[.07] px-3 text-xs font-black text-rose-300"><x-heroicon-o-trash class="h-4 w-4" />{{ __('Löschen') }}</button>@endif
+            @if($portfolio->type === 'paper')<button type="button" @click="deleteConfirmed=false; deleteOpen=true" class="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-300/20 bg-rose-400/[.07] px-3 text-xs font-black text-rose-300"><x-heroicon-o-trash class="h-4 w-4" />{{ __('Löschen') }}</button>@endif
             @endif
             <a href="{{ $backUrl }}" data-back-link class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:bg-teal-500/10 hover:text-teal-700">
                 <x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Zurück') }}
@@ -418,12 +418,12 @@
             </form>
         </div>
 
-        <div x-show="deleteOpen" x-cloak class="fixed inset-0 z-[123] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-sm" @keydown.escape.window="deleteOpen=false">
-            <form method="POST" action="{{ route('depots.destroy', $portfolio) }}" class="w-full max-w-lg rounded-2xl border border-rose-300/30 bg-[#16253a]/90 p-6 shadow-2xl" @click.outside="deleteOpen=false">@csrf @method('DELETE')
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-400/12 text-rose-300"><x-heroicon-o-trash class="h-7 w-7" /></div><h2 class="mt-4 text-xl font-black text-rose-100">{{ __('Musterdepot endgültig löschen?') }}</h2>
-                <p class="mt-3 text-sm leading-6 text-slate-200">{{ __('Das Depot, seine Strategiezuordnungen, Positionen, Transaktionen, Kontobuchungen und Berichte werden unwiderruflich gelöscht. Die Strategien selbst bleiben im Strategie Manager erhalten.') }}</p>
-                <label class="mt-4 flex gap-3 rounded-xl border border-rose-300/25 bg-rose-400/[.08] p-3 text-sm font-bold text-rose-100"><input required type="checkbox" name="confirm_delete" value="1" class="mt-0.5 h-4 w-4 rounded bg-slate-950 text-rose-500"><span>{{ __('Ich bestätige die endgültige Löschung dieses Musterdepots.') }}</span></label>
-                <div class="mt-5 flex justify-end gap-2"><button type="button" @click="deleteOpen=false" class="h-10 rounded-lg border border-white/10 px-4 text-xs font-black text-slate-300">{{ __('Abbrechen') }}</button><button class="h-10 rounded-lg bg-gradient-to-r from-rose-600 to-red-700 px-4 text-xs font-black text-white">{{ __('Endgültig löschen') }}</button></div>
+        <div x-show="deleteOpen" x-cloak class="ak-delete-modal fixed inset-0 z-[123] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm" @keydown.escape.window="deleteOpen=false; deleteConfirmed=false" @click.self="deleteOpen=false; deleteConfirmed=false">
+            <form method="POST" action="{{ route('depots.destroy', $portfolio) }}" class="ak-delete-dialog w-full max-w-lg rounded-2xl border p-6 shadow-2xl" @submit="if (!deleteConfirmed) $event.preventDefault()">@csrf @method('DELETE')
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500"><x-heroicon-o-trash class="h-7 w-7" /></div><h2 class="mt-4 text-xl font-black text-rose-600">{{ __('Musterdepot endgültig löschen?') }}</h2>
+                <p class="ak-delete-copy mt-3 text-sm leading-6">{{ __('Das Depot, seine Strategiezuordnungen, Positionen, Transaktionen, Kontobuchungen und Berichte werden unwiderruflich gelöscht. Die Strategien selbst bleiben im Strategie Manager erhalten.') }}</p>
+                <label class="ak-delete-confirm mt-4 flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm font-bold"><input x-model="deleteConfirmed" required type="checkbox" name="confirm_delete" value="1" class="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-2 accent-rose-600"><span>{{ __('Ich bestätige die endgültige Löschung dieses Musterdepots.') }}</span></label>
+                <div class="mt-5 flex justify-end gap-2"><button type="button" @click="deleteOpen=false; deleteConfirmed=false" class="ak-delete-cancel h-10 rounded-lg border px-4 text-xs font-black">{{ __('Abbrechen') }}</button><button type="submit" :disabled="!deleteConfirmed" class="ak-delete-submit h-10 rounded-lg bg-gradient-to-r from-rose-600 to-red-700 px-4 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{{ __('Endgültig löschen') }}</button></div>
             </form>
         </div>
     </div>

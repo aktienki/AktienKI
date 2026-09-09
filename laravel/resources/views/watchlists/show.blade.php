@@ -23,6 +23,9 @@
                 <a href="{{ route('watchlists.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/[.06] px-4 text-xs font-bold text-amber-200 transition hover:border-amber-300/45 hover:bg-amber-300/10">
                     <x-heroicon-o-cog-6-tooth class="h-4 w-4" />{{ __('Watchlists verwalten') }}
                 </a>
+                <a href="{{ route('watchlists.index') }}" data-back-link class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-[var(--ak-border-strong)] hover:text-[var(--ak-text)]">
+                    <x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Zurück') }}
+                </a>
             </div>
         </header>
 

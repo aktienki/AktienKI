@@ -708,6 +708,7 @@ final class RunFilteredBacktest implements ShouldQueue
             ->map(static fn (array $row): array => [
                 'symbol' => strtoupper(trim((string) $row['symbol'])),
                 'release_id' => (string) $row['release_id'],
+                'release_policy' => strtolower(trim((string) ($row['release_policy'] ?? 'pinned'))),
                 'horizon' => (int) $row['horizon'],
                 'variant' => (string) $row['variant'],
             ])
@@ -717,15 +718,35 @@ final class RunFilteredBacktest implements ShouldQueue
             return collect();
         }
 
-        $allowed = $configurations->mapWithKeys(fn (array $row): array => [
-            implode('|', [$row['release_id'], $row['symbol'], $row['horizon'], $row['variant']]) => true,
-        ]);
         // Queue workers are long-lived. Never reuse a serving PDO connection
         // that may still point at an earlier tunnel/database target from when
         // the worker was started. Each strategy run must read the canonical
         // Service DB configured at execution time.
         DB::purge('serving');
         $serving = DB::connection('serving');
+        $activeReleaseBySymbol = $serving->table('serving_active_models as active_model')
+            ->join('serving_instruments as instrument', 'instrument.id', '=', 'active_model.instrument_id')
+            ->whereIn('instrument.symbol', $configurations->pluck('symbol')->unique())
+            ->pluck('active_model.release_id', 'instrument.symbol')
+            ->mapWithKeys(fn ($releaseId, $symbol): array => [
+                strtoupper((string) $symbol) => (string) $releaseId,
+            ]);
+        // A saved strategy follows the current active release. Keeping the
+        // release ID captured when the UI was opened would make an otherwise
+        // valid strategy unusable immediately after a retrain.
+        $configurations = $configurations->map(function (array $configuration) use ($activeReleaseBySymbol): array {
+            if ($configuration['release_policy'] === 'active') {
+                $configuration['release_id'] = $activeReleaseBySymbol->get(
+                    $configuration['symbol'],
+                    $configuration['release_id'],
+                );
+            }
+
+            return $configuration;
+        });
+        $allowed = $configurations->mapWithKeys(fn (array $row): array => [
+            implode('|', [$row['release_id'], $row['symbol'], $row['horizon'], $row['variant']]) => true,
+        ]);
         $runs = $serving->table('serving_strategy_runs')
             ->where('status', 'complete')
             ->whereIn(DB::raw("source_metadata::jsonb->>'release_id'"), $configurations->pluck('release_id')->unique())

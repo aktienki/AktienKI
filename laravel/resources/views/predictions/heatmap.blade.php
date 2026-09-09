@@ -3,7 +3,32 @@
         $setupMode = $setupMode ?? false;
         $shortMode = $shortMode ?? false;
         $qualitySetupMode = $qualitySetupMode ?? false;
+        $originBacktestSettings = isset($activeBacktestRun)
+            ? (json_decode((string) ($activeBacktestRun->settings ?? '{}'), true) ?: [])
+            : [];
+        $startedFromModels = request()->filled('serving_selection')
+            || collect((array) data_get($originBacktestSettings, 'selection_filters.serving_model_configurations', []))
+                ->contains(fn ($configuration) => data_get($configuration, 'source') === 'serving_prediction_table');
+        $modelsReturnToken = (string) request(
+            'serving_selection',
+            data_get($originBacktestSettings, 'selection_filters.serving_selection', '')
+        );
+        $modelsReturnParameters = preg_match('/^[A-Za-z0-9]{40}$/', $modelsReturnToken)
+            ? ['restore_selection' => $modelsReturnToken]
+            : [];
         $heatmapFilterRoute = $qualitySetupMode ? 'setup.quality' : ($shortMode ? 'setup.short' : ($setupMode ? 'setup.filter' : 'predictions.heatmap'));
+        $requestedBacktestReturnTo = (string) request('backtest_return_to', '');
+        $requestedBacktestReturnTo = str_starts_with($requestedBacktestReturnTo, '/') && ! str_starts_with($requestedBacktestReturnTo, '//')
+            ? $requestedBacktestReturnTo
+            : '';
+        $backtestOriginUrl = $startedFromModels
+            ? route('setup.models', $modelsReturnParameters)
+            : ($requestedBacktestReturnTo !== ''
+                ? url($requestedBacktestReturnTo)
+                : route($heatmapFilterRoute, request()->except(['new_backtest', 'backtest_run', 'show_result', 'backtest_return_to'])));
+        $backtestOriginParts = parse_url($backtestOriginUrl) ?: [];
+        $backtestOriginPath = (string) ($backtestOriginParts['path'] ?? '/');
+        if (filled($backtestOriginParts['query'] ?? null)) $backtestOriginPath .= '?'.$backtestOriginParts['query'];
         $rangeMaxima = array_merge([
             'score' => 10, 'confidence' => 100, 'drawdown' => 50, 'profit_factor' => 3, 'profit_per_trade' => 5,
             'volatility' => 100, 'predicted_return' => 10, 'pe' => 100,
@@ -81,6 +106,12 @@
                 </div>
             </div>
             <div class="ak-strategy-header-actions flex shrink-0 items-center gap-2">
+                @if ($setupMode && ! $shortMode && $startedFromModels)
+                    <a href="{{ route('setup.models', $modelsReturnParameters) }}" class="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--ak-border-strong)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-text-soft)] transition hover:border-[var(--ak-accent)] hover:text-[var(--ak-accent)]">
+                        <x-heroicon-o-arrow-left class="h-4 w-4" />
+                        {{ __('Zurück zur Modellauswahl') }}
+                    </a>
+                @endif
                 @if ($setupMode && ! $shortMode)
                     <button type="button" @if($canImportStrategy ?? false) @click="strategyImportOpen = true" @else @click="showPlanNotice(@js(__('Strategie importieren')), @js(__('Importiere gespeicherte Strategien und übernimm alle Filter, Rotationen und Positionsregeln direkt in den Strategietester.')), 'PRO')" @endif class="inline-flex items-center gap-2 rounded-xl border border-teal-300/30 bg-teal-400/[.09] px-3 py-2 text-xs font-black text-teal-200 transition hover:border-teal-300/55 hover:bg-teal-400/[.16]">
                         <x-heroicon-o-arrow-down-tray class="h-4 w-4" />
@@ -88,13 +119,19 @@
                     </button>
                 @endif
                 @unless ($setupMode)
-                    <a href="{{ route('predictions.index', request()->query()) }}" data-back-link class="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:text-teal-400">
+                    <a href="{{ request()->filled('serving_selection') ? route('setup.models', $modelsReturnParameters) : route('predictions.index', request()->query()) }}" data-back-link class="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-card)] px-4 text-xs font-black text-[var(--ak-muted)] transition hover:border-teal-500/35 hover:text-teal-400">
                         <x-heroicon-o-arrow-left class="h-4 w-4" />
                         {{ __('Zurück') }}
                     </a>
                 @endunless
             </div>
         </header>
+
+        @error('backtest')
+            <div class="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-800" role="alert">
+                {{ $message }}
+            </div>
+        @enderror
 
         @if ($setupMode && ! $shortMode && ($canImportStrategy ?? false))
         <template x-teleport="body">
@@ -296,6 +333,7 @@
                 </div>
             </div>
             @if ($qualitySetupMode)<input type="hidden" name="quality_setup" value="1">@endif
+            @if (request()->filled('serving_selection'))<input type="hidden" name="serving_selection" value="{{ request('serving_selection') }}">@endif
             <input type="hidden" name="heatmap_selection" value="{{ request('heatmap_selection', '') }}" data-heatmap-selection-input>
             <input type="hidden" name="signal_quality_min" value="{{ request('signal_quality_min', 0) }}" data-heatmap-signal-quality-input>
             <input type="hidden" name="model_quality_min" value="{{ request('model_quality_min', 0) }}" data-heatmap-model-quality-input>
@@ -593,6 +631,10 @@
                     <form method="POST" action="{{ $qualitySetupMode ? route('setup.quality.labels.store') : route('setup.filter.saved.store') }}" class="relative isolate max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-teal-300/20 p-5 shadow-2xl" style="background: rgba(21, 36, 58, 0.90) !important; background-image: none !important; backdrop-filter: none !important;" @click.outside="saveOpen = false">
                         @csrf
                         @if (request('backtest_run'))<input type="hidden" name="backtest_run" value="{{ request('backtest_run') }}">@endif
+                        @if ($startedFromModels)
+                            <input type="hidden" name="return_to_models" value="1">
+                            @if($modelsReturnToken !== '')<input type="hidden" name="models_return_token" value="{{ $modelsReturnToken }}">@endif
+                        @endif
                         @if ($editingSavedFilter)<input type="hidden" name="saved_filter" value="{{ $editingSavedFilter->id }}">@endif
                         @foreach (\App\Http\Controllers\SavedPredictionFilterController::FILTER_KEYS as $filterKey)
                             @continue($qualitySetupMode && in_array($filterKey, ['score_min', 'confidence_min', 'drawdown_max', 'risk_max', 'profit_per_trade_min', 'median_return_min', 'profit_factor_min', 'volatility_max', 'predicted_return_min', 'hit_rate_min', 'minimum_trades', 'pe_max', 'dividend_yield_min', 'market_cap_min', 'revenue_growth_min'], true))
@@ -788,6 +830,7 @@
                     'indicator_matrix_stoch_min', 'indicator_matrix_stoch_max', 'indicator_matrix_macd_direction',
                     'indicator_probability_min', 'heatmap_selection', 'profit_factor_min',
                     'signal_quality_min', 'model_quality_min',
+                    'serving_selection',
                 ];
             @endphp
             @if (! $qualitySetupMode)
@@ -820,6 +863,7 @@
                 @if ($backtestIsActive)
                     <form method="POST" action="{{ route('setup.filter.backtest.cancel', $activeBacktestRun->public_id) }}" x-data="{ cancelling: false }" @submit="cancelling = true" class="shrink-0">
                         @csrf
+                        <input type="hidden" name="backtest_return_to" value="{{ $backtestOriginPath }}">
                         @if ($qualitySetupMode)<input type="hidden" name="quality_setup" value="1">@endif
                         @foreach ($backtestFilters as $filter)
                             @if (request()->filled($filter) || $filter === 'position_factor')
@@ -852,7 +896,7 @@
                                 <span class="rounded bg-slate-400/10 px-1.5 py-0.5 text-[8px]">{{ __('Premium') }}</span>
                             </button>
                         @endif
-                        <a href="{{ route($heatmapFilterRoute, array_merge(request()->except('backtest_run'), ['new_backtest' => 1])) }}" data-open-backtest-capital class="ak-backtest-recalculate-action inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 px-3 text-[10px] font-black uppercase tracking-[.06em] text-slate-300 hover:text-white">
+                        <a href="{{ route($heatmapFilterRoute, array_merge(request()->except(['backtest_run', 'show_result']), ['new_backtest' => 1, 'backtest_return_to' => $backtestOriginPath])) }}" data-open-backtest-capital class="ak-backtest-recalculate-action inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 px-3 text-[10px] font-black uppercase tracking-[.06em] text-slate-300 hover:text-white">
                             <x-heroicon-o-arrow-path class="h-4 w-4" />{{ __('Neu berechnen') }}
                         </a>
                         <button type="button" onclick="window.dispatchEvent(new CustomEvent('open-backtest-result'))" class="ak-backtest-primary-action inline-flex h-9 items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/12 px-4 text-[10px] font-black uppercase tracking-[.08em] text-amber-200 transition hover:bg-amber-300/20">
@@ -864,7 +908,7 @@
                         <button type="button" @click="wizardOpen = true" class="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-4 text-[10px] font-black uppercase tracking-[.08em] text-cyan-200 transition hover:bg-cyan-400/20">
                             <x-heroicon-o-map class="h-4 w-4" />{{ __('Strategie-Assistent') }}
                         </button>
-                        <a href="{{ route($heatmapFilterRoute, array_merge(request()->except('backtest_run'), ['new_backtest' => 1])) }}" data-open-backtest-capital class="ak-backtest-primary-action inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/12 px-4 text-[10px] font-black uppercase tracking-[.08em] text-amber-200 transition hover:bg-amber-300/20">
+                        <a href="{{ route($heatmapFilterRoute, array_merge(request()->except(['backtest_run', 'show_result']), ['new_backtest' => 1, 'backtest_return_to' => $backtestOriginPath])) }}" data-open-backtest-capital class="ak-backtest-primary-action inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/12 px-4 text-[10px] font-black uppercase tracking-[.08em] text-amber-200 transition hover:bg-amber-300/20">
                             <x-heroicon-o-play class="h-4 w-4" />
                             {{ __('Manuellen Backtest starten') }}
                         </a>
@@ -873,6 +917,7 @@
                     <div x-show="wizardOpen" x-cloak class="fixed inset-0 z-[10010] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md" @keydown.escape.window="wizardOpen = false">
                         <form method="POST" action="{{ route('setup.filter.backtest') }}" x-data="{ step: 1, submitting: false, score: 0, confidence: 0, trades: 1, profit: 0, drawdown: 100, expectedReturn: .5, allocation: Number({{ max(1, min(5, (int) request('position_factor', 1))) }}), scoreGrade(value) { const grades = ['5−', '5+', '4−', '4+', '3−', '3+', '2−', '2+', '1−', '1+']; return grades[Math.max(0, Math.min(9, Math.floor(Number(value) || 0)))]; } }" @submit="submitting = true" class="w-full max-w-2xl rounded-2xl border border-cyan-300/25 bg-[#15243a] p-5 shadow-2xl" @click.outside="wizardOpen = false">
                             @csrf
+                            <input type="hidden" name="backtest_return_to" value="{{ $backtestOriginPath }}">
                             @foreach ($backtestFilters as $filter)
                                 @continue(! in_array($filter, ['q','country','exchange','sector','ai_type','model','quality_tier','signal','gate_mode'], true))
                                 @if (request()->filled($filter))
@@ -963,6 +1008,7 @@
                     <div data-backtest-capital-modal x-show="capitalOpen" @unless(request()->boolean('new_backtest') || $errors->any()) x-cloak @endunless class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md" @keydown.escape.window="$dispatch('close-capital-modal')">
                         <form method="POST" action="{{ route('setup.filter.backtest') }}" x-data="{ submitting: false, entryStrategy: @js($modalEntryStrategy), exitStrategy: @js($modalExitStrategy), automaticComparison: @js(request()->boolean('automatic_strategy_comparison')), matrixUsage: @js(request('indicator_matrix_usage', 'off')), matrixPreset: @js(request('indicator_matrix_preset', 'manual')) }" @submit="submitting = true" class="ak-backtest-config-dialog max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-teal-300/20 bg-[#15243a] p-5 shadow-2xl" style="background-color:#15243a !important; opacity:1 !important;" @click.outside="$dispatch('close-capital-modal')">
                             @csrf
+                            <input type="hidden" name="backtest_return_to" value="{{ $backtestOriginPath }}">
                             @if ($errors->any())
                                 <div class="mb-4 rounded-xl border border-rose-300/25 bg-rose-400/[.08] px-4 py-3 text-xs font-bold text-rose-200">{{ $errors->first() }}</div>
                             @endif
@@ -988,9 +1034,15 @@
                                             <strong class="text-base font-black tabular-nums">{{ number_format((int) ($heatmapSummary->instruments ?? 0), 0, ',', '.') }}</strong>
                                             <span>{{ __('Aktien erfüllen die gewählten Kriterien') }}</span>
                                         </div>
+                                        @if(request()->filled('serving_selection'))
+                                            <div class="mt-2 flex items-start gap-2 rounded-lg border border-emerald-300/25 bg-emerald-400/[.08] px-3 py-2 text-[10px] font-bold leading-4 text-emerald-100">
+                                                <x-heroicon-o-lock-closed class="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                                                <span>{{ __('Modellauswahl gesperrt: Der Backtest verwendet ausschließlich die gefilterten Aktien-, Horizont- und Modellvarianten. Eine gespeicherte Strategie folgt nach einem Retrain automatisch dem jeweils aktiven Release.') }}</span>
+                                            </div>
+                                        @endif
                                     @endif
                                 </div>
-                                <a href="{{ route($heatmapFilterRoute, request()->except(['new_backtest', 'backtest_run'])) }}" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white" aria-label="{{ __('Schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></a>
+                                <a href="{{ $backtestOriginUrl }}" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white" aria-label="{{ __('Schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></a>
                             </div>
                             @if ($qualitySetupMode)
                                 <input type="hidden" name="max_positions" value="5">
@@ -1163,7 +1215,7 @@
                             </div>
                             @endif
                             <div class="mt-5 flex justify-end gap-2">
-                                <a href="{{ route($heatmapFilterRoute, request()->except(['new_backtest', 'backtest_run'])) }}" class="inline-flex h-10 items-center rounded-lg border border-white/10 px-4 text-xs font-bold text-slate-300">{{ __('Abbrechen') }}</a>
+                                <a href="{{ $backtestOriginUrl }}" class="inline-flex h-10 items-center rounded-lg border border-white/10 px-4 text-xs font-bold text-slate-300">{{ __('Abbrechen') }}</a>
                                 <button type="submit" formnovalidate :disabled="submitting" class="ak-backtest-submit-action inline-flex h-10 items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/15 px-5 text-xs font-black text-amber-200 hover:bg-amber-300/20 disabled:cursor-wait disabled:opacity-60">
                                     <span x-show="submitting" class="ak-backtest-spinner h-4 w-4" aria-hidden="true"></span>
                                     <x-heroicon-o-play x-show="!submitting" class="h-4 w-4" />
@@ -1931,8 +1983,8 @@
             $activeRunSettings = json_decode((string) ($activeBacktestRun->settings ?? '{}'), true) ?: [];
             $automaticComparisonActive = (bool) data_get($activeRunSettings, 'selection_filters.automatic_strategy_comparison', false);
         @endphp
-        <div x-data="{ open: @js(request()->boolean('show_result')) }" x-show="open" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" @open-backtest-result.window="open = true" @automatic-strategy-selected.window="open = false" @keydown.escape.window="if (!@js($automaticComparisonActive)) open = false">
-            <section class="ak-backtest-result-dialog w-full max-w-5xl rounded-2xl border border-teal-300/20 bg-[#15243a]/90 p-5 shadow-2xl" @click.outside="if (!@js($automaticComparisonActive)) open = false">
+        <div x-data="{ open: @js(request()->boolean('show_result')) }" x-show="open" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" @open-backtest-result.window="open = true" @automatic-strategy-selected.window="open = false" @keydown.escape.window="if (!@js($automaticComparisonActive)) window.location.assign(@js($backtestOriginUrl))">
+            <section class="ak-backtest-result-dialog w-full max-w-5xl rounded-2xl border border-teal-300/20 bg-[#15243a]/90 p-5 shadow-2xl" @click.outside="if (!@js($automaticComparisonActive)) window.location.assign(@js($backtestOriginUrl))">
                 <div id="filtered-backtest-result-loading" class="mb-4 flex items-center gap-3 rounded-xl border border-cyan-300/20 bg-cyan-400/[.06] px-4 py-3" role="status" aria-live="polite">
                     <span class="relative flex h-8 w-8 shrink-0 items-center justify-center">
                         <span class="absolute h-8 w-8 animate-ping rounded-full bg-cyan-300/15"></span>
@@ -1950,17 +2002,22 @@
                         <p class="mt-1 text-xs text-slate-300">{{ __('Strategie und S&P 500 starten mit demselben gewählten Kapital.') }}</p>
                     </div>
                     <div class="flex items-center gap-2">
+                        @if($startedFromModels)
+                            <a href="{{ route('setup.models', $modelsReturnParameters) }}" class="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300/25 bg-white/[.06] px-3 text-[10px] font-black uppercase tracking-wide text-slate-200 transition hover:bg-white/[.12]">
+                                <x-heroicon-o-arrow-left class="h-4 w-4" />{{ __('Zurück zur Modellauswahl') }}
+                            </a>
+                        @endif
                         @if (! $qualitySetupMode)
                         <a href="{{ route('setup.filter.backtest.report', $activeBacktestRun->public_id) }}" class="ak-backtest-report-link inline-flex h-9 items-center gap-2 rounded-lg border border-teal-300/20 bg-teal-400/10 px-3 text-[10px] font-black uppercase tracking-wide text-teal-200 hover:bg-teal-400/15">
                             <x-heroicon-o-arrow-down-tray class="h-4 w-4" />{{ __('PDF-Bericht') }}
                         </a>
                         @endif
-                        <button type="button" @click="open = false; window.dispatchEvent(new CustomEvent('cancel-backtest-result'))" class="inline-flex h-9 items-center gap-2 rounded-lg border border-rose-300/20 bg-rose-400/[.07] px-3 text-[10px] font-black uppercase tracking-wide text-rose-200 transition hover:bg-rose-400/15">
+                        <a href="{{ $backtestOriginUrl }}" onclick="window.dispatchEvent(new CustomEvent('cancel-backtest-result'))" class="inline-flex h-9 items-center gap-2 rounded-lg border border-rose-300/20 bg-rose-400/[.07] px-3 text-[10px] font-black uppercase tracking-wide text-rose-200 transition hover:bg-rose-400/15">
                             <x-heroicon-o-x-mark class="h-4 w-4" />{{ __('Abbrechen') }}
-                        </button>
-                        @unless ($automaticComparisonActive)<button type="button" @click="open = false" class="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white" aria-label="{{ __('Schließen') }}">
-                            <x-heroicon-o-x-mark class="h-5 w-5" />
-                        </button>@endunless
+                        </a>
+                        @unless ($automaticComparisonActive)
+                            <a href="{{ $backtestOriginUrl }}" class="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white" aria-label="{{ $startedFromModels ? __('Zurück zur Modellauswahl') : __('Schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></a>
+                        @endunless
                     </div>
                 </header>
 
@@ -1975,6 +2032,8 @@
                         [__('Hitrate'), '…', 'filtered-backtest-hit-rate'],
                         [__('Ø Profit je Trade (ATR · 3J WF)'), '…', 'filtered-backtest-profit-per-trade'],
                         [__('Max. Portfolio-Drawdown'), '…', 'filtered-backtest-drawdown'],
+                        [__('Ø Kapitalbindung'), '…', 'filtered-backtest-average-capital-binding'],
+                        [__('Max. Kapitalbindung'), '…', 'filtered-backtest-maximum-capital-binding'],
                     ] as $index => $metric)
                         @php [$label, $value, $metricId] = array_pad($metric, 3, ''); @endphp
                         <div class="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-white/[.08] bg-white/[.035] px-3 py-2">
@@ -2114,6 +2173,8 @@
                 const hitRate = document.querySelector('#filtered-backtest-hit-rate');
                 const profitPerTrade = document.querySelector('#filtered-backtest-profit-per-trade');
                 const drawdown = document.querySelector('#filtered-backtest-drawdown');
+                const averageCapitalBinding = document.querySelector('#filtered-backtest-average-capital-binding');
+                const maximumCapitalBinding = document.querySelector('#filtered-backtest-maximum-capital-binding');
                 const winnerTrades = document.querySelector('#filtered-backtest-winner-trades');
                 const loserTrades = document.querySelector('#filtered-backtest-loser-trades');
                 const averageGainFactor = document.querySelector('#filtered-backtest-average-gain-factor');
@@ -2139,6 +2200,8 @@
                 if (hitRate) hitRate.textContent = `${Number(result.hit_rate).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
                 if (profitPerTrade) profitPerTrade.textContent = `${Number(result.average_trade_return || 0) >= 0 ? '+' : ''}${Number(result.average_trade_return || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} ATR`;
                 if (drawdown) drawdown.textContent = `${Number(result.portfolio_max_drawdown || 0).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
+                if (averageCapitalBinding) averageCapitalBinding.textContent = `${Number(result.average_capital_binding || 0).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
+                if (maximumCapitalBinding) maximumCapitalBinding.textContent = `${Number(result.maximum_capital_binding || 0).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
                 if (winnerTrades) winnerTrades.textContent = Number(result.winner_trades || 0).toLocaleString('de-DE');
                 if (loserTrades) loserTrades.textContent = Number(result.loser_trades || 0).toLocaleString('de-DE');
                 if (averageGainFactor) averageGainFactor.textContent = result.average_gain_factor === null ? '∞' : Number(result.average_gain_factor).toLocaleString('de-DE', { maximumFractionDigits: 2 });

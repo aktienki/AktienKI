@@ -82,6 +82,15 @@ return [
         'watchlist_limit_free' => (int) env('AKTIENKI_WATCHLIST_LIMIT_FREE', 10),
     ],
 
+    'navigation' => [
+        // The prediction tables remain reachable by their direct routes, but
+        // are intentionally not advertised in the main navigation.
+        'show_tables_menu' => (bool) env('AKTIENKI_SHOW_TABLES_MENU', false),
+        // Account administration remains available by direct route for
+        // administrators while its top-level navigation entry stays hidden.
+        'show_accounts_menu' => (bool) env('AKTIENKI_SHOW_ACCOUNTS_MENU', false),
+    ],
+
     'twelve_data' => [
         'api_key' => env('TWELVE_DATA_API_KEY'),
         'base_url' => env('TWELVE_DATA_BASE_URL', 'https://api.twelvedata.com'),
