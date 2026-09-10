@@ -10,11 +10,16 @@ final class StockPanelSectorDonutTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $controller = (string) file_get_contents($root.'/app/Http/Controllers/StockController.php');
+        $servingAdapter = (string) file_get_contents($root.'/app/Services/ServingStockLegacyViewService.php');
 
         $this->assertStringContainsString('$this->panelSectorSnapshot($instrument)', $controller);
         $this->assertStringContainsString("->where('peer.sector', (string) \$instrument->sector)", $controller);
         $this->assertStringContainsString("->pluck('panel.raw_score')", $controller);
         $this->assertStringContainsString("'panelSector',", $controller);
+        $this->assertStringContainsString('$panelInstrument = $this->panelInstrument($instrument)', $servingAdapter);
+        $this->assertStringContainsString("->orWhereRaw('UPPER(provider_symbol) = ?'", $servingAdapter);
+        $this->assertStringContainsString("'panelSector' => \$panelSector", $servingAdapter);
+        $this->assertStringContainsString('panel_universe.as_of_date = stock_panel.as_of_date', $servingAdapter);
     }
 
     public function test_stock_details_render_panel_sector_as_third_donut(): void
@@ -27,16 +32,20 @@ final class StockPanelSectorDonutTest extends TestCase
         $this->assertStringContainsString('grid-template-columns: minmax(210px, 235px)', $view);
     }
 
-    public function test_historical_panel_score_uses_its_own_indicator_chart(): void
+    public function test_panel_score_and_prediction_are_integrated_into_the_main_chart(): void
     {
         $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/stocks/show.blade.php');
 
-        $this->assertStringContainsString('id="stock-panel-history-panel"', $view);
-        $this->assertStringContainsString('id="stock-detail-panel-history"', $view);
-        $this->assertStringContainsString('const panelHistoryOptions = () =>', $view);
-        $this->assertStringContainsString("series: [{ name: 'Panel', data: panelHistoryData() }]", $view);
-        $this->assertStringContainsString("formatter: value => `D\${Math.round(value)}`", $view);
-        $this->assertStringNotContainsString("panelAxisTitle.textContent = 'PANEL'", $view);
-        $this->assertStringNotContainsString('const visiblePanelScores = historicalPanelScores', $view);
+        $this->assertStringNotContainsString('id="stock-panel-history-panel"', $view);
+        $this->assertStringNotContainsString('id="stock-detail-panel-history"', $view);
+        $this->assertStringContainsString('const visiblePanelScores = panelPoints.filter', $view);
+        $this->assertStringContainsString("label.textContent = `PANEL D\${score}`", $view);
+        $this->assertStringContainsString('const forecastEnd = addTradingDays(latestPanel.x, 20)', $view);
+        $this->assertStringContainsString('PANEL 20T · D', $view);
+        $this->assertStringContainsString('latestPanel.predictionPercent', $view);
+
+        $controller = (string) file_get_contents(dirname(__DIR__, 2).'/app/Http/Controllers/StockController.php');
+        $this->assertStringContainsString("->get(['as_of_date', 'raw_score', 'xsec_pctile', 'decile'])", $controller);
+        $this->assertStringContainsString("'prediction_percent' => is_numeric(\$row->raw_score)", $controller);
     }
 }

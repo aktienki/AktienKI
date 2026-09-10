@@ -1586,15 +1586,6 @@
                         <svg id="stock-indicator-overlay" class="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible" aria-hidden="true"></svg>
                         <div id="stock-chart-zoom-selection" class="pointer-events-none absolute bottom-8 top-4 z-20 hidden rounded border border-cyan-300 bg-cyan-300/10 shadow-[0_0_12px_rgba(34,211,238,.22)]" aria-hidden="true"></div>
                     </div>
-                    @if (($historicalPanelScores ?? collect())->isNotEmpty())
-                        <div id="stock-panel-history-panel" class="mt-2 shrink-0 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-transparent px-2 pb-1 pt-1.5">
-                            <div class="flex items-center justify-between px-1">
-                                <span class="text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Panel · historisches Dezil') }}</span>
-                                <span id="stock-panel-history-value" class="text-[10px] font-black text-amber-600 dark:text-amber-400">—</span>
-                            </div>
-                            <div id="stock-detail-panel-history" class="h-20 min-w-0" aria-label="{{ __('Historischer Panelwert') }} {{ $instrument->symbol }}"></div>
-                        </div>
-                    @endif
                     <div id="stock-rsi-panel" class="mt-2 hidden shrink-0 overflow-hidden rounded-xl border border-[var(--ak-border)] bg-transparent px-2 pb-1 pt-1.5">
                         <div class="flex items-center justify-between px-1">
                             <span class="text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">RSI 14</span>
@@ -3504,8 +3495,6 @@
                 const dataUrl = @json($chartDataUrl);
                 const updatedElement = document.querySelector('#stock-chart-updated');
                 const changeElement = document.querySelector('#stock-chart-change');
-                const panelHistoryElement = document.querySelector('#stock-detail-panel-history');
-                const panelHistoryValueElement = document.querySelector('#stock-panel-history-value');
                 const rsiElement = document.querySelector('#stock-detail-rsi');
                 const rsiPanel = document.querySelector('#stock-rsi-panel');
                 const rsiValueElement = document.querySelector('#stock-rsi-value');
@@ -3521,7 +3510,6 @@
                 const canUseChartIndicators = @json($canUseChartIndicators);
                 const canUseChartZoom = @json($canUseChartZoom);
                 let chart;
-                let panelHistoryChart;
                 let rsiChart;
                 const secondaryCharts = new Map();
                 let currentCandles = initialCandles;
@@ -4064,103 +4052,14 @@
                 };
 
                 const panelHistoryData = () => historicalPanelScores
-                    .map(point => ({ x: new Date(point.x).getTime(), y: Number(point.y) }))
+                    .map(point => ({
+                        x: new Date(point.x).getTime(),
+                        y: Number(point.y),
+                        predictionPercent: point.prediction_percent === null || point.prediction_percent === undefined
+                            ? null
+                            : Number(point.prediction_percent),
+                    }))
                     .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
-
-                const panelHistoryOptions = () => {
-                    const light = document.documentElement.dataset.theme === 'light';
-                    const range = chartTimeRange();
-
-                    return {
-                        chart: {
-                            type: 'area',
-                            height: 80,
-                            background: 'transparent',
-                            toolbar: { show: false },
-                            zoom: { enabled: false, allowMouseWheelZoom: false },
-                            selection: { enabled: false },
-                            pan: { enabled: false },
-                            animations: { enabled: true, speed: 250 },
-                            parentHeightOffset: 0,
-                        },
-                        series: [{ name: 'Panel', data: panelHistoryData() }],
-                        colors: [light ? '#b45309' : '#f59e0b'],
-                        stroke: { width: 2, curve: 'smooth' },
-                        fill: {
-                            type: 'gradient',
-                            gradient: { shadeIntensity: 0.15, opacityFrom: 0.2, opacityTo: 0.02, stops: [0, 100] },
-                        },
-                        markers: { size: 0 },
-                        dataLabels: { enabled: false },
-                        states: {
-                            hover: { filter: { type: 'none' } },
-                            active: { filter: { type: 'none' } },
-                        },
-                        grid: {
-                            borderColor: light ? 'rgba(51,65,85,.12)' : 'rgba(148,163,184,.09)',
-                            strokeDashArray: 4,
-                            padding: { top: -7, right: 8, bottom: -10, left: 2 },
-                        },
-                        annotations: {
-                            yaxis: [{
-                                y: 5,
-                                borderColor: light ? 'rgba(100,116,139,.38)' : 'rgba(148,163,184,.32)',
-                                strokeDashArray: 4,
-                            }],
-                        },
-                        xaxis: {
-                            type: 'datetime',
-                            min: range.min,
-                            max: range.max,
-                            labels: { show: false },
-                            axisBorder: { show: false },
-                            axisTicks: { show: false },
-                            tooltip: { enabled: false },
-                        },
-                        yaxis: {
-                            min: 0,
-                            max: 10,
-                            tickAmount: 5,
-                            opposite: true,
-                            labels: {
-                                formatter: value => `D${Math.round(value)}`,
-                                style: { colors: [light ? '#92400e' : '#fbbf24'], fontSize: '9px', fontWeight: 700 },
-                            },
-                        },
-                        tooltip: {
-                            theme: light ? 'light' : 'dark',
-                            x: { format: 'dd.MM.yyyy' },
-                            y: {
-                                formatter: value => Number.isFinite(Number(value))
-                                    ? `Panel D${Number(value).toFixed(1).replace('.', ',')}`
-                                    : '—',
-                            },
-                        },
-                        theme: { mode: light ? 'light' : 'dark' },
-                    };
-                };
-
-                const updatePanelHistoryValue = () => {
-                    if (!panelHistoryValueElement) return;
-                    const range = chartTimeRange();
-                    const latestPanel = panelHistoryData()
-                        .filter(point => point.x >= range.min && point.x <= range.max)
-                        .at(-1)?.y;
-                    panelHistoryValueElement.textContent = Number.isFinite(latestPanel)
-                        ? `D${Number(latestPanel).toFixed(1).replace('.', ',')}`
-                        : '—';
-                };
-
-                const renderPanelHistoryChart = async () => {
-                    if (!panelHistoryElement) return;
-                    if (!panelHistoryChart) {
-                        panelHistoryChart = new window.ApexCharts(panelHistoryElement, panelHistoryOptions());
-                        await panelHistoryChart.render();
-                    } else {
-                        await panelHistoryChart.updateOptions(panelHistoryOptions(), false, true);
-                    }
-                    updatePanelHistoryValue();
-                };
 
                 const updateRsiValue = () => {
                     if (!rsiValueElement) return;
@@ -4780,13 +4679,14 @@
                         .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y)
                             && point.x >= timeRange.min && point.x <= timeRange.max);
                     if (visibleAiScores.length >= 2) {
+                        const aiColor = light ? '#6d5f86' : '#c4b5fd';
                         const toAiY = score => top + plotHeight - (Math.max(0, Math.min(10, score)) / 10) * plotHeight;
                         const aiPath = svgNode('path', {
                             d: visibleAiScores.map((point, index) =>
                                 `${index === 0 ? 'M' : 'L'} ${toX(point.x).toFixed(2)} ${toAiY(point.y).toFixed(2)}`
                             ).join(' '),
                             fill: 'none',
-                            stroke: '#f59e0b',
+                            stroke: aiColor,
                             'stroke-width': '2',
                             'stroke-linecap': 'round',
                             'stroke-linejoin': 'round',
@@ -4799,7 +4699,7 @@
                             const label = svgNode('text', {
                                 x: left + 4,
                                 y: toAiY(score) + (score === 10 ? 10 : (score === 0 ? -4 : 3)),
-                                fill: '#f59e0b',
+                                fill: aiColor,
                                 'fill-opacity': '.72',
                                 'font-size': '8',
                                 'font-weight': '700',
@@ -4808,6 +4708,88 @@
                             label.textContent = `KI ${score}`;
                             svg.appendChild(label);
                         });
+                    }
+
+                    const panelColor = light ? '#b45309' : '#fbbf24';
+                    const toPanelY = score => top + plotHeight - (Math.max(0, Math.min(10, score)) / 10) * plotHeight;
+                    const panelPoints = panelHistoryData();
+                    const visiblePanelScores = panelPoints.filter(point =>
+                        point.x >= timeRange.min && point.x <= timeRange.max
+                    );
+                    if (visiblePanelScores.length >= 2) {
+                        svg.appendChild(svgNode('path', {
+                            d: visiblePanelScores.map((point, index) =>
+                                `${index === 0 ? 'M' : 'L'} ${toX(point.x).toFixed(2)} ${toPanelY(point.y).toFixed(2)}`
+                            ).join(' '),
+                            fill: 'none',
+                            stroke: panelColor,
+                            'stroke-width': '2.2',
+                            'stroke-linecap': 'round',
+                            'stroke-linejoin': 'round',
+                            'stroke-opacity': '.9',
+                            'vector-effect': 'non-scaling-stroke',
+                        }));
+                    }
+                    if (panelPoints.length) {
+                        [10, 5, 0].forEach(score => {
+                            const label = svgNode('text', {
+                                x: left + plotWidth - 4,
+                                y: toPanelY(score) + (score === 10 ? 10 : (score === 0 ? -4 : 3)),
+                                fill: panelColor,
+                                'fill-opacity': '.82',
+                                'font-size': '8',
+                                'font-weight': '800',
+                                'text-anchor': 'end',
+                                'font-family': 'inherit',
+                            });
+                            label.textContent = `PANEL D${score}`;
+                            svg.appendChild(label);
+                        });
+
+                        const forecastTimestamp = new Date(forecastOrigin()?.x).getTime();
+                        const latestPanel = panelPoints
+                            .filter(point => !Number.isFinite(forecastTimestamp) || point.x <= forecastTimestamp)
+                            .at(-1);
+                        if (latestPanel) {
+                            const forecastEnd = addTradingDays(latestPanel.x, 20);
+                            const startX = toX(Math.max(timeRange.min, latestPanel.x));
+                            const endX = toX(Math.min(timeRange.max, forecastEnd));
+                            const panelY = toPanelY(latestPanel.y);
+                            if (endX > startX && forecastEnd >= timeRange.min) {
+                                svg.appendChild(svgNode('line', {
+                                    x1: startX, x2: endX, y1: panelY, y2: panelY,
+                                    stroke: panelColor,
+                                    'stroke-width': '2',
+                                    'stroke-dasharray': '5 4',
+                                    'stroke-opacity': '.95',
+                                    'vector-effect': 'non-scaling-stroke',
+                                }));
+                                svg.appendChild(svgNode('circle', {
+                                    cx: endX, cy: panelY, r: '3.5',
+                                    fill: light ? '#fff' : '#0f172a',
+                                    stroke: panelColor, 'stroke-width': '2',
+                                }));
+                                const relativePrediction = Number.isFinite(latestPanel.predictionPercent)
+                                    ? ` · ${latestPanel.predictionPercent >= 0 ? '+' : ''}${latestPanel.predictionPercent.toFixed(1).replace('.', ',')} % rel.`
+                                    : '';
+                                const labelText = `PANEL 20T · D${latestPanel.y.toFixed(1).replace('.', ',')}${relativePrediction}`;
+                                const labelWidth = relativePrediction ? 142 : 88;
+                                const labelX = Math.max(left, Math.min(left + plotWidth - labelWidth, endX - labelWidth));
+                                const labelY = panelY < top + 22 ? panelY + 8 : panelY - 18;
+                                svg.appendChild(svgNode('rect', {
+                                    x: labelX, y: labelY, width: labelWidth, height: 15, rx: '5',
+                                    fill: panelColor, 'fill-opacity': light ? '.12' : '.18',
+                                    stroke: panelColor, 'stroke-opacity': '.7',
+                                }));
+                                const label = svgNode('text', {
+                                    x: labelX + labelWidth / 2, y: labelY + 10.5,
+                                    fill: panelColor, 'font-size': '8', 'font-weight': '850',
+                                    'text-anchor': 'middle', 'font-family': 'inherit',
+                                });
+                                label.textContent = labelText;
+                                svg.appendChild(label);
+                            }
+                        }
                     }
 
                     const signalColors = {
@@ -4928,7 +4910,6 @@
 
                 const rerenderAllCharts = async () => {
                     renderMainChart();
-                    await renderPanelHistoryChart();
                     if (activeIndicators.has('rsi') && rsiElement && !rsiChart) {
                         rsiChart = new window.ApexCharts(rsiElement, rsiOptions());
                         await rsiChart.render();
@@ -5067,7 +5048,6 @@
                 document.addEventListener('webkitfullscreenchange', syncFullscreenButton);
 
                 renderMainChart();
-                renderPanelHistoryChart();
                 if (indicatorOverlay && window.ResizeObserver) {
                     new ResizeObserver(() => renderMainChart()).observe(element);
                 }
@@ -5263,7 +5243,6 @@
                             chartPatterns = nextChartPatterns;
                             watchlistEntry = payload.watchlist_entry || null;
                             renderMainChart();
-                            await renderPanelHistoryChart();
                             if (rsiChart) {
                                 await rsiChart.updateOptions(rsiOptions(), false, true);
                                 updateRsiValue();

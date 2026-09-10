@@ -1368,18 +1368,23 @@ class StockController extends Controller
 
         return Cache::remember('stocks.panel-sector.v1.'.(int) $instrument->id, now()->addMinutes(5), function () use ($instrument, $empty): array {
             try {
-                $panelVersion = 'panel-price-risk-freeze-2026-09-07';
+                $panelVersion = $this->panelModelVersion((int) $instrument->id);
+                if (! $panelVersion) {
+                    return $empty;
+                }
                 $peakCount = (int) DB::table('panel_predictions')
                     ->where('model_version', $panelVersion)
                     ->groupBy('as_of_date')
                     ->orderByDesc(DB::raw('count(*)'))
                     ->value(DB::raw('count(*)'));
-                $panelAsOf = DB::table('panel_predictions')
-                    ->where('model_version', $panelVersion)
-                    ->groupBy('as_of_date')
-                    ->havingRaw('count(*) >= ?', [max(50, (int) ($peakCount * 0.85))])
-                    ->orderByDesc('as_of_date')
-                    ->value('as_of_date');
+                $panelAsOf = DB::table('panel_predictions as stock_panel')
+                    ->where('stock_panel.model_version', $panelVersion)
+                    ->where('stock_panel.instrument_id', (int) $instrument->id)
+                    ->whereRaw('(SELECT count(*) FROM panel_predictions AS panel_universe WHERE panel_universe.model_version = stock_panel.model_version AND panel_universe.as_of_date = stock_panel.as_of_date) >= ?', [
+                        max(50, (int) ($peakCount * 0.85)),
+                    ])
+                    ->orderByDesc('stock_panel.as_of_date')
+                    ->value('stock_panel.as_of_date');
 
                 if (! $panelAsOf) {
                     return $empty;
@@ -1430,7 +1435,7 @@ class StockController extends Controller
         });
     }
 
-    /** @return \Illuminate\Support\Collection<int, array{x:int,y:float}> */
+    /** @return \Illuminate\Support\Collection<int, array{x:int,y:float,prediction_percent:?float}> */
     private function panelChartHistory(int $instrumentId, array $chartPoints): \Illuminate\Support\Collection
     {
         if (! Schema::hasTable('panel_predictions') || $chartPoints === []) {
@@ -1447,15 +1452,18 @@ class StockController extends Controller
         if ($timestamps->isEmpty()) return collect();
 
         try {
+            $panelVersion = $this->panelModelVersion($instrumentId);
+            if (! $panelVersion) return collect();
+
             return DB::table('panel_predictions')
-                ->where('model_version', 'panel-price-risk-freeze-2026-09-07')
+                ->where('model_version', $panelVersion)
                 ->where('instrument_id', $instrumentId)
                 ->whereBetween('as_of_date', [
                     CarbonImmutable::createFromTimestamp((int) $timestamps->min())->toDateString(),
                     CarbonImmutable::createFromTimestamp((int) $timestamps->max())->toDateString(),
                 ])
                 ->orderBy('as_of_date')
-                ->get(['as_of_date', 'xsec_pctile', 'decile'])
+                ->get(['as_of_date', 'raw_score', 'xsec_pctile', 'decile'])
                 ->map(function (object $row): array {
                     $score = is_numeric($row->xsec_pctile)
                         ? (float) $row->xsec_pctile * 10
@@ -1464,11 +1472,23 @@ class StockController extends Controller
                     return [
                         'x' => CarbonImmutable::parse($row->as_of_date)->getTimestampMs(),
                         'y' => max(0.0, min(10.0, $score)),
+                        'prediction_percent' => is_numeric($row->raw_score) ? (float) $row->raw_score * 100 : null,
                     ];
                 });
         } catch (Throwable) {
             return collect();
         }
+    }
+
+    private function panelModelVersion(int $instrumentId): ?string
+    {
+        $version = DB::table('panel_predictions')
+            ->where('instrument_id', $instrumentId)
+            ->orderByDesc('as_of_date')
+            ->orderByDesc('updated_at')
+            ->value('model_version');
+
+        return filled($version) ? (string) $version : null;
     }
 
     public function liveQuote(Request $request, string $symbol, PlanAccessService $planAccess, TwelveDataService $marketData): JsonResponse

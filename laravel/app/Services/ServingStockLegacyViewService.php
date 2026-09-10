@@ -88,6 +88,7 @@ final class ServingStockLegacyViewService
             'german_listing_exchange' => $stock->german_listing_exchange ?? null,
             'german_listing_currency' => $stock->german_listing_currency ?? null,
         ];
+        $panelInstrument = $this->panelInstrument($instrument);
 
         $prediction = $primaryPrediction ? (object) [
             'id' => $stock->latest_prediction?->id,
@@ -224,7 +225,10 @@ final class ServingStockLegacyViewService
             ];
         })->values();
         $chartPatternData = $this->chartPatternData($chartCandles);
-        $historicalPanelScores = $this->panelChartHistory((int) $stock->instrument_id, $chartCandles);
+        $historicalPanelScores = $panelInstrument
+            ? $this->panelChartHistory((int) $panelInstrument->id, $chartCandles)
+            : collect();
+        $panelSector = $this->panelSectorSnapshot($panelInstrument, (string) $instrument->sector);
 
         $fundamental = (object) [
             'snapshot_date' => $stock->fundamental_snapshot_date ?? null,
@@ -358,6 +362,7 @@ final class ServingStockLegacyViewService
             'stockNewsCount' => 0,
             'stockEtfs' => collect(),
             'linkedSecurities' => collect(),
+            'panelSector' => $panelSector,
             'canViewRealtime' => true,
             'canUseChartIndicators' => true,
             'canViewChartPatterns' => true,
@@ -373,6 +378,113 @@ final class ServingStockLegacyViewService
             'servingReleaseId' => (string) $stock->release_id,
             'canViewModelOverview' => true,
         ];
+    }
+
+    private function panelInstrument(object $instrument): ?object
+    {
+        if (! Schema::hasTable('instruments')) {
+            return null;
+        }
+
+        $providerSymbol = strtoupper(trim((string) ($instrument->provider_symbol ?? '')));
+        $symbol = strtoupper(trim((string) ($instrument->symbol ?? '')));
+        $germanListingSymbol = strtoupper(trim((string) ($instrument->german_listing_symbol ?? '')));
+
+        return DB::table('instruments')
+            ->whereNull('deleted_at')
+            ->where('type', 'stock')
+            ->where(function ($query) use ($providerSymbol, $symbol, $germanListingSymbol): void {
+                if ($providerSymbol !== '') {
+                    $query->orWhereRaw('UPPER(provider_symbol) = ?', [$providerSymbol]);
+                }
+                if ($symbol !== '') {
+                    $query->orWhereRaw('UPPER(symbol) = ?', [$symbol]);
+                }
+                if ($germanListingSymbol !== '') {
+                    $query->orWhereRaw('UPPER(german_listing_symbol) = ?', [$germanListingSymbol]);
+                }
+            })
+            ->orderByRaw('CASE WHEN UPPER(provider_symbol) = ? THEN 0 WHEN UPPER(symbol) = ? THEN 1 ELSE 2 END', [
+                $providerSymbol,
+                $symbol,
+            ])
+            ->first(['id', 'sector']);
+    }
+
+    private function panelSectorSnapshot(?object $panelInstrument, string $fallbackSector): array
+    {
+        $sector = filled($panelInstrument?->sector ?? null) ? (string) $panelInstrument->sector : $fallbackSector;
+        $empty = ['percentile' => null, 'decile' => null, 'sector' => $sector, 'as_of' => null, 'peer_count' => 0];
+
+        if (! $panelInstrument || ! Schema::hasTable('panel_predictions') || ! filled($sector)) {
+            return $empty;
+        }
+
+        return Cache::remember('stocks.panel-sector.v2.'.(int) $panelInstrument->id, now()->addMinutes(5), function () use ($panelInstrument, $sector, $empty): array {
+            try {
+                $panelVersion = $this->panelModelVersion((int) $panelInstrument->id);
+                if (! $panelVersion) {
+                    return $empty;
+                }
+                $peakCount = (int) DB::table('panel_predictions')
+                    ->where('model_version', $panelVersion)
+                    ->groupBy('as_of_date')
+                    ->orderByDesc(DB::raw('count(*)'))
+                    ->value(DB::raw('count(*)'));
+                $panelAsOf = DB::table('panel_predictions as stock_panel')
+                    ->where('stock_panel.model_version', $panelVersion)
+                    ->where('stock_panel.instrument_id', (int) $panelInstrument->id)
+                    ->whereRaw('(SELECT count(*) FROM panel_predictions AS panel_universe WHERE panel_universe.model_version = stock_panel.model_version AND panel_universe.as_of_date = stock_panel.as_of_date) >= ?', [
+                        max(50, (int) ($peakCount * 0.85)),
+                    ])
+                    ->orderByDesc('stock_panel.as_of_date')
+                    ->value('stock_panel.as_of_date');
+
+                if (! $panelAsOf) {
+                    return $empty;
+                }
+
+                $stockScore = DB::table('panel_predictions')
+                    ->where('model_version', $panelVersion)
+                    ->where('as_of_date', $panelAsOf)
+                    ->where('instrument_id', (int) $panelInstrument->id)
+                    ->value('raw_score');
+                if (! is_numeric($stockScore)) {
+                    return $empty;
+                }
+
+                $sectorScores = DB::table('panel_predictions as panel')
+                    ->join('instruments as peer', 'peer.id', '=', 'panel.instrument_id')
+                    ->where('panel.model_version', $panelVersion)
+                    ->where('panel.as_of_date', $panelAsOf)
+                    ->whereRaw('LOWER(peer.sector) = LOWER(?)', [$sector])
+                    ->whereNotNull('panel.raw_score')
+                    ->pluck('panel.raw_score')
+                    ->map(fn ($score): float => (float) $score);
+                $peerCount = $sectorScores->count();
+                if ($peerCount === 0) {
+                    return $empty;
+                }
+
+                $score = (float) $stockScore;
+                $below = $sectorScores->filter(fn (float $peerScore): bool => $peerScore < $score)->count();
+                $equal = $sectorScores->filter(fn (float $peerScore): bool => abs($peerScore - $score) < 0.0000001)->count();
+                $percentile = $peerCount === 1
+                    ? 100.0
+                    : (($below + max(0, $equal - 1) / 2) / ($peerCount - 1)) * 100;
+                $percentile = round(max(0, min(100, $percentile)), 1);
+
+                return [
+                    'percentile' => $percentile,
+                    'decile' => max(1, min(10, (int) ceil(max(0.1, $percentile) / 10))),
+                    'sector' => $sector,
+                    'as_of' => $panelAsOf,
+                    'peer_count' => $peerCount,
+                ];
+            } catch (\Throwable) {
+                return $empty;
+            }
+        });
     }
 
     /** @return array{recent: array<int, array<string, mixed>>, statistics: array<int, array<string, mixed>>} */
@@ -679,7 +791,7 @@ final class ServingStockLegacyViewService
         return is_numeric($value) ? (float) $value : null;
     }
 
-    /** @return Collection<int, array{x:int,y:float}> */
+    /** @return Collection<int, array{x:int,y:float,prediction_percent:?float}> */
     private function panelChartHistory(int $instrumentId, Collection $candles): Collection
     {
         if (! Schema::hasTable('panel_predictions') || $candles->isEmpty()) {
@@ -690,15 +802,18 @@ final class ServingStockLegacyViewService
         if ($timestamps->isEmpty()) return collect();
 
         try {
+            $panelVersion = $this->panelModelVersion($instrumentId);
+            if (! $panelVersion) return collect();
+
             return DB::table('panel_predictions')
-                ->where('model_version', 'panel-price-risk-freeze-2026-09-07')
+                ->where('model_version', $panelVersion)
                 ->where('instrument_id', $instrumentId)
                 ->whereBetween('as_of_date', [
                     CarbonImmutable::createFromTimestampMs((int) $timestamps->min())->toDateString(),
                     CarbonImmutable::createFromTimestampMs((int) $timestamps->max())->toDateString(),
                 ])
                 ->orderBy('as_of_date')
-                ->get(['as_of_date', 'xsec_pctile', 'decile'])
+                ->get(['as_of_date', 'raw_score', 'xsec_pctile', 'decile'])
                 ->map(function (object $row): array {
                     $score = is_numeric($row->xsec_pctile)
                         ? (float) $row->xsec_pctile * 10
@@ -707,11 +822,23 @@ final class ServingStockLegacyViewService
                     return [
                         'x' => CarbonImmutable::parse($row->as_of_date)->getTimestampMs(),
                         'y' => max(0.0, min(10.0, $score)),
+                        'prediction_percent' => is_numeric($row->raw_score) ? (float) $row->raw_score * 100 : null,
                     ];
                 });
         } catch (\Throwable) {
             return collect();
         }
+    }
+
+    private function panelModelVersion(int $instrumentId): ?string
+    {
+        $version = DB::table('panel_predictions')
+            ->where('instrument_id', $instrumentId)
+            ->orderByDesc('as_of_date')
+            ->orderByDesc('updated_at')
+            ->value('model_version');
+
+        return filled($version) ? (string) $version : null;
     }
 
     private function currentPrice(?array $prediction, object $stock): ?float

@@ -1,11 +1,14 @@
 @props(['score' => 0, 'display' => null, 'level' => null, 'type' => 'chance', 'label' => null])
 @php
     $value = max(0, min(100, (float) $score));
-    $activeLevel = $level !== null
+    $gradeLevel = $level !== null
         ? max(0, min(5, (int) $level))
         : ($value > 0 ? max(1, min(5, (int) ceil($value / 20))) : 0);
+    $activeLevel = $type === 'risk' && $gradeLevel > 0
+        ? 6 - $gradeLevel
+        : $gradeLevel;
     $palette = $type === 'risk'
-        ? ['#35b779', '#8fca45', '#e1be32', '#ed8a32', '#df4d5f']
+        ? ['#df4d5f', '#ed8a32', '#e1be32', '#8fca45', '#35b779']
         : ['#df4d5f', '#ed8a32', '#e1be32', '#8fca45', '#35b779'];
 @endphp
 <div class="segmented-score" role="meter" aria-label="{{ $label ?: ucfirst($type) }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($value, 1, '.', '') }}">
