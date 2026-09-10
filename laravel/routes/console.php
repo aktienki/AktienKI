@@ -197,4 +197,18 @@ if (config('aktienki.python_engine.server_predictions_enabled', false)) {
         ->withoutOverlapping(180)
         ->onOneServer()
         ->runInBackground();
+
+    // Safety net for serving_current_stock_signals_materialized: the serving
+    // publish normally fires the refresh trigger, but a bulk load without a
+    // status transition would leave the dashboard snapshot stale. Runs after
+    // the morning finalize and after each cash-session batch.
+    foreach (['07:15', '19:00', '23:55'] as $refreshAt) {
+        Schedule::command('serving:refresh-signal-matview')
+            ->weekdays()
+            ->dailyAt($refreshAt)
+            ->timezone('Europe/Berlin')
+            ->withoutOverlapping(30)
+            ->onOneServer()
+            ->runInBackground();
+    }
 }
