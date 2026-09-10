@@ -300,25 +300,17 @@
                                 <x-heroicon-o-bookmark-square class="h-5 w-5 text-amber-400" />
                                 {{ __('Strategie Manager') }}
                             </a>
-                            {{-- Auf localhost vorerst ausgeblendet, solange die Serving-Pipeline steht. --}}
-                            @unless(app()->isLocal())
-                                @if($canUseStrategies)
-                                    <a href="{{ route('setup.models') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-slate-500/10 hover:text-slate-700">
-                                        <x-heroicon-o-cpu-chip class="h-5 w-5 text-slate-600" />
-                                        {{ __('Modelle & Predictions') }}
-                                    </a>
-                                    <a href="{{ route('setup.models') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-slate-500/10 hover:text-slate-700">
-                                        <x-heroicon-o-cpu-chip class="h-5 w-5 text-slate-600" />
-                                        {{ __('Modellübersicht') }}
-                                    </a>
-                                @else
-                                    <span class="{{ $lockedMenuClass }}" title="{{ __('Ab Pro verfügbar') }}">
-                                        <x-heroicon-o-cpu-chip class="h-5 w-5" />{{ __('Modelle & Predictions') }}
-                                        <small class="ml-auto text-[8px] font-black">PRO</small>
-                                    </span>
-                                    <span class="{{ $lockedMenuClass }}"><x-heroicon-o-cpu-chip class="h-5 w-5" />{{ __('Modellübersicht') }} <small class="ml-auto">PRO</small></span>
-                                @endif
-                            @endunless
+                            @if($canUseStrategies)
+                                <a href="{{ route('setup.models') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-slate-500/10 hover:text-slate-700">
+                                    <x-heroicon-o-cpu-chip class="h-5 w-5 text-slate-600" />
+                                    {{ __('Modelle') }}
+                                </a>
+                            @else
+                                <span class="{{ $lockedMenuClass }}" title="{{ __('Ab Pro verfügbar') }}">
+                                    <x-heroicon-o-cpu-chip class="h-5 w-5" />{{ __('Modelle') }}
+                                    <small class="ml-auto text-[8px] font-black">PRO</small>
+                                </span>
+                            @endif
                         </div>
                     </template>
                 </div>
