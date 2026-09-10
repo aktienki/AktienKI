@@ -162,8 +162,8 @@
             </section>
 
             <section class="ak-card overflow-hidden border-cyan-400/25">
-                <div class="overflow-x-auto">
-                    <table class="w-full table-fixed border-collapse text-left" style="min-width:1180px">
+                <div class="serving-model-scroll overflow-auto" style="max-height:75vh">
+                    <table class="serving-model-table w-full table-fixed border-collapse text-left" style="min-width:1180px">
                         <colgroup>
                             <col style="width:220px">
                             <col style="width:120px">
@@ -280,6 +280,19 @@
                     </table>
                 </div>
             </section>
+            @once
+                <style>
+                    .serving-model-scroll { -webkit-overflow-scrolling: touch; }
+                    @media (min-width: 1024px) { .serving-model-scroll { max-height: none; } }
+                    /* Fixed first column + fixed header while the rest scrolls horizontally. */
+                    .serving-model-table thead th,
+                    .serving-model-table tbody td:first-child { background: var(--ak-surface); }
+                    .serving-model-table thead th { position: sticky; top: 0; z-index: 20; box-shadow: inset 0 -1px 0 var(--ak-border); }
+                    .serving-model-table :is(thead, tbody) :is(th, td):first-child { position: sticky; left: 0; box-shadow: inset -1px 0 0 var(--ak-border); }
+                    .serving-model-table tbody td:first-child { z-index: 10; }
+                    .serving-model-table thead th:first-child { z-index: 30; }
+                </style>
+            @endonce
             <div class="mt-5">{{ $stocks->links() }}</div>
             <p class="mt-3 text-[9px] text-[var(--ak-muted)]">Quelle: aktienki_serving_next · kein Fallback auf die alte Predictions-Tabelle.</p>
         </div>
