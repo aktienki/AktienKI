@@ -68,6 +68,22 @@
             </video>
         </div>
     </section>
+    <section class="mt-6 overflow-hidden rounded-[2rem] border border-cyan-400/25 bg-[var(--ak-card)] shadow-xl">
+        <div class="flex flex-col gap-3 border-b border-[var(--ak-border)] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+            <div>
+                <p class="text-[10px] font-black uppercase tracking-[.2em] text-cyan-500">{{ $en ? 'Explainer' : 'Kurzerklärung' }}</p>
+                <h2 class="mt-1 text-xl font-black text-[var(--ak-text)]">{{ $en ? 'From data to model' : 'Von den Daten zum Modell' }}</h2>
+                <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ $en ? 'How raw data becomes a validated, tradable forecast - features, training, out-of-sample check, quality gate, champion, signal.' : 'Wie aus Rohdaten eine geprüfte, handelbare Prognose wird - Merkmale, Training, Out-of-Sample-Prüfung, Quality Gate, Champion, Signal.' }}</p>
+            </div>
+            <a href="{{ asset('media/aktienki-von-den-daten-zum-modell.mp4') }}" target="_blank" rel="noopener" class="inline-flex w-fit items-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-400/10 px-4 py-2.5 text-sm font-black text-cyan-500 transition hover:bg-cyan-400/20"><x-heroicon-o-play class="h-5 w-5" />{{ $en ? 'Open video' : 'Video öffnen' }}</a>
+        </div>
+        <div class="bg-[#050b18] p-2 sm:p-4">
+            <video class="aspect-video w-full rounded-2xl bg-[#050b18]" controls preload="metadata" playsinline aria-label="{{ $en ? 'From data to model' : 'Von den Daten zum Modell' }}">
+                <source src="{{ asset('media/aktienki-von-den-daten-zum-modell.mp4') }}" type="video/mp4">
+                {{ $en ? 'Your browser cannot play this video.' : 'Dein Browser kann dieses Video nicht wiedergeben.' }}
+            </video>
+        </div>
+    </section>
     <section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         @foreach($chapters as $index => [$title, $description, $icon, $url])
         <article class="group flex min-h-72 flex-col rounded-3xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 transition hover:-translate-y-1 hover:border-cyan-400/40 hover:shadow-xl">
