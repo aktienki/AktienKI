@@ -52,6 +52,22 @@
             </video>
         </div>
     </section>
+    <section class="mt-6 overflow-hidden rounded-[2rem] border border-violet-400/25 bg-[var(--ak-card)] shadow-xl">
+        <div class="flex flex-col gap-3 border-b border-[var(--ak-border)] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+            <div>
+                <p class="text-[10px] font-black uppercase tracking-[.2em] text-violet-500">{{ $en ? 'Explainer' : 'Kurzerklärung' }}</p>
+                <h2 class="mt-1 text-xl font-black text-[var(--ak-text)]">{{ $en ? 'Stock & model - the football analogy' : 'Aktie & Modell - die Fußball-Analogie' }}</h2>
+                <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ $en ? 'Which coach gets the best out of the player? How each stock is matched to the model that fits it.' : 'Welcher Trainer holt aus dem Spieler das Beste heraus? Wie jede Aktie dem passenden Modell zugeordnet wird.' }}</p>
+            </div>
+            <a href="{{ asset('media/aktienki-aktie-modell-fussball.mp4') }}" target="_blank" rel="noopener" class="inline-flex w-fit items-center gap-2 rounded-xl border border-violet-400/40 bg-violet-400/10 px-4 py-2.5 text-sm font-black text-violet-500 transition hover:bg-violet-400/20"><x-heroicon-o-play class="h-5 w-5" />{{ $en ? 'Open video' : 'Video öffnen' }}</a>
+        </div>
+        <div class="bg-[#0b0620] p-2 sm:p-4">
+            <video class="aspect-video w-full rounded-2xl bg-[#0b0620]" controls preload="metadata" playsinline aria-label="{{ $en ? 'Stock and model - football analogy' : 'Aktie und Modell - Fußball-Analogie' }}">
+                <source src="{{ asset('media/aktienki-aktie-modell-fussball.mp4') }}" type="video/mp4">
+                {{ $en ? 'Your browser cannot play this video.' : 'Dein Browser kann dieses Video nicht wiedergeben.' }}
+            </video>
+        </div>
+    </section>
     <section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         @foreach($chapters as $index => [$title, $description, $icon, $url])
         <article class="group flex min-h-72 flex-col rounded-3xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-5 transition hover:-translate-y-1 hover:border-cyan-400/40 hover:shadow-xl">
