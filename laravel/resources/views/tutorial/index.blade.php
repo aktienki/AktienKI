@@ -52,37 +52,39 @@
             </video>
         </div>
     </section>
-    <section class="mt-6 overflow-hidden rounded-[2rem] border border-violet-400/25 bg-[var(--ak-card)] shadow-xl">
-        <div class="flex flex-col gap-3 border-b border-[var(--ak-border)] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-            <div>
-                <p class="text-[10px] font-black uppercase tracking-[.2em] text-violet-500">{{ $en ? 'Explainer' : 'Kurzerklärung' }}</p>
-                <h2 class="mt-1 text-xl font-black text-[var(--ak-text)]">{{ $en ? 'Stock & model - the football analogy' : 'Aktie & Modell - die Fußball-Analogie' }}</h2>
-                <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ $en ? 'Which coach gets the best out of the player? How each stock is matched to the model that fits it.' : 'Welcher Trainer holt aus dem Spieler das Beste heraus? Wie jede Aktie dem passenden Modell zugeordnet wird.' }}</p>
+    <section class="mt-6 grid gap-4 sm:grid-cols-2">
+        <article class="overflow-hidden rounded-3xl border border-violet-400/25 bg-[var(--ak-card)] shadow-lg">
+            <div class="bg-[#0b0620] p-2">
+                <video class="aspect-video w-full rounded-2xl bg-[#0b0620]" controls preload="metadata" playsinline aria-label="{{ $en ? 'Stock and model - football analogy' : 'Aktie und Modell - Fußball-Analogie' }}">
+                    <source src="{{ asset('media/aktienki-aktie-modell-fussball.mp4') }}" type="video/mp4">
+                    {{ $en ? 'Your browser cannot play this video.' : 'Dein Browser kann dieses Video nicht wiedergeben.' }}
+                </video>
             </div>
-            <a href="{{ asset('media/aktienki-aktie-modell-fussball.mp4') }}" target="_blank" rel="noopener" class="inline-flex w-fit items-center gap-2 rounded-xl border border-violet-400/40 bg-violet-400/10 px-4 py-2.5 text-sm font-black text-violet-500 transition hover:bg-violet-400/20"><x-heroicon-o-play class="h-5 w-5" />{{ $en ? 'Open video' : 'Video öffnen' }}</a>
-        </div>
-        <div class="bg-[#0b0620] p-2 sm:p-4">
-            <video class="aspect-video w-full rounded-2xl bg-[#0b0620]" controls preload="metadata" playsinline aria-label="{{ $en ? 'Stock and model - football analogy' : 'Aktie und Modell - Fußball-Analogie' }}">
-                <source src="{{ asset('media/aktienki-aktie-modell-fussball.mp4') }}" type="video/mp4">
-                {{ $en ? 'Your browser cannot play this video.' : 'Dein Browser kann dieses Video nicht wiedergeben.' }}
-            </video>
-        </div>
-    </section>
-    <section class="mt-6 overflow-hidden rounded-[2rem] border border-cyan-400/25 bg-[var(--ak-card)] shadow-xl">
-        <div class="flex flex-col gap-3 border-b border-[var(--ak-border)] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-            <div>
-                <p class="text-[10px] font-black uppercase tracking-[.2em] text-cyan-500">{{ $en ? 'Explainer' : 'Kurzerklärung' }}</p>
-                <h2 class="mt-1 text-xl font-black text-[var(--ak-text)]">{{ $en ? 'From data to model' : 'Von den Daten zum Modell' }}</h2>
-                <p class="mt-1 text-sm text-[var(--ak-muted)]">{{ $en ? 'How raw data becomes a validated, tradable forecast - features, training, out-of-sample check, quality gate, champion, signal.' : 'Wie aus Rohdaten eine geprüfte, handelbare Prognose wird - Merkmale, Training, Out-of-Sample-Prüfung, Quality Gate, Champion, Signal.' }}</p>
+            <div class="flex items-start justify-between gap-3 px-4 py-4">
+                <div class="min-w-0">
+                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-violet-500">{{ $en ? 'Explainer' : 'Kurzerklärung' }}</p>
+                    <h3 class="mt-1 text-sm font-black text-[var(--ak-text)]">{{ $en ? 'Stock & model - the football analogy' : 'Aktie & Modell - die Fußball-Analogie' }}</h3>
+                    <p class="mt-1 text-xs leading-5 text-[var(--ak-muted)]">{{ $en ? 'Which coach gets the best out of the player?' : 'Welcher Trainer holt aus dem Spieler das Beste heraus?' }}</p>
+                </div>
+                <a href="{{ asset('media/aktienki-aktie-modell-fussball.mp4') }}" target="_blank" rel="noopener" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-violet-400/40 bg-violet-400/10 px-2.5 py-1.5 text-xs font-black text-violet-500 transition hover:bg-violet-400/20"><x-heroicon-o-play class="h-4 w-4" />{{ $en ? 'Open' : 'Öffnen' }}</a>
             </div>
-            <a href="{{ asset('media/aktienki-von-den-daten-zum-modell.mp4') }}" target="_blank" rel="noopener" class="inline-flex w-fit items-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-400/10 px-4 py-2.5 text-sm font-black text-cyan-500 transition hover:bg-cyan-400/20"><x-heroicon-o-play class="h-5 w-5" />{{ $en ? 'Open video' : 'Video öffnen' }}</a>
-        </div>
-        <div class="bg-[#050b18] p-2 sm:p-4">
-            <video class="aspect-video w-full rounded-2xl bg-[#050b18]" controls preload="metadata" playsinline aria-label="{{ $en ? 'From data to model' : 'Von den Daten zum Modell' }}">
-                <source src="{{ asset('media/aktienki-von-den-daten-zum-modell.mp4') }}" type="video/mp4">
-                {{ $en ? 'Your browser cannot play this video.' : 'Dein Browser kann dieses Video nicht wiedergeben.' }}
-            </video>
-        </div>
+        </article>
+        <article class="overflow-hidden rounded-3xl border border-cyan-400/25 bg-[var(--ak-card)] shadow-lg">
+            <div class="bg-[#050b18] p-2">
+                <video class="aspect-video w-full rounded-2xl bg-[#050b18]" controls preload="metadata" playsinline aria-label="{{ $en ? 'From data to model' : 'Von den Daten zum Modell' }}">
+                    <source src="{{ asset('media/aktienki-von-den-daten-zum-modell.mp4') }}" type="video/mp4">
+                    {{ $en ? 'Your browser cannot play this video.' : 'Dein Browser kann dieses Video nicht wiedergeben.' }}
+                </video>
+            </div>
+            <div class="flex items-start justify-between gap-3 px-4 py-4">
+                <div class="min-w-0">
+                    <p class="text-[10px] font-black uppercase tracking-[.2em] text-cyan-500">{{ $en ? 'Explainer' : 'Kurzerklärung' }}</p>
+                    <h3 class="mt-1 text-sm font-black text-[var(--ak-text)]">{{ $en ? 'From data to model' : 'Von den Daten zum Modell' }}</h3>
+                    <p class="mt-1 text-xs leading-5 text-[var(--ak-muted)]">{{ $en ? 'How raw data becomes a validated forecast.' : 'Wie aus Rohdaten eine geprüfte Prognose wird.' }}</p>
+                </div>
+                <a href="{{ asset('media/aktienki-von-den-daten-zum-modell.mp4') }}" target="_blank" rel="noopener" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-black text-cyan-500 transition hover:bg-cyan-400/20"><x-heroicon-o-play class="h-4 w-4" />{{ $en ? 'Open' : 'Öffnen' }}</a>
+            </div>
+        </article>
     </section>
     <section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         @foreach($chapters as $index => [$title, $description, $icon, $url])
