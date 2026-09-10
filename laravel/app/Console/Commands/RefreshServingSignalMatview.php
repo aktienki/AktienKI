@@ -41,22 +41,19 @@ final class RefreshServingSignalMatview extends Command
                 return self::SUCCESS;
             }
 
-            // The generated plan is large; LLVM JIT costs more than executing it.
-            $connection->statement("SET jit = 'off'");
-
             $concurrent = ! $this->option('no-concurrent');
             $started = microtime(true);
             try {
-                $connection->statement(
-                    'REFRESH MATERIALIZED VIEW '.($concurrent ? 'CONCURRENTLY ' : '').self::MATVIEW
-                );
+                // SECURITY DEFINER wrapper (serving migration 031): the matview
+                // is owned by `postgres`, the app role may only refresh it here.
+                $connection->statement('SELECT serving_refresh_current_signals(?)', [$concurrent]);
             } catch (Throwable $e) {
                 if (! $concurrent) {
                     throw $e;
                 }
                 // CONCURRENTLY fails on a never-populated view – fall back once.
                 $this->warn('CONCURRENTLY fehlgeschlagen ('.$e->getMessage().'), blockierender Refresh …');
-                $connection->statement('REFRESH MATERIALIZED VIEW '.self::MATVIEW);
+                $connection->statement('SELECT serving_refresh_current_signals(false)');
             }
 
             $rows = (int) ($connection->selectOne('SELECT count(*) AS c FROM '.self::MATVIEW)->c ?? 0);

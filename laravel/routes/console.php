@@ -212,3 +212,12 @@ if (config('aktienki.python_engine.server_predictions_enabled', false)) {
             ->runInBackground();
     }
 }
+
+// Freeze guard: alert when the serving snapshot the dashboard/screener reads
+// has not advanced. Independent of the publish topology.
+Schedule::command('serving:check-freshness --max-hours=30')
+    ->weekdays()
+    ->twiceDailyAt(9, 20, 30)
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping()
+    ->onOneServer();
