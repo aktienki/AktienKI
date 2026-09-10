@@ -163,10 +163,10 @@
 
             <section class="ak-card overflow-hidden border-cyan-400/25">
                 <div class="serving-model-scroll overflow-auto" style="max-height:75vh">
-                    <table class="serving-model-table w-full table-fixed border-collapse text-left" style="min-width:1180px">
+                    <table class="serving-model-table w-full table-fixed border-collapse text-left" style="min-width:1076px">
                         <colgroup>
-                            <col style="width:220px">
-                            <col style="width:120px">
+                            <col style="width:140px">
+                            <col style="width:96px">
                             @foreach(range(1, 6) as $modelColumn)<col style="width:140px">@endforeach
                         </colgroup>
                         <thead class="bg-cyan-400/[.055] text-[9px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">
@@ -198,7 +198,7 @@
                             @endphp
                             <tr class="align-top text-xs text-[var(--ak-text)] transition hover:bg-slate-400/[.035]">
                                 <td class="px-3 py-3">
-                                    <div class="flex max-w-64 items-center gap-2 font-black">
+                                    <div class="flex max-w-full items-center gap-2 font-black">
                                         <span class="shrink-0 text-base leading-none" aria-label="{{ $stock->country_code ?: __('Land') }}" title="{{ $stock->country_code ?: __('Land') }}">{{ \App\Support\CountryFlag::emoji($stock->country_code) }}</span>
                                         <span class="min-w-0 truncate">{{ $stock->name ?: $stock->symbol }}</span>
                                     </div>
