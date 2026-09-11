@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 /**
@@ -77,6 +78,21 @@ final class CheckServingFreshness extends Command
     {
         $this->error($message);
         Log::error('serving:check-freshness – '.$message);
+
+        $recipient = trim((string) config('aktienki.training_report_email', ''));
+        if ($recipient !== '') {
+            try {
+                Mail::raw(
+                    "Serving-Snapshot (Dashboard/Screener) ist eingefroren oder nicht lesbar.\n\n{$message}\n\n"
+                    .'Prüfen: serving_prediction_batches (Status/finished_at), serving_current_stock_signals_materialized.',
+                    function ($mail) use ($recipient): void {
+                        $mail->to($recipient)->subject('⚠️ AktienKI · Serving-Freeze erkannt');
+                    }
+                );
+            } catch (Throwable $e) {
+                Log::error('serving:check-freshness – Alarm-Mail fehlgeschlagen: '.$e->getMessage());
+            }
+        }
 
         return self::FAILURE;
     }
