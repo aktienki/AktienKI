@@ -1020,7 +1020,7 @@
                             @endif
                             @if ($qualitySetupMode)<input type="hidden" name="quality_setup" value="1">@endif
                             @foreach ($backtestFilters as $filter)
-                                @continue($filter === 'position_factor')
+                                @continue(in_array($filter, ['position_factor', 'quality_horizons_present', 'quality_horizons'], true))
                                 @if (request()->filled($filter))
                                     @if (is_array(request($filter)))
                                         @foreach (request($filter) as $item)<input type="hidden" name="{{ $filter }}[]" value="{{ $item }}">@endforeach
@@ -1180,6 +1180,23 @@
                                     {{ __('Max. gleichzeitig gehaltene Aktien') }}
                                     <input name="max_positions" type="number" min="1" max="50" step="1" x-model.number="positions" @input="positionFactor = Math.min(positionFactor, Math.max(1, positions))" required class="ak-input mt-2 h-11 w-full rounded-lg text-sm font-bold text-white">
                                 </label>
+                            </div>
+                            @php
+                                $modalSelectedHorizons = collect((array) (request()->has('quality_horizons_present') ? request('quality_horizons', []) : [10, 20, 40]))
+                                    ->map(fn ($horizon) => (int) $horizon);
+                            @endphp
+                            <div class="mt-4 rounded-xl border border-white/[.08] bg-white/[.035] px-4 py-3">
+                                <span class="text-[10px] font-black uppercase tracking-wide text-slate-400">{{ __('Horizont') }}</span>
+                                <p class="mt-1 text-[9px] leading-4 text-slate-400">{{ __('Nur Prognosezeiträume mit Haken fließen in diesen Backtest ein.') }}</p>
+                                <input type="hidden" name="quality_horizons_present" value="1">
+                                <div class="mt-2 grid grid-cols-3 gap-1" role="group" aria-label="{{ __('Horizont') }}">
+                                    @foreach ([10, 20, 40] as $modalHorizon)
+                                        <label class="cursor-pointer">
+                                            <input type="checkbox" name="quality_horizons[]" value="{{ $modalHorizon }}" @checked($modalSelectedHorizons->contains($modalHorizon)) class="peer sr-only">
+                                            <span class="flex h-9 items-center justify-center rounded-md border border-white/10 text-xs font-black text-slate-400 transition peer-checked:border-teal-300/45 peer-checked:bg-teal-400/15 peer-checked:text-teal-200">{{ $modalHorizon }}T</span>
+                                        </label>
+                                    @endforeach
+                                </div>
                             </div>
                             <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-teal-300/25 bg-teal-400/[.07] px-4 py-3">
                                 <input type="checkbox" name="serving_fixed_horizon_exit_enabled" value="1" @checked(request()->boolean('serving_fixed_horizon_exit_enabled', true)) class="mt-0.5 h-4 w-4 rounded border-slate-500 bg-slate-900 text-teal-500">

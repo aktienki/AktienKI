@@ -4105,5 +4105,6 @@
     "über alle Indizes": "across all indices",
     "überkauft": "overbought",
     "überverkauft": "oversold",
-    "überwunden": "crossed"
+    "überwunden": "crossed",
+    "Nur Prognosezeiträume mit Haken fließen in diesen Backtest ein.": "Only checked forecast horizons flow into this backtest."
 }

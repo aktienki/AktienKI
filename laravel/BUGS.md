@@ -75,6 +75,18 @@ Gesammelt aus der laufenden Session. Status: ✅ behoben · 🟡 teilweise/mitig
 10. ✅ **Perplexity-Reviews: hohe INSUFFICIENT_EVIDENCE-Quote — akzeptiert, kein Bug.** `search_context_size` von `low` auf `medium` gestellt, alle 96 betroffenen Aktien neu bewertet (78 von 96 bleiben trotzdem bei "unzureichende Beweise", da die 2-Domain-Mindestanforderung für Perplexity-Sonar strukturell schwer erreichbar ist). Geprüft und bestätigt: der Kommentar/die Zusammenfassung wird trotzdem vollständig geschrieben — nur Verdict/Confidence werden gedeckelt, nicht der Text. Als gewolltes Verhalten akzeptiert.
 11. **Yahoo-Finance-Fallback für Chartanzeige.** In `ServingChartCacheService` eingebaut (Fallback auf `YahooIndexService::dailyHistory()`, wenn Twelve Data leer liefert), Dependency-Injection verifiziert — siehe Punkt 14 zur Symbolformat-Einschränkung. Ende-zu-Ende noch nicht an einer echten leeren-Twelve-Data-Aktie getestet.
 
+## ✅ Heute behoben (2)
+
+23. ✅ **"Allocation je Aktie"-Fenster im Strategie-Assistenten hatte keine Horizont-Auswahl.** Die im Hauptfilter gesetzte Horizont-Auswahl (10T/20T/40T) wurde beim Öffnen dieses Fensters nur unsichtbar per Hidden-Field durchgereicht, ohne dass sie dort sichtbar oder änderbar war. Jetzt als eigenes, editierbares Auswahlfeld direkt im Fenster (gleiches Toggle-Button-Muster wie "Allocation je Aktie").
+    *Datei:* `resources/views/predictions/heatmap.blade.php`
+
+## 🔴 Offen (beim Deploy entdeckt)
+
+22. **Strategie-Assistent/Heatmap zeigt nur ~133 von 772+ Aktien — strukturell, nicht filterbedingt.** Jeder System-Backtest-Lauf (`backtest_runs`, `run_type` = system/`system_walk_forward_source`) deckt seit mindestens 21.8.2026 konsequent exakt 133 Instrumente ab (verifiziert über 6 aufeinanderfolgende Läufe inkl. dem heutigen von 15:52 Uhr) — unabhängig von Score-/Konfidenz-/Qualitäts-Filtern (alle auf Standard/aus getestet). Der komplette Backtest-Assistent (`PredictionController::heatmap()`, `AutomatedPortfolioService::candidates()`) basiert auf der Legacy-`predictions`/`backtest_trades`-Tabelle, die nur für diese kleine Kern-Auswahl gepflegt wird, während das reale/Serving-Universum 522-928 Aktien umfasst. Echte Lösung: entweder den System-Backtest auf das volle Universum ausweiten, oder den Strategie-Assistenten auf die Serving-Datenbasis umstellen (großer Schnitt, nicht nebenbei zu machen).
+    *Dateien:* `app/Http/Controllers/PredictionController.php` (heatmap-Query), `app/Services/AutomatedPortfolioService.php` (`candidates()`)
+21. **`ENTRY_SHADOW_SOURCE_BATCH_FAILED` — wiederkehrender Fehler alle 5 Minuten seit mindestens 9.9.2026, unabhängig vom heutigen Deploy.** `FinalEntryShadowWriter.php:279` (`assertOutboxEnvelope()`), ausgelöst über `signals:shadow-final-entry` (`app/Console/Commands/ShadowFinalEntrySignals.php`). Über 1200 Vorkommen im Produktions-Log, keine sichtbare Auswirkung auf die Nutzer-Anwendung bisher (Shadow-Modus), aber unnötige Log-/Fehlerlast. Noch nicht untersucht.
+    *Datei:* `app/Services/FinalEntryShadowWriter.php`
+
 ## ✅ Heute behoben
 
 - Composite-Score horizontgebunden (nicht mehr cross-scope geblendet)
