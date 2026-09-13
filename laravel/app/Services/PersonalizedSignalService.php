@@ -146,7 +146,7 @@ class PersonalizedSignalService
         ]);
 
         if ($signal === 'BUY') {
-            return __('BUY: Score :score, Konfidenz :confidence % und Nettorendite erfüllen die Anforderungen. Volatilität :volatility, Sektor :sector. :limits', [
+            return __('POSITIV: Score :score, Konfidenz :confidence % und Nettorendite erfüllen die Anforderungen. Volatilität :volatility, Sektor :sector. :limits', [
                 'score' => number_format($score, 1, ',', '.'),
                 'confidence' => number_format($confidence * 100, 0, ',', '.'),
                 'volatility' => $volatilityText,
@@ -156,13 +156,13 @@ class PersonalizedSignalService
         }
         if ($signal === 'WATCH') {
             $reason = $score < $thresholds['buy_score']
-                ? __('Der Score :score liegt unter der BUY-Schwelle :threshold.', [
+                ? __('Der Score :score liegt unter der POSITIV-Schwelle :threshold.', [
                     'score' => number_format($score, 1, ',', '.'),
                     'threshold' => number_format($thresholds['buy_score'], 0, ',', '.'),
                 ])
-                : __('Mindestens eine BUY-Anforderung ist noch nicht vollständig erfüllt.');
+                : __('Mindestens eine POSITIV-Anforderung ist noch nicht vollständig erfüllt.');
 
-            return __('WATCH statt BUY: :reason Volatilität :volatility, Sektor :sector. :limits', [
+            return __('WATCH statt POSITIV: :reason Volatilität :volatility, Sektor :sector. :limits', [
                 'reason' => $reason,
                 'volatility' => $volatilityText,
                 'sector' => $sectorText,
@@ -170,7 +170,7 @@ class PersonalizedSignalService
             ]);
         }
 
-        return __('HOLD: Score, Konfidenz oder die profilabhängige Volatilitätsgrenze reichen noch nicht für WATCH oder BUY. Volatilität :volatility, Sektor :sector. :limits', [
+        return __('HOLD: Score, Konfidenz oder die profilabhängige Volatilitätsgrenze reichen noch nicht für WATCH oder POSITIV. Volatilität :volatility, Sektor :sector. :limits', [
             'volatility' => $volatilityText,
             'sector' => $sectorText,
             'limits' => $profileLimits,
@@ -220,8 +220,8 @@ class PersonalizedSignalService
 
         $addCheck(
             $score >= $thresholds['buy_score'],
-            __('KI-Score :value erfüllt die BUY-Schwelle von :limit.', ['value' => number_format($score, 1, ',', '.'), 'limit' => number_format($thresholds['buy_score'], 0, ',', '.')]),
-            __('KI-Score :value liegt unter der BUY-Schwelle von :limit.', ['value' => number_format($score, 1, ',', '.'), 'limit' => number_format($thresholds['buy_score'], 0, ',', '.')]),
+            __('KI-Score :value erfüllt die POSITIV-Schwelle von :limit.', ['value' => number_format($score, 1, ',', '.'), 'limit' => number_format($thresholds['buy_score'], 0, ',', '.')]),
+            __('KI-Score :value liegt unter der POSITIV-Schwelle von :limit.', ['value' => number_format($score, 1, ',', '.'), 'limit' => number_format($thresholds['buy_score'], 0, ',', '.')]),
         );
         $addCheck(
             $confidence >= $thresholds['buy_confidence'],
@@ -261,11 +261,11 @@ class PersonalizedSignalService
         }
 
         $summary = match ($signal) {
-            'BUY' => __('Die Voraussetzungen für ein Kaufsignal sind im Profil :profile erfüllt.', ['profile' => $profile]),
+            'BUY' => __('Die Voraussetzungen für ein Positiv-Signal sind im Profil :profile erfüllt.', ['profile' => $profile]),
             'WAIT' => __('Der längerfristige Ausblick ist positiv, kurzfristig wird jedoch zunächst ein deutlicher Rücksetzer unter die Profilschwelle erwartet. Daher noch abwarten.'),
-            'WATCH' => __('Die Aktie ist interessant, erfüllt aber noch nicht alle Voraussetzungen für BUY.'),
+            'WATCH' => __('Die Aktie ist interessant, erfüllt aber noch nicht alle Voraussetzungen für POSITIV.'),
             'SELL' => __('Score oder erwartete Rendite sprechen derzeit für ein Verkaufssignal.'),
-            default => __('Die positiven und negativen Faktoren reichen derzeit weder für BUY noch für SELL.'),
+            default => __('Die positiven und negativen Faktoren reichen derzeit weder für POSITIV noch für SELL.'),
         };
 
         return compact('summary', 'pros', 'cons');

@@ -161,24 +161,22 @@ class DashboardController extends Controller
                 $stock->market_return_20d = $stock->expected_return_20d;
             });
         $externalConfirmedBuys = $this->externalConfirmedBuys($remoteDashboardStocks);
-        $threeFactorRanked = $this->threeFactorRanking($externalConfirmedBuys);
-        $panelRankedBuys = $this->threeFactorRanking(
-            $remoteDashboardStocks
-                ->filter(fn (object $stock): bool => strtoupper((string) ($stock->personalized_signal ?? '')) === 'BUY')
-                ->values()
-        );
-        $threeFactorEligible = $threeFactorRanked
-            ->filter(fn (object $stock): bool => (int) ($stock->panel_decile ?? 0) >= 6)
-            ->values();
+        // Champion and its two ranked alternatives all come from ONE pool -
+        // every externally GPT-confirmed POSITIV signal with panel data,
+        // ranked by the same composite score the screener shows - and the
+        // champion is simply whichever of those ranks first. No extra,
+        // champion-only bar (a minimum panel decile, previously) sits on top
+        // of that: any such extra requirement can let an alternative that
+        // does not clear it outscore the champion that does, which is
+        // exactly the inversion this single shared pool avoids.
+        $externalConfirmedRanked = $this->threeFactorRanking($externalConfirmedBuys);
         $topStockToday = $remoteDashboardStocks->firstWhere('personalized_signal', 'BUY');
         $topWatchStock = $remoteDashboardStocks->firstWhere('personalized_signal', 'WATCH');
-        $topRankedStocks = $threeFactorEligible->take(1)->values();
+        $topRankedStocks = $externalConfirmedRanked->take(1)->values();
         $championInstrumentId = $topRankedStocks->first()?->instrument_id;
-        $panelAlternativePool = $panelRankedBuys
+        $threeFactorAlternatives = $externalConfirmedRanked
             ->reject(fn (object $stock): bool => $championInstrumentId !== null
                 && (int) $stock->instrument_id === (int) $championInstrumentId)
-            ->values();
-        $threeFactorAlternatives = $panelAlternativePool
             ->take(2)
             ->values()
             ->map(function (object $stock, int $index): object {
@@ -261,6 +259,13 @@ class DashboardController extends Controller
         if ($additionalAlternative) {
             $additionalAlternative = clone $additionalAlternative;
             $additionalAlternative->alternative_category = 'alternative';
+            // This pick never goes through threeFactorRanking(), so without
+            // this it had no three_factor_score at all and its donut always
+            // showed a hardcoded 0 - fall back to the same composite score
+            // every other card on the dashboard (and the screener) shows.
+            $additionalAlternative->three_factor_score = is_numeric($additionalAlternative->composite_score ?? null)
+                ? (float) $additionalAlternative->composite_score
+                : 0.0;
             $threeFactorAlternatives->push($additionalAlternative);
         }
         $scoreRiser = $canUsePro ? $this->strongestScoreRiser($remoteDashboardStocks) : null;
@@ -289,7 +294,7 @@ class DashboardController extends Controller
                             'type' => 'prediction',
                             'symbol' => $reminder->symbol,
                             'name' => $reminder->name,
-                            'label' => $reminder->intent === 'purchased' ? __('SELL-Überwachung') : __('Kauferinnerung'),
+                            'label' => $reminder->intent === 'purchased' ? __('SELL-Überwachung') : __('Positiv-Erinnerung'),
                             'schedule' => __('E-Mail').' · '.$remindOn->format('d.m.Y'),
                             'date' => $remindOn->format('Y-m-d'),
                             'sort_at' => (string) $reminder->remind_on,
@@ -311,8 +316,8 @@ class DashboardController extends Controller
                         'type' => 'signal',
                         'symbol' => $alert->symbol,
                         'name' => $alert->name,
-                        'label' => $alert->notification_mode === 'wait_or_buy' ? __('WAIT-Einstellung') : __('BUY-Einstellung'),
-                        'schedule' => __('E-Mail').' · '.($alert->notification_mode === 'wait_or_buy' ? 'WAIT → BUY' : __('Nur BUY')),
+                        'label' => $alert->notification_mode === 'wait_or_buy' ? __('WAIT-Einstellung') : __('POSITIV-Einstellung'),
+                        'schedule' => __('E-Mail').' · '.($alert->notification_mode === 'wait_or_buy' ? 'WAIT → POSITIV' : __('Nur POSITIV')),
                         'date' => null,
                         'sort_at' => '0000-00-00',
                         'status' => $alert->status,
@@ -697,11 +702,22 @@ class DashboardController extends Controller
                     $stock->three_factor_external_confirmed = is_numeric($stock->external_confirmation_confidence ?? null);
                     $stock->three_factor_external_score = (float) ($stock->external_confirmation_confidence ?? 0);
                     $stock->three_factor_panel_score = $stock->panel_percentile;
-                    $stock->three_factor_score = round((
-                        $stock->three_factor_buy_score
-                        + $stock->three_factor_external_score
-                        + $stock->three_factor_panel_score
-                    ) / 3, 1);
+                    // The same composite score the screener shows for this
+                    // instrument (ServingScreenerService::compositeScores(),
+                    // already attached to $remoteDashboardStocks) - not an
+                    // independent three-factor average, so the champion/
+                    // alternatives never disagree with the screener's number
+                    // for the same stock. POSITIV/extern/Panel stay visible
+                    // as supporting context, not as the score's literal
+                    // ingredients. The average is kept only as a fallback for
+                    // the rare case a stock has no composite score yet.
+                    $stock->three_factor_score = is_numeric($stock->composite_score ?? null)
+                        ? (float) $stock->composite_score
+                        : round((
+                            $stock->three_factor_buy_score
+                            + $stock->three_factor_external_score
+                            + $stock->three_factor_panel_score
+                        ) / 3, 1);
                     $stock->dashboard_ranking_score = $stock->three_factor_score;
                 })
                 ->sortByDesc('three_factor_score')
@@ -773,7 +789,7 @@ class DashboardController extends Controller
             ['label' => 'SELL', 'range' => 'Aktuelles Verkaufssignal', 'signal' => 'SELL'],
             ['label' => 'HOLD', 'range' => 'Aktuelles Haltesignal', 'signal' => 'HOLD'],
             ['label' => 'WATCH', 'range' => 'Aktuelles Beobachtungssignal', 'signal' => 'WATCH'],
-            ['label' => 'BUY', 'range' => 'Aktuelles Kaufsignal', 'signal' => 'BUY'],
+            ['label' => 'POSITIV', 'range' => 'Aktuelles Positiv-Signal', 'signal' => 'BUY'],
         ])->map(fn (array $bin): array => [
             'label' => $bin['label'],
             'range' => $bin['range'],

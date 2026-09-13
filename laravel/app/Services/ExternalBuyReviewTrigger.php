@@ -94,8 +94,10 @@ final class ExternalBuyReviewTrigger
                 'previous_prediction_id' => $previous->id,
                 'triggered_at' => $prediction->prediction_time,
                 'status' => 'pending',
-                'provider' => 'openai',
-                'model' => (string) config('aktienki.external_buy_review.model', 'gpt-5.6-luna'),
+                'provider' => (string) config('aktienki.external_buy_review.provider', 'openai'),
+                'model' => config('aktienki.external_buy_review.provider', 'openai') === 'perplexity'
+                    ? (string) config('aktienki.external_buy_review.perplexity_model', 'sonar')
+                    : (string) config('aktienki.external_buy_review.model', 'gpt-5.6-luna'),
                 'prompt_version' => (string) config('aktienki.external_buy_review.prompt_version', 'buy-twelve-data-luna-v3'),
                 'request_identity' => $identity,
                 'signal_scope' => [

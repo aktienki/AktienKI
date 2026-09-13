@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\ServingReadService;
+use App\Services\ServingWalkForwardStatisticsService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -14,18 +15,24 @@ use Illuminate\View\View;
 
 final class ServingPredictionTableController extends Controller
 {
+    private const MAX_SAVED_SELECTION_SNAPSHOTS = 100;
+
     private const RESTORABLE_FILTERS = [
         'q', 'country', 'exchange', 'sector', 'quality', 'status', 'signal', 'horizon', 'variant', 'panel',
-        'profit_per_trade_min', 'drawdown_max', 'hit_rate_min', 'sort', 'direction',
+        'profit_per_trade_min', 'drawdown_max', 'hit_rate_min', 'minimum_trades', 'sort', 'direction',
     ];
 
     public function __invoke(Request $request, ServingReadService $serving): View
     {
         $restoreToken = (string) $request->query('restore_selection', '');
+        $storedRestoredSelection = preg_match('/^[A-Za-z0-9]{40}$/', $restoreToken) === 1
+            ? $request->session()->get("serving_strategy_selections.{$restoreToken}")
+            : null;
+        $hasRestoredSelection = is_array($storedRestoredSelection) && $storedRestoredSelection !== [];
         $restoredConfigurationKeys = collect();
-        if (preg_match('/^[A-Za-z0-9]{40}$/', $restoreToken)) {
+        if ($hasRestoredSelection) {
             $restored = (array) $request->session()->get("serving_strategy_selection_filters.{$restoreToken}", []);
-            $restoredConfigurationKeys = collect((array) $request->session()->get("serving_strategy_selections.{$restoreToken}", []))
+            $restoredConfigurationKeys = collect($storedRestoredSelection)
                 ->map(fn (array $configuration): string => $this->configurationKey($configuration));
             if ($restored !== []) {
                 $request->query->replace(array_merge(
@@ -38,6 +45,7 @@ final class ServingPredictionTableController extends Controller
         $allStocks = $serving->activeStocks();
         $this->attachPanelRatings($allStocks);
         $this->expandModelVariants($allStocks);
+        $this->attachWalkForwardStatistics($allStocks);
         $executableModelKeys = $this->executableServingModelKeys();
         $allStocks->each(function (object $stock) use ($executableModelKeys): void {
             $this->stockModels($stock)->each(function (object $model) use ($stock, $executableModelKeys): void {
@@ -50,10 +58,17 @@ final class ServingPredictionTableController extends Controller
             });
         });
         $allModels = $allStocks->flatMap(fn (object $stock): Collection => $this->stockModels($stock));
+        $trainingModels = $allModels->filter(
+            fn (object $model): bool => (int) ($model->statistics_metrics?->trades ?? 0) > 0,
+        );
+        $profitPerTradeRange = $this->metricRange($trainingModels, 'median_return', -10.0, 10.0, 0.1, false, 0.0, 'statistics_metrics');
+        $profitPerTradeRange->min = min(-10.0, (float) $profitPerTradeRange->min);
+        $profitPerTradeRange->max = max(10.0, (float) $profitPerTradeRange->max);
         $metricRanges = (object) [
-            'profit_per_trade' => $this->metricRange($allModels, 'median_return', -10.0, 10.0, 0.1),
-            'drawdown' => $this->metricRange($allModels, 'max_drawdown', 0.0, 100.0, 0.1, true),
-            'hit_rate' => $this->metricRange($allModels, 'hit_rate', 0.0, 100.0, 0.1),
+            'profit_per_trade' => $profitPerTradeRange,
+            'drawdown' => $this->metricRange($trainingModels, 'max_drawdown', 0.0, 100.0, 0.1, true, 0.0, 'statistics_metrics'),
+            'hit_rate' => $this->metricRange($trainingModels, 'hit_rate', 0.0, 100.0, 0.1, false, 0.0, 'statistics_metrics'),
+            'trades' => $this->metricRange($trainingModels, 'trades', 0.0, 100.0, 1.0, false, 0.0, 'statistics_metrics'),
         ];
         $search = mb_strtolower(trim((string) $request->query('q', '')));
         $country = strtoupper(trim((string) $request->query('country', '')));
@@ -74,13 +89,17 @@ final class ServingPredictionTableController extends Controller
         $profitPerTradeMin = $this->optionalNumber($request, 'profit_per_trade_min', $metricRanges->profit_per_trade->min, $metricRanges->profit_per_trade->max);
         $drawdownMax = $this->optionalNumber($request, 'drawdown_max', $metricRanges->drawdown->min, $metricRanges->drawdown->max);
         $hitRateMin = $this->optionalNumber($request, 'hit_rate_min', $metricRanges->hit_rate->min, $metricRanges->hit_rate->max);
+        $minimumTrades = $this->optionalNumber($request, 'minimum_trades', $metricRanges->trades->min, $metricRanges->trades->max);
         $profitPerTradeMin = $profitPerTradeMin !== null && $profitPerTradeMin > $metricRanges->profit_per_trade->min ? $profitPerTradeMin : null;
         $drawdownMax = $drawdownMax !== null && $drawdownMax < $metricRanges->drawdown->max ? $drawdownMax : null;
         $hitRateMin = $hitRateMin !== null && $hitRateMin > $metricRanges->hit_rate->min ? $hitRateMin : null;
-        $modelFilterActive = $signal !== '' || $horizon !== null || $variant !== '' || $profitPerTradeMin !== null || $drawdownMax !== null || $hitRateMin !== null;
+        $minimumTrades = $minimumTrades !== null && $minimumTrades > $metricRanges->trades->min ? (int) round($minimumTrades) : null;
+        $selectionFilterActive = $horizon !== null || $variant !== '' || $profitPerTradeMin !== null
+            || $drawdownMax !== null || $hitRateMin !== null || $minimumTrades !== null;
+        $modelFilterActive = $signal !== '' || $selectionFilterActive;
 
-        $allStocks->each(function (object $stock) use ($modelFilterActive, $signal, $horizon, $variant, $profitPerTradeMin, $drawdownMax, $hitRateMin): void {
-            $this->stockModels($stock)->each(function (object $model) use ($modelFilterActive, $signal, $horizon, $variant, $profitPerTradeMin, $drawdownMax, $hitRateMin): void {
+        $allStocks->each(function (object $stock) use ($modelFilterActive, $selectionFilterActive, $signal, $horizon, $variant, $profitPerTradeMin, $drawdownMax, $hitRateMin, $minimumTrades): void {
+            $this->stockModels($stock)->each(function (object $model) use ($modelFilterActive, $selectionFilterActive, $signal, $horizon, $variant, $profitPerTradeMin, $drawdownMax, $hitRateMin, $minimumTrades): void {
                 $model->matches_active_filter = ! $modelFilterActive || $this->modelMatchesFilters(
                     $model,
                     $signal,
@@ -88,15 +107,38 @@ final class ServingPredictionTableController extends Controller
                     $variant,
                     $profitPerTradeMin,
                     $drawdownMax,
-                    $hitRateMin
+                    $hitRateMin,
+                    $minimumTrades
+                );
+                // A live signal belongs to the stock's currently active
+                // serving variant. It may decide whether the stock row is
+                // visible, but it must not disable another variant that has a
+                // complete historical backtest and can therefore be tested.
+                $model->matches_selection_filter = ! $selectionFilterActive || $this->modelMatchesFilters(
+                    $model,
+                    '',
+                    $horizon,
+                    $variant,
+                    $profitPerTradeMin,
+                    $drawdownMax,
+                    $hitRateMin,
+                    $minimumTrades
                 );
             });
         });
 
         $filtered = $allStocks->filter(function (object $stock) use (
             $search, $country, $exchange, $sector, $quality, $status,
-            $modelFilterActive, $panelDecile
+            $modelFilterActive, $selectionFilterActive, $signal, $panelDecile
         ): bool {
+            // Availability is model-specific and based only on the two-year
+            // training window. A stock stays visible when any one of its
+            // Standard or TCN configurations has training trades.
+            if (! $this->stockModels($stock)->contains(
+                fn (object $model): bool => (bool) ($model->training_selectable ?? false)
+            )) {
+                return false;
+            }
             if ($search !== '' && ! str_contains(mb_strtolower(implode(' ', [
                 $stock->name, $stock->symbol, $stock->isin, $stock->industry,
             ])), $search)) {
@@ -129,8 +171,14 @@ final class ServingPredictionTableController extends Controller
             if ($panelDecile !== null && (int) ($stock->panel_decile ?? 0) !== $panelDecile) {
                 return false;
             }
-            if ($modelFilterActive && ! $this->stockModels($stock)->contains(
-                fn (object $model): bool => $model->matches_active_filter
+            if ($signal !== '' && ! $this->stockModels($stock)->contains(
+                fn (object $model): bool => $model->prediction_enabled
+                    && strtoupper((string) ($model->prediction?->signal ?? '')) === $signal
+            )) {
+                return false;
+            }
+            if ($selectionFilterActive && ! $this->stockModels($stock)->contains(
+                fn (object $model): bool => $model->matches_selection_filter
             )) {
                 return false;
             }
@@ -155,7 +203,7 @@ final class ServingPredictionTableController extends Controller
             ->mapWithKeys(fn (string $class): array => [$class => $allStocks->where('quality_class', $class)->count()]);
         $filteredModels = $filtered
             ->flatMap(fn (object $stock): Collection => $this->stockModels($stock))
-            ->filter(fn (object $model): bool => ! $modelFilterActive || $model->matches_active_filter);
+            ->filter(fn (object $model): bool => ! $selectionFilterActive || $model->matches_selection_filter);
         $summary = (object) [
             'active_stocks' => $filtered->count(),
             'eligible_horizons' => $filteredModels->where('prediction_enabled', true)->count(),
@@ -170,10 +218,10 @@ final class ServingPredictionTableController extends Controller
         // Freeze the exact Service-DB model configurations represented by the
         // current result. Rebuilding this selection later from broad filters
         // could silently include a different variant or horizon.
-        $strategyConfigurations = $filtered->flatMap(function (object $stock) use ($modelFilterActive): Collection {
+        $strategyConfigurations = $filtered->flatMap(function (object $stock) use ($selectionFilterActive): Collection {
             return $this->stockModels($stock)
-                ->filter(fn (object $model): bool => (! $modelFilterActive || $model->matches_active_filter)
-                    && $model->strategy_selectable)
+                ->filter(fn (object $model): bool => (! $selectionFilterActive || $model->matches_selection_filter)
+                    && $model->training_selectable)
                 ->map(fn (object $model): array => [
                     'source' => 'serving_prediction_table',
                     'symbol' => strtoupper((string) $stock->symbol),
@@ -189,15 +237,30 @@ final class ServingPredictionTableController extends Controller
         })->unique(fn (array $configuration): string => implode('|', $configuration))->values();
         $strategySelectionToken = null;
         if ($strategyConfigurations->isNotEmpty()) {
-            $strategySelectionToken = Str::random(40);
             $selections = (array) $request->session()->get('serving_strategy_selections', []);
-            $selections[$strategySelectionToken] = $strategyConfigurations->all();
-            while (count($selections) > 10) {
-                array_shift($selections);
+            $selectionFilters = (array) $request->session()->get('serving_strategy_selection_filters', []);
+            $snapshotConfigurations = $strategyConfigurations->all();
+            $snapshotFilters = Arr::only($request->query(), self::RESTORABLE_FILTERS);
+            // Repeated GET requests (range sliders, pagination or browser
+            // prefetching) must not evict the token that belongs to the table
+            // the user is still looking at. Reuse an identical snapshot.
+            foreach (array_reverse(array_keys($selections)) as $existingToken) {
+                if (($selections[$existingToken] ?? null) === $snapshotConfigurations
+                    && ($selectionFilters[$existingToken] ?? []) === $snapshotFilters) {
+                    $strategySelectionToken = (string) $existingToken;
+                    break;
+                }
+            }
+            if ($strategySelectionToken === null) {
+                $strategySelectionToken = Str::random(40);
+                $selections[$strategySelectionToken] = $snapshotConfigurations;
+                $selectionFilters[$strategySelectionToken] = $snapshotFilters;
+            }
+            while (count($selections) > self::MAX_SAVED_SELECTION_SNAPSHOTS) {
+                $oldestToken = (string) array_key_first($selections);
+                unset($selections[$oldestToken], $selectionFilters[$oldestToken]);
             }
             $request->session()->put('serving_strategy_selections', $selections);
-            $selectionFilters = (array) $request->session()->get('serving_strategy_selection_filters', []);
-            $selectionFilters[$strategySelectionToken] = Arr::only($request->query(), self::RESTORABLE_FILTERS);
             $selectionFilters = Arr::only($selectionFilters, array_keys($selections));
             $request->session()->put('serving_strategy_selection_filters', $selectionFilters);
         }
@@ -209,12 +272,14 @@ final class ServingPredictionTableController extends Controller
         $selectableModelKeys = $strategyConfigurations
             ->map(fn (array $configuration): string => $this->configurationKey($configuration))
             ->values();
-        $bulkSelectableModelKeys = $strategyConfigurations
-            ->where('selection_active', true)
-            ->map(fn (array $configuration): string => $this->configurationKey($configuration))
-            ->values();
-        $initialSelectedModelKeys = $restoredConfigurationKeys
-            ->intersect($selectableModelKeys)
+        // "All" means every selectable model remaining after the current
+        // filters, not only the release's green champion variant. Otherwise a
+        // filtered page containing only available challengers starts with zero
+        // selected models and the strategy action can never be submitted.
+        $bulkSelectableModelKeys = $selectableModelKeys;
+        $initialSelectedModelKeys = ($hasRestoredSelection
+            ? $restoredConfigurationKeys->intersect($selectableModelKeys)
+            : $bulkSelectableModelKeys)
             ->values();
         $indexRoute = $request->routeIs('setup.models') ? 'setup.models' : 'predictions.index';
 
@@ -228,7 +293,7 @@ final class ServingPredictionTableController extends Controller
         ));
     }
 
-    public function storeStrategySelection(Request $request): RedirectResponse
+    public function storeStrategySelection(Request $request, ServingReadService $serving): RedirectResponse
     {
         $validated = $request->validate([
             'selection_token' => ['required', 'string', 'size:40', 'regex:/^[A-Za-z0-9]+$/'],
@@ -237,15 +302,34 @@ final class ServingPredictionTableController extends Controller
             'models.*' => ['required', 'string', 'max:180'],
         ]);
         $sourceToken = $validated['selection_token'];
-        $available = collect((array) $request->session()->get("serving_strategy_selections.{$sourceToken}", []));
-        $availableByKey = $available->keyBy(fn (array $configuration): string => $this->configurationKey($configuration));
+        $sourceAvailable = collect((array) $request->session()->get("serving_strategy_selections.{$sourceToken}", []));
+        // Browser back/forward navigation can restore a table DOM from an
+        // older page while retaining the newest opaque selection token. Use
+        // all still-valid session configurations to resolve the stable model
+        // keys actually submitted by the checkboxes. This preserves the
+        // user's exact visible selection without trusting arbitrary symbols.
+        $availableByKey = collect((array) $request->session()->get('serving_strategy_selections', []))
+            ->flatMap(fn (mixed $configurations): array => is_array($configurations) ? $configurations : [])
+            ->filter(fn (mixed $configuration): bool => is_array($configuration))
+            ->keyBy(fn (array $configuration): string => $this->configurationKey($configuration));
+        $submittedModelKeys = collect($validated['models'] ?? [])->unique()->values();
+        $unresolvedModelKeys = $submittedModelKeys->reject(fn (string $key): bool => $availableByKey->has($key));
+        if ($unresolvedModelKeys->isNotEmpty()) {
+            $canonicalByKey = $this->canonicalStrategyConfigurations($serving)
+                ->keyBy(fn (array $configuration): string => $this->configurationKey($configuration));
+            $availableByKey = $availableByKey->union(
+                $canonicalByKey->only($unresolvedModelKeys->all()),
+            );
+        }
         $selected = $request->boolean('select_all')
-            ? $available->where('selection_active', true)->values()
-            : collect($validated['models'] ?? [])
+            ? $sourceAvailable->values()
+            : ($submittedModelKeys->isNotEmpty()
+                ? $submittedModelKeys
                 ->unique()
                 ->map(fn (string $key): ?array => $availableByKey->get($key))
                 ->filter()
-                ->values();
+                ->values()
+                : collect());
         $selected = $selected
             ->map(fn (array $configuration): array => Arr::except($configuration, ['selection_active']))
             ->values();
@@ -257,8 +341,9 @@ final class ServingPredictionTableController extends Controller
         $selectionToken = Str::random(40);
         $selections = (array) $request->session()->get('serving_strategy_selections', []);
         $selections[$selectionToken] = $selected->all();
-        while (count($selections) > 10) {
-            array_shift($selections);
+        while (count($selections) > self::MAX_SAVED_SELECTION_SNAPSHOTS) {
+            $oldestToken = (string) array_key_first($selections);
+            unset($selections[$oldestToken]);
         }
         $request->session()->put('serving_strategy_selections', $selections);
 
@@ -278,6 +363,29 @@ final class ServingPredictionTableController extends Controller
         return strtoupper((string) ($configuration['symbol'] ?? '')).'|'
             .(int) ($configuration['horizon_days'] ?? $configuration['horizon'] ?? 0).'|'
             .strtolower((string) ($configuration['variant'] ?? 'standard'));
+    }
+
+    private function canonicalStrategyConfigurations(ServingReadService $serving): Collection
+    {
+        $stocks = $serving->activeStocks();
+        $this->expandModelVariants($stocks);
+        $this->attachWalkForwardStatistics($stocks);
+
+        return $stocks->flatMap(function (object $stock): Collection {
+            return $this->stockModels($stock)
+                ->filter(fn (object $model): bool => (bool) $model->training_selectable)
+                ->map(fn (object $model): array => [
+                    'source' => 'serving_prediction_table',
+                    'symbol' => strtoupper((string) $stock->symbol),
+                    'release_id' => (string) $stock->release_id,
+                    'source_release_id' => (string) $stock->release_id,
+                    'release_policy' => 'active',
+                    'horizon' => (int) $model->horizon,
+                    'horizon_days' => (int) $model->horizon,
+                    'variant' => (string) $model->variant,
+                    'selection_active' => (bool) $model->is_active,
+                ]);
+        })->values();
     }
 
     /** @return Collection<string, true> */
@@ -376,10 +484,11 @@ final class ServingPredictionTableController extends Controller
         float $fallbackMax,
         float $step,
         bool $absolute = false,
-        float $trimPercent = 0.0
+        float $trimPercent = 0.0,
+        string $metricsProperty = 'metrics'
     ): object {
         $values = $models
-            ->map(fn (object $model): mixed => $model->metrics->{$metric} ?? null)
+            ->map(fn (object $model): mixed => data_get($model, $metricsProperty.'.'.$metric))
             ->filter(fn (mixed $value): bool => is_numeric($value) && is_finite((float) $value))
             ->map(fn (mixed $value): float => $absolute ? abs((float) $value) : (float) $value)
             ->sort()
@@ -410,7 +519,8 @@ final class ServingPredictionTableController extends Controller
         string $variant,
         ?float $profitPerTradeMin,
         ?float $drawdownMax,
-        ?float $hitRateMin
+        ?float $hitRateMin,
+        ?int $minimumTrades
     ): bool {
         if ($signal !== '' && ! $model->prediction_enabled) {
             return false;
@@ -425,7 +535,13 @@ final class ServingPredictionTableController extends Controller
             return false;
         }
 
-        $metrics = $model->metrics;
+        // Model selection is fitted exclusively on the first two years. The
+        // following year is displayed as an untouched validation result and
+        // must never decide whether its checkbox is enabled.
+        $metrics = $model->statistics_metrics;
+        if ($metrics === null || (int) ($metrics->trades ?? 0) < 1) {
+            return false;
+        }
         if ($profitPerTradeMin !== null && (! is_numeric($metrics->median_return) || (float) $metrics->median_return < $profitPerTradeMin)) {
             return false;
         }
@@ -433,6 +549,9 @@ final class ServingPredictionTableController extends Controller
             return false;
         }
         if ($hitRateMin !== null && (! is_numeric($metrics->hit_rate) || (float) $metrics->hit_rate < $hitRateMin)) {
+            return false;
+        }
+        if ($minimumTrades !== null && (! is_numeric($metrics->trades) || (int) $metrics->trades < $minimumTrades)) {
             return false;
         }
 
@@ -464,6 +583,35 @@ final class ServingPredictionTableController extends Controller
                         'prediction' => $isActive ? $scope->prediction : null,
                     ];
                 });
+            });
+        });
+    }
+
+    private function attachWalkForwardStatistics(Collection $stocks): void
+    {
+        $statistics = app(ServingWalkForwardStatisticsService::class)->forActiveStocks($stocks);
+
+        $stocks->each(function (object $stock) use ($statistics): void {
+            $this->stockModels($stock)->each(function (object $model) use ($stock, $statistics): void {
+                $key = implode('|', [(int) $stock->instrument_id, (int) $model->horizon, (string) $model->variant]);
+                $split = $statistics->get($key);
+                $model->full_period_metrics = $model->metrics;
+                $model->statistics_metrics = $split['statistics'] ?? null;
+                $model->walk_forward_metrics = $split['walk_forward'] ?? null;
+                $model->walk_forward_passed = (bool) ($split['walk_forward_passed'] ?? false);
+                $model->statistics_from = $split['statistics_from'] ?? null;
+                $model->statistics_to = $split['statistics_to'] ?? null;
+                $model->walk_forward_from = $split['walk_forward_from'] ?? null;
+                $model->walk_forward_to = $split['walk_forward_to'] ?? null;
+
+                if ($model->statistics_metrics !== null) {
+                    // Slider ranges, filters and displayed selection metrics
+                    // must all use the same two-year statistics window.
+                    $model->metrics = $model->statistics_metrics;
+                }
+                $model->training_selectable = $model->statistics_metrics !== null
+                    && $model->statistics_metrics->trades > 0;
+                $model->strategy_selectable = $model->training_selectable;
             });
         });
     }

@@ -7,6 +7,8 @@
         $selectedLocale = old('locale', $preferences['locale'] ?? app()->getLocale());
         $selectedCountry = strtoupper((string) old('country_code', $preferences['country_code'] ?? 'DE'));
         $selectedRiskLevel = old('risk_level', data_get($user->meta, 'risk_profile.level', 'normal'));
+        $taxAllowance = old('tax_allowance_eur', $user->tax_allowance_eur ?? 1000);
+        $taxRate = old('tax_rate_percent', $user->tax_rate_percent ?? 25);
         $mobileNavDefaults = ['welcome','features','roadmap','dashboard','predictions','depots', ...($user->is_admin ? ['accounts'] : []), 'setup','news','pricing','contact','community'];
         $mobileNavLabels = ['welcome' => __('Startseite'), 'features' => __('Features'), 'roadmap' => __('Roadmap'), 'dashboard' => __('Dashboard'), 'predictions' => __('Prognosen'), 'depots' => __('Depots & Watchlist'), 'accounts' => __('Konten'), 'setup' => __('Setup'), 'news' => __('News'), 'pricing' => __('Preise'), 'contact' => __('Kontakt'), 'community' => __('Community')];
         $savedMobileNav = data_get($preferences, 'mobile_navigation', []);
@@ -69,6 +71,29 @@
                         @error('country_code')<p class="mt-2 text-xs text-rose-400">{{ $message }}</p>@enderror
                     </div>
                 </div>
+            </details>
+
+            <details id="steuern" open class="ak-detail-panel scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl lg:col-span-2">
+                <summary class="ak-detail-card-head -mx-6 -mt-6 flex cursor-pointer list-none items-center gap-3 px-6 py-5">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-400/25 bg-emerald-400/10 text-emerald-500"><x-heroicon-o-banknotes class="h-5 w-5" /></span>
+                    <div>
+                        <h2 class="font-black text-[var(--ak-text)]">{{ __('Steuersimulation') }}</h2>
+                        <p class="mt-0.5 text-xs text-[var(--ak-muted)]">{{ __('Diese persönlichen Werte werden ausschließlich bei aktivierter Steuersimulation einer Depotberechnung verwendet.') }}</p>
+                    </div>
+                </summary>
+                <div class="mt-6 grid gap-4 md:grid-cols-2">
+                    <label>
+                        <span class="ak-label">{{ __('Jährlicher Freibetrag') }}</span>
+                        <div class="relative mt-2"><input id="tax_allowance_eur" name="tax_allowance_eur" type="number" min="0" max="1000000" step="0.01" value="{{ $taxAllowance }}" class="ak-input w-full pr-9" required><span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-[var(--ak-muted)]">€</span></div>
+                        @error('tax_allowance_eur')<p class="mt-2 text-xs text-rose-400">{{ $message }}</p>@enderror
+                    </label>
+                    <label>
+                        <span class="ak-label">{{ __('Steuersatz') }}</span>
+                        <div class="relative mt-2"><input id="tax_rate_percent" name="tax_rate_percent" type="number" min="0" max="100" step="0.01" value="{{ $taxRate }}" class="ak-input w-full pr-9" required><span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-[var(--ak-muted)]">%</span></div>
+                        @error('tax_rate_percent')<p class="mt-2 text-xs text-rose-400">{{ $message }}</p>@enderror
+                    </label>
+                </div>
+                <p class="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/[.07] px-4 py-3 text-xs leading-5 text-[var(--ak-muted)]">{{ __('Die Simulation ist eine vereinfachte Modellrechnung und keine Steuerberatung. Freibetrag und Verlustverrechnung werden für jedes Kalenderjahr separat berücksichtigt.') }}</p>
             </details>
 
             <details id="darstellung" open class="ak-detail-panel scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-[var(--ak-border)] bg-[var(--ak-card)] p-6 shadow-[var(--ak-shadow)] backdrop-blur-xl">

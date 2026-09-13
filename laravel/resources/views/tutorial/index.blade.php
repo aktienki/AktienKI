@@ -6,7 +6,7 @@
     $videoLocale = $en ? 'en' : 'de';
     $chapters = $en ? [
         ['Dashboard', 'Signals, forecasts, market conditions, appointments and personal lists come together on your dashboard.', 'squares-2x2', route('dashboard')],
-        ['Understand signals', 'BUY supports an entry under current model conditions. HOLD means observe or maintain. WAIT/WATCH is not ready yet. SELL warns of weakness.', 'signal', route('predictions.index')],
+        ['Understand signals', 'POSITIV supports an entry under current model conditions. HOLD means observe or maintain. WAIT/WATCH is not ready yet. SELL warns of weakness.', 'signal', route('predictions.index')],
         ['Read forecasts', 'The 5, 10, 15 and 20 trading-day arrows show model direction. Stock details add target prices, possible returns, confidence and risk.', 'chart', route('predictions.index')],
         ['Use screeners', 'Compare stocks, indices, sectors, market conditions and news. Narrow results by country, sector, score, signal and risk.', 'funnel', route('screener.index')],
         ['Organize stocks', 'Use watchlists, labels and model portfolios. Strategy filters can monitor your criteria and optionally notify you.', 'bookmark', route('watchlists.index')],
@@ -15,7 +15,7 @@
         ['Ask AKI', 'Use AKI chat for explanations of the displayed stock, signal or metric. Keep questions specific and verify important decisions.', 'chat', route('dashboard')],
     ] : [
         ['Dashboard', 'Im Dashboard laufen Signale, Prognosen, Marktlage, Termine und persönliche Listen zusammen.', 'squares-2x2', route('dashboard')],
-        ['Signale verstehen', 'BUY spricht unter aktuellen Modellbedingungen für einen Einstieg. HOLD bedeutet beobachten oder halten. WAIT/WATCH ist noch nicht bereit. SELL warnt vor Schwäche.', 'signal', route('predictions.index')],
+        ['Signale verstehen', 'POSITIV spricht unter aktuellen Modellbedingungen für einen Einstieg. HOLD bedeutet beobachten oder halten. WAIT/WATCH ist noch nicht bereit. SELL warnt vor Schwäche.', 'signal', route('predictions.index')],
         ['Prognosen lesen', 'Die Pfeile für 5, 10, 15 und 20 Handelstage zeigen die Modellrichtung. Die Aktiendetails ergänzen Zielkurse, mögliche Renditen, Konfidenz und Risiko.', 'chart', route('predictions.index')],
         ['Screener nutzen', 'Vergleiche Aktien, Indizes, Sektoren, Marktlage und Nachrichten. Filtere nach Land, Sektor, Score, Signal und Risiko.', 'funnel', route('screener.index')],
         ['Aktien organisieren', 'Nutze Watchlists, Labels und Musterdepots. Strategiefilter überwachen deine Kriterien und informieren dich auf Wunsch.', 'bookmark', route('watchlists.index')],

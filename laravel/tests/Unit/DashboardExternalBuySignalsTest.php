@@ -15,23 +15,30 @@ final class DashboardExternalBuySignalsTest extends TestCase
         $this->assertStringContainsString("->where('verdict', 'NO_OBJECTION')", $controller);
         $this->assertStringContainsString("\$stock->instrument_id.'|'.\$stock->serving_batch_id", $controller);
         $this->assertStringContainsString('@forelse($externalConfirmedBuys as $stock)', $view);
-        $this->assertStringContainsString("__('Bestätigte BUY-Signale')", $view);
+        $this->assertStringContainsString("__('Bestätigte POSITIV-Signale')", $view);
         $this->assertStringNotContainsString("\$recentSignalOverview['wait_count']", $view);
         $this->assertStringNotContainsString("\$recentSignalOverview['sell_count']", $view);
         $this->assertStringNotContainsString("\$recentSignalOverview['hold_count']", $view);
     }
 
-    public function test_champion_uses_the_equal_three_factor_average_and_positive_panel_half(): void
+    public function test_champion_uses_the_screener_composite_score_and_positive_panel_half(): void
     {
         $root = dirname(__DIR__, 2);
         $controller = (string) file_get_contents($root.'/app/Http/Controllers/DashboardController.php');
         $view = (string) file_get_contents($root.'/resources/views/dashboard.blade.php');
 
-        $this->assertStringContainsString('$this->threeFactorRanking($externalConfirmedBuys)', $controller);
-        $this->assertStringContainsString('(int) ($stock->panel_decile ?? 0) >= 6', $controller);
+        // Champion and its two ranked alternatives are ranked in the SAME
+        // pool (every externally GPT-confirmed BUY signal) by the same
+        // composite score the screener shows for that instrument, and the
+        // champion is simply whichever ranks first - no extra, champion-only
+        // requirement (e.g. a minimum panel decile) sits on top of that,
+        // since such a requirement can let an alternative that does not
+        // clear it outscore the champion that does.
         $this->assertStringContainsString('$stock->three_factor_buy_score', $controller);
         $this->assertStringContainsString('$stock->three_factor_external_score', $controller);
         $this->assertStringContainsString('$stock->three_factor_panel_score', $controller);
+        $this->assertStringContainsString('is_numeric($stock->composite_score ?? null)', $controller);
+        $this->assertStringContainsString('(float) $stock->composite_score', $controller);
         $this->assertStringContainsString(') / 3, 1)', $controller);
         $this->assertStringContainsString("__('Drei-Faktoren-Champion')", $view);
         $this->assertStringNotContainsString('@if($champion)<a href=', $view);
@@ -43,7 +50,7 @@ final class DashboardExternalBuySignalsTest extends TestCase
         $controller = (string) file_get_contents($root.'/app/Http/Controllers/DashboardController.php');
         $view = (string) file_get_contents($root.'/resources/views/dashboard.blade.php');
 
-        $this->assertStringContainsString('$panelAlternativePool', $controller);
+        $this->assertStringContainsString('$externalConfirmedRanked', $controller);
         $this->assertStringContainsString('->take(2)', $controller);
         $this->assertStringContainsString("\$alternative->alternative_category = 'rank';", $controller);
         $this->assertStringContainsString('$alternative->alternative_rank = $index + 2;', $controller);
@@ -54,11 +61,11 @@ final class DashboardExternalBuySignalsTest extends TestCase
         $this->assertStringContainsString("\$additionalAlternative->alternative_category = 'alternative';", $controller);
         $this->assertStringContainsString('dashboard-alternative-entry', $view);
         $this->assertStringContainsString('dashboard-opportunity-card', $view);
-        $this->assertStringContainsString('min-height: 4.75rem;', $view);
+        $this->assertStringContainsString('min-height: 3.9rem;', $view);
         $this->assertStringContainsString('margin-top: 1rem;', $view);
         $this->assertStringContainsString('id="dashboard-ranking-stocks-row"', $view);
         $this->assertStringContainsString('#personal-dashboard #dashboard-best-stocks-row', $view);
-        $this->assertStringContainsString('row-gap: .5rem !important;', $view);
+        $this->assertStringContainsString('row-gap: .4rem !important;', $view);
         $this->assertStringContainsString('const alignStockRows = () =>', $view);
         $this->assertStringContainsString('const targetTop = Math.max(rankingTop, opportunityTop);', $view);
         $this->assertStringContainsString('x-heroicon-o-check-badge', $view);

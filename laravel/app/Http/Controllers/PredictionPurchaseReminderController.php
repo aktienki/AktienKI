@@ -76,7 +76,7 @@ class PredictionPurchaseReminderController extends Controller
         $this->authorizeReminder($request, $reminder);
         $reminder->update(['status' => 'disabled']);
 
-        return back()->with('status', __('Kauferinnerung wurde deaktiviert.'));
+        return back()->with('status', __('Positiv-Erinnerung wurde deaktiviert.'));
     }
 
     public function enable(Request $request, PredictionPurchaseReminder $reminder): RedirectResponse
@@ -84,7 +84,7 @@ class PredictionPurchaseReminderController extends Controller
         $this->authorizeReminder($request, $reminder);
         $reminder->update(['status' => 'active', 'notified_at' => null]);
 
-        return back()->with('status', __('Kauferinnerung wurde aktiviert.'));
+        return back()->with('status', __('Positiv-Erinnerung wurde aktiviert.'));
     }
 
     public function reschedule(Request $request, PredictionPurchaseReminder $reminder): RedirectResponse
@@ -101,7 +101,7 @@ class PredictionPurchaseReminderController extends Controller
         $this->authorizeReminder($request, $reminder);
         $reminder->delete();
 
-        return back()->with('status', __('Kauferinnerung wurde gelöscht.'));
+        return back()->with('status', __('Positiv-Erinnerung wurde gelöscht.'));
     }
 
     private function authorizeReminder(Request $request, PredictionPurchaseReminder $reminder): void

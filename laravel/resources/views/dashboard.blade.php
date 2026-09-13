@@ -32,7 +32,7 @@
             'community-posts' => __('Beiträge in der Community öffnen.'),
             'community-members' => __('Mitglieder der Community anzeigen.'),
             'community-recent' => __('Community-Aktivität der letzten sieben Tage anzeigen.'),
-            'best-buy' => __('Aktuell stärkste BUY-Aktie öffnen.'),
+            'best-buy' => __('Aktuell stärkste POSITIV-Aktie öffnen.'),
             'best-wait' => __('Aktuell stärkste WATCH-Aktie öffnen.'),
             'watchlist-screener' => __('Watchlist-Aktien direkt filtern.'),
             'predictions' => __('Alle aktuellen Prognosen vergleichen.'),
@@ -55,7 +55,7 @@
         $dashboardMainCardLabels = [
             'strategy' => __('Strategiedepot'), 'personal' => __('Persönlicher Bereich'),
             'community' => __('Community'), 'market' => __('Aktuelle Remote-Aktien'),
-            'models' => __('Letzte Prognosen'), 'signals' => __('Extern bestätigte BUY-Signale'),
+            'models' => __('Letzte Prognosen'), 'signals' => __('Extern bestätigte POSITIV-Signale'),
             'earnings' => __('Aktuelle Quartalszahlen'),
             'market-summary' => __('Kompakter Marktbericht'),
             'schedule' => __('Termine & Erinnerungen'), 'signal-cockpit' => __('Beste Alternativen'),
@@ -66,7 +66,7 @@
         $dashboardMainCardDescriptions = [
             'strategy' => __('Depotwert, Kapital und Performance.'), 'personal' => __('Deine persönlichen Schnellzugriffe.'),
             'community' => __('Aktivität seit deinem letzten Login.'), 'market' => __('Ausblick und aktueller Marktbericht.'),
-            'models' => __('Globale Modellläufe nach Regionen.'), 'signals' => __('Aktuelle BUY-Signale ohne wesentlichen externen Einwand.'),
+            'models' => __('Globale Modellläufe nach Regionen.'), 'signals' => __('Aktuelle POSITIV-Signale ohne wesentlichen externen Einwand.'),
             'earnings' => __('Aktuelle Quartalszahlen aus dem Portfolio.'),
             'market-summary' => __('Aktuelle Marktlage kompakt zusammengefasst.'),
             'schedule' => __('Anstehende E-Mails und Aktionen.'),
@@ -109,18 +109,18 @@
             'market' => [__('Größe deines aktiven Remote-Universums: wie viele Aktien eine aktuelle Prediction haben und wie viele noch ausstehen, plus die KI-Rating-Verteilung.')],
             'market-summary' => [__('Die aktuelle Marktlage in einem Satz zusammengefasst, plus kurzer Ausblick.')],
             'daily-tips' => [
-                __('Zwei Zusatzkandidaten neben dem Champion. Oben: die Aktie mit dem stärksten Anstieg des KI-Scores über die letzten rund fünf Handelstage, die noch kein BUY-Signal hat (aus der lokalen Prognosehistorie).'),
+                __('Zwei Zusatzkandidaten neben dem Champion. Oben: die Aktie mit dem stärksten Anstieg des KI-Scores über die letzten rund fünf Handelstage, die noch kein POSITIV-Signal hat (aus der lokalen Prognosehistorie).'),
                 __('Unten: die Aktie mit der besten ChartView-Statistik – ein nach Fallzahl gewichteter Mittelwert der „Kurs danach gestiegen"-Wahrscheinlichkeit über ihre bullischen technischen Ereignisse (20-Tage-Horizont).'),
             ],
             'models' => [__('Status der globalen Modellläufe nach Regionen und die zuletzt erzeugten Prognosen.')],
-            'signals' => [__('Aktuelle BUY-Signale, für deren exakte Serving-Version die externe Prüfung keinen wesentlichen Einwand gefunden hat.')],
+            'signals' => [__('Aktuelle POSITIV-Signale, für deren exakte Serving-Version die externe Prüfung keinen wesentlichen Einwand gefunden hat.')],
             'earnings' => [__('Anstehende Quartalszahlen für Aktien aus deinem Portfolio und deinen Watchlists.')],
             'schedule' => [__('Anstehende E-Mails, Erinnerungen und geplante Aktionen mit Datum.')],
             'community' => [__('Neue Beiträge, Mitglieder und Aktivität in der Community seit deinem letzten Login.')],
             'mobile-view' => [__('Lege fest, welche Karten auf dem Smartphone angezeigt werden.')],
-            'champion' => [__('Die beste Aktie im gleichgewichteten Mittel aus BUY-Rating, externer Bestätigung und Panel-Perzentil. Berücksichtigt werden nur extern bestätigte BUYs in den Panel-Dezilen 6 bis 10.')],
+            'champion' => [__('Die beste Aktie im gleichgewichteten Mittel aus POSITIV-Rating, externer Bestätigung und Panel-Perzentil. Berücksichtigt werden nur extern bestätigte BUYs in den Panel-Dezilen 6 bis 10.')],
             'center-combined' => [
-                __('Oben steht der Drei-Faktoren-Champion aus BUY-Rating, externer Bestätigung und Panel-Perzentil.'),
+                __('Oben steht der Drei-Faktoren-Champion aus POSITIV-Rating, externer Bestätigung und Panel-Perzentil.'),
                 __('Darunter folgen die Ranking-Plätze 2 bis 4 und eine zusätzliche Alternativaktie.'),
             ],
         ];
@@ -380,12 +380,12 @@
                             </a>
                             @if ($topStockToday)
                                 @php $topStockScore = \App\Support\AiScore::toTen(is_numeric($topStockToday->ai_score) ? $topStockToday->ai_score : $topStockToday->prediction_score); @endphp
-                                <a href="{{ route('stocks.show', ['symbol' => $topStockToday->symbol, 'prediction' => $topStockToday->prediction_id, 'return_to' => '/dashboard']) }}" data-dashboard-tile="best-buy" data-dashboard-tile-label="{{ __('Beste BUY-Aktie') }}" class="group min-w-0 rounded-xl border border-emerald-400/25 bg-emerald-400/[.055] px-3 py-3 transition hover:border-emerald-300/50 hover:bg-emerald-400/[.11] {{ $dashboardTileVisible('best-buy') ? '' : 'hidden' }}" title="{{ $topStockToday->name }}">
+                                <a href="{{ route('stocks.show', ['symbol' => $topStockToday->symbol, 'prediction' => $topStockToday->prediction_id, 'return_to' => '/dashboard']) }}" data-dashboard-tile="best-buy" data-dashboard-tile-label="{{ __('Beste POSITIV-Aktie') }}" class="group min-w-0 rounded-xl border border-emerald-400/25 bg-emerald-400/[.055] px-3 py-3 transition hover:border-emerald-300/50 hover:bg-emerald-400/[.11] {{ $dashboardTileVisible('best-buy') ? '' : 'hidden' }}" title="{{ $topStockToday->name }}">
                                     <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-emerald-400/25 bg-emerald-400/10 text-emerald-400"><x-heroicon-o-trophy class="h-4 w-4" /></span><span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $topStockToday->symbol }}</b><small class="block text-[8px] font-black text-emerald-400">{{ $topStockScore !== null ? number_format($topStockScore, 1, ',', '.').'/10' : '—' }}</small></span></span>
-                                    <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Beste BUY-Aktie') }}</small>
+                                    <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Beste POSITIV-Aktie') }}</small>
                                 </a>
                             @else
-                                <div data-dashboard-tile="best-buy" data-dashboard-tile-label="{{ __('Beste BUY-Aktie') }}" class="min-w-0 rounded-xl border border-orange-400/15 bg-orange-400/[.025] px-3 py-3 opacity-70 {{ $dashboardTileVisible('best-buy') ? '' : 'hidden' }}"><span class="flex items-center gap-2"><span class="grid h-8 w-8 place-items-center rounded-lg border border-orange-400/20 text-orange-400"><x-heroicon-o-trophy class="h-4 w-4" /></span><b class="text-lg text-[var(--ak-muted)]">—</b></span><small class="mt-2 block truncate text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Beste BUY-Aktie') }}</small></div>
+                                <div data-dashboard-tile="best-buy" data-dashboard-tile-label="{{ __('Beste POSITIV-Aktie') }}" class="min-w-0 rounded-xl border border-orange-400/15 bg-orange-400/[.025] px-3 py-3 opacity-70 {{ $dashboardTileVisible('best-buy') ? '' : 'hidden' }}"><span class="flex items-center gap-2"><span class="grid h-8 w-8 place-items-center rounded-lg border border-orange-400/20 text-orange-400"><x-heroicon-o-trophy class="h-4 w-4" /></span><b class="text-lg text-[var(--ak-muted)]">—</b></span><small class="mt-2 block truncate text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Beste POSITIV-Aktie') }}</small></div>
                             @endif
                             @php
                                 $topWatchScore = $topWatchStock ? \App\Support\AiScore::toTen(is_numeric($topWatchStock->ai_score) ? $topWatchStock->ai_score : $topWatchStock->prediction_score) : null;
@@ -485,7 +485,7 @@
                                         <span class="absolute top-0 -translate-x-1/2" style="left:{{ $position }}%" title="{{ $bin['range'] ?? $bin['label'] }}: {{ $bin['count'] }} {{ __('Aktien') }}"><span class="grid h-8 w-12 place-items-center rounded-md border px-1 text-[10px] font-black leading-none tabular-nums shadow-md {{ $markerTone }}">{{ $bin['count'] }}</span><span class="mx-auto block h-2.5 w-px bg-current opacity-60"></span></span>
                                     @endforeach
                                     <div class="absolute inset-x-0 bottom-0 grid grid-cols-4 text-center text-[7px] font-black uppercase tracking-wide">
-                                        @foreach ([[__('SELL'),'text-rose-500'],[__('HOLD'),'text-amber-500'],[__('WATCH'),'text-lime-600'],[__('BUY'),'text-emerald-500']] as [$signalLabel,$signalTone])
+                                        @foreach ([[__('SELL'),'text-rose-500'],[__('HOLD'),'text-amber-500'],[__('WATCH'),'text-lime-600'],[__('POSITIV'),'text-emerald-500']] as [$signalLabel,$signalTone])
                                             <span class="truncate {{ $signalTone }}">{{ $signalLabel }}</span>
                                         @endforeach
                                     </div>
@@ -502,7 +502,7 @@
                     @endphp
                     <article id="dashboard-daily-tips-card" data-help-card="daily-tips" x-data="{ opportunitiesOpen: true }" class="dashboard-daily-tips ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden rounded-xl border-cyan-400/30 p-4" aria-labelledby="dashboard-daily-tips-title">
                         <div class="dashboard-collapsible-header flex items-center justify-between gap-3" :class="opportunitiesOpen ? 'mb-3' : ''">
-                            <div class="flex min-w-0 flex-1 items-center gap-3 text-left"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-600"><x-heroicon-o-bolt class="h-5 w-5" /></span><span class="min-w-0"><span class="block whitespace-nowrap text-[9px] font-black uppercase tracking-[.16em] text-cyan-600">{{ __('Zusätzliche Kandidaten') }}</span><span class="mt-1 flex min-w-0 items-center gap-2"><span id="dashboard-daily-tips-title" class="truncate text-base font-black text-[var(--ak-text)]">{{ __('Aufsteiger, Technik & Neu') }}</span></span><span class="mt-1 flex flex-wrap gap-1.5 text-[8px] font-black"><span class="text-cyan-600">{{ __('Score-Anstieg (5 Tage)') }}</span><span class="text-[var(--ak-muted)]">· {{ __('ChartView') }} · {{ __('neues BUY') }}</span></span></span></div>
+                            <div class="flex min-w-0 flex-1 items-center gap-3 text-left"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-600"><x-heroicon-o-bolt class="h-5 w-5" /></span><span class="min-w-0"><span class="block whitespace-nowrap text-[9px] font-black uppercase tracking-[.16em] text-cyan-600">{{ __('Zusätzliche Kandidaten') }}</span><span class="mt-1 flex min-w-0 items-center gap-2"><span id="dashboard-daily-tips-title" class="truncate text-base font-black text-[var(--ak-text)]">{{ __('Aufsteiger, Technik & Neu') }}</span></span><span class="mt-1 flex flex-wrap gap-1.5 text-[8px] font-black"><span class="text-cyan-600">{{ __('Score-Anstieg (5 Tage)') }}</span><span class="text-[var(--ak-muted)]">· {{ __('ChartView') }} · {{ __('neues POSITIV') }}</span></span></span></div>
                         </div>
                         <div id="dashboard-best-stocks-row" x-show="opportunitiesOpen" x-cloak x-transition.opacity class="grid min-h-0 flex-1 grid-cols-1 content-start gap-1.5 overflow-y-auto pr-1" aria-label="{{ __('Aufsteiger und technische Auswahl') }}">
                             @if(! $canUsePro)
@@ -514,15 +514,15 @@
                                         $newStockDate = $bestNewStock->new_buy_at ? \Illuminate\Support\Carbon::parse($bestNewStock->new_buy_at)->timezone('Europe/Berlin')->format('d.m.Y') : null;
                                     @endphp
                                     <a href="{{ route('stocks.show', ['symbol' => $bestNewStock->symbol, 'return_to' => '/dashboard']) }}" class="dashboard-opportunity-card group flex min-w-0 items-center gap-2.5 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-2 transition hover:border-orange-300/45 hover:bg-orange-400/[.10]" title="{{ $bestNewStock->name }}">
-                                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-amber-400/35 bg-amber-400/[.12] text-amber-500"><x-heroicon-o-sparkles class="h-5 w-5" /></span>
+                                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-amber-400/35 bg-amber-400/[.12] text-amber-500"><x-heroicon-o-sparkles class="h-4 w-4" /></span>
                                         <span class="min-w-0 flex-1">
                                             <span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $newStockFlag }} {{ $bestNewStock->name ?: $bestNewStock->symbol }}</b><em class="shrink-0 rounded-md border border-amber-400/35 bg-amber-400/[.12] px-1.5 py-0.5 text-[9px] font-black not-italic tabular-nums text-amber-500">KI {{ number_format((float) ($bestNewStock->score_10 ?? 0), 1, ',', '.') }}</em></span>
-                                            <small class="mt-0.5 block truncate text-[9px] font-black text-amber-500">{{ $bestNewStock->is_fresh_buy ? __('Beste neue BUY-Aktie') : __('Neueste Aktie') }}@if($newStockDate) · {{ $newStockDate }}@endif</small>
-                                            <small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $bestNewStock->symbol }}</span><span class="text-emerald-500">BUY</span>@if(is_numeric($bestNewStock->panel_decile ?? null))<span class="text-cyan-500">Panel D{{ (int) $bestNewStock->panel_decile }}</span>@endif@if(is_numeric($bestNewStock->expected_return_20d ?? null))<span class="{{ (float) $bestNewStock->expected_return_20d >= 0 ? 'text-emerald-500' : 'text-rose-400' }}">20T {{ sprintf('%+.1f %%', (float) $bestNewStock->expected_return_20d) }}</span>@endif</small>
+                                            <small class="mt-0.5 block truncate text-[9px] font-black text-amber-500">{{ $bestNewStock->is_fresh_buy ? __('Beste neue POSITIV-Aktie') : __('Neueste Aktie') }}@if($newStockDate) · {{ $newStockDate }}@endif</small>
+                                            <small class="mt-0.5 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $bestNewStock->symbol }}</span><span class="text-emerald-500">{{ signal_label('BUY') }}</span>@if(is_numeric($bestNewStock->panel_decile ?? null))<span class="text-cyan-500">Panel D{{ (int) $bestNewStock->panel_decile }}</span>@endif@if(is_numeric($bestNewStock->expected_return_20d ?? null))<span class="{{ (float) $bestNewStock->expected_return_20d >= 0 ? 'text-emerald-500' : 'text-rose-400' }}">20T {{ sprintf('%+.1f %%', (float) $bestNewStock->expected_return_20d) }}</span>@endif</small>
                                         </span>
                                     </a>
                                 @else
-                                    <div class="rounded-xl border border-dashed border-orange-400/20 p-3 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Keine weitere neue BUY-Aktie verfügbar.') }}</div>
+                                    <div class="rounded-xl border border-dashed border-orange-400/20 p-3 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Keine weitere neue POSITIV-Aktie verfügbar.') }}</div>
                                 @endif
 
                                 @if($scoreRiser)
@@ -532,15 +532,15 @@
                                         $riserSignalTone = match($riserSignal) { 'WATCH' => 'text-lime-500', 'SELL' => 'text-rose-400', 'WAIT' => 'text-orange-500', default => 'text-amber-500' };
                                     @endphp
                                     <a href="{{ route('stocks.show', ['symbol' => $scoreRiser->symbol, 'return_to' => '/dashboard']) }}" class="dashboard-opportunity-card group flex min-w-0 items-center gap-2.5 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-2 transition hover:border-orange-300/45 hover:bg-orange-400/[.10]" title="{{ $scoreRiser->name }}">
-                                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-emerald-400/35 bg-emerald-400/[.12] text-emerald-500"><x-heroicon-o-arrow-trending-up class="h-5 w-5" /></span>
+                                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-emerald-400/35 bg-emerald-400/[.12] text-emerald-500"><x-heroicon-o-arrow-trending-up class="h-4 w-4" /></span>
                                         <span class="min-w-0 flex-1">
                                             <span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $riserFlag }} {{ $scoreRiser->name ?: $scoreRiser->symbol }}</b><em class="shrink-0 rounded-md border border-emerald-400/35 bg-emerald-400/[.12] px-1.5 py-0.5 text-[9px] font-black not-italic tabular-nums text-emerald-500">+{{ number_format($scoreRiser->score_rise_delta, 1, ',', '.') }}</em></span>
-                                            <small class="mt-0.5 block truncate text-[9px] font-black text-emerald-500">{{ __('Score-Aufsteiger · :days Tage · noch kein BUY', ['days' => $scoreRiser->score_rise_days]) }}</small>
-                                            <small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $scoreRiser->symbol }}</span><span class="{{ $riserSignalTone }}">{{ $riserSignal }}</span><span class="text-emerald-500">KI {{ number_format($scoreRiser->score_rise_prev, 1, ',', '.') }} → {{ number_format($scoreRiser->score_rise_now, 1, ',', '.') }}</span></small>
+                                            <small class="mt-0.5 block truncate text-[9px] font-black text-emerald-500">{{ __('Score-Aufsteiger · :days Tage · noch kein POSITIV', ['days' => $scoreRiser->score_rise_days]) }}</small>
+                                            <small class="mt-0.5 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $scoreRiser->symbol }}</span><span class="{{ $riserSignalTone }}">{{ signal_label($riserSignal) }}</span><span class="text-emerald-500">KI {{ number_format($scoreRiser->score_rise_prev, 1, ',', '.') }} → {{ number_format($scoreRiser->score_rise_now, 1, ',', '.') }}</span></small>
                                         </span>
                                     </a>
                                 @else
-                                    <div class="rounded-xl border border-dashed border-orange-400/20 p-3 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Kein Score-Aufsteiger der letzten Tage ohne BUY.') }}</div>
+                                    <div class="rounded-xl border border-dashed border-orange-400/20 p-3 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Kein Score-Aufsteiger der letzten Tage ohne POSITIV.') }}</div>
                                 @endif
 
                                 @if($topIndicatorStock)
@@ -549,11 +549,11 @@
                                         $indicatorSignal = strtoupper((string) ($topIndicatorStock->personalized_signal ?: $topIndicatorStock->model_signal ?: 'HOLD'));
                                     @endphp
                                     <a href="{{ route('stocks.show', ['symbol' => $topIndicatorStock->symbol, 'return_to' => '/dashboard']) }}" class="dashboard-opportunity-card group flex min-w-0 items-center gap-2.5 rounded-xl border border-orange-400/20 bg-orange-400/[.045] px-3 py-2 transition hover:border-orange-300/45 hover:bg-orange-400/[.10]" title="{{ $topIndicatorStock->name }}">
-                                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-cyan-400/35 bg-cyan-400/[.12] text-cyan-500"><x-heroicon-o-chart-bar class="h-5 w-5" /></span>
+                                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-cyan-400/35 bg-cyan-400/[.12] text-cyan-500"><x-heroicon-o-chart-bar class="h-4 w-4" /></span>
                                         <span class="min-w-0 flex-1">
                                             <span class="flex items-center justify-between gap-2"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $indicatorFlag }} {{ $topIndicatorStock->name ?: $topIndicatorStock->symbol }}</b><em class="shrink-0 rounded-md border border-cyan-400/35 bg-cyan-400/[.12] px-1.5 py-0.5 text-[9px] font-black not-italic tabular-nums text-cyan-500">{{ number_format($topIndicatorStock->indicator_score, 0, ',', '.') }}%</em></span>
                                             <small class="mt-0.5 block truncate text-[9px] font-black text-cyan-500">{{ __('Bester Indikatorscore · :events Signale, :n Fälle', ['events' => $topIndicatorStock->indicator_events, 'n' => $topIndicatorStock->indicator_samples]) }}</small>
-                                            <small class="mt-1 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $topIndicatorStock->symbol }}</span><span>{{ $indicatorSignal }}</span>@if($topIndicatorStock->indicator_top_label)<span class="truncate text-cyan-500" title="{{ $topIndicatorStock->indicator_top_label }}">{{ $topIndicatorStock->indicator_top_label }}{{ $topIndicatorStock->indicator_top_prob !== null ? ' · '.number_format($topIndicatorStock->indicator_top_prob, 0, ',', '.').'%' : '' }}</span>@endif</small>
+                                            <small class="mt-0.5 flex flex-wrap gap-x-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $topIndicatorStock->symbol }}</span><span>{{ signal_label($indicatorSignal) }}</span>@if($topIndicatorStock->indicator_top_label)<span class="truncate text-cyan-500" title="{{ $topIndicatorStock->indicator_top_label }}">{{ $topIndicatorStock->indicator_top_label }}{{ $topIndicatorStock->indicator_top_prob !== null ? ' · '.number_format($topIndicatorStock->indicator_top_prob, 0, ',', '.').'%' : '' }}</span>@endif</small>
                                         </span>
                                     </a>
                                 @else
@@ -635,19 +635,24 @@
                                 $rankCurrency = strtoupper((string) ($rankedStock->currency ?: 'EUR'));
                                 $rankCurrencyLabel = match($rankCurrency) { 'EUR' => '€', 'USD' => '$', 'GBP' => '£', 'JPY' => '¥', default => $rankCurrency };
                                 $rankDailyChange = is_numeric($rankedStock->daily_change_percent ?? null) ? (float) $rankedStock->daily_change_percent : null;
-                                $rankReason = __('Gleichgewichtetes Mittel :average % aus BUY :buy %, extern :external % und Panel :panel % (Dezil :decile)', [
+                                $rankReason = __('Gesamtscore :average (wie im Screener), unterstützt durch POSITIV :buy %, extern :external % und Panel :panel % (Dezil :decile)', [
                                     'average' => number_format((float) ($rankedStock->three_factor_score ?? 0), 1, ',', '.'),
                                     'buy' => number_format((float) ($rankedStock->three_factor_buy_score ?? 0), 0, ',', '.'),
                                     'external' => number_format((float) ($rankedStock->three_factor_external_score ?? 0), 0, ',', '.'),
                                     'panel' => number_format((float) ($rankedStock->three_factor_panel_score ?? 0), 1, ',', '.'),
                                     'decile' => (int) ($rankedStock->panel_decile ?? 0),
                                 ]);
+                                // All three inputs the 81%-average is made of, shown
+                                // individually next to the donut instead of just one
+                                // of them (panel) - so nothing looks re-counted that
+                                // is already folded into the score above.
+                                $rankExternalConfirmed = (bool) ($rankedStock->three_factor_external_confirmed ?? false);
                             @endphp
                             @if($rank === 1)
                                 <div class="dashboard-champion-entry group grid min-h-0 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] content-center items-center gap-3 overflow-y-auto rounded-xl border border-amber-400/35 px-4 py-3 transition hover:border-amber-400/60">
                                     <a href="{{ route('stocks.show', ['symbol' => $rankedStock->symbol, 'return_to' => '/dashboard']) }}" class="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                                        <span class="min-w-0"><b class="flex min-w-0 items-center gap-2"><span class="truncate text-sm font-black text-[var(--ak-text)]">{{ $rankFlag }} {{ $rankedStock->name ?: $rankedStock->symbol }}</span>@if($rankedStock->external_review_ranking_downgraded ?? false)<span class="shrink-0 rounded-md border border-rose-400/35 bg-rose-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-rose-400" title="{{ __('Externer KI-Widerspruch: Ranking um einen Punkt reduziert') }}">KI −1</span>@endif</b><small class="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $rankedStock->symbol }}</span><span class="{{ $rankSignalTone }}">{{ $rankSignal }}</span><span>{{ ($rankedStock->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($rankedStock->display_price ?? null) ? number_format((float) $rankedStock->display_price, 2, ',', '.').' '.$rankCurrencyLabel : '—' }}</span><span class="{{ $rankDailyChange === null ? '' : ($rankDailyChange >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ __('Tag') }} {{ $rankDailyChange !== null ? sprintf('%+.2f%%', $rankDailyChange) : '—' }}</span></small></span>
-                                        <span class="flex items-center gap-2"><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankQualityPercent" :display="$rankQualityGrade" :level="$rankQualityLevel" type="chance" :label="__('Drei-Faktoren-Mittel')" /></span><span class="grid h-[66px] min-w-[66px] place-items-center rounded-full border border-emerald-400/30 bg-emerald-400/[.07] text-center"><span><b class="block text-sm font-black text-emerald-400">D{{ (int) ($rankedStock->panel_decile ?? 0) }}</b><small class="block text-[7px] font-black uppercase text-[var(--ak-muted)]">Panel</small></span></span></span>
+                                        <span class="min-w-0"><b class="flex min-w-0 items-center gap-2"><span class="truncate text-sm font-black text-[var(--ak-text)]">{{ $rankFlag }} {{ $rankedStock->name ?: $rankedStock->symbol }}</span>@if($rankedStock->external_review_ranking_downgraded ?? false)<span class="shrink-0 rounded-md border border-rose-400/35 bg-rose-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-rose-400" title="{{ __('Externer KI-Widerspruch: Ranking um einen Punkt reduziert') }}">KI −1</span>@endif</b><small class="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $rankedStock->symbol }}</span><span class="{{ $rankSignalTone }}">{{ signal_label($rankSignal) }}</span><span>{{ ($rankedStock->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($rankedStock->display_price ?? null) ? number_format((float) $rankedStock->display_price, 2, ',', '.').' '.$rankCurrencyLabel : '—' }}</span><span class="{{ $rankDailyChange === null ? '' : ($rankDailyChange >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ __('Tag') }} {{ $rankDailyChange !== null ? sprintf('%+.2f%%', $rankDailyChange) : '—' }}</span></small></span>
+                                        <span class="flex items-center gap-2"><span class="dashboard-champion-donut"><x-segmented-score-donut :score="$rankQualityPercent" :display="$rankQualityGrade" :level="$rankQualityLevel" type="chance" :label="__('Drei-Faktoren-Mittel')" /></span><span class="dashboard-champion-factors grid h-[66px] min-w-[76px] grid-rows-3 items-center gap-0.5 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2 py-1" title="{{ $rankReason }}"><span class="flex items-center justify-between gap-1.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Positiv') }}<b class="text-emerald-400">{{ number_format((float) ($rankedStock->three_factor_buy_score ?? 0), 0, ',', '.') }}%</b></span><span class="flex items-center justify-between gap-1.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Extern') }}<b class="text-cyan-400">{{ $rankExternalConfirmed ? number_format((float) ($rankedStock->three_factor_external_score ?? 0), 0, ',', '.').'%' : '—' }}</b></span><span class="flex items-center justify-between gap-1.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Panel') }}<b class="text-amber-400">D{{ (int) ($rankedStock->panel_decile ?? 0) }}</b></span></span></span>
                                     </a>
                                     <details class="dashboard-champion-reason group col-span-2 min-w-0 border-t border-amber-400/15 pt-2">
                                         <summary class="flex cursor-pointer list-none items-center gap-2 text-[9px] font-bold leading-4 text-[var(--ak-muted)] [&::-webkit-details-marker]:hidden">
@@ -659,7 +664,7 @@
                                 </div>
                             @else
                                 <a href="{{ route('stocks.show', ['symbol' => $rankedStock->symbol, 'return_to' => '/dashboard']) }}" class="group grid min-h-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-xl border border-cyan-400/25 bg-white/[.018] px-4 py-3 transition hover:border-cyan-400/45">
-                                    <span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $rankFlag }} {{ $rankedStock->name ?: $rankedStock->symbol }}</b><small class="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $rankedStock->symbol }}</span><span class="{{ $rankSignalTone }}">{{ $rankSignal }}</span><span>{{ ($rankedStock->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($rankedStock->display_price ?? null) ? number_format((float) $rankedStock->display_price, 2, ',', '.').' '.$rankCurrencyLabel : '—' }}</span><span class="{{ $rankDailyChange === null ? '' : ($rankDailyChange >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ __('Tag') }} {{ $rankDailyChange !== null ? sprintf('%+.2f%%', $rankDailyChange) : '—' }}</span></small></span>
+                                    <span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $rankFlag }} {{ $rankedStock->name ?: $rankedStock->symbol }}</b><small class="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ $rankedStock->symbol }}</span><span class="{{ $rankSignalTone }}">{{ signal_label($rankSignal) }}</span><span>{{ ($rankedStock->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($rankedStock->display_price ?? null) ? number_format((float) $rankedStock->display_price, 2, ',', '.').' '.$rankCurrencyLabel : '—' }}</span><span class="{{ $rankDailyChange === null ? '' : ($rankDailyChange >= 0 ? 'text-emerald-400' : 'text-rose-400') }}">{{ __('Tag') }} {{ $rankDailyChange !== null ? sprintf('%+.2f%%', $rankDailyChange) : '—' }}</span></small></span>
                                     <span class="flex items-center gap-1.5"><span class="rounded-md border border-cyan-400/20 px-1.5 py-1 text-[9px] font-black text-cyan-400">KI {{ is_numeric($rankScore) ? number_format($rankScore, 1, ',', '.') : '—' }}</span><span class="rounded-md border px-1.5 py-1 text-[9px] font-black {{ is_numeric($rankReturn) && $rankReturn < 0 ? 'border-rose-400/25 text-rose-400' : 'border-emerald-400/25 text-emerald-400' }}">20T {{ is_numeric($rankReturn) ? sprintf('%+.1f%%', $rankReturn) : '—' }}</span></span>
                                 </a>
                             @endif
@@ -678,10 +683,10 @@
                                 <span class="block whitespace-nowrap text-[9px] font-black uppercase tracking-[.16em] text-cyan-600">PRO · 5 {{ __('Handelstage') }}</span>
                                 <span class="mt-1 flex min-w-0 items-center gap-2">
                                     <span class="block min-w-0 truncate text-sm font-black text-[var(--ak-text)] sm:text-base">{{ __('Signal-Cockpit') }}</span>
-                                    <span class="hidden shrink-0 rounded-md border border-cyan-400/25 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide sm:inline-flex"><span class="text-emerald-500">Top 3 BUY</span><span class="mx-1 text-[var(--ak-muted)]">·</span><span class="text-rose-500">1 SELL</span></span>
+                                    <span class="hidden shrink-0 rounded-md border border-cyan-400/25 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide sm:inline-flex"><span class="text-emerald-500">Top 3 POSITIV</span><span class="mx-1 text-[var(--ak-muted)]">·</span><span class="text-rose-500">1 SELL</span></span>
                                 </span>
                                 <span class="mt-1 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[8px] font-black">
-                                    <span class="inline-flex shrink-0 rounded border border-cyan-400/20 px-1 py-0.5 sm:hidden"><span class="text-emerald-500">Top 3 BUY</span><span class="mx-1 text-[var(--ak-muted)]">·</span><span class="text-rose-500">1 SELL</span></span>
+                                    <span class="inline-flex shrink-0 rounded border border-cyan-400/20 px-1 py-0.5 sm:hidden"><span class="text-emerald-500">Top 3 POSITIV</span><span class="mx-1 text-[var(--ak-muted)]">·</span><span class="text-rose-500">1 SELL</span></span>
                                     <span class="text-cyan-600" title="{{ __('Rohwert') }}: {{ is_numeric($cockpitAverageScore) ? number_format((float) $cockpitAverageScore, 1, ',', '.').'/10' : '—' }}">Ø KI {{ $cockpitAverageScoreGrade }}</span>
                                     <span class="text-amber-600" title="{{ __('Rohwert') }}: {{ is_numeric($cockpitAverageRisk) ? number_format((float) $cockpitAverageRisk, 0, ',', '.').' %' : '—' }}">Ø {{ __('Risiko') }} {{ $cockpitAverageRiskLevel }}</span>
                                 </span>
@@ -850,6 +855,7 @@
                                     $alternativeLongReturn = is_numeric($alternative->{'expected_return_'.$alternativeLongDays.'d'} ?? null) ? (float) $alternative->{'expected_return_'.$alternativeLongDays.'d'} : null;
                                     $alternativeReturn20 = is_numeric($alternative->expected_return_20d ?? null) ? (float) $alternative->expected_return_20d : null;
                                     $alternativeScore = is_numeric($alternative->three_factor_score ?? null) ? (float) $alternative->three_factor_score : 0.0;
+                                    $alternativeBuyScore = is_numeric($alternative->three_factor_buy_score ?? null) ? (float) $alternative->three_factor_buy_score : 0.0;
                                     $alternativeScoreGrade = number_format($alternativeScore, 0, ',', '.');
                                     $alternativeScoreLevel = max(0, min(5, (int) ceil($alternativeScore / 20)));
                                     $alternativeSignal = strtoupper((string) ($alternative->personalized_signal ?: 'BUY'));
@@ -863,17 +869,17 @@
                                     <span class="dashboard-alternative-rank" aria-hidden="true">{{ $alternativeRankBadge }}</span>
                                     <span class="min-w-0 flex-1">
                                         <small class="block text-[8px] font-black uppercase tracking-[.14em] {{ $alternativeCategory === 'alternative' ? 'text-amber-600' : 'text-cyan-600' }}">{{ $alternativeCategoryLabel }}</small>
-                                        <b class="mt-0.5 flex min-w-0 items-center gap-1.5"><span class="truncate text-[13px] font-black text-[var(--ak-text)]">{{ $alternativeFlag }} {{ $alternative->name ?: $alternative->symbol }}</span></b>
-                                        <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                        <b class="flex min-w-0 items-center gap-1.5"><span class="truncate text-[13px] font-black text-[var(--ak-text)]">{{ $alternativeFlag }} {{ $alternative->name ?: $alternative->symbol }}</span></b>
+                                        <small class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                                             <span>{{ $alternative->symbol }}</span>
-                                            <span class="{{ $alternativeSignalTone }}">{{ $alternativeSignal }}</span>
+                                            <span class="{{ $alternativeSignalTone }}">{{ signal_label($alternativeSignal) }}</span>
                                             <span>{{ ($alternative->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($alternative->display_price ?? null) ? number_format((float) $alternative->display_price, 2, ',', '.').' '.$alternativeCurrencyLabel : '—' }}</span>
                                             <span class="{{ $alternativeDaily === null ? '' : ($alternativeDaily >= 0 ? 'text-emerald-500' : 'text-rose-400') }}">{{ __('Tag') }} {{ $alternativeDaily !== null ? sprintf('%+.2f%%', $alternativeDaily) : '—' }}</span>
                                         </small>
                                         @if($alternativeCategory === 'alternative')
-                                            <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span class="text-emerald-500">KI {{ $alternativeRating }}</span><span>CONF. {{ $alternativeConfidence !== null ? number_format($alternativeConfidence, 0, ',', '.').'%' : '—' }}</span><span class="text-amber-500">RISK {{ $alternativeRisk !== null ? number_format($alternativeRisk, 0, ',', '.') : '—' }}</span><span class="{{ $alternativeReturn10 !== null && $alternativeReturn10 < 0 ? 'text-rose-400' : 'text-emerald-500' }}">10T {{ $alternativeReturn10 !== null ? sprintf('%+.1f%%', $alternativeReturn10) : '—' }}</span><span class="{{ $alternativeLongReturn !== null && $alternativeLongReturn >= 0 ? 'text-emerald-500' : 'text-rose-400' }}">{{ $alternativeLongDays }}T {{ $alternativeLongReturn !== null ? sprintf('%+.1f%%', $alternativeLongReturn) : '—' }}</span></small>
+                                            <small class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span class="text-emerald-500">KI {{ $alternativeRating }}</span><span>CONF. {{ $alternativeConfidence !== null ? number_format($alternativeConfidence, 0, ',', '.').'%' : '—' }}</span><span class="text-amber-500">RISK {{ $alternativeRisk !== null ? number_format($alternativeRisk, 0, ',', '.') : '—' }}</span><span class="{{ $alternativeReturn10 !== null && $alternativeReturn10 < 0 ? 'text-rose-400' : 'text-emerald-500' }}">10T {{ $alternativeReturn10 !== null ? sprintf('%+.1f%%', $alternativeReturn10) : '—' }}</span><span class="{{ $alternativeLongReturn !== null && $alternativeLongReturn >= 0 ? 'text-emerald-500' : 'text-rose-400' }}">{{ $alternativeLongDays }}T {{ $alternativeLongReturn !== null ? sprintf('%+.1f%%', $alternativeLongReturn) : '—' }}</span></small>
                                         @else
-                                            <small class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                            <small class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                                                 <span class="text-emerald-500">KI {{ $alternativeRating }}</span>
                                                 <span class="text-cyan-500">{{ __('Extern') }} {{ $alternativeExternal !== null ? number_format($alternativeExternal, 0, ',', '.').'%' : '—' }}</span>
                                                 <span class="{{ $alternativeReturn20 !== null && $alternativeReturn20 < 0 ? 'text-rose-400' : 'text-emerald-500' }}">20T {{ $alternativeReturn20 !== null ? sprintf('%+.1f%%', $alternativeReturn20) : '—' }}</span>
@@ -882,11 +888,11 @@
                                     </span>
                                     <span class="dashboard-alternative-scores">
                                         <span class="dashboard-champion-donut"><x-segmented-score-donut :score="$alternativeScore" :display="$alternativeScoreGrade" :level="$alternativeScoreLevel" type="chance" :label="__('Drei-Faktoren-Mittel')" /></span>
-                                        <span class="dashboard-alternative-panel {{ $alternativeDecile === null ? 'is-empty' : ($alternativeDecile >= 6 ? 'is-strong' : ($alternativeDecile >= 4 ? 'is-mid' : 'is-weak')) }}"><b>{{ $alternativeDecile !== null ? 'D'.$alternativeDecile : '—' }}</b><small>Panel</small></span>
+                                        <span class="dashboard-champion-factors grid grid-rows-3 items-center gap-0.5 rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2 py-1" title="{{ __('Gesamtscore :average (wie im Screener), unterstützt durch POSITIV :buy %, extern :external % und Panel :panel (Dezil :decile)', ['average' => number_format($alternativeScore, 1, ',', '.'), 'buy' => number_format($alternativeBuyScore, 0, ',', '.'), 'external' => $alternativeExternal !== null ? number_format($alternativeExternal, 0, ',', '.') : '—', 'panel' => $alternativeDecile !== null ? 'D'.$alternativeDecile : '—', 'decile' => $alternativeDecile ?? 0]) }}"><span class="flex items-center justify-between gap-1.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Positiv') }}<b class="text-emerald-400">{{ number_format($alternativeBuyScore, 0, ',', '.') }}%</b></span><span class="flex items-center justify-between gap-1.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Extern') }}<b class="text-cyan-400">{{ $alternativeExternal !== null ? number_format($alternativeExternal, 0, ',', '.').'%' : '—' }}</b></span><span class="flex items-center justify-between gap-1.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Panel') }}<b class="text-amber-400">{{ $alternativeDecile !== null ? 'D'.$alternativeDecile : '—' }}</b></span></span>
                                     </span>
                                 </a>
                             @empty
-                                <div class="grid min-h-28 place-items-center px-4 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Aktuell gibt es neben dem Champion keine weitere extern bestätigte BUY-Alternative mit Panel-Wert.') }}</div>
+                                <div class="grid min-h-28 place-items-center px-4 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Aktuell gibt es neben dem Champion keine weitere extern bestätigte POSITIV-Alternative mit Panel-Wert.') }}</div>
                             @endforelse
                         </div>
                     </div>
@@ -917,7 +923,7 @@
                                     <time class="block text-[11px] tabular-nums text-[var(--ak-muted)]">{{ $continent['latest_at'] ? \Illuminate\Support\Carbon::parse($continent['latest_at'])->timezone('Europe/Berlin')->format('d.m.Y H:i') : '—' }}</time>
                                 </span>
                                 <span class="aki-model-run-signals flex items-center gap-1 text-[10px] font-black tabular-nums">
-                                    <a href="{{ route('predictions.index', ['signal' => 'BUY']) }}" class="inline-flex h-8 w-12 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/[.10] px-1 py-1 text-cyan-300 transition hover:border-cyan-300/60 hover:bg-cyan-400/20" title="{{ __('BUY-Aktien in der Prognosetabelle anzeigen') }}" aria-label="{{ __('BUY-Aktien in der Prognosetabelle anzeigen') }}">B {{ $continent['buy'] }}</a>
+                                    <a href="{{ route('predictions.index', ['signal' => 'BUY']) }}" class="inline-flex h-8 w-12 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/[.10] px-1 py-1 text-cyan-300 transition hover:border-cyan-300/60 hover:bg-cyan-400/20" title="{{ __('POSITIV-Aktien in der Prognosetabelle anzeigen') }}" aria-label="{{ __('POSITIV-Aktien in der Prognosetabelle anzeigen') }}">P {{ $continent['buy'] }}</a>
                                     <a href="{{ route('predictions.index', ['signal' => 'WATCH']) }}" class="inline-flex h-8 w-12 items-center justify-center rounded-lg border border-amber-400/25 bg-amber-400/[.10] px-1 py-1 text-amber-300 transition hover:border-amber-300/60 hover:bg-amber-400/20" title="{{ __('WATCH-Aktien in der Prognosetabelle anzeigen') }}" aria-label="{{ __('WATCH-Aktien in der Prognosetabelle anzeigen') }}">W {{ $continent['watch'] }}</a>
                                     <a href="{{ route('predictions.index', ['signal' => 'HOLD']) }}" class="inline-flex h-8 w-12 items-center justify-center rounded-lg border border-slate-400/25 bg-slate-400/[.10] px-1 py-1 text-slate-300 transition hover:border-slate-300/60 hover:bg-slate-400/20" title="{{ __('HOLD-Aktien in der Prognosetabelle anzeigen') }}" aria-label="{{ __('HOLD-Aktien in der Prognosetabelle anzeigen') }}">H {{ $continent['hold'] }}</a>
                                     <a href="{{ route('predictions.index', ['signal' => 'SELL']) }}" class="inline-flex h-8 w-12 items-center justify-center rounded-lg border border-rose-400/25 bg-rose-400/[.10] px-1 py-1 text-rose-300 transition hover:border-rose-300/60 hover:bg-rose-400/20" title="{{ __('SELL-Aktien in der Prognosetabelle anzeigen') }}" aria-label="{{ __('SELL-Aktien in der Prognosetabelle anzeigen') }}">S {{ $continent['sell'] }}</a>
@@ -931,7 +937,7 @@
                     <div class="mb-3 flex items-center justify-between gap-3">
                         <div>
                             <p class="text-[9px] font-black uppercase tracking-[.16em] text-emerald-400">{{ __('Extern geprüft') }}</p>
-                            <h2 class="mt-1 text-base font-black text-[var(--ak-text)]">{{ __('Bestätigte BUY-Signale') }}</h2>
+                            <h2 class="mt-1 text-base font-black text-[var(--ak-text)]">{{ __('Bestätigte POSITIV-Signale') }}</h2>
                         </div>
                         <span class="inline-flex items-center gap-1 rounded-md border border-emerald-400/25 bg-emerald-400/[.08] px-2 py-1 text-[9px] font-black text-emerald-400"><x-heroicon-o-check-badge class="h-4 w-4" />{{ $externalConfirmedBuys->count() }}</span>
                     </div>
@@ -945,12 +951,12 @@
                             <a href="{{ route('stocks.show', ['symbol' => $stock->symbol, 'return_to' => '/dashboard']) }}" class="group grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-emerald-400/25 bg-emerald-400/[.045] px-3 py-2 transition hover:border-emerald-400/55 hover:bg-emerald-400/[.08]">
                                 <span class="min-w-0">
                                     <b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $confirmedFlag }} {{ $stock->name ?: $stock->symbol }}</b>
-                                    <small class="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide"><span class="text-[var(--ak-muted)]">{{ $stock->symbol }}</span><span class="text-emerald-400">BUY {{ $confirmedRating }}</span><span class="text-cyan-500">{{ (int) ($stock->serving_buy_confirmations ?? 0) }} {{ __('Modellbestätigungen') }}</span></small>
+                                    <small class="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide"><span class="text-[var(--ak-muted)]">{{ $stock->symbol }}</span><span class="text-emerald-400">POSITIV {{ $confirmedRating }}</span><span class="text-cyan-500">{{ (int) ($stock->serving_buy_confirmations ?? 0) }} {{ __('Modellbestätigungen') }}</span></small>
                                 </span>
                                 <span class="text-right"><b class="block text-base font-black tabular-nums text-emerald-400">{{ is_numeric($confirmedConfidence) ? number_format((int) $confirmedConfidence, 0, ',', '.').' %' : '—' }}</b><small class="block text-[7px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Extern') }}</small></span>
                             </a>
                         @empty
-                            <div class="grid min-h-24 place-items-center rounded-lg border border-dashed border-emerald-400/25 px-4 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Aktuell ist kein BUY-Signal für denselben Serving-Batch extern bestätigt.') }}</div>
+                            <div class="grid min-h-24 place-items-center rounded-lg border border-dashed border-emerald-400/25 px-4 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Aktuell ist kein POSITIV-Signal für denselben Serving-Batch extern bestätigt.') }}</div>
                         @endforelse
                     </div>
                 </article>
@@ -1844,6 +1850,30 @@
                 max-width: 100%;
                 min-width: 0;
             }
+            /* Champion card's own factor box (distinct from the narrower
+               desktop-column shrink further below, and from the smaller one
+               used inside .dashboard-alternative-scores) - without this the
+               stock name column is squeezed uncomfortably narrow on phones. */
+            #personal-dashboard .dashboard-champion-entry .dashboard-champion-donut .segmented-score {
+                width: 2.75rem;
+                height: 2.75rem;
+            }
+            #personal-dashboard .dashboard-champion-entry .dashboard-champion-donut .segmented-score b {
+                font-size: .68rem;
+            }
+            #personal-dashboard .dashboard-champion-entry .dashboard-champion-factors {
+                height: 2.75rem;
+                min-width: 3.4rem;
+                padding: .1rem .3rem;
+            }
+            #personal-dashboard .dashboard-champion-entry .dashboard-champion-factors span {
+                font-size: 6.5px;
+            }
+        }
+        @media (max-width: 380px) {
+            #personal-dashboard .dashboard-champion-entry .dashboard-champion-factors {
+                display: none;
+            }
         }
         @media (min-width: 768px) {
             #personal-dashboard .dashboard-bento-signal-cockpit .aki-signal-cockpit-grid {
@@ -2005,6 +2035,14 @@
             }
             #dashboard-middle-column > article:first-child .dashboard-champion-donut .segmented-score b {
                 font-size: .75rem;
+            }
+            #dashboard-middle-column > article:first-child .dashboard-champion-factors {
+                height: 3.25rem;
+                min-width: 4.1rem;
+                padding: .15rem .4rem;
+            }
+            #dashboard-middle-column > article:first-child .dashboard-champion-factors span {
+                font-size: 7px;
             }
             #dashboard-middle-column > article:first-child .dashboard-champion-reason {
                 padding-top: .3rem;
@@ -2371,14 +2409,14 @@
         }
         #personal-dashboard .dashboard-alternative-entry {
             display: flex;
-            min-height: 4.75rem;
+            min-height: 3.9rem;
             min-width: 0;
             align-items: center;
-            gap: .75rem;
+            gap: .65rem;
             border: 1px solid rgba(34, 211, 238, .25);
             border-radius: .9rem;
             background: rgba(255, 255, 255, .018);
-            padding: .7rem .8rem;
+            padding: .5rem .7rem;
             transition: border-color .15s ease, background .15s ease, transform .15s ease;
         }
         #personal-dashboard .dashboard-alternative-entry:hover {
@@ -2391,30 +2429,35 @@
         :root[data-theme="light"] #personal-dashboard .dashboard-alternative-entry:hover {
             background: rgba(255, 255, 255, .78);
         }
-        /* Match the middle-column stock cards (.dashboard-alternative-entry): ranked
-           entries render ~6.5rem tall once their meta line wraps in the narrow column. */
+        /* Same height and spacing as the middle-column stock cards
+           (.dashboard-alternative-entry), so both columns' rows start at the
+           same height and look like one consistent design. */
         #personal-dashboard .dashboard-opportunity-card {
-            min-height: 6.5rem;
+            min-height: 3.9rem;
             box-sizing: border-box;
-            gap: .75rem;
+            gap: .65rem;
             border-radius: .9rem;
-            padding: .7rem .8rem;
+            padding: .5rem .7rem;
+        }
+        #personal-dashboard .dashboard-opportunity-card > span:first-child {
+            height: 1.85rem;
+            width: 1.85rem;
         }
         #personal-dashboard #dashboard-ranking-stocks-row,
         #personal-dashboard #dashboard-best-stocks-row {
-            row-gap: .5rem !important;
+            row-gap: .4rem !important;
         }
         #personal-dashboard .dashboard-alternative-rank {
             display: grid;
-            width: 2.1rem;
-            height: 2.1rem;
-            flex: 0 0 2.1rem;
+            width: 1.85rem;
+            height: 1.85rem;
+            flex: 0 0 1.85rem;
             place-items: center;
             border: 1px solid rgba(34, 211, 238, .4);
-            border-radius: .65rem;
+            border-radius: .6rem;
             background: rgba(34, 211, 238, .1);
             color: #0891b2;
-            font-size: .78rem;
+            font-size: .74rem;
             font-weight: 950;
             line-height: 1;
         }
@@ -2479,30 +2522,23 @@
             gap: .5rem;
         }
         #personal-dashboard .dashboard-alternative-scores .dashboard-champion-donut .segmented-score {
-            width: 52px;
-            height: 52px;
+            width: 44px;
+            height: 44px;
         }
         #personal-dashboard .dashboard-alternative-scores .dashboard-champion-donut .segmented-score b {
-            font-size: 12px;
+            font-size: 11px;
         }
-        #personal-dashboard .dashboard-alternative-panel {
-            display: grid;
-            width: 52px;
-            min-width: 52px;
-            height: 52px;
-            place-items: center;
-            border: 1px solid rgba(148, 163, 184, .3);
-            border-radius: 999px;
-            text-align: center;
+        #personal-dashboard .dashboard-alternative-scores .dashboard-champion-factors {
+            height: 44px;
+            min-width: 64px;
+            padding: .1rem .35rem;
+            gap: 0;
         }
-        #personal-dashboard .dashboard-alternative-panel b { display: block; font-size: .78rem; font-weight: 950; line-height: 1; }
-        #personal-dashboard .dashboard-alternative-panel small { display: block; font-size: 7px; font-weight: 900; text-transform: uppercase; color: var(--ak-muted); }
-        #personal-dashboard .dashboard-alternative-panel.is-strong { border-color: rgba(52, 211, 153, .45); background: rgba(52, 211, 153, .1); color: #059669; }
-        #personal-dashboard .dashboard-alternative-panel.is-mid { border-color: rgba(251, 191, 36, .45); background: rgba(251, 191, 36, .1); color: #d97706; }
-        #personal-dashboard .dashboard-alternative-panel.is-weak { border-color: rgba(251, 113, 133, .45); background: rgba(251, 113, 133, .1); color: #e11d48; }
-        #personal-dashboard .dashboard-alternative-panel.is-empty { color: var(--ak-muted); }
+        #personal-dashboard .dashboard-alternative-scores .dashboard-champion-factors span {
+            font-size: 6.5px;
+        }
         @media (max-width: 420px) {
-            #personal-dashboard .dashboard-alternative-panel { display: none; }
+            #personal-dashboard .dashboard-alternative-scores .dashboard-champion-factors { display: none; }
         }
         @media (min-width: 1280px) {
             #personal-dashboard .dashboard-center-combined-card {

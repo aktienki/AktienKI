@@ -847,6 +847,8 @@ final class FinalEntryFilterRuleRegistry
         }
 
         $knownMaps = [
+            'score_risk', 'score_drawdown',
+            'score_profit_factor', 'score_volatility',
             'profit_factor_hit_rate', 'signal_risk',
             'volatility_drawdown', 'trades_return',
         ];

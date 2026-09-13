@@ -94,7 +94,7 @@ final class ServingMarketSnapshotService
                 $averageRisk >= 3.25 => __('erhöht'),
                 default => __('moderat'),
             };
-            $summary = __(':buy von :total Aktien liefern im aktuellen Serving-Lauf ein BUY-Signal. Der mittlere Modellscore liegt bei :score von 10 und die durchschnittliche kalibrierte Prognose bei :return %.', [
+            $summary = __(':buy von :total Aktien liefern im aktuellen Serving-Lauf ein POSITIV-Signal. Der mittlere Modellscore liegt bei :score von 10 und die durchschnittliche kalibrierte Prognose bei :return %.', [
                 'buy' => $buyCount,
                 'total' => $count,
                 'score' => number_format($score, 1, ',', '.'),
@@ -188,7 +188,7 @@ final class ServingMarketSnapshotService
             'confidence' => (int) round($qualityRate),
             'riskLevel' => $averageRisk >= 4.25 ? 'HIGH' : ($averageRisk >= 3.25 ? 'MEDIUM' : 'LOW'),
             'headline' => __('Aktuelles Lagebild aus der Service Datenbank'),
-            'summary' => __('Der aktuelle vollständige Serving-Lauf umfasst :count Aktien. :buy davon sind als BUY eingestuft; der mittlere KI-Score beträgt :score von 10. Die durchschnittliche kalibrierte Prognose des bevorzugten Horizonts liegt bei :return %.', [
+            'summary' => __('Der aktuelle vollständige Serving-Lauf umfasst :count Aktien. :buy davon sind als POSITIV eingestuft; der mittlere KI-Score beträgt :score von 10. Die durchschnittliche kalibrierte Prognose des bevorzugten Horizonts liegt bei :return %.', [
                 'count' => $count,
                 'buy' => $buyCount,
                 'score' => number_format($score, 1, ',', '.'),
@@ -208,7 +208,7 @@ final class ServingMarketSnapshotService
             'watchlist' => $rows->where('normalized_signal', 'WATCH')->sortByDesc('rating_percent')->take(5)->map(fn (object $row): string => $this->stockLine($row))->values()->all(),
             'metrics' => [
                 ['label' => __('Abdeckung'), 'value' => (string) $count, 'detail' => __('Aktien im Serving-Lauf')],
-                ['label' => __('BUY-Breite'), 'value' => number_format($count > 0 ? $buyCount / $count * 100 : 0, 0, ',', '.').' %', 'detail' => "{$buyCount} von {$count}"],
+                ['label' => __('POSITIV-Breite'), 'value' => number_format($count > 0 ? $buyCount / $count * 100 : 0, 0, ',', '.').' %', 'detail' => "{$buyCount} von {$count}"],
                 ['label' => __('Ø Prognose'), 'value' => sprintf('%+.1f %%', $averageReturn), 'detail' => __('bevorzugter Horizont')],
                 ['label' => __('Quality Gate'), 'value' => number_format($qualityRate, 0, ',', '.').' %', 'detail' => "{$qualityCount} von {$count}"],
             ],
@@ -219,7 +219,7 @@ final class ServingMarketSnapshotService
     {
         $return = is_numeric($row->expected_return_percent) ? sprintf('%+.1f %%', $row->expected_return_percent) : '—';
 
-        return sprintf('%s (%s): %s · Rating %s · Prognose %s.', $row->name ?: $row->symbol, $row->symbol, $row->normalized_signal, $row->buy_rating ?: $row->underlying_buy_rating ?: '—', $return);
+        return sprintf('%s (%s): %s · Rating %s · Prognose %s.', $row->name ?: $row->symbol, $row->symbol, signal_label($row->normalized_signal), $row->buy_rating ?: $row->underlying_buy_rating ?: '—', $return);
     }
 
     private function riskLine(object $row): string

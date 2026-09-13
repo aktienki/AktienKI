@@ -33,7 +33,7 @@
                 $intensity = $count > 0 ? .12 + (.58 * ($count / $maxCount)) : .035;
             @endphp
             <div class="ak-signal-distribution-cell" data-signal="{{ strtolower($signal) }}" style="background-color:rgba({{ $colors[$signal] }},{{ number_format($intensity, 2, '.', '') }});">
-                <span>{{ $signal }}</span>
+                <span>{{ signal_label($signal) }}</span>
                 <strong>{{ number_format($count, 0, ',', '.') }}</strong>
                 <small>{{ number_format($share, 0, ',', '.') }} %</small>
             </div>

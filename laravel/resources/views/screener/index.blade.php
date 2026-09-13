@@ -4,9 +4,17 @@
             && ((bool) (auth()->user()?->is_admin ?? false) || strtolower((string) (auth()->user()?->role ?? '')) === 'admin');
     @endphp
     <style>
+        .screener-page .screener-signal-score-donut .segmented-score{position:relative;display:grid;width:3rem;height:3rem;place-items:center}
+        .screener-page .screener-signal-score-donut .segmented-score-ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+        .screener-page .screener-signal-score-donut .segmented-score-sector{fill:none;stroke-width:8px;stroke-linecap:butt;opacity:.66}
+        .screener-page .screener-signal-score-donut .segmented-score-sector.is-active{stroke-width:9px;opacity:.95}
+        .screener-page .screener-signal-score-donut .segmented-score-sector.is-end{stroke-width:12px;opacity:1;filter:drop-shadow(0 0 3px currentColor)}
+        .screener-page .screener-signal-score-donut .segmented-score>b{position:relative;color:var(--ak-text);font-size:.78rem;font-weight:950;font-variant-numeric:tabular-nums}
+        :root:not([data-theme="light"]) .screener-page .screener-signal-score-donut .segmented-score-sector[stroke="#dfe8ea"]{stroke:#40536a;opacity:.62}
+        :root[data-theme="light"] .screener-page .screener-signal-score-donut .segmented-score-sector[stroke="#dfe8ea"]{stroke:#b5c5cb;opacity:.85}
         @media (min-width:768px) {
-            .screener-page .screener-table-head{grid-template-columns:42px minmax(360px,1fr) 190px 54px 78px 112px 112px repeat(3,62px)!important}
-            .screener-page .screener-desktop-summary{grid-template-columns:minmax(360px,1fr) 190px 54px 78px 112px 112px repeat(3,62px)!important}
+            .screener-page .screener-table-head{grid-template-columns:42px minmax(360px,1fr) 78px 190px 54px 112px 112px repeat(3,62px)!important}
+            .screener-page .screener-desktop-summary{grid-template-columns:minmax(360px,1fr) 78px 190px 54px 112px 112px repeat(3,62px)!important}
             .screener-page .screener-desktop-price{grid-template-columns:minmax(92px,auto) 58px!important;gap:.55rem!important;padding-inline:.7rem!important}
             .screener-page .screener-desktop-forecasts>i{box-sizing:border-box;width:62px!important;min-width:62px!important;max-width:62px!important}
             .screener-page .screener-desktop-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.12rem;box-sizing:border-box;width:54px!important;min-width:54px!important;max-width:54px!important}
@@ -18,7 +26,6 @@
             .screener-page .screener-desktop-scale-grade>.screener-desktop-scale{position:relative;display:block!important;box-sizing:border-box;width:102px!important;min-width:102px!important;max-width:102px!important;height:.34rem;align-self:center;flex:0 0 102px!important;border-radius:.12rem;font-style:normal}
             .screener-page .screener-row-profile-badge{display:inline-grid;width:1.65rem;height:1.65rem;flex:none;place-items:center;border:1px solid var(--profile-border);border-radius:.48rem;background:var(--profile-bg);color:var(--profile-color)}
             .screener-page .screener-row-profile-badge svg{width:.95rem;height:.95rem;stroke-width:2}
-            .screener-page .screener-desktop-signal>strong{box-sizing:border-box;width:72px!important;min-width:72px!important;max-width:72px!important;text-align:center}
             .screener-page .screener-desktop-signal>.screener-signal-validity{display:flex!important;align-items:center;justify-content:center;gap:.18rem;margin-top:.22rem;color:var(--ak-muted);font-size:.47rem;font-weight:800;line-height:1;white-space:nowrap}
             .screener-page .screener-signal-validity>b{color:var(--ak-text-soft);font-size:inherit;font-weight:950}
             .screener-page .screener-signal-validity>i{font-style:normal}
@@ -70,9 +77,13 @@
             .screener-page .sms-v2-forecast>i.has-dynamic-risk.is-critical-dynamic-risk{border-bottom-color:#fb7185!important}
             .screener-page .sms-v2-scale>.screener-dynamic-risk-marker{position:absolute!important;top:50%!important;left:clamp(3%,var(--dynamic-risk-position),97%)!important;z-index:10!important;display:block!important;box-sizing:border-box;width:5px!important;height:1.35rem!important;border:1px solid rgba(255,255,255,.9)!important;outline:2px solid color-mix(in srgb,var(--ak-bg) 78%,transparent);border-radius:999px;background:var(--dynamic-risk-color,#22d3ee)!important;opacity:1;visibility:visible;transform:translate(-50%,-50%) translateX(3px);transition:left .55s cubic-bezier(.22,1,.36,1),background-color .3s ease,border-color .3s ease}
             .screener-page .sms-v2-scale>.screener-dynamic-risk-marker::after{position:absolute;top:-.22rem;left:50%;width:.42rem;height:.42rem;border:1px solid rgba(255,255,255,.9);border-radius:999px;background:var(--dynamic-risk-color,#22d3ee);content:"";transform:translateX(-50%)}
-            .screener-page .sms-v2-forecast>strong{gap:.12rem;line-height:1}
-            .screener-page .sms-v2-forecast>strong>[data-trade-status-label]{font-size:.68rem;font-weight:950}
-            .screener-page .sms-v2-forecast>strong>.screener-signal-validity{display:block;color:var(--ak-muted);font-size:.43rem;font-weight:850;line-height:1;white-space:nowrap}
+            .screener-page .sms-v2-forecast>.screener-mobile-signal-score{display:grid;min-width:0;place-content:center;justify-items:center;gap:.14rem}
+            .screener-page .screener-mobile-signal-score>.screener-signal-score-donut .segmented-score{width:2.4rem;height:2.4rem}
+            .screener-page .screener-mobile-signal-score>.screener-signal-score-donut .segmented-score-sector{stroke-width:8px}
+            .screener-page .screener-mobile-signal-score>.screener-signal-score-donut .segmented-score-sector.is-active{stroke-width:9px}
+            .screener-page .screener-mobile-signal-score>.screener-signal-score-donut .segmented-score-sector.is-end{stroke-width:11px}
+            .screener-page .screener-mobile-signal-score>.screener-signal-score-donut .segmented-score>b{font-size:.7rem}
+            .screener-page .screener-mobile-signal-score>.screener-signal-validity{color:var(--ak-muted);font-size:.43rem;font-weight:850;line-height:1;white-space:nowrap}
             .screener-page .screener-mobile-summary-v2{padding-right:.72rem!important;padding-left:3.35rem!important}
             .screener-page .screener-row-watchlist-picker-mobile{position:absolute;z-index:35;top:.52rem;left:.55rem;transform:none}
             :root[data-theme="light"] .screener-page .screener-mobile-summary-v2{border-color:rgba(8,145,178,.42)!important;background:linear-gradient(110deg,rgba(224,242,254,.95),rgba(255,255,255,.9))!important}
@@ -127,7 +138,11 @@
             @php $selectedRiskProfiles=collect(request('risk_class',[]));$defaultRiskProfiles=!request()->boolean('risk_profiles'); @endphp
             <fieldset class="screener-risk-choice"><legend class="sr-only">{{ __('Profil') }}</legend><input type="hidden" name="risk_profiles" value="1"><button type="button" aria-label="{{ __('Alle') }}" title="{{ __('Alle') }}" @click="$el.closest('fieldset').querySelectorAll('input[type=checkbox]').forEach(input => input.checked = true); submitFilters($el.form)"><span><x-heroicon-o-squares-2x2 /><b class="risk-profile-text">{{ __('Alle') }}</b></span></button><label title="{{ __('Defensiv') }}"><input type="checkbox" name="risk_class[]" value="defensive" aria-label="{{ __('Defensiv') }}" @checked($defaultRiskProfiles||$selectedRiskProfiles->contains('defensive')) @change="submitFilters($el.form)"><span><x-heroicon-o-shield-check /><b class="risk-profile-text">{{ __('Defensiv') }}</b></span></label><label title="{{ __('Ausgewogen') }}"><input type="checkbox" name="risk_class[]" value="balanced" aria-label="{{ __('Ausgewogen') }}" @checked($defaultRiskProfiles||$selectedRiskProfiles->contains('balanced')) @change="submitFilters($el.form)"><span><x-heroicon-o-scale /><b class="risk-profile-text">{{ __('Ausgewogen') }}</b></span></label><label title="{{ __('Offensiv') }}"><input type="checkbox" name="risk_class[]" value="offensive" aria-label="{{ __('Offensiv') }}" @checked($defaultRiskProfiles||$selectedRiskProfiles->contains('offensive')) @change="submitFilters($el.form)"><span><x-heroicon-o-bolt /><b class="risk-profile-text">{{ __('Offensiv') }}</b></span></label></fieldset>
             <select name="index" @change="submitFilters($el.form)" class="ak-input h-10 min-w-[125px] flex-1 text-sm"><option value="">{{ __('Alle Indizes') }}</option>@foreach($indices as $index)<option value="{{ $index->symbol }}" @selected(request('index') === $index->symbol)>{{ $index->name ?: $index->symbol }}</option>@endforeach</select>
-            <select name="signal" @change="submitFilters($el.form)" class="ak-input h-10 min-w-[125px] flex-1 text-sm"><option value="">{{ __('BUY, WAIT und WATCH') }}</option>@foreach(['BUY','WAIT','WATCH'] as $signal)<option value="{{ $signal }}" @selected(request('signal') === $signal)>{{ $signal }}</option>@endforeach</select>
+            <select name="signal" @change="submitFilters($el.form)" class="ak-input h-10 min-w-[125px] flex-1 text-sm"><option value="">{{ __('POSITIV, WAIT und WATCH') }}</option>@foreach(['BUY','WAIT','WATCH'] as $signal)<option value="{{ $signal }}" @selected(request('signal') === $signal)>{{ signal_label($signal) }}</option>@endforeach</select>
+            <label class="ak-input flex h-10 min-w-[190px] flex-1 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-xs font-bold" title="{{ __('Nur Aktien zeigen, deren Modell den eigenen Drei-Jahres-Qualitäts-Gate bestanden hat.') }}">
+                <input type="checkbox" name="quality_gate_only" value="1" @checked(request()->boolean('quality_gate_only')) @change="submitFilters($el.form)" class="h-4 w-4 shrink-0" />
+                <span>{{ __('Nur Quality-Gate bestanden') }}</span>
+            </label>
             <select name="min_max_return" @change="submitFilters($el.form)" class="ak-input h-10 min-w-[185px] flex-1 text-base font-bold" aria-label="{{ __('Maximale Rendite') }}">
                 <option value="">{{ __('Max. Rendite') }} · {{ __('Alle') }}</option>
                 @foreach(range(0,10,2) as $minimum)<option value="{{ $minimum }}" @selected((string)request('min_max_return')===(string)$minimum)>{{ __('Max. Rendite') }} ≥ {{ $minimum > 0 ? '+' : '' }}{{ $minimum }} %</option>@endforeach
@@ -230,59 +245,40 @@
             <div class="screener-table-head hidden lg:grid" aria-hidden="true">
                 <span class="screener-watchlist-head" title="{{ __('Watchlist') }}"><x-heroicon-o-star /></span>
                 <span>{{ __('Aktie') }}</span>
+                <span>{{ __('Signal') }}</span>
                 <span>{{ __('Kurs') }}</span>
                 <span title="{{ __('Querschnitts-Panelmodell: Perzentil (0–100) und Dezil in der Vergleichsgruppe') }}">Panel</span>
-                <span>{{ __('Signal') }}</span>
                 <span>{{ __('Bewertung') }}</span>
                 <span>{{ __('Risiko') }}</span>
                 @foreach([10, 20, 40] as $days)
                     <span><button type="button" data-screener-sort="forecast-{{ $days }}">{{ $days }}T <i>↕</i></button></span>
                 @endforeach
             </div>
-            @php
-                // Cross-sectional panel model (frozen research table, linked to
-                // instruments): load the latest full cross-section once and look
-                // it up per row. Missing rows just render a dash.
-                $panelByInstrument = collect();
-                $panelAsOf = null;
-                try {
-                    $panelVersion = 'panel-price-risk-freeze-2026-09-07';
-                    // Skip the shrinking right-edge cross-section (20d forward target
-                    // not yet observable): take the latest date near the fullest universe.
-                    $panelPeakCount = (int) \Illuminate\Support\Facades\DB::table('panel_predictions')
-                        ->where('model_version', $panelVersion)
-                        ->groupBy('as_of_date')
-                        ->orderByDesc(\Illuminate\Support\Facades\DB::raw('count(*)'))
-                        ->value(\Illuminate\Support\Facades\DB::raw('count(*)'));
-                    $panelAsOf = \Illuminate\Support\Facades\DB::table('panel_predictions')
-                        ->where('model_version', $panelVersion)
-                        ->groupBy('as_of_date')
-                        ->havingRaw('count(*) >= ?', [max(50, (int) ($panelPeakCount * 0.85))])
-                        ->orderByDesc('as_of_date')
-                        ->value('as_of_date');
-                    if ($panelAsOf) {
-                        $panelByInstrument = \Illuminate\Support\Facades\DB::table('panel_predictions')
-                            ->where('model_version', $panelVersion)
-                            ->where('as_of_date', $panelAsOf)
-                            ->get(['instrument_id', 'raw_score', 'xsec_pctile', 'decile'])
-                            ->keyBy('instrument_id');
-                    }
-                } catch (\Throwable $e) {
-                    $panelByInstrument = collect();
-                }
-
-            @endphp
             @forelse($stocks as $stock)
                 @php
-                    $panelRow = $panelByInstrument->get($stock->instrument_id ?? null);
-                    $panelPctile = $panelRow && is_numeric($panelRow->xsec_pctile ?? null) ? (int) round($panelRow->xsec_pctile * 100) : null;
-                    $panelDecile = $panelRow && is_numeric($panelRow->decile ?? null) ? (int) $panelRow->decile : null;
+                    // Cross-sectional panel model (frozen research table): batch-loaded
+                    // and attached per stock in ServingScreenerService, which also feeds
+                    // it into the composite score below. Missing rows just render a dash.
+                    $panelPctile = $stock->panel_percentile ?? null;
+                    $panelDecile = $stock->panel_decile ?? null;
                     $panelTone = $panelPctile === null
                         ? 'color:var(--ak-muted)'
                         : ($panelPctile >= 80 ? 'color:#34d399' : ($panelPctile <= 30 ? 'color:#fb7185' : 'color:#fbbf24'));
-                    $panelTitle = $panelRow
-                        ? __('Panelmodell').': '.__('Perzentil').' '.$panelPctile.' · '.__('Dezil').' '.($panelDecile ?? '—').' · Score '.number_format((float) $panelRow->raw_score, 4, ',', '.').' ('.\Illuminate\Support\Carbon::parse($panelAsOf)->format('d.m.Y').')'
+                    $panelTitle = $panelPctile !== null
+                        ? __('Panelmodell').': '.__('Perzentil').' '.$panelPctile.' · '.__('Dezil').' '.($panelDecile ?? '—').' · Score '.number_format((float) $stock->panel_raw_score, 4, ',', '.').' ('.\Illuminate\Support\Carbon::parse($stock->panel_as_of)->format('d.m.Y').')'
                         : __('Keine Panel-Bewertung für diese Aktie');
+
+                    // One 0-100 number blending KI-Score, Modellqualität
+                    // (Profit-Faktor + Konfidenz aus dem 3-Jahres-Backtest),
+                    // Risiko und Indikator - eine Ergänzung zum Signal-Badge,
+                    // keine Ersatz-Klassifikation.
+                    $compositeScore = $stock->composite_score ?? null;
+                    $compositeScoreTone = $compositeScore === null
+                        ? 'color:var(--ak-muted)'
+                        : ($compositeScore >= 70 ? 'color:#34d399' : ($compositeScore < 40 ? 'color:#fb7185' : 'color:#fbbf24'));
+                    $compositeScoreTitle = $compositeScore !== null
+                        ? __('Gesamtscore :score/100 aus KI-Score, Quality-Gate, Modellqualität (Profit-Faktor, Konfidenz), Risiko und Indikator.', ['score' => $compositeScore])
+                        : __('Für einen Gesamtscore fehlen noch Eingangswerte.');
 
                     // Top-10 ranking and its explanation are based on the model
                     // signal. Keep the visible badge consistent with that ranking
@@ -291,6 +287,19 @@
                     $isBuyPaused = ($realtimeQuotes ?? false)
                         && $signal === 'BUY'
                         && ($stock->trade_status ?? null) === \App\Services\TradeEligibilityStatusService::PAUSED_LOW_RETURN;
+                    // A paused BUY normally just waits for the return to recover. If
+                    // every forecast horizon has since turned negative net of costs -
+                    // the same threshold the forecast badges use - "wait for entry"
+                    // no longer applies and it falls through to HOLD instead.
+                    $pausedForecastHorizons = ($stock->data_source ?? null) === 'serving' ? [10, 20, 40] : [5, 10, 15, 20];
+                    $pausedForecastCostPercent = max(0, (float) config('aktienki.signals.round_trip_cost_percent', .5));
+                    $pausedForecastValues = collect($pausedForecastHorizons)
+                        ->map(fn (int $days) => $stock->{"expected_return_{$days}d"} ?? null)
+                        ->filter(fn ($value) => is_numeric($value))
+                        ->map(fn ($value): float => (float) $value - $pausedForecastCostPercent);
+                    $isBuyPausedAllNegative = $isBuyPaused
+                        && $pausedForecastValues->isNotEmpty()
+                        && $pausedForecastValues->every(fn (float $value): bool => $value < 0);
                     $tone = match ($signal) {
                         'BUY' => 'border-emerald-300/80 bg-emerald-500/[.35] text-white shadow-[0_0_18px_rgba(16,185,129,.42)]',
                         'SELL' => 'border-rose-400/45 bg-rose-400/[.10] text-rose-300',
@@ -301,8 +310,16 @@
                     if ($isBuyPaused) {
                         $tone = 'border-amber-400/40 bg-amber-400/[.08] text-amber-300';
                     }
-                    $signalLabel = $isBuyPaused ? __('BUY pausiert') : $signal;
-                    $displaySignalKey = $isBuyPaused ? 'wait' : strtolower($signal);
+                    $signalLabel = match (true) {
+                        $isBuyPausedAllNegative => signal_label('HOLD'),
+                        $isBuyPaused => signal_label('WAIT'),
+                        default => signal_label($signal),
+                    };
+                    $displaySignalKey = match (true) {
+                        $isBuyPausedAllNegative => 'hold',
+                        $isBuyPaused => 'wait',
+                        default => strtolower($signal),
+                    };
                     $recentNews = $recentNewsByInstrument->get((int) $stock->instrument_id);
                     $recentNewsSentiment = is_numeric($recentNews?->sentiment_score) ? (float) $recentNews->sentiment_score : null;
                     [$recentNewsTone, $recentNewsLabel] = match (true) {
@@ -561,6 +578,10 @@
                             @endif
                             <span><strong>{{ $stock->name ?: $stock->symbol }}</strong><small>{{ $stock->symbol }} · {{ $stock->sector ?: __('Sektor nicht hinterlegt') }}</small></span>
                         </span>
+                        <span class="screener-desktop-signal" data-signal="{{ $displaySignalKey }}" data-trade-status-signal title="{{ $compositeScoreTitle }} · {{ $signalValidityTitle }}">
+                            <span class="screener-signal-score-donut"><x-segmented-score-donut :score="$compositeScore ?? 0" :display="$compositeScore ?? '—'" :segments="10" type="chance" :label="__('Score')" /></span>
+                            <span class="screener-signal-validity"><b>{{ $activeForecastHorizon }}T</b><i>· {{ __('noch') }} {{ $signalRemainingTradingDays }}T</i></span>
+                        </span>
                         <span class="screener-desktop-price">
                             <span><strong
                                 @if($realtimeQuotes ?? false)
@@ -575,7 +596,6 @@
                             <small>{{ __('Kurs') }}</small>
                         </span>
                         <span class="screener-desktop-panel" title="{{ $panelTitle }}"><small>Panel</small><strong style="{{ $panelTone }}">{{ $panelPctile !== null ? $panelPctile : '—' }}</strong><i>{{ $panelDecile !== null ? 'D'.$panelDecile : '' }}</i></span>
-                        <span class="screener-desktop-signal" data-signal="{{ $displaySignalKey }}" data-trade-status-signal title="{{ $signalValidityTitle }}"><strong data-trade-status-label>{{ $signalLabel }}</strong><span class="screener-signal-validity"><b>{{ $activeForecastHorizon }}T</b><i>· {{ __('noch') }} {{ $signalRemainingTradingDays }}T</i></span></span>
                         <span class="screener-desktop-grade screener-desktop-scale-grade">
                             <strong>{{ __('Bewertung') }} · {{ $buySignalScoreLabel }}</strong>
                             <i class="screener-desktop-scale signal" style="--position:{{ number_format($buySignalScorePercent, 2, '.', '') }}%;--marker:{{ $buySignalScoreColor }}" role="meter" aria-label="{{ __('Signalqualität') }} {{ $buySignalScoreLabel }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($buySignalScorePercent, 1, '.', '') }}"><em></em></i>
@@ -600,8 +620,8 @@
                     </a>
                     </div>
                     <button type="button" class="screener-mobile-summary screener-mobile-summary-v2 md:hidden" @click="mobileExpanded = ! mobileExpanded; if (mobileExpanded) $nextTick(async () => { await window.loadAktienKiCharts?.(); window.initializeServingCharts?.() })" :aria-expanded="mobileExpanded.toString()">
-                        <span class="sms-v2-head"><b>{{ $ranking > 0 ? '#'.$ranking : '—' }}</b><i>{{ $countryFlag }}</i><span><strong>{{ $stock->name ?: $stock->symbol }}</strong><small>@if($riskProfileKey)<span class="screener-mobile-profile-badge" style="{{ $riskProfileKey === 'defensive' ? '--profile-color:#6ee7b7;--profile-border:rgba(52,211,153,.34);--profile-bg:rgba(52,211,153,.06)' : ($riskProfileKey === 'balanced' ? '--profile-color:#fcd34d;--profile-border:rgba(251,191,36,.34);--profile-bg:rgba(251,191,36,.06)' : '--profile-color:#fda4af;--profile-border:rgba(251,113,133,.34);--profile-bg:rgba(251,113,133,.06)') }}" title="{{ __('Profil') }}: {{ $riskProfileLabel }}">@if($riskProfileKey === 'defensive')<x-heroicon-o-shield-check />@elseif($riskProfileKey === 'balanced')<x-heroicon-o-scale />@else<x-heroicon-o-bolt />@endif</span>@endif{{ $stock->symbol }} · {{ $stock->sector ?: '—' }}@if($panelPctile !== null) · <span style="{{ $panelTone }};font-weight:800" title="{{ $panelTitle }}">Panel {{ $panelPctile }}{{ $panelDecile !== null ? ' · D'.$panelDecile : '' }}</span>@endif</small></span><em @if($realtimeQuotes ?? false) data-live-symbol="{{ $stock->symbol }}" data-live-decimals="2" data-live-currency="{{ $displayCurrencySymbol }}" data-live-base-price="{{ (float) $stock->current_price }}" @endif>{{ is_numeric($stock->current_price) ? number_format((float)$stock->current_price,2,',','.') : '—' }} {{ $displayCurrencySymbol }}</em><x-heroicon-o-chevron-down class="h-4 w-4 text-cyan-300 transition" x-bind:class="mobileExpanded && 'rotate-180'" /></span>
-                        <span class="sms-v2-forecast"><strong data-signal="{{ $displaySignalKey }}" data-trade-status-signal title="{{ $signalValidityTitle }}"><b data-trade-status-label>{{ $signalLabel }}</b><span class="screener-signal-validity">{{ $signalValidityLabel }}</span></strong>@foreach($mobileForecasts as $days=>$forecast)<i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" data-assessment-base-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon '.(($realtimeQuotes ?? false) && $showDynamicRiskBorder ? 'has-dynamic-risk '.((float) $dynamicRiskPercent >= 90 ? 'is-critical-dynamic-risk ' : '') : '') : '' }}{{ is_numeric($forecast) && (float) $forecast < 2.0 && ($triggerHorizon !== (int) $days || $showDynamicRiskBorder) ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}"><small>{{ $days }}T</small><b class="{{ $forecast===null?'text-slate-400':($forecast>=0?'text-emerald-400':'text-rose-400') }}" @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null)) data-screener-live-forecast="{{ $stock->symbol }}" data-horizon="{{ $days }}" data-target-price="{{ (float) $stock->{"predicted_price_{$days}d"} }}" @endif>{{ $forecast===null?'—':(($forecast>0?'+':'').number_format($forecast,1,',','.').' %') }}</b></i>@endforeach</span>
+                        <span class="sms-v2-head"><b>{{ $ranking > 0 ? '#'.$ranking : '—' }}</b><i>{{ $countryFlag }}</i><span><strong>{{ $stock->name ?: $stock->symbol }}</strong><small>@if($riskProfileKey)<span class="screener-mobile-profile-badge" style="{{ $riskProfileKey === 'defensive' ? '--profile-color:#6ee7b7;--profile-border:rgba(52,211,153,.34);--profile-bg:rgba(52,211,153,.06)' : ($riskProfileKey === 'balanced' ? '--profile-color:#fcd34d;--profile-border:rgba(251,191,36,.34);--profile-bg:rgba(251,191,36,.06)' : '--profile-color:#fda4af;--profile-border:rgba(251,113,133,.34);--profile-bg:rgba(251,113,133,.06)') }}" title="{{ __('Profil') }}: {{ $riskProfileLabel }}">@if($riskProfileKey === 'defensive')<x-heroicon-o-shield-check />@elseif($riskProfileKey === 'balanced')<x-heroicon-o-scale />@else<x-heroicon-o-bolt />@endif</span>@endif{{ $stock->symbol }} · {{ $stock->sector ?: '—' }}@if($panelPctile !== null) · <span style="{{ $panelTone }};font-weight:800" title="{{ $panelTitle }}">Panel {{ $panelPctile }}{{ $panelDecile !== null ? ' · D'.$panelDecile : '' }}</span>@endif@if($compositeScore !== null) · <span style="{{ $compositeScoreTone }};font-weight:800" title="{{ $compositeScoreTitle }}">{{ __('Score') }} {{ $compositeScore }}</span>@endif</small></span><em @if($realtimeQuotes ?? false) data-live-symbol="{{ $stock->symbol }}" data-live-decimals="2" data-live-currency="{{ $displayCurrencySymbol }}" data-live-base-price="{{ (float) $stock->current_price }}" @endif>{{ is_numeric($stock->current_price) ? number_format((float)$stock->current_price,2,',','.') : '—' }} {{ $displayCurrencySymbol }}</em><x-heroicon-o-chevron-down class="h-4 w-4 text-cyan-300 transition" x-bind:class="mobileExpanded && 'rotate-180'" /></span>
+                        <span class="sms-v2-forecast"><span class="screener-mobile-signal-score" data-signal="{{ $displaySignalKey }}" data-trade-status-signal title="{{ $compositeScoreTitle }} · {{ $signalValidityTitle }}"><span class="screener-signal-score-donut"><x-segmented-score-donut :score="$compositeScore ?? 0" :display="$compositeScore ?? '—'" :segments="10" type="chance" :label="__('Score')" /></span><span class="screener-signal-validity">{{ $signalValidityLabel }}</span></span>@foreach($mobileForecasts as $days=>$forecast)<i data-assessment-horizon="{{ $days }}" data-assessment-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" data-assessment-base-return="{{ is_numeric($forecast) ? number_format((float) $forecast, 6, '.', '') : '' }}" class="{{ $triggerHorizon === (int) $days ? 'is-trigger-horizon '.(($realtimeQuotes ?? false) && $showDynamicRiskBorder ? 'has-dynamic-risk '.((float) $dynamicRiskPercent >= 90 ? 'is-critical-dynamic-risk ' : '') : '') : '' }}{{ is_numeric($forecast) && (float) $forecast < 2.0 && ($triggerHorizon !== (int) $days || $showDynamicRiskBorder) ? 'is-time-downgraded ' : '' }}{{ is_numeric($forecast) && (float) $forecast < 0 ? 'is-negative-forecast' : '' }}"><small>{{ $days }}T</small><b class="{{ $forecast===null?'text-slate-400':($forecast>=0?'text-emerald-400':'text-rose-400') }}" @if(($realtimeQuotes ?? false) && is_numeric($stock->{"predicted_price_{$days}d"} ?? null)) data-screener-live-forecast="{{ $stock->symbol }}" data-horizon="{{ $days }}" data-target-price="{{ (float) $stock->{"predicted_price_{$days}d"} }}" @endif>{{ $forecast===null?'—':(($forecast>0?'+':'').number_format($forecast,1,',','.').' %') }}</b></i>@endforeach</span>
                         <span class="sms-v2-scales"><i><small>{{ __('Signalqualität') }} · {{ $buySignalScoreLabel }}</small><span class="sms-v2-scale signal" style="--position:{{ $buySignalScorePercent }}%;--marker:{{ $buySignalScoreColor }}"><em></em></span></i><i><small>{{ __('Risiko') }} · {{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</small><span class="sms-v2-scale risk" style="--position:{{ 100 - ($rankingRiskPercent ?? 0) }}%;--marker:{{ $riskDonutColor }}"><em></em>@if(($realtimeQuotes ?? false) && is_numeric($baseRankingRiskPercent))<b class="screener-dynamic-risk-marker" data-screener-dynamic-risk style="--dynamic-risk-position:{{ number_format(100 - (float) ($dynamicRiskPercent ?? 0), 2, '.', '') }}%;--dynamic-risk-color:{{ $dynamicRiskColor }}" title="{{ __('Dynamisches Risiko') }}: {{ number_format((float) ($dynamicRiskPercent ?? 0), 1, ',', '.') }} %" @if(!is_numeric($activeNetForecast) || (float) $activeNetForecast >= 2) hidden @endif></b>@endif</span></i></span>
                     </button>
                     <x-screener.watchlist-picker :watchlists="$userWatchlists" :membership-ids="$stockWatchlistIds" :paper-portfolios="$paperPortfolios" :paper-portfolio-membership-ids="$stockPaperPortfolioIds" :instrument-id="$stock->instrument_id" :instrument-name="$stock->name ?: $stock->symbol" :prediction-id="($stock->data_source ?? null) !== 'serving' ? $stock->id : null" :active="$isOnWatchlist" class="screener-row-watchlist-picker screener-row-watchlist-picker-mobile md:hidden" />
@@ -623,6 +643,9 @@
                                     </p>
                                     <span class="relative z-20 mt-3 inline-flex items-center gap-1.5">
                                         <span class="inline-flex w-28 justify-center rounded-lg border px-2.5 py-1 text-[10px] font-black tracking-[.08em] {{ $tone }}">{{ $signalLabel }}</span>
+                                        @if($compositeScore !== null)
+                                            <span class="inline-flex items-center gap-1 rounded-lg border border-[var(--ak-border)] px-2 py-1 text-[10px] font-black" style="{{ $compositeScoreTone }}" title="{{ $compositeScoreTitle }}">{{ __('Score') }} {{ $compositeScore }}</span>
+                                        @endif
                                         @if($stock->external_review_ranking_downgraded ?? false)
                                             <span class="inline-flex rounded-md border border-rose-400/35 bg-rose-400/10 px-2 py-1 text-[8px] font-black uppercase tracking-wide text-rose-400" title="{{ __('Externer KI-Widerspruch: Ranking um einen Punkt reduziert') }}">KI −1</span>
                                         @endif
@@ -764,6 +787,13 @@
                                 <div class="screener-metric-wrap" title="{{ __('Rohwert') }}: {{ $rankingRiskPercent !== null ? number_format($rankingRiskPercent, 0, ',', '.').' %' : '—' }}">
                                     <div class="screener-metric-donut screener-risk-donut" style="--donut-value: {{ number_format($rankingRiskPercent ?? 0, 2, '.', '') }}%; --donut-color: {{ $riskDonutColor }}; --active-sector-start: {{ $riskSectorStart }}%; --active-sector-end: {{ $riskSectorEnd }}%; --active-sector-color: {{ $riskDonutColor }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" @if($rankingRiskPercent !== null) aria-valuenow="{{ number_format($rankingRiskPercent, 1, '.', '') }}" @endif><span>{{ \App\Support\QualityGrade::riskLevel($rankingRiskPercent) ?? '—' }}</span></div>
                                     <small>{{ __('Risiko') }}</small>
+                                </div>
+                                <div class="screener-metric-wrap" title="{{ $compositeScoreTitle }}">
+                                    <div class="screener-metric-donut screener-score-decile-donut" style="--score-angle: {{ number_format(($compositeScore ?? 0) * 3.6, 2, '.', '') }}deg" role="meter" aria-label="{{ __('Score') }}" aria-valuemin="0" aria-valuemax="100" @if($compositeScore !== null) aria-valuenow="{{ $compositeScore }}" @endif>
+                                        <i class="screener-score-decile-donut-marker" @if($compositeScore === null) hidden @endif></i>
+                                        <span>{{ $compositeScore !== null ? $compositeScore : '—' }}</span>
+                                    </div>
+                                    <small>{{ __('Score') }}</small>
                                 </div>
                             </div>
                             <div class="screener-donut-spacer"></div>
@@ -917,9 +947,9 @@
                                 ? 'border-emerald-400/45 bg-emerald-400/15 text-emerald-300'
                                 : 'border-rose-400/45 bg-rose-400/15 text-rose-300';
                             $externalReviewAdjustment = match ($stock->external_review_status === 'completed' ? $stock->external_review_verdict : $stock->external_review_status) {
-                                'NO_OBJECTION' => __('BUY bestätigt'),
-                                'CAUTION', 'OBJECTION' => __('BUY extern abgestuft'),
-                                'INSUFFICIENT_EVIDENCE', 'failed' => __('BUY nicht bestätigt'),
+                                'NO_OBJECTION' => __('POSITIV bestätigt'),
+                                'CAUTION', 'OBJECTION' => __('POSITIV extern abgestuft'),
+                                'INSUFFICIENT_EVIDENCE', 'failed' => __('POSITIV nicht bestätigt'),
                                 default => __('Prüfung offen'),
                             };
                             $externalReviewAdjustmentTone = in_array($stock->external_review_verdict, ['CAUTION', 'OBJECTION'], true)
@@ -1006,10 +1036,10 @@
                                 ? 'border-emerald-400/45 bg-emerald-400/15 text-emerald-300'
                                 : 'border-rose-400/45 bg-rose-400/15 text-rose-300';
                             $internalAssessmentAdjustment = $internalAssessmentIsYes
-                                ? __('BUY bestätigt')
+                                ? __('POSITIV bestätigt')
                                 : ($internalAssessmentSignal !== ''
-                                    ? __('BUY auf :signal abgestuft', ['signal' => $internalAssessmentSignal])
-                                    : __('BUY nicht bestätigt'));
+                                    ? __('POSITIV auf :signal abgestuft', ['signal' => $internalAssessmentSignal])
+                                    : __('POSITIV nicht bestätigt'));
                             $internalAssessmentAdjustmentTone = $internalAssessmentIsYes
                                 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
                                 : 'border-amber-400/35 bg-amber-400/10 text-amber-300';
@@ -1256,11 +1286,20 @@
                     }
                     if(tradeStatus!==previousTradeStatus){
                         row.dataset.tradeStatus=tradeStatus;
+                        const paused=tradeStatus==='paused_low_return';
+                        // Mirror the server-side rule: a paused BUY normally just
+                        // waits for the return to recover (WAIT). If every forecast
+                        // horizon on this row is already negative, WAIT no longer
+                        // applies - it falls through to HOLD instead.
+                        let pausedAllNegative=false;
+                        if(paused){
+                            const returns=[...row.querySelectorAll('[data-assessment-horizon]')]
+                                .map(cell=>Number(cell.dataset.assessmentReturn))
+                                .filter(value=>Number.isFinite(value));
+                            pausedAllNegative=returns.length>0&&returns.every(value=>value<0);
+                        }
                         row.querySelectorAll('[data-trade-status-signal]').forEach(badge=>{
-                            const paused=tradeStatus==='paused_low_return';
-                            badge.dataset.signal=paused?'wait':'buy';
-                            const label=badge.querySelector('[data-trade-status-label]')??(badge.matches('strong')?badge:badge.querySelector('strong'));
-                            if(label)label.textContent=paused?'{{ __('BUY pausiert') }}':'BUY';
+                            badge.dataset.signal=paused?(pausedAllNegative?'hold':'wait'):'buy';
                         });
                     }
                     const forecastRisk=Math.max(0,Math.min(100,100-Math.max(0,netForecast)*20));

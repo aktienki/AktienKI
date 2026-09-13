@@ -1965,7 +1965,7 @@
                     }
 
                     const signalColors = {
-                        BUY: '#22c55e',
+                        POSITIV: '#22c55e',
                         WATCH: '#84cc16',
                         HOLD: '#f59e0b',
                         SELL: '#ef4444',

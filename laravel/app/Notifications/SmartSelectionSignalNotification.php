@@ -50,7 +50,7 @@ final class SmartSelectionSignalNotification extends Notification implements Sho
                 : null;
 
         return (new MailMessage)
-            ->subject(__('Neues Kaufsignal für :symbol', ['symbol' => $instrument->symbol]))
+            ->subject(__('Neues Positiv-Signal für :symbol', ['symbol' => $instrument->symbol]))
             ->markdown('mail.signal-changed', [
                 'prediction' => $this->prediction,
                 'instrument' => $instrument,

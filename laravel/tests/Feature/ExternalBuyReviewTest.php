@@ -200,7 +200,7 @@ final class ExternalBuyReviewTest extends TestCase
 
         $this->assertStringContainsString('UNABHÄNGIGER KI-CHECK', $html);
         $this->assertStringContainsString('NEIN', $html);
-        $this->assertStringContainsString('BUY extern abgestuft', $html);
+        $this->assertStringContainsString('POSITIV extern abgestuft', $html);
         $this->assertStringContainsString('Vorsicht', $html);
         $this->assertStringContainsString('erhöhtes Ereignisrisiko', $html);
         $this->assertStringContainsString('Quartalszahlen werden in Kürze veröffentlicht', $html);

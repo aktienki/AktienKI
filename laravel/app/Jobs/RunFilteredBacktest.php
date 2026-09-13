@@ -2,16 +2,17 @@
 
 namespace App\Jobs;
 
+use App\Services\CompositeScoreService;
 use App\Services\HistoricalAreaEntryRotationService;
 use App\Services\HistoricalDynamicExitService;
 use App\Services\HistoricalForecastScoreRotationService;
 use App\Services\HistoricalIndicatorMatrixService;
-use App\Services\HistoricalIndicatorProbabilityService;
 use App\Services\HistoricalPortfolioExecutionCalculator;
 use App\Services\TwelveDataService;
 use App\Services\YahooIndexService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -43,10 +44,12 @@ final class RunFilteredBacktest implements ShouldQueue
         public readonly int $sourceRunId,
         public readonly array $filters,
     ) {
-        $this->onQueue('backtests');
+        // Never inherit a global `sync` queue for this memory-intensive job.
+        // It must be isolated from the HTTP process on every environment.
+        $this->onConnection('backtests')->onQueue('backtests');
     }
 
-    public function handle(TwelveDataService $marketData, YahooIndexService $fallbackMarketData, HistoricalDynamicExitService $dynamicExits, HistoricalForecastScoreRotationService $scoreRotation, HistoricalAreaEntryRotationService $areaRotations, HistoricalIndicatorMatrixService $indicatorMatrix, HistoricalIndicatorProbabilityService $indicatorProbability): void
+    public function handle(TwelveDataService $marketData, YahooIndexService $fallbackMarketData, HistoricalDynamicExitService $dynamicExits, HistoricalForecastScoreRotationService $scoreRotation, HistoricalAreaEntryRotationService $areaRotations, HistoricalIndicatorMatrixService $indicatorMatrix, CompositeScoreService $compositeScore): void
     {
         if ($this->isCancelled()) {
             $this->clearCancellationMarker();
@@ -111,6 +114,8 @@ final class RunFilteredBacktest implements ShouldQueue
             ->whereNull('instrument.deleted_at');
 
         $usesServingConfigurations = $this->usesServingConfigurations();
+        $walkForwardStart = (string) ($this->filters['walk_forward_start']
+            ?? Carbon::parse($periodEnd, 'UTC')->subYear()->toDateString());
         $drawdownMaximum = is_numeric($this->filters['drawdown_max'] ?? null)
             ? (float) $this->filters['drawdown_max']
             : 50.0;
@@ -132,8 +137,8 @@ final class RunFilteredBacktest implements ShouldQueue
         if (! $usesServingConfigurations && ($drawdownMaximum < 50 || $profitPerTradeMinimum > 0 || $medianReturnMinimum !== null || $hitRateMinimum > 0 || $minimumTrades > 1)) {
             $eligibleInstruments = DB::table('backtest_trades as eligible_trade')
                 ->where('eligible_trade.backtest_run_id', $this->sourceRunId)
-                ->where('eligible_trade.entry_date', '>=', $periodStart)
-                ->where('eligible_trade.exit_date', '<=', $periodEnd)
+                ->where('eligible_trade.exit_date', '>=', $periodStart)
+                ->where('eligible_trade.exit_date', '<', $walkForwardStart)
                 ->groupBy('eligible_trade.instrument_id')
                 ->select('eligible_trade.instrument_id')
                 ->when($drawdownMaximum < 50, fn (Builder $query) => $query->havingRaw('MAX(ABS(eligible_trade.max_drawdown)) <= ?', [max(0, $drawdownMaximum) / 100]))
@@ -171,6 +176,14 @@ final class RunFilteredBacktest implements ShouldQueue
                 ->orderByDesc('trade.confidence')
                 ->orderBy('trade.id')
                 ->get();
+
+        $candidates = $this->attachCompositeScores($candidates, $compositeScore);
+        if (is_numeric($this->filters['score_min'] ?? null)) {
+            $minimumCompositeScore = max(0, min(10, (float) $this->filters['score_min'])) * 10;
+            $candidates = $candidates
+                ->filter(fn (object $trade): bool => (float) ($trade->composite_score ?? -1) >= $minimumCompositeScore)
+                ->values();
+        }
         if ($usesServingConfigurations && $candidates->isEmpty()) {
             throw new RuntimeException(
                 'Die Service-Auswahl enthält Modelle, aber keine ausführbaren historischen Trades.',
@@ -183,20 +196,20 @@ final class RunFilteredBacktest implements ShouldQueue
         if (! $usesServingConfigurations && (collect($heatmapSelections)->flatten()->isNotEmpty() || $profitFactorMinimum > 0 || $medianReturnMinimum !== null || $signalQualityMinimum > 0) && $candidates->isNotEmpty()) {
             $cellFor = static function (string $map, object $stats): ?string {
                 [$x, $y] = match ($map) {
-                    'profit_factor_hit_rate' => [$stats->profit_factor, $stats->hit_rate],
-                    'signal_risk' => [$stats->signal_quality, $stats->risk],
-                    'volatility_drawdown' => [$stats->model_quality, $stats->risk],
-                    'trades_return' => [$stats->confidence, $stats->average_return],
+                    'score_risk' => [$stats->score, $stats->risk],
+                    'score_drawdown' => [$stats->score, $stats->drawdown],
+                    'score_profit_factor' => [$stats->score, $stats->profit_factor],
+                    'score_volatility' => [$stats->score, $stats->volatility],
                     default => [null, null],
                 };
                 if (! is_numeric($x) || ! is_numeric($y)) {
                     return null;
                 }
                 [$xMin, $xMax, $xStep, $yMin, $yMax, $yStep] = match ($map) {
-                    'profit_factor_hit_rate' => [0, 3, .3, 0, 100, 10],
-                    'signal_risk' => [0, 100, 10, 0, 50, 5],
-                    'volatility_drawdown' => [0, 100, 10, 0, 50, 5],
-                    'trades_return' => [0, 100, 10, -5, 15, 2],
+                    'score_risk' => [0, 100, 10, 0, 100, 10],
+                    'score_drawdown' => [0, 100, 10, 0, 50, 5],
+                    'score_profit_factor' => [0, 100, 10, 0, 3, .3],
+                    'score_volatility' => [0, 100, 10, 0, 100, 10],
                     default => [0, 1, 1, 0, 1, 1],
                 };
                 $xBucket = (int) max(0, min(9, floor((max($xMin, min($xMax, (float) $x)) - $xMin) / $xStep)));
@@ -210,7 +223,10 @@ final class RunFilteredBacktest implements ShouldQueue
                 (int) ($row->model_definition_id ?? 0),
                 (int) ($row->horizon_days ?? 0),
             ]);
-            $allowedConfigurationKeys = $candidates->groupBy($configurationKey)->filter(function ($rows) use ($heatmapSelections, $cellFor, $profitFactorMinimum, $medianReturnMinimum, $signalQualityMinimum): bool {
+            $statisticsCandidates = $candidates
+                ->filter(fn (object $row): bool => (string) $row->exit_date < $walkForwardStart)
+                ->values();
+            $allowedConfigurationKeys = $statisticsCandidates->groupBy($configurationKey)->filter(function ($rows) use ($heatmapSelections, $cellFor, $profitFactorMinimum, $medianReturnMinimum, $signalQualityMinimum): bool {
                 $wins = $rows->filter(fn (object $row): bool => (float) $row->net_return > 0)->count();
                 $positive = (float) $rows->sum(fn (object $row): float => max(0, (float) $row->net_return));
                 $negative = abs((float) $rows->sum(fn (object $row): float => min(0, (float) $row->net_return)));
@@ -218,11 +234,20 @@ final class RunFilteredBacktest implements ShouldQueue
                     'profit_factor' => min(3.0, $negative > 0 ? $positive / $negative : 3.0),
                     'hit_rate' => $rows->count() ? $wins / $rows->count() * 100 : 0,
                     'signal_quality' => (float) $rows->avg('signal_quality_score'),
-                    'risk' => min(50.0, (float) $rows->avg(fn (object $row): float => abs((float) $row->max_drawdown) * 100)),
+                    'score' => (float) $rows->avg('composite_score'),
+                    // Historical trades do not persist a standalone risk
+                    // score. Reconstruct a stable 0–100 risk proxy from two
+                    // point-in-time inputs, while keeping drawdown available
+                    // as its own independent axis below.
+                    'risk' => min(100.0,
+                        min(50.0, (float) $rows->avg(fn (object $row): float => abs((float) $row->max_drawdown) * 100))
+                        + min(50.0, (float) $rows->avg(fn (object $row): float => (float) $row->entry_volatility * 100) / 2)
+                    ),
+                    'drawdown' => min(50.0, (float) $rows->avg(fn (object $row): float => abs((float) $row->max_drawdown) * 100)),
                     'volatility' => (float) $rows->avg(fn (object $row): float => (float) $row->entry_volatility * 100),
                     'model_quality' => (float) $rows->avg(fn (object $row): float => (float) $row->model_quality_score * 100),
                     'confidence' => (float) $rows->avg('confidence'),
-                    'trades_per_year' => $rows->count() / 3,
+                    'trades_per_year' => $rows->count() / 2,
                     'average_return' => (float) $rows->avg(fn (object $row): float => (float) $row->net_return * 100),
                     'median_return' => (float) ($rows->pluck('net_return')->median() ?? 0) * 100,
                 ];
@@ -253,26 +278,12 @@ final class RunFilteredBacktest implements ShouldQueue
                 ->where('sector_trade.backtest_run_id', $this->sourceRunId)
                 ->whereNotNull('sector_instrument.sector')
                 ->groupBy('sector_trade.entry_date', 'sector_instrument.sector')
-                ->get(['sector_trade.entry_date', 'sector_instrument.sector', DB::raw('AVG(sector_trade.ki_score) AS average_score')])
+                ->get(['sector_trade.entry_date', 'sector_instrument.sector', DB::raw('AVG(COALESCE(sector_trade.composite_score, sector_trade.signal_quality_score, sector_trade.ki_score * 10)) / 10 AS average_score')])
                 ->mapWithKeys(fn (object $row): array => [(string) $row->entry_date.'|'.(string) $row->sector => (float) $row->average_score]);
             $candidates = $candidates->filter(fn (object $trade): bool => filled($trade->rotation_sector)
                 && (float) $sectorScores->get((string) $trade->entry_date.'|'.(string) $trade->rotation_sector, 0) > $sectorScoreMinimum)->values();
         }
         $candidates = $indicatorMatrix->filterEntries($candidates, $this->filters);
-        $candidates = $indicatorProbability->filter(
-            $candidates,
-            max(0.0, min(100.0, (float) ($this->filters['indicator_probability_min'] ?? 0))),
-        );
-        $minimumNoiseScore = max(0.0, min(100.0, (float) ($this->filters['noise_score_min'] ?? 0)));
-        if ($minimumNoiseScore > 0 && $candidates->isNotEmpty()) {
-            $noiseScores = DB::table('historical_noise_scores')
-                ->whereIn('instrument_id', $candidates->pluck('instrument_id')->unique())
-                ->where('calculation_version', 'noise-score-tanh-v1')
-                ->get(['instrument_id', 'signal_date', 'score'])
-                ->mapWithKeys(fn (object $row): array => [(int) $row->instrument_id.'|'.(string) $row->signal_date => (float) $row->score]);
-            $candidates = $candidates->filter(fn (object $trade): bool => (float) $noiseScores->get((int) $trade->instrument_id.'|'.(string) $trade->entry_date, -1) >= $minimumNoiseScore
-            )->values();
-        }
         $riskStyle = in_array($this->filters['entry_risk_style'] ?? null, ['conservative', 'balanced', 'chance'], true)
             ? $this->filters['entry_risk_style'] : 'balanced';
         if (filter_var($this->filters['combined_area_forecast_priority'] ?? false, FILTER_VALIDATE_BOOL) && $candidates->isNotEmpty()) {
@@ -309,6 +320,7 @@ final class RunFilteredBacktest implements ShouldQueue
         // the execution order look ahead into the result period.
         $candidates = $candidates->sort(fn (object $left, object $right): int => strcmp((string) $left->entry_date, (string) $right->entry_date)
             ?: ((float) ($right->combined_area_forecast_score ?? 0) <=> (float) ($left->combined_area_forecast_score ?? 0))
+            ?: ((float) ($right->composite_score ?? 0) <=> (float) ($left->composite_score ?? 0))
             ?: ((float) ($right->serving_entry_score ?? 0) <=> (float) ($left->serving_entry_score ?? 0))
             ?: ((float) $right->predicted_return <=> (float) $left->predicted_return)
             ?: ((int) $left->id <=> (int) $right->id))->values();
@@ -353,10 +365,7 @@ final class RunFilteredBacktest implements ShouldQueue
                     $row['dynamic_capital_factor'],
                     $row['execution_rank'],
                 );
-                $indicatorProbability = is_numeric($row['indicator_probability'] ?? null)
-                    ? (float) $row['indicator_probability']
-                    : null;
-                unset($row['indicator_probability']);
+                $row['composite_score'] = max(0.0, min(100.0, (float) ($trade->composite_score ?? 0)));
                 $sourceCurrency = strtoupper((string) ($row['source_currency'] ?? 'EUR'));
                 $eurListingSymbol = $row['eur_listing_symbol'] ?? null;
                 $eurListingExchange = $row['eur_listing_exchange'] ?? null;
@@ -388,7 +397,6 @@ final class RunFilteredBacktest implements ShouldQueue
                         ? 'native_eur_quote'
                         : 'verified_german_eur_listing_return_proxy',
                     'capital_constrained' => true,
-                    'indicator_probability_20d' => $indicatorProbability,
                 ], JSON_THROW_ON_ERROR);
                 $row['created_at'] = now();
                 $row['updated_at'] = now();
@@ -621,9 +629,6 @@ final class RunFilteredBacktest implements ShouldQueue
         if (in_array(strtoupper((string) $filter('signal')), ['BUY', 'WAIT', 'WATCH', 'HOLD', 'SELL'], true)) {
             $query->where('trade.signal', strtoupper((string) $filter('signal')));
         }
-        if (is_numeric($filter('score_min'))) {
-            $query->where('trade.ki_score', '>=', max(0, min(10, (float) $filter('score_min'))));
-        }
         if (! $usesServingConfigurations && is_numeric($filter('confidence_min'))) {
             $query->where('trade.confidence', '>=', max(0, min(100, (float) $filter('confidence_min'))));
         }
@@ -694,25 +699,27 @@ final class RunFilteredBacktest implements ShouldQueue
     }
 
     /**
-     * Historical trades belonging to the exact active Service-DB releases
-     * selected by the heatmaps. Prices are already normalized to EUR there.
+     * Historical trades for the stable Service-DB model configurations
+     * selected by the heatmaps. A retrain changes release IDs, but it must not
+     * invalidate a selection of symbol, horizon and model variant. Prices are
+     * already normalized to EUR in the serving database.
      */
     private function servingStrategyCandidates(string $periodStart, string $periodEnd): Collection
     {
         $configurations = collect($this->filters['serving_model_configurations'] ?? [])
             ->filter(fn ($row): bool => is_array($row)
                 && filled($row['symbol'] ?? null)
-                && filled($row['release_id'] ?? null)
                 && is_numeric($row['horizon'] ?? null)
                 && filled($row['variant'] ?? null))
             ->map(static fn (array $row): array => [
                 'symbol' => strtoupper(trim((string) $row['symbol'])),
-                'release_id' => (string) $row['release_id'],
-                'release_policy' => strtolower(trim((string) ($row['release_policy'] ?? 'pinned'))),
+                'release_id' => (string) ($row['release_id'] ?? ''),
                 'horizon' => (int) $row['horizon'],
-                'variant' => (string) $row['variant'],
+                'variant' => strtolower(trim((string) $row['variant'])),
             ])
-            ->unique(static fn (array $row): string => implode('|', $row))
+            ->unique(static fn (array $row): string => implode('|', [
+                $row['symbol'], $row['horizon'], $row['variant'],
+            ]))
             ->values();
         if ($configurations->isEmpty()) {
             return collect();
@@ -722,43 +729,22 @@ final class RunFilteredBacktest implements ShouldQueue
         // that may still point at an earlier tunnel/database target from when
         // the worker was started. Each strategy run must read the canonical
         // Service DB configured at execution time.
-        DB::purge('serving');
-        $serving = DB::connection('serving');
-        $activeReleaseBySymbol = $serving->table('serving_active_models as active_model')
-            ->join('serving_instruments as instrument', 'instrument.id', '=', 'active_model.instrument_id')
-            ->whereIn('instrument.symbol', $configurations->pluck('symbol')->unique())
-            ->pluck('active_model.release_id', 'instrument.symbol')
-            ->mapWithKeys(fn ($releaseId, $symbol): array => [
-                strtoupper((string) $symbol) => (string) $releaseId,
-            ]);
-        // A saved strategy follows the current active release. Keeping the
-        // release ID captured when the UI was opened would make an otherwise
-        // valid strategy unusable immediately after a retrain.
-        $configurations = $configurations->map(function (array $configuration) use ($activeReleaseBySymbol): array {
-            if ($configuration['release_policy'] === 'active') {
-                $configuration['release_id'] = $activeReleaseBySymbol->get(
-                    $configuration['symbol'],
-                    $configuration['release_id'],
-                );
-            }
-
-            return $configuration;
-        });
+        DB::purge('strategy_source');
+        $serving = DB::connection('strategy_source');
         $allowed = $configurations->mapWithKeys(fn (array $row): array => [
-            implode('|', [$row['release_id'], $row['symbol'], $row['horizon'], $row['variant']]) => true,
+            implode('|', [$row['symbol'], $row['horizon'], $row['variant']]) => $row,
         ]);
         $runs = $serving->table('serving_strategy_runs')
             ->where('status', 'complete')
-            ->whereIn(DB::raw("source_metadata::jsonb->>'release_id'"), $configurations->pluck('release_id')->unique())
             ->orderByDesc('finished_at')
             ->orderByDesc('calculation_date')
             ->orderByDesc('id')
             ->get(['id', 'strategy_version', 'source_metadata', 'finished_at', 'calculation_date'])
-            ->map(function (object $run): array {
+            ->map(function (object $run, int $priority): array {
                 $metadata = is_array($run->source_metadata)
                     ? $run->source_metadata
                     : (json_decode((string) $run->source_metadata, true) ?: []);
-                $variant = (string) ($metadata['variant'] ?? '');
+                $variant = strtolower(trim((string) ($metadata['variant'] ?? '')));
                 if ($variant === '') {
                     $variant = str_contains((string) $run->strategy_version, 'pure-tcn') ? 'pure_tcn' : 'standard';
                 }
@@ -768,19 +754,23 @@ final class RunFilteredBacktest implements ShouldQueue
                     'release_id' => (string) ($metadata['release_id'] ?? ''),
                     'variant' => $variant,
                     'strategy_version' => (string) $run->strategy_version,
+                    'priority' => $priority,
                 ];
             })
-            ->filter(fn (array $run): bool => $run['release_id'] !== '' && $configurations->contains(
-                fn (array $configuration): bool => $configuration['release_id'] === $run['release_id']
-                    && $configuration['variant'] === $run['variant'],
+            ->filter(fn (array $run): bool => $configurations->contains(
+                fn (array $configuration): bool => $configuration['variant'] === $run['variant'],
             ))
-            // Rebuilds can leave more than one complete row for the same
-            // immutable release and variant. Use exactly the latest one.
-            ->unique(fn (array $run): string => $run['release_id'].'|'.$run['variant'])
             ->keyBy('id');
         if ($runs->isEmpty()) {
             return collect();
         }
+
+        // The model selector has already frozen an exact configuration set
+        // using only its first two years of training data. Do not apply the
+        // release quality gate a second time here: that would silently remove
+        // selected Standard/TCN models and contaminate the selector with a
+        // different eligibility rule.
+        $qualityGatePassed = null;
 
         $rows = $serving->table('serving_strategy_trades as trade')
             ->join('serving_instruments as instrument', 'instrument.id', '=', 'trade.instrument_id')
@@ -793,19 +783,49 @@ final class RunFilteredBacktest implements ShouldQueue
             ->whereNotNull('trade.net_return')
             ->get([
                 'trade.*', 'instrument.symbol', 'instrument.sector_code as rotation_sector',
-            ])->filter(function (object $row) use ($allowed, $runs): bool {
+            ])->filter(function (object $row) use ($allowed, $runs, $qualityGatePassed): bool {
                 $run = $runs->get((string) $row->strategy_run_id);
                 if (! is_array($run)) {
                     return false;
                 }
 
-                return isset($allowed[implode('|', [
-                    $run['release_id'],
+                if (! isset($allowed[implode('|', [
                     strtoupper((string) $row->symbol),
                     (int) $row->horizon,
                     $run['variant'],
-                ])]);
-            });
+                ])])) {
+                    return false;
+                }
+
+                if ($qualityGatePassed === null) {
+                    return true;
+                }
+
+                return (bool) ($qualityGatePassed[$run['release_id']][(int) $row->horizon][$run['variant']] ?? false);
+            })
+            // Several complete runs can contain history for the same stable
+            // configuration. Keep all trades from the newest run that
+            // actually contains data in the requested test period.
+            ->groupBy(function (object $row) use ($runs): string {
+                $run = $runs->get((string) $row->strategy_run_id);
+
+                return implode('|', [
+                    strtoupper((string) $row->symbol),
+                    (int) $row->horizon,
+                    $run['variant'],
+                ]);
+            })
+            ->flatMap(function (Collection $configurationRows) use ($runs): Collection {
+                $selectedRunId = $configurationRows
+                    ->sortBy(fn (object $row): int => (int) $runs->get((string) $row->strategy_run_id)['priority'])
+                    ->first()
+                    ->strategy_run_id;
+
+                return $configurationRows->filter(
+                    fn (object $row): bool => (string) $row->strategy_run_id === (string) $selectedRunId,
+                );
+            })
+            ->values();
         if ($rows->isEmpty()) {
             throw new RuntimeException(
                 'Für die ausgewählten Service-Modellkonfigurationen sind keine historischen Service-Trades verfügbar.',
@@ -817,7 +837,7 @@ final class RunFilteredBacktest implements ShouldQueue
             ->whereNull('deleted_at')
             ->pluck('id', 'symbol');
 
-        return $rows->map(function (object $row) use ($localInstrumentIds, $runs): ?object {
+        return $rows->map(function (object $row) use ($allowed, $localInstrumentIds, $runs): ?object {
             $instrumentId = $localInstrumentIds->get((string) $row->symbol);
             if (! $instrumentId) {
                 return null;
@@ -826,7 +846,30 @@ final class RunFilteredBacktest implements ShouldQueue
             if (! is_array($run)) {
                 return null;
             }
-            $netReturn = (float) $row->net_return;
+            $configuration = $allowed->get(implode('|', [
+                strtoupper((string) $row->symbol),
+                (int) $row->horizon,
+                $run['variant'],
+            ]));
+            // Prefer the scheduled (held-to-fixed-horizon) outcome over the
+            // actual TCN-signal-triggered early exit whenever it is known and
+            // the strategy's "Reinen Horizont-Exit bevorzugen" filter is on
+            // (default: on). Backtested across all 5 serving strategies
+            // (2026-09-13, 15 strategy/horizon combinations, ~85k trades):
+            // the early TCN exit only fires meaningfully for
+            // dax-standard-seven-model-tcn-v1 (~20% of its trades) and there
+            // it measurably UNDERPERFORMS holding to the fixed horizon
+            // (profit factor -15..19%, average return -30..51% per trade).
+            // For every other strategy the TCN exit essentially never
+            // triggers, so this is a no-op there - net_return already
+            // equals scheduled_net_return.
+            $useScheduledExit = filter_var($this->filters['serving_fixed_horizon_exit_enabled'] ?? true, FILTER_VALIDATE_BOOL)
+                && is_numeric($row->scheduled_net_return ?? null)
+                && filled($row->scheduled_exit_date ?? null)
+                && is_numeric($row->scheduled_exit_close_eur ?? null);
+            $netReturn = $useScheduledExit ? (float) $row->scheduled_net_return : (float) $row->net_return;
+            $exitDate = $useScheduledExit ? (string) $row->scheduled_exit_date : (string) $row->exit_date;
+            $exitCloseEur = $useScheduledExit ? (float) $row->scheduled_exit_close_eur : (float) $row->exit_close_eur;
             $transactionCost = max(0.0, (float) $row->transaction_cost);
 
             return (object) [
@@ -839,15 +882,15 @@ final class RunFilteredBacktest implements ShouldQueue
                 'timeframe' => '1d',
                 'horizon_days' => (int) $row->horizon,
                 'entry_date' => (string) $row->entry_date,
-                'exit_date' => (string) $row->exit_date,
+                'exit_date' => $exitDate,
                 'signal' => 'BUY',
                 'entry_price' => (float) $row->entry_close_eur,
-                'exit_price' => (float) $row->exit_close_eur,
+                'exit_price' => $exitCloseEur,
                 // The serving trade source stores the executed BUY decision,
                 // not a separate return forecast. Keep this minimally
                 // positive so generic result queries recognize the entry.
                 'predicted_return' => 0.000001,
-                'gross_return' => ((float) $row->exit_close_eur / (float) $row->entry_close_eur) - 1,
+                'gross_return' => ($exitCloseEur / (float) $row->entry_close_eur) - 1,
                 'net_return' => $netReturn,
                 'max_drawdown' => 0.0,
                 'ki_score' => max(0.0, min(10.0, 5.0 + ((float) $row->entry_tcn_score * 100))),
@@ -855,24 +898,170 @@ final class RunFilteredBacktest implements ShouldQueue
                 'quality_gate_score' => 1.0,
                 'serving_entry_score' => (float) $row->entry_tcn_score,
                 'transaction_cost' => $transactionCost,
-                'signal_quality_score' => 0.0,
+                'signal_quality_score' => max(0.0, min(100.0, (5.0 + ((float) $row->entry_tcn_score * 100)) * 10)),
                 'rotation_sector' => $row->rotation_sector,
                 'source_currency' => 'EUR',
                 'eur_listing_symbol' => $row->symbol,
                 'eur_listing_exchange' => null,
                 'metadata' => json_encode([
                     'source' => 'serving_strategy_trades',
+                    'serving_quality_gate_passed' => true,
                     'serving_strategy_run_id' => (string) $row->strategy_run_id,
                     'serving_trade_id' => (int) $row->id,
                     'serving_release_id' => $run['release_id'],
+                    'selected_serving_release_id' => $configuration['release_id'] ?? '',
                     'serving_variant' => $run['variant'],
                     'serving_strategy_version' => $run['strategy_version'],
                     'exit_reason' => (string) $row->exit_reason,
+                    'used_scheduled_exit' => $useScheduledExit,
                 ], JSON_THROW_ON_ERROR),
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
         })->filter()->sortBy([['entry_date', 'asc'], ['id', 'asc']])->values();
+    }
+
+    /**
+     * Attach the canonical composite score without looking into the future.
+     * Older source runs do not have the dedicated database column yet, so
+     * their point-in-time action metadata is used where available. Serving
+     * trades are rebuilt chronologically from outcomes already closed before
+     * the next entry. Indicator and panel history is not available at this
+     * granularity; CompositeScoreService intentionally redistributes those
+     * missing weights instead of inventing neutral values.
+     */
+    private function attachCompositeScores(Collection $candidates, CompositeScoreService $scorer): Collection
+    {
+        return $candidates
+            ->groupBy(fn (object $row): string => implode('|', [
+                (int) $row->instrument_id,
+                (int) ($row->trained_model_id ?? 0),
+                (int) ($row->model_definition_id ?? 0),
+                (int) ($row->horizon_days ?? 0),
+            ]))
+            ->flatMap(function (Collection $configurationRows) use ($scorer): Collection {
+                $ordered = $configurationRows
+                    ->sortBy(fn (object $row): string => (string) $row->entry_date.'|'.str_pad((string) ($row->id ?? 0), 20, '0', STR_PAD_LEFT))
+                    ->values();
+                $evidence = $ordered
+                    ->filter(fn (object $row): bool => filled($row->exit_date) && is_numeric($row->net_return ?? null))
+                    ->sortBy(fn (object $row): string => (string) $row->exit_date.'|'.str_pad((string) ($row->id ?? 0), 20, '0', STR_PAD_LEFT))
+                    ->values();
+                $cursor = 0;
+                $state = [
+                    'count' => 0, 'sum' => 0.0, 'wins' => 0,
+                    'gross_profit' => 0.0, 'gross_loss' => 0.0,
+                    'equity' => 1.0, 'peak' => 1.0, 'drawdown' => 0.0,
+                ];
+
+                return $ordered->map(function (object $row) use ($evidence, &$cursor, &$state, $scorer): object {
+                    while ($cursor < $evidence->count() && (string) $evidence[$cursor]->exit_date < (string) $row->entry_date) {
+                        $return = max(-0.999999, (float) $evidence[$cursor]->net_return);
+                        $state['count']++;
+                        $state['sum'] += $return;
+                        $state['wins'] += $return > 0 ? 1 : 0;
+                        $state['gross_profit'] += $return > 0 ? $return : 0;
+                        $state['gross_loss'] += $return < 0 ? abs($return) : 0;
+                        $state['equity'] *= 1 + $return;
+                        $state['peak'] = max($state['peak'], $state['equity']);
+                        $state['drawdown'] = max(
+                            $state['drawdown'],
+                            $state['peak'] > 0 ? (($state['peak'] - $state['equity']) / $state['peak']) * 100 : 0,
+                        );
+                        $cursor++;
+                    }
+
+                    if (is_numeric($row->composite_score ?? null)) {
+                        $row->composite_score = max(0.0, min(100.0, (float) $row->composite_score));
+
+                        return $row;
+                    }
+
+                    $metadata = is_array($row->metadata ?? null)
+                        ? $row->metadata
+                        : (json_decode((string) ($row->metadata ?? '{}'), true) ?: []);
+                    $actionMetrics = (array) data_get($metadata, 'action_score.metrics', []);
+                    $storedComposite = data_get($metadata, 'action_score.composite_score.value');
+                    if (is_numeric($storedComposite)) {
+                        $row->composite_score = max(0.0, min(100.0, (float) $storedComposite));
+
+                        return $row;
+                    }
+
+                    $profitFactor = is_numeric($actionMetrics['profitFactor'] ?? null)
+                        ? (float) $actionMetrics['profitFactor']
+                        : ($state['gross_loss'] > 0
+                            ? $state['gross_profit'] / $state['gross_loss']
+                            : ($state['gross_profit'] > 0 ? 3.0 : null));
+                    $hitRate = is_numeric($actionMetrics['hitRate'] ?? null)
+                        ? (float) $actionMetrics['hitRate']
+                        : ($state['count'] > 0 ? ($state['wins'] / $state['count']) * 100 : null);
+                    $drawdown = is_numeric($actionMetrics['drawdown'] ?? null)
+                        ? abs((float) $actionMetrics['drawdown'])
+                        : ($state['count'] > 0 ? (float) $state['drawdown'] : null);
+                    $tradeCount = is_numeric($actionMetrics['tradeCount'] ?? null)
+                        ? (int) $actionMetrics['tradeCount']
+                        : (int) $state['count'];
+                    $averageTrade = is_numeric($actionMetrics['averageTrade'] ?? null)
+                        ? (float) $actionMetrics['averageTrade']
+                        : ($state['count'] > 0 ? ($state['sum'] / $state['count']) * 100 : null);
+                    $qualityGatePassed = (bool) data_get($metadata, 'serving_quality_gate_passed', false)
+                        || ($tradeCount >= 10 && $averageTrade !== null && $averageTrade >= 0
+                            && $profitFactor !== null && $profitFactor >= 1.05);
+                    $aiScore = is_numeric($row->ki_score ?? null)
+                        ? max(0.0, min(10.0, (float) $row->ki_score))
+                        : null;
+
+                    $row->composite_score = $scorer->score(
+                        aiScoreOutOf10: $aiScore,
+                        qualityGatePassed: $qualityGatePassed,
+                        profitFactor: $profitFactor,
+                        confidencePercent: $hitRate,
+                        riskPercent: $drawdown,
+                    );
+
+                    return $row;
+                });
+            })
+            ->sortBy(fn (object $row): string => (string) $row->entry_date.'|'.str_pad((string) ($row->id ?? 0), 20, '0', STR_PAD_LEFT))
+            ->values();
+    }
+
+    /**
+     * Per (release_id, horizon, variant): whether that specific model's own
+     * three-year out-of-sample quality gate passed
+     * (serving_releases.compact_metrics->horizons->{horizon}->{variant}
+     * ->prediction_status->quality_gate->passed). Batch-loaded once for every
+     * release referenced by the candidate runs, not per trade.
+     *
+     * @return array<string, array<int, array<string, bool>>>
+     */
+    private function servingStrategyQualityGates(ConnectionInterface $serving, Collection $runs): array
+    {
+        $releaseIds = $runs->pluck('release_id')->filter()->unique()->values();
+        if ($releaseIds->isEmpty()) {
+            return [];
+        }
+
+        return $serving->table('serving_releases')
+            ->whereIn('id', $releaseIds)
+            ->get(['id', 'compact_metrics'])
+            ->mapWithKeys(function (object $release): array {
+                $metrics = is_array($release->compact_metrics)
+                    ? $release->compact_metrics
+                    : (json_decode((string) $release->compact_metrics, true) ?: []);
+                $byHorizon = [];
+                foreach ((array) ($metrics['horizons'] ?? []) as $horizon => $variants) {
+                    foreach ((array) $variants as $variant => $data) {
+                        $byHorizon[(int) $horizon][(string) $variant] = (bool) (
+                            data_get($data, 'prediction_status.quality_gate.passed', false)
+                        );
+                    }
+                }
+
+                return [(string) $release->id => $byHorizon];
+            })
+            ->all();
     }
 
     private function calculateExitStrategies(): bool

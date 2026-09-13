@@ -101,7 +101,7 @@
                 <div class="ak-market-hero-stat">
                     <span>{{ __('Marktbreite') }}</span>
                     <strong>{{ number_format($breadth, 0, ',', '.') }}<small>%</small></strong>
-                    <small>{{ $positiveMarkets }}/{{ $marketCount }} {{ $isServingAssessment ? 'BUY' : __('positiv') }}</small>
+                    <small>{{ $positiveMarkets }}/{{ $marketCount }} {{ $isServingAssessment ? 'POSITIV' : __('positiv') }}</small>
                 </div>
                 <div class="ak-market-hero-stat" data-tone="{{ $tone }}">
                     <span>{{ __('Regime') }}</span>

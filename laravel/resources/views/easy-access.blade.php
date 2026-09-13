@@ -17,7 +17,7 @@
         <section class="w-full rounded-3xl border border-cyan-300/25 bg-[#0c2035]/90 p-7 shadow-2xl shadow-black/25 backdrop-blur-xl sm:p-11">
             <p class="text-xs font-black uppercase tracking-[.25em] text-cyan-300">{{ __('Easy Access') }}</p>
             <h1 class="mt-3 text-3xl font-black tracking-tight sm:text-5xl">{{ __('Top-3-Signale direkt erhalten') }}</h1>
-            <p class="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">{{ __('Trage deine E-Mail-Adresse ein, bestätige dein Anlageprofil und wähle eine freigegebene Strategie. Du erhältst ausschließlich eine Nachricht, wenn ein BUY- oder SELL-Signal für eine Aktie der offiziellen Top 3 entsteht.') }}</p>
+            <p class="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">{{ __('Trage deine E-Mail-Adresse ein, bestätige dein Anlageprofil und wähle eine freigegebene Strategie. Du erhältst ausschließlich eine Nachricht, wenn ein POSITIV- oder SELL-Signal für eine Aktie der offiziellen Top 3 entsteht.') }}</p>
 
             @if (session('easy_access_subscribed'))<div class="mt-6 rounded-xl border border-emerald-300/40 bg-emerald-300/10 px-4 py-3 text-sm font-semibold text-emerald-100">{{ session('easy_access_subscribed') }}</div>@endif
             @if ($errors->any())<div class="mt-6 rounded-xl border border-rose-300/40 bg-rose-300/10 px-4 py-3 text-sm text-rose-100"><ul class="list-disc space-y-1 pl-5">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif

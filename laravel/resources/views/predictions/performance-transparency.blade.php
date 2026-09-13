@@ -4,7 +4,7 @@
             <header class="mb-5 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
                 <div><p class="text-[10px] font-black uppercase tracking-[.2em] text-cyan-500">{{ __('Transparenz') }}</p>
                 <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)] sm:text-3xl">{{ __('Performance & Einordnung') }}</h1>
-                <p class="mt-2 max-w-4xl text-sm leading-6 text-[var(--ak-muted)]">{{ __('Aktienspezifische Out-of-Sample-Ergebnisse nach deinem Profil. Die Werte zeigen abgeschlossene Signalwechsel-Trades und keine bloßen Tage innerhalb eines BUY-Signals.') }}</p></div>
+                <p class="mt-2 max-w-4xl text-sm leading-6 text-[var(--ak-muted)]">{{ __('Aktienspezifische Out-of-Sample-Ergebnisse nach deinem Profil. Die Werte zeigen abgeschlossene Signalwechsel-Trades und keine bloßen Tage innerhalb eines POSITIV-Signals.') }}</p></div>
                 <div class="self-start rounded-xl border border-cyan-400/20 px-3 py-2 lg:min-w-[390px]">
                     <div class="flex items-center justify-between gap-5 text-[8px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]"><span>{{ __('Qualitätsstufen') }}</span><span>{{ array_sum($qualitySummary) }} {{ __('Aktien') }}</span></div>
                     <div class="mt-2 grid grid-cols-4 gap-2">
@@ -23,7 +23,7 @@
                     </button>
                     <form x-cloak x-show="filtersOpen" x-transition class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-7" method="GET">
                         <label class="xl:col-span-2"><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-[var(--ak-muted)]">{{ __('Aktie') }}</span><input name="q" value="{{ request('q') }}" placeholder="{{ __('Name oder Symbol') }}" class="ak-input w-full" /></label>
-                        <label><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-[var(--ak-muted)]">{{ __('Signal') }}</span><select name="signal" class="ak-input w-full"><option value="">{{ __('Alle') }}</option>@foreach(['BUY','WATCH','HOLD','WAIT','SELL'] as $value)<option value="{{ $value }}" @selected(request('signal')===$value)>{{ $value }}</option>@endforeach</select></label>
+                        <label><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-[var(--ak-muted)]">{{ __('Signal') }}</span><select name="signal" class="ak-input w-full"><option value="">{{ __('Alle') }}</option>@foreach(['BUY','WATCH','HOLD','WAIT','SELL'] as $value)<option value="{{ $value }}" @selected(request('signal')===$value)>{{ signal_label($value) }}</option>@endforeach</select></label>
                         <label><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-[var(--ak-muted)]">{{ __('Score') }}</span><select name="score" class="ak-input w-full"><option value="">{{ __('Alle') }}</option>@foreach(['1+','1','1−','2+','2','2−','3+','3','3−','4+','4','4−','5+','5','5−'] as $value)<option value="{{ $value }}" @selected(request('score')===$value)>{{ $value }}</option>@endforeach</select></label>
                         <label><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-[var(--ak-muted)]">{{ __('Risiko') }}</span><select name="risk" class="ak-input w-full"><option value="">{{ __('Alle') }}</option>@foreach([2,3,4,5] as $value)<option value="{{ $value }}" @selected((string)request('risk')===(string)$value)>{{ $value }}</option>@endforeach</select></label>
                         <label><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-[var(--ak-muted)]">{{ __('Klasse') }}</span><select name="quality" class="ak-input w-full"><option value="">{{ __('Alle') }}</option>@foreach(['quality','solid','basic','observation'] as $value)<option value="{{ $value }}" @selected(request('quality')===$value)>{{ __(ucfirst($value)) }}</option>@endforeach</select></label>
@@ -46,7 +46,7 @@
                             @endphp
                             <tr class="text-xs text-[var(--ak-text)]">
                                 <td class="px-4 py-3"><a href="{{ route('stocks.show', $row->symbol) }}" class="block max-w-64 truncate font-black hover:text-cyan-500">{{ $row->name ?: $row->symbol }}</a><small class="text-[9px] text-[var(--ak-muted)]">{{ $row->country }} · {{ $row->symbol }}</small></td>
-                                <td><b class="{{ $signalTone }}">{{ strtoupper((string)$row->personalized_signal) }}</b></td>
+                                <td><b class="{{ $signalTone }}">{{ signal_label($row->personalized_signal) }}</b></td>
                                 <td><b class="text-base">{{ $row->score_grade ?: '—' }}</b></td>
                                 <td><b class="text-base">{{ $row->risk_level ?: '—' }}</b>@if(is_numeric($row->risk_percent))<small class="ml-1 text-[9px] text-[var(--ak-muted)]">{{ number_format($row->risk_percent,0,',','.') }}%</small>@endif</td>
                                 <td><span class="rounded-md border px-2 py-1 text-[9px] font-black uppercase {{ $classTone }}">{{ __($row->quality_class) }}</span></td>

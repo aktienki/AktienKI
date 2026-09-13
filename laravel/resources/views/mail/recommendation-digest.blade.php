@@ -7,7 +7,7 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 <tr>
 <td><div style="color:#d9a84e;font-size:10px;font-weight:800;letter-spacing:1.7px">TOP {{ $index + 1 }}</div><div style="color:#ffffff;font-size:21px;font-weight:800;margin-top:4px">{!! str_ireplace('.com', '.&#8203;com', e($recommendation['name'])) !!}</div><div style="color:#d9a84e;font-size:12px;font-weight:700">{{ $recommendation['symbol'] }}</div></td>
-<td align="right" valign="top"><span style="display:inline-block;background:#153d3b;border:1px solid #2b746c;border-radius:6px;padding:6px 12px;color:#4ad9bd;font-size:13px;font-weight:800">{{ $recommendation['signal'] }}</span></td>
+<td align="right" valign="top"><span style="display:inline-block;background:#153d3b;border:1px solid #2b746c;border-radius:6px;padding:6px 12px;color:#4ad9bd;font-size:13px;font-weight:800">{{ signal_label($recommendation['signal']) }}</span></td>
 </tr>
 </table>
 

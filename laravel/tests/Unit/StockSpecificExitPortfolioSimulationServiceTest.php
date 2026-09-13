@@ -25,6 +25,28 @@ final class StockSpecificExitPortfolioSimulationServiceTest extends TestCase
     }
 
     #[Test]
+    public function it_reports_a_prepared_payload_as_available_only_when_the_file_and_checksum_match(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'exit-payload-');
+        $this->assertIsString($path);
+        file_put_contents($path, '{}');
+        config()->set('aktienki.portfolio_exit_backtest.payload_path', $path);
+        config()->set('aktienki.portfolio_exit_backtest.payload_sha256', hash_file('sha256', $path));
+
+        try {
+            $this->assertTrue(StockSpecificExitPortfolioSimulationService::preparedPayloadAvailable());
+
+            config()->set('aktienki.portfolio_exit_backtest.payload_sha256', str_repeat('0', 64));
+            $this->assertFalse(StockSpecificExitPortfolioSimulationService::preparedPayloadAvailable());
+
+            config()->set('aktienki.portfolio_exit_backtest.payload_path', $path.'.missing');
+            $this->assertFalse(StockSpecificExitPortfolioSimulationService::preparedPayloadAvailable());
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    #[Test]
     public function it_maps_frozen_sources_to_local_instruments_and_a_real_assigned_strategy(): void
     {
         $service = new StockSpecificExitPortfolioSimulationService(new ServingPortfolioCalculator);
@@ -88,6 +110,28 @@ final class StockSpecificExitPortfolioSimulationServiceTest extends TestCase
             StockSpecificExitPortfolioSimulationService::STOCK_SPECIFIC_FINAL_EXIT,
             str_repeat('b', 64),
         );
+    }
+
+    #[Test]
+    public function depot_calculation_books_tax_and_exposes_the_untaxed_comparison_curve(): void
+    {
+        $result = (new ServingPortfolioCalculator)->calculate(
+            [$this->source()],
+            10000,
+            1,
+            ServingPortfolioCalculator::ALLOCATION_EQUAL_WEIGHT,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            25.0,
+        );
+
+        $this->assertSame(250.0, $result['total_taxes']);
+        $this->assertSame(10750.0, $result['final_capital']);
+        $this->assertSame(11000.0, $result['final_capital_without_tax']);
+        $this->assertSame(250.0, $result['trade_log'][0]['tax_eur']);
+        $this->assertSame(11000.0, $result['equity_curve'][1]['equity_without_tax']);
     }
 
     #[Test]

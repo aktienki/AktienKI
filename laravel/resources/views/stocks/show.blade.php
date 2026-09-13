@@ -1164,6 +1164,7 @@
     </style>
     @php
         $servingMode = $servingMode ?? false;
+        $compositeScore = $compositeScore ?? null;
         $backtestMetricPercentiles = $backtestMetricPercentiles ?? [];
         $displayHorizons = $displayHorizons ?? [5, 10, 15, 20];
         $signalReferenceHorizon = in_array(20, $displayHorizons, true)
@@ -1172,6 +1173,17 @@
         // Pro reminders are supported for both legacy and serving predictions.
         $canCreatePredictionReminder = $canViewRealtime;
         $scorePercent = \App\Support\AiScore::toPercent($prediction?->display_score_10 ?? $prediction?->prediction_score);
+        // Header badge: the risk/quality-gate/panel-aware composite score (same
+        // blend as the screener), not the pure AI model score above - $scorePercent
+        // stays reserved for the "Signalqualität" donut further down, which shows
+        // model quality in isolation.
+        $headlineScore = $compositeScore ?? $scorePercent;
+        // Same red-to-green 10-step palette as the screener's score donut, so the
+        // number itself is graded independently of the badge's signal color.
+        $headlineScoreTone = $headlineScore === null ? null : [
+            '#f43f5e', '#fb7185', '#f97316', '#fb923c', '#f59e0b',
+            '#fbbf24', '#a3e635', '#4ade80', '#34d399', '#10b981',
+        ][(int) min(9, max(0, floor($headlineScore / 10)))];
         $confidencePercent = is_numeric($prediction?->confidence)
             ? max(0, min(100, (float) $prediction->confidence <= 1 ? (float) $prediction->confidence * 100 : (float) $prediction->confidence))
             : null;
@@ -1213,7 +1225,7 @@
                     : ($signal === 'WAIT'
                         ? 'border-emerald-300/70 bg-emerald-400/25 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,.22)]'
                         : 'border-amber-300/30 bg-amber-300/10 text-amber-300')));
-        $signalLabel = $signal;
+        $signalLabel = signal_label($signal);
         $trendValue = strtolower((string) ($predictionMetadata['trend'] ?? $prediction?->higher_timeframe_trend ?? 'neutral'));
         $trendLabel = match ($trendValue) {
             'bullish', 'up', 'uptrend' => __('Bullisch'),
@@ -1337,7 +1349,7 @@
                         · {{ $currency }}</span>
                     </p>
                     @if ($servingMode)
-                        <p class="mt-1 text-[8px] font-black uppercase tracking-[.14em] text-cyan-500">{{ __('Service Datenbank · aktives Release') }} {{ \Illuminate\Support\Str::limit($servingReleaseId ?? '', 12, '…') }}</p>
+                        <p class="mt-1 text-[8px] font-black uppercase tracking-[.14em] text-cyan-500">{{ __('Service Datenbank') }}</p>
                     @endif
                 </div>
             </div>
@@ -1634,8 +1646,8 @@
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-400">{{ __('Performance seit Signal') }}</p>
-                            <h2 class="mt-1 text-lg font-black">{{ __('Entwicklung seit dem letzten BUY') }}</h2>
-                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Ausschließlich realisierte Kurse nach dem letzten Signalwechsel auf BUY.') }}</p>
+                            <h2 class="mt-1 text-lg font-black">{{ __('Entwicklung seit dem letzten POSITIV') }}</h2>
+                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Ausschließlich realisierte Kurse nach dem letzten Signalwechsel auf POSITIV.') }}</p>
                         </div>
                         <button type="button" onclick="this.closest('dialog').close()" aria-label="{{ __('Schließen') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)] hover:text-cyan-400">
                             <x-heroicon-o-x-mark class="h-5 w-5" />
@@ -1645,7 +1657,7 @@
                 <div class="p-5">
                     @if ($performanceBuyTransition && $performanceBuyPrice !== null)
                         <div class="mb-4 grid grid-cols-3 gap-2">
-                            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('BUY-Signal') }}</small><strong class="mt-1 block text-xs">{{ \Carbon\CarbonImmutable::createFromTimestampMs($performanceBuyAt)->format('d.m.Y') }}</strong></div>
+                            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('POSITIV-Signal') }}</small><strong class="mt-1 block text-xs">{{ \Carbon\CarbonImmutable::createFromTimestampMs($performanceBuyAt)->format('d.m.Y') }}</strong></div>
                             <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Signalkurs') }}</small><strong class="mt-1 block text-xs">{{ number_format($performanceBuyPrice, 2, ',', '.') }} {{ $currency }}</strong></div>
                             <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Bis heute') }}</small><strong class="mt-1 block text-xs {{ $performanceCurrentReturn >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $performanceCurrentReturn !== null ? (($performanceCurrentReturn > 0 ? '+' : '').number_format($performanceCurrentReturn, 2, ',', '.').' %') : '—' }}</strong></div>
                         </div>
@@ -1675,7 +1687,7 @@
                             @endforeach
                         </tbody>
                     </table>
-                    @unless ($performanceBuyTransition && $performanceBuyPrice !== null)<p class="py-6 text-center text-sm text-[var(--ak-muted)]">{{ __('Kein auswertbares BUY-Signal im verfügbaren Kurszeitraum.') }}</p>@endunless
+                    @unless ($performanceBuyTransition && $performanceBuyPrice !== null)<p class="py-6 text-center text-sm text-[var(--ak-muted)]">{{ __('Kein auswertbares POSITIV-Signal im verfügbaren Kurszeitraum.') }}</p>@endunless
                     <p class="mt-4 text-[10px] leading-5 text-[var(--ak-muted)]">{{ __('Berechnung auf Basis der tatsächlichen Tages-Schlusskurse. Der Signalhandelstag zählt als Ausgangspunkt; Gebühren sind nicht berücksichtigt.') }}</p>
                 </div>
             </dialog>
@@ -1694,7 +1706,7 @@
                             <x-heroicon-o-clock class="h-4 w-4" />{{ $signalLabel }}
                         </button>
                     @else
-                        <span data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isStrongBuy ? __('Alle Qualitätskriterien und Prognosehorizonte sind positiv') : ($isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel) }}" class="ak-signal-badge inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-lg border px-2 text-[10px] font-black sm:min-w-20 sm:gap-1.5 sm:px-3 sm:text-xs {{ $signalClass }}"><span>{{ $isStrongBuy ? 'STRONG BUY' : $signalLabel }} · {{ __('Score') }} {{ $scorePercent !== null ? number_format($scorePercent / 10, 1, ',', '.') : '—' }}/10</span>@if($isQualityGateRestrictedBuy)<small class="ak-restricted-buy-label">BUY*</small>@endif</span>
+                        <span data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isStrongBuy ? __('Alle Qualitätskriterien und Prognosehorizonte sind positiv') : ($isQualityGateRestrictedBuy ? __('POSITIV durch Quality Gate eingeschränkt') : ($compositeScore !== null ? __('Gesamtscore aus KI-Score, Quality-Gate, Modellqualität, Risiko und Panel-Rang.') : $signalLabel)) }}" class="ak-signal-badge inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-lg border px-2 text-[10px] font-black sm:min-w-20 sm:gap-1.5 sm:px-3 sm:text-xs {{ $signalClass }}"><span>{{ $isStrongBuy ? signal_label('STRONG_BUY') : $signalLabel }} · {{ __('Score') }} <b style="{{ $headlineScoreTone ? 'color:'.$headlineScoreTone : '' }}">{{ $headlineScore !== null ? number_format($headlineScore / 10, 1, ',', '.') : '—' }}/10</b></span>@if($isQualityGateRestrictedBuy)<small class="ak-restricted-buy-label">POSITIV*</small>@endif</span>
                     @endif
                     @unless ($servingMode)
                         <button type="button" onclick="document.getElementById('stock-product-finder-modal')?.showModal()" class="hidden h-8 items-center justify-center gap-1.5 rounded-lg border border-cyan-400/35 bg-cyan-400/10 px-3 text-xs font-black text-cyan-400 transition hover:bg-cyan-400/15 sm:inline-flex">
@@ -1942,7 +1954,9 @@
                                     </div>
                                 </div>
                                 <div id="stock-signal-trade-chart" class="h-[180px] w-full"></div>
-                                <div class="mt-1.5 space-y-2 border-t border-[var(--ak-border)] pt-2">
+                                <details class="mt-1.5 border-t border-[var(--ak-border)] pt-2">
+                                    <summary class="cursor-pointer list-none text-[8px] font-black uppercase tracking-wide text-cyan-500">{{ __('Kennzahlen im Detail') }} ↓</summary>
+                                    <div class="mt-2 space-y-2">
                                     @foreach ([
                                         ['trades', __('Trades'), data_get($detailWalkForwardStats, 'trade_count'), 'integer', __('Anzahl der abgeschlossenen historischen Modelltrades.')],
                                         ['hit_rate', __('Trefferquote'), data_get($detailWalkForwardStats, 'hit_rate'), 'percent', __('Anteil der historischen Trades mit positivem Ergebnis.')],
@@ -1974,7 +1988,8 @@
                                             <div class="mt-0.5 flex justify-between text-[6px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span>{{ __('Schwach') }}</span><span>{{ __('Mittel') }}</span><span>{{ __('Stark') }}</span></div>
                                         </div>
                                     @endforeach
-                                </div>
+                                    </div>
+                                </details>
                             </div>
                             <style>
                                 #stock-signal-trade-chart .stock-signal-sell-marker { transform-box: fill-box; transform-origin: center; transform: rotate(180deg); }
@@ -2080,7 +2095,7 @@
                                                 <input type="date" name="remind_on" x-model="reminderDate" min="{{ now()->toDateString() }}" required @click="$event.target.showPicker?.()" class="mt-1 block w-full cursor-pointer border-0 bg-transparent p-0 text-base font-black text-amber-500 outline-none focus:ring-0" aria-label="{{ __('Datum der Erinnerung') }}">
                                             </label>
                                         </div>
-                                        @if($signal === 'WAIT')<p class="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] p-3 text-xs font-bold text-emerald-300">{{ __('WAIT: Eine spätere Kaufprüfung ist hier besonders sinnvoll. Die E-Mail zeigt auch, ob das Signal inzwischen auf BUY gewechselt ist.') }}</p>@endif
+                                        @if($signal === 'WAIT')<p class="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] p-3 text-xs font-bold text-emerald-300">{{ __('WAIT: Eine spätere Kaufprüfung ist hier besonders sinnvoll. Die E-Mail zeigt auch, ob das Signal inzwischen auf POSITIV gewechselt ist.') }}</p>@endif
                                         <fieldset class="mt-4">
                                             <legend class="mb-2 text-xs font-black uppercase tracking-wide text-slate-300">{{ __('Was möchtest du tun?') }}</legend>
                                             <div class="grid gap-2 sm:grid-cols-2">
@@ -2155,16 +2170,16 @@
                             </div>
                             <button type="button" onclick="this.closest('dialog').close()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)]"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
                         </div>
-                        <p class="mt-4 text-sm leading-6 text-[var(--ak-muted)]">{{ __('Du erhältst einmalig eine E-Mail, sobald sich der Status von WAIT auf BUY ändert. Danach wird der Alarm automatisch beendet.') }}</p>
+                        <p class="mt-4 text-sm leading-6 text-[var(--ak-muted)]">{{ __('Du erhältst einmalig eine E-Mail, sobald sich der Status von WAIT auf POSITIV ändert. Danach wird der Alarm automatisch beendet.') }}</p>
                         <fieldset class="mt-4 space-y-2">
                             <legend class="mb-2 text-[9px] font-black uppercase tracking-wide text-emerald-400">{{ __('Wann informieren?') }}</legend>
                             <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] p-3">
                                 <input type="radio" name="notification_mode" value="buy_only" checked class="mt-0.5 text-emerald-500 focus:ring-emerald-400/30">
-                                <span><strong class="block text-sm text-[var(--ak-text)]">{{ __('Nur bei BUY') }}</strong><small class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('E-Mail erst beim tatsächlichen Wechsel auf BUY.') }}</small></span>
+                                <span><strong class="block text-sm text-[var(--ak-text)]">{{ __('Nur bei POSITIV') }}</strong><small class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('E-Mail erst beim tatsächlichen Wechsel auf POSITIV.') }}</small></span>
                             </label>
                             <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3">
                                 <input type="radio" name="notification_mode" value="wait_or_buy" class="mt-0.5 text-emerald-500 focus:ring-emerald-400/30">
-                                <span><strong class="block text-sm text-[var(--ak-text)]">{{ __('Bei WAIT oder BUY') }}</strong><small class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Bei der nächsten positiven Tagesprognose informieren – auch wenn WAIT bestehen bleibt.') }}</small></span>
+                                <span><strong class="block text-sm text-[var(--ak-text)]">{{ __('Bei WAIT oder POSITIV') }}</strong><small class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Bei der nächsten positiven Tagesprognose informieren – auch wenn WAIT bestehen bleibt.') }}</small></span>
                             </label>
                         </fieldset>
                         <p class="mt-3 rounded-lg border border-rose-400/15 bg-rose-400/[.05] px-3 py-2 text-[10px] leading-4 text-[var(--ak-muted)]">{{ __('Bei HOLD oder SELL wird keine E-Mail gesendet. Der Alarm bleibt für eine spätere positive Prognose aktiv.') }}</p>
@@ -2583,9 +2598,9 @@
                         ? 'border-emerald-400/45 bg-emerald-400/15 text-emerald-400'
                         : 'border-rose-400/45 bg-rose-400/15 text-rose-400';
                     $externalReviewAdjustment = match ($externalBuyReview->status === 'completed' ? $externalBuyReview->verdict : $externalBuyReview->status) {
-                        'NO_OBJECTION' => __('BUY bestätigt'),
-                        'CAUTION', 'OBJECTION' => __('BUY extern abgestuft'),
-                        'INSUFFICIENT_EVIDENCE', 'failed' => __('BUY nicht bestätigt'),
+                        'NO_OBJECTION' => __('POSITIV bestätigt'),
+                        'CAUTION', 'OBJECTION' => __('POSITIV extern abgestuft'),
+                        'INSUFFICIENT_EVIDENCE', 'failed' => __('POSITIV nicht bestätigt'),
                         default => __('Prüfung offen'),
                     };
                     $externalReviewAdjustmentTone = match ($externalBuyReview->status === 'completed' ? $externalBuyReview->verdict : $externalBuyReview->status) {
@@ -2617,7 +2632,7 @@
                         <table class="w-full text-left text-[10px]">
                             <thead class="bg-[var(--ak-surface-muted)] text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><tr><th class="px-3 py-2">{{ __('System') }}</th><th class="px-3 py-2">{{ __('Urteil') }}</th><th class="px-3 py-2 text-right">{{ __('Konfidenz') }}</th></tr></thead>
                             <tbody>
-                                <tr class="border-t border-[var(--ak-border)]"><td class="px-3 py-2 font-black">AktienKI ML</td><td class="px-3 py-2 font-black text-emerald-400">BUY</td><td class="px-3 py-2 text-right font-bold tabular-nums">{{ is_numeric($externalReviewMlConfidence) ? number_format((float) $externalReviewMlConfidence, 0, ',', '.').' %' : '—' }}</td></tr>
+                                <tr class="border-t border-[var(--ak-border)]"><td class="px-3 py-2 font-black">AktienKI ML</td><td class="px-3 py-2 font-black text-emerald-400">POSITIV</td><td class="px-3 py-2 text-right font-bold tabular-nums">{{ is_numeric($externalReviewMlConfidence) ? number_format((float) $externalReviewMlConfidence, 0, ',', '.').' %' : '—' }}</td></tr>
                                 <tr class="border-t border-[var(--ak-border)]"><td class="px-3 py-2 font-black">GPT‑5.6 Terra</td><td class="px-3 py-2 font-black {{ $externalReviewTone }}">{{ $externalReviewAdjustment }}</td><td class="px-3 py-2 text-right font-bold tabular-nums">{{ is_numeric($externalBuyReview->confidence) ? number_format((float) $externalBuyReview->confidence, 0, ',', '.').' %' : '—' }}</td></tr>
                             </tbody>
                         </table>
@@ -2674,15 +2689,6 @@
                         @if ($externalBuyReviewLimitations !== [])
                             <p class="mt-3 text-[10px] leading-4 text-[var(--ak-muted)]">{{ __('Einschränkungen') }}: {{ implode(' · ', $externalBuyReviewLimitations) }}</p>
                         @endif
-                        <p class="mt-3 text-[9px] font-bold text-[var(--ak-muted)]">
-                            {{ $externalBuyReview->model }}
-                            · {{ $externalBuyReview->confidence }}% {{ __('Recherche-Konfidenz') }}
-                            · {{ count($externalBuyReviewSources) }} {{ __('Quellen') }}
-                            @if (is_numeric($externalBuyReview->estimated_cost_microusd))
-                                · ca. ${{ number_format($externalBuyReview->estimated_cost_microusd / 1_000_000, 4, '.', '') }}
-                            @endif
-                            · {{ __('Keine Anlageberatung') }}
-                        </p>
                     @endif
                 </div>
             @endif
@@ -3524,7 +3530,7 @@
 
                 const latestSignalTransition = historicalSignalTransitions.at(-1) ?? null;
                 const signalColors = {
-                    BUY: '#22c55e', WATCH: '#84cc16', HOLD: '#facc15', WAIT: '#22d3ee', SELL: '#fb7185',
+                    POSITIV: '#22c55e', WATCH: '#84cc16', HOLD: '#facc15', WAIT: '#22d3ee', SELL: '#fb7185',
                 };
 
                 const latestSignalAnchor = () => {
@@ -4175,7 +4181,16 @@
                     const left = 18;
                     const top = 16;
                     const plotWidth = Math.max(1, width - left - 86);
-                    const plotHeight = Math.max(1, height - top - 32);
+                    // Bottom margin holds two stacked banner rows (see
+                    // BOTTOM_BADGE_Y below and PANEL_BADGE_Y in renderMainChart)
+                    // above the date-axis labels - must match renderMainChart's
+                    // `bottom` so both SVG layers stay aligned. Two rows, not
+                    // one: the panel forecast horizon (20 trading days from the
+                    // latest panel point) and the 20T probability badge land on
+                    // the same or an adjacent date almost every time, so one
+                    // shared row made them draw on top of each other.
+                    const plotHeight = Math.max(1, height - top - 74);
+                    const BOTTOM_BADGE_Y = top + plotHeight + 22;
                     const xSpan = timeRange.max - timeRange.min;
                     const ySpan = priceRange.max - priceRange.min;
                     const overlayX = timestamp => left + ((timestamp - timeRange.min) / xSpan) * plotWidth;
@@ -4267,7 +4282,10 @@
                             indicatorOverlay.appendChild(segmentLine);
                         }
 
-                        points.slice(1).forEach((point, pointIndex) => {
+                        // Cap defensively at the most recent 5 horizon points -
+                        // normally there are only 3-4 (10/20/40T), but this
+                        // keeps the bottom banner row from ever overcrowding.
+                        points.slice(1).slice(-5).forEach((point, pointIndex) => {
                             const previous = points[pointIndex];
                             const pointColor = point.price >= previous.price ? '#22c55e' : '#ef4444';
                             const x = toX(point.timestamp);
@@ -4332,14 +4350,16 @@
                                     Math.min(left + plotWidth - probabilityWidth, requestedProbabilityX),
                                 );
                                 const probabilityCenterX = probabilityX + (probabilityWidth / 2);
-                                const probabilityLabelY = y < top + (plotHeight / 2)
-                                    ? top + plotHeight - 8 - (pointIndex * 18)
-                                    : top + 18 + (pointIndex * 18);
+                                // Fixed row at the bottom of the chart, below the
+                                // plot area, instead of floating near the point -
+                                // keeps the banner readable regardless of where
+                                // the forecast point itself sits vertically.
+                                const probabilityLabelY = BOTTOM_BADGE_Y;
                                 const probabilityGuide = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                                 probabilityGuide.setAttribute('x1', x);
                                 probabilityGuide.setAttribute('x2', probabilityCenterX);
-                                probabilityGuide.setAttribute('y1', y + (probabilityLabelY > y ? 6 : -6));
-                                probabilityGuide.setAttribute('y2', probabilityLabelY + (probabilityLabelY > y ? -12 : 5));
+                                probabilityGuide.setAttribute('y1', y + 6);
+                                probabilityGuide.setAttribute('y2', probabilityLabelY - 12);
                                 probabilityGuide.setAttribute('stroke', pointColor);
                                 probabilityGuide.setAttribute('stroke-width', '.8');
                                 probabilityGuide.setAttribute('stroke-dasharray', '2 3');
@@ -4470,9 +4490,20 @@
                     const left = 18;
                     const top = 16;
                     const right = 86;
-                    const bottom = 32;
+                    // Must match drawSmaLines' plotHeight margin so the two
+                    // stacked SVG layers (this chart + #stock-indicator-overlay)
+                    // share the same coordinate system. 74, not 56: room for
+                    // two stacked banner rows (see PANEL_BADGE_Y below).
+                    const bottom = 74;
                     const plotWidth = Math.max(1, width - left - right);
                     const plotHeight = Math.max(1, height - top - bottom);
+                    const BOTTOM_BADGE_Y = top + plotHeight + 22;
+                    // Second row, below the probability-badge row: the panel
+                    // banner's own forecast horizon (20 trading days from the
+                    // latest panel point) almost always lands on the same or an
+                    // adjacent date as the 20T probability badge above, so it
+                    // needs its own row rather than sharing BOTTOM_BADGE_Y.
+                    const PANEL_BADGE_Y = BOTTOM_BADGE_Y + 18;
                     const xSpan = Math.max(1, timeRange.max - timeRange.min);
                     const ySpan = Math.max(0.0001, priceRange.max - priceRange.min);
                     const toX = timestamp => left + ((timestamp - timeRange.min) / xSpan) * plotWidth;
@@ -4774,15 +4805,29 @@
                                     : '';
                                 const labelText = `PANEL 20T · D${latestPanel.y.toFixed(1).replace('.', ',')}${relativePrediction}`;
                                 const labelWidth = relativePrediction ? 142 : 88;
-                                const labelX = Math.max(left, Math.min(left + plotWidth - labelWidth, endX - labelWidth));
-                                const labelY = panelY < top + 22 ? panelY + 8 : panelY - 18;
+                                const labelX = Math.max(left, Math.min(left + plotWidth - labelWidth, endX - (labelWidth / 2)));
+                                // A row of its own, one below the forecast-
+                                // horizon probability badges: the panel's own
+                                // 20-trading-day horizon usually lands on the
+                                // same or an adjacent date as the 20T
+                                // probability badge, so sharing BOTTOM_BADGE_Y
+                                // made the two draw on top of each other.
+                                const labelY = PANEL_BADGE_Y;
+                                svg.appendChild(svgNode('line', {
+                                    x1: endX, x2: labelX + (labelWidth / 2), y1: panelY + 6, y2: labelY - 12,
+                                    stroke: panelColor,
+                                    'stroke-width': '.8',
+                                    'stroke-dasharray': '2 3',
+                                    'stroke-opacity': '.5',
+                                    'vector-effect': 'non-scaling-stroke',
+                                }));
                                 svg.appendChild(svgNode('rect', {
-                                    x: labelX, y: labelY, width: labelWidth, height: 15, rx: '5',
+                                    x: labelX, y: labelY - 11, width: labelWidth, height: 15, rx: '5',
                                     fill: panelColor, 'fill-opacity': light ? '.12' : '.18',
                                     stroke: panelColor, 'stroke-opacity': '.7',
                                 }));
                                 const label = svgNode('text', {
-                                    x: labelX + labelWidth / 2, y: labelY + 10.5,
+                                    x: labelX + labelWidth / 2, y: labelY,
                                     fill: panelColor, 'font-size': '8', 'font-weight': '850',
                                     'text-anchor': 'middle', 'font-family': 'inherit',
                                 });
@@ -4793,7 +4838,7 @@
                     }
 
                     const signalColors = {
-                        BUY: '#22c55e',
+                        POSITIV: '#22c55e',
                         WATCH: '#84cc16',
                         HOLD: '#f59e0b',
                         SELL: '#ef4444',

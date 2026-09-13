@@ -64,7 +64,7 @@
                                 <td><b>HR {{ is_numeric($tcn->hit_rate) ? number_format($tcn->hit_rate,1,',','.').' %' : '—' }}</b><small class="block text-[8px] text-[var(--ak-muted)]">PF {{ is_numeric($tcn->profit_factor) ? number_format($tcn->profit_factor,2,',','.') : '—' }} · {{ $tcn->trades }} Trades</small><small class="block text-[8px] {{ (float)($tcn->average_return??0)>=0?'text-emerald-400':'text-rose-400' }}">Ø {{ is_numeric($tcn->average_return) ? sprintf('%+.2f %%',$tcn->average_return) : '—' }}</small></td>
                                 <td><b>HR {{ is_numeric($active->hit_rate) ? number_format($active->hit_rate,1,',','.').' %' : '—' }}</b><small class="block text-[8px] text-[var(--ak-muted)]">PF {{ is_numeric($active->profit_factor) ? number_format($active->profit_factor,2,',','.') : '—' }} · DD {{ is_numeric($active->max_drawdown) ? number_format($active->max_drawdown,1,',','.').' %' : '—' }}</small><small class="block text-[8px] text-[var(--ak-muted)]">{{ $active->trades }} nicht überlappende Trades</small></td>
                                 <td><b class="tabular-nums">{{ is_numeric($row->entry_threshold) ? number_format($row->entry_threshold*100,2,',','.').' %' : '—' }}</b><small class="block text-[8px] text-[var(--ak-muted)]">TCN {{ is_numeric($row->pure_tcn_entry_threshold) ? number_format($row->pure_tcn_entry_threshold*100,2,',','.').' %' : '—' }}</small></td>
-                                <td class="pr-4">@if($row->prediction)<b class="text-emerald-400">{{ $row->prediction->signal }}</b><small class="block text-[8px] text-[var(--ak-muted)]">{{ sprintf('%+.2f %%',$row->prediction->expected_return_percent) }} · {{ \Illuminate\Support\Carbon::parse($row->prediction->as_of)->format('d.m.Y') }}</small>@else<span class="text-[var(--ak-muted)]">Keine gespeichert</span>@endif</td>
+                                <td class="pr-4">@if($row->prediction)<b class="text-emerald-400">{{ signal_label($row->prediction->signal) }}</b><small class="block text-[8px] text-[var(--ak-muted)]">{{ sprintf('%+.2f %%',$row->prediction->expected_return_percent) }} · {{ \Illuminate\Support\Carbon::parse($row->prediction->as_of)->format('d.m.Y') }}</small>@else<span class="text-[var(--ak-muted)]">Keine gespeichert</span>@endif</td>
                             </tr>
                         @empty
                             <tr><td colspan="9" class="px-6 py-14 text-center text-sm text-[var(--ak-muted)]">Keine Modell-/Horizont-Konfiguration mit diesen Filtern.</td></tr>
@@ -74,7 +74,7 @@
                 </div>
             </section>
             <div class="mt-5">{{ $rows->links() }}</div>
-            <p class="mt-3 text-[9px] text-[var(--ak-muted)]">Quelle: serving_releases.compact_metrics · feste Horizonte · keine überlappenden Positionen.</p>
+            <p class="mt-3 text-[9px] text-[var(--ak-muted)]">Quelle: geprüfte Serving-Kennzahlen · feste Horizonte · keine überlappenden Positionen.</p>
         </div>
     </main>
 </x-app-layout>

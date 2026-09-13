@@ -123,6 +123,14 @@ class ProfileController extends Controller
             'email' => $validated['email'],
         ]);
 
+        if (array_key_exists('tax_allowance_eur', $validated)) {
+            $user->tax_allowance_eur = round((float) $validated['tax_allowance_eur'], 2);
+        }
+
+        if (array_key_exists('tax_rate_percent', $validated)) {
+            $user->tax_rate_percent = round((float) $validated['tax_rate_percent'], 2);
+        }
+
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
         }

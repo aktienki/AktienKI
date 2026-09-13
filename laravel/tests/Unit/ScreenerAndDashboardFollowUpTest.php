@@ -18,46 +18,95 @@ final class ScreenerAndDashboardFollowUpTest extends TestCase
         $this->assertStringContainsString("'symbol' => strtoupper((string) \$stock->symbol)", $controller);
         $this->assertStringContainsString("'release_id' => (string) \$stock->release_id", $controller);
         $this->assertStringContainsString("'release_policy' => 'active'", $controller);
-        $this->assertStringContainsString("'release_policy' => strtolower(trim((string) (\$row['release_policy'] ?? 'pinned')))", $backtestJob);
-        $this->assertStringContainsString("serving_active_models as active_model", $backtestJob);
-        $this->assertStringContainsString("if (\$configuration['release_policy'] === 'active')", $backtestJob);
+        $this->assertStringContainsString("implode('|', [\$row['symbol'], \$row['horizon'], \$row['variant']])", $backtestJob);
+        $this->assertStringNotContainsString("source_metadata::jsonb->>'release_id'", $backtestJob);
+        $this->assertStringContainsString("'selected_serving_release_id'", $backtestJob);
         $this->assertStringContainsString("'horizon_days' => (int) \$model->horizon", $controller);
         $this->assertStringContainsString("'horizon' => (int) \$model->horizon", $controller);
         $this->assertStringContainsString("'variant' => (string) \$model->variant", $controller);
         $this->assertStringContainsString("'selection_active' => (bool) \$model->is_active", $controller);
         $this->assertStringContainsString('executableServingModelKeys()', $controller);
+        $this->assertStringContainsString('$model->matches_selection_filter', $controller);
+        $this->assertStringContainsString("\$model,\n                    '',\n                    \$horizon", $controller);
+        $this->assertStringContainsString('$model->training_selectable', $controller);
+        $this->assertStringContainsString('$model->walk_forward_metrics', $controller);
         $this->assertStringContainsString("'historical_trade_available' => (bool) (\$model->strategy_executable ?? false)", $controller);
         $this->assertStringNotContainsString('&& $model->strategy_executable)', $controller);
-        $this->assertStringContainsString("\$available->where('selection_active', true)", $controller);
+        $this->assertStringContainsString('$sourceAvailable->values()', $controller);
+        $this->assertStringContainsString("->flatMap(fn (mixed \$configurations): array", $controller);
+        $this->assertStringContainsString('canonicalStrategyConfigurations($serving)', $controller);
         $this->assertStringContainsString("Arr::except(\$configuration, ['selection_active'])", $controller);
         $this->assertStringContainsString('serving_strategy_selections', $controller);
         $this->assertStringContainsString('serving_strategy_selection_filters', $controller);
         $this->assertStringContainsString("'restore_selection'", $controller);
         $this->assertStringContainsString("if (\$request->filled('serving_selection'))", $predictionController);
         $this->assertStringContainsString('$filters[\'serving_model_configurations\'] = $lockedServingConfigurations;', $predictionController);
-        $this->assertStringContainsString('catch (\\RuntimeException $exception)', $predictionController);
+        $this->assertStringContainsString('$selectedServingInstrumentCount', $predictionController);
+        $this->assertStringContainsString("->pluck('symbol')", $predictionController);
+        $this->assertStringContainsString('$selectedServingInstrumentCount = collect(', $predictionController);
+        $this->assertStringContainsString("->pluck('symbol')", $predictionController);
+        $this->assertStringContainsString('$data[\'heatmapSummary\']->instruments = $selectedServingInstrumentCount;', $predictionController);
+        $this->assertStringContainsString('RunFilteredBacktest::dispatch($runId, (int) $sourceRun->id, $filters);', $predictionController);
+        $this->assertStringNotContainsString('RunFilteredBacktest::dispatchSync(', $predictionController);
         $this->assertStringContainsString("__('Strategie berechnen')", $servingView);
         $this->assertStringContainsString('id="serving-select-all"', $servingView);
         $this->assertStringContainsString('data-serving-model-checkbox', $servingView);
-        $this->assertStringContainsString('data-serving-select-all-eligible="{{ $modelIsActive ?', $servingView);
+        $this->assertStringContainsString('class="serving-model-checkbox h-5 w-5 shrink-0 cursor-pointer"', $servingView);
+        $this->assertStringContainsString('.serving-model-checkbox:checked {', $servingView);
+        $this->assertStringContainsString('background: #0891b2 !important;', $servingView);
+        $this->assertStringContainsString('data-serving-select-all-eligible="true"', $servingView);
+        $this->assertStringContainsString('is-model-selected', $servingView);
+        $this->assertStringContainsString('is-model-unselected', $servingView);
+        $this->assertStringContainsString("__('Keine Walk-Forward-Daten')", $servingView);
         $this->assertStringContainsString("checkbox.checked = selectAll.checked && checkbox.dataset.servingSelectAllEligible === 'true';", $servingView);
         $this->assertStringContainsString("selectAll.addEventListener('change'", $servingView);
+        $this->assertStringContainsString('name="models[]"', $servingView);
+        $this->assertStringNotContainsString('data-serving-submitted-model', $servingView);
+        $this->assertStringContainsString('? $restoredConfigurationKeys->intersect($selectableModelKeys)', $controller);
+        $this->assertStringContainsString('$bulkSelectableModelKeys = $selectableModelKeys;', $controller);
+        $this->assertStringContainsString('? $sourceAvailable->values()', $controller);
+        $this->assertStringContainsString('is_array($storedRestoredSelection) && $storedRestoredSelection !== []', $controller);
         $this->assertStringContainsString('form="serving-model-selection-form"', $servingView);
+        $this->assertStringContainsString('<form id="serving-model-selection-form" method="POST"', $servingView);
+        $this->assertStringNotContainsString('id="serving-model-selection-form" method="POST" action="{{ route(\'setup.models.strategy\') }}" class="hidden"', $servingView);
         $this->assertStringContainsString('name="select_all"', $servingView);
         $this->assertStringContainsString('name="models[]"', $servingView);
         $this->assertStringContainsString("'serving_selection',", $heatmapView);
         $this->assertStringContainsString("__('Modellauswahl gesperrt:", $heatmapView);
+        $this->assertStringContainsString("__('Aktien in der Modellauswahl')", $heatmapView);
         $this->assertStringContainsString("name=\"return_to_models\" value=\"1\"", $heatmapView);
         $this->assertStringContainsString("__('Zurück zur Modellauswahl')", $heatmapView);
         $this->assertStringContainsString("selection_filters.serving_model_configurations", $heatmapView);
         $this->assertStringContainsString('$modelsReturnParameters', $heatmapView);
         $this->assertStringContainsString('$backtestOriginUrl', $heatmapView);
         $this->assertStringContainsString('name="backtest_return_to"', $heatmapView);
-        $this->assertStringContainsString('window.location.assign(@js($backtestOriginUrl))', $heatmapView);
+        $this->assertStringContainsString('window.location.assign(@js($backtestTuningUrl))', $heatmapView);
         $this->assertStringContainsString('name="models_return_token"', $heatmapView);
         $this->assertStringContainsString('filtered-backtest-average-capital-binding', $heatmapView);
         $this->assertStringContainsString('filtered-backtest-maximum-capital-binding', $heatmapView);
+        $this->assertStringContainsString('filtered-backtest-walk-forward-average-capital-binding', $heatmapView);
+        $this->assertStringContainsString('filtered-backtest-walk-forward-maximum-capital-binding', $heatmapView);
+        $this->assertStringContainsString('filtered-backtest-last-trade', $heatmapView);
+        $this->assertStringContainsString("__('Danach lag kein weiteres qualifiziertes Kaufsignal vor; das Kapital blieb unverändert.')", $heatmapView);
         $this->assertStringContainsString("@error('backtest')", $heatmapView);
+
+        $this->assertStringContainsString('filtered-backtest-result:v19:', $predictionController);
+        $this->assertStringContainsString("'statistics_dax_chart' => \$statisticsDaxChart", $predictionController);
+        $this->assertStringContainsString("'sp500_performance'", $predictionController);
+        $this->assertStringContainsString('(string) $trade->entry_date >= $walkForwardStart', $predictionController);
+        $this->assertStringContainsString("'purged_boundary_trades' => \$purgedBoundaryTrades", $predictionController);
+        $this->assertStringContainsString("'average_net_return' => round(\$averageNetReturn, 2)", $predictionController);
+        $this->assertStringContainsString('completeBacktestTimeline($pythonResult', $predictionController);
+        $this->assertStringContainsString('private function extendSeriesTo(array $series, int $periodEnd): array', $predictionController);
+
+        $appJs = (string) file_get_contents($root.'/resources/js/app.js');
+        $this->assertStringContainsString("'#filtered-backtest-statistics-chart'", $appJs);
+        $this->assertStringContainsString("'#filtered-backtest-walk-forward-chart'", $appJs);
+        $this->assertStringContainsString("const statisticsTiles = result.statistics_window || result;", $heatmapView);
+        $this->assertStringContainsString("__('Weiter feinjustieren')", $heatmapView);
+        $this->assertStringContainsString('$backtestTuningUrl', $heatmapView);
+        $this->assertStringContainsString('filtered-backtest-purged-boundary-trades', $heatmapView);
+        $this->assertStringContainsString('statisticsTiles.average_net_return', $heatmapView);
 
         $savedFilterController = (string) file_get_contents($root.'/app/Http/Controllers/SavedPredictionFilterController.php');
         $this->assertStringContainsString("selection_filters.serving_model_configurations", $savedFilterController);
@@ -71,6 +120,33 @@ final class ScreenerAndDashboardFollowUpTest extends TestCase
         $this->assertStringContainsString("Route::get('/setup/models'", $routes);
         $this->assertStringContainsString("name('setup.models')", $routes);
         $this->assertStringContainsString("route('setup.models')", $navigation);
+    }
+
+    public function test_filtered_backtests_are_isolated_from_the_web_process(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $controller = (string) file_get_contents($root.'/app/Http/Controllers/PredictionController.php');
+        $composer = json_decode((string) file_get_contents($root.'/composer.json'), true, flags: JSON_THROW_ON_ERROR);
+        $queueConfig = (string) file_get_contents($root.'/config/queue.php');
+        $devCommand = implode(' ', $composer['scripts']['dev']);
+
+        $this->assertStringContainsString('RunFilteredBacktest::dispatch($runId, (int) $sourceRun->id, $filters);', $controller);
+        $this->assertStringNotContainsString('RunFilteredBacktest::dispatchSync(', $controller);
+        $this->assertStringContainsString('queue:listen backtests --queue=backtests', $devCommand);
+        $this->assertStringContainsString('--timeout=7200', $devCommand);
+        $this->assertStringContainsString("env('DB_BACKTEST_QUEUE_RETRY_AFTER', 7500)", $queueConfig);
+    }
+
+    public function test_saved_quality_gate_strategies_keep_all_gate_rules(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $controller = (string) file_get_contents($root.'/app/Http/Controllers/SavedPredictionFilterController.php');
+        $command = (string) file_get_contents($root.'/app/Console/Commands/CreateQualityGateStrategy.php');
+
+        $this->assertStringContainsString("'positive_prediction_required', 'ensemble_veto_required'", $controller);
+        $this->assertStringContainsString("'service_quality_gate' => 'passed'", $command);
+        $this->assertStringContainsString("'max_positions' => 5", $command);
+        $this->assertStringContainsString('QualityGateSetupController::DEFAULTS', $command);
     }
 
     public function test_commodity_screener_uses_the_stock_table_columns_and_scales(): void
@@ -96,15 +172,16 @@ final class ScreenerAndDashboardFollowUpTest extends TestCase
         $this->assertStringNotContainsString('screener-desktop-gesamt', $view);
         $this->assertStringNotContainsString('>Gesamt</span>', $view);
         $this->assertStringNotContainsString('Gesamt {{ $compositeScore }}', $view);
-        $this->assertStringContainsString('grid-template-columns:42px minmax(360px,1fr) 190px', $view);
-        $this->assertStringContainsString('grid-template-columns:minmax(360px,1fr) 190px 54px 78px 112px 112px repeat(3,62px)', $view);
+        $this->assertStringContainsString('grid-template-columns:42px minmax(360px,1fr) 78px 190px', $view);
+        $this->assertStringContainsString('grid-template-columns:minmax(360px,1fr) 78px 190px 54px 112px 112px repeat(3,62px)', $view);
         $this->assertStringNotContainsString("<span>{{ __('Modell') }}</span>", $view);
         $this->assertStringNotContainsString('screener-trigger-model', $view);
         $this->assertStringContainsString("route('tutorial.index')", $view);
         $this->assertStringContainsString('x-heroicon-o-question-mark-circle', $view);
         $this->assertStringContainsString('$signalRemainingTradingDays', $view);
         $this->assertStringContainsString('screener-signal-validity', $view);
-        $this->assertStringContainsString('data-trade-status-label', $view);
+        $this->assertStringContainsString('screener-signal-score-donut', $view);
+        $this->assertStringNotContainsString('data-trade-status-label', $view);
     }
 
     public function test_strategy_manager_handles_nested_filter_metadata_without_array_conversion(): void
@@ -126,7 +203,7 @@ final class ScreenerAndDashboardFollowUpTest extends TestCase
         $this->assertStringContainsString('...$usedAlternativeInstrumentIds', $controller);
         $this->assertStringContainsString("strtoupper((string) (\$change['to'] ?? '')) === 'BUY'", $controller);
         $this->assertStringContainsString('@if($bestNewStock)', $view);
-        $this->assertStringContainsString("__('Beste neue BUY-Aktie')", $view);
+        $this->assertStringContainsString("__('Beste neue POSITIV-Aktie')", $view);
         $this->assertStringContainsString('dashboard-opportunity-card', $view);
     }
 
@@ -215,5 +292,15 @@ final class ScreenerAndDashboardFollowUpTest extends TestCase
         $this->assertStringNotContainsString('Dashboard skin matching the index screener', $view);
         $this->assertStringNotContainsString('--dbx-', $view);
         $this->assertStringNotContainsString('#f3efe6', $view);
+    }
+
+    public function test_two_year_training_data_gates_each_model_independently(): void
+    {
+        $controller = (string) file_get_contents(dirname(__DIR__, 2).'/app/Http/Controllers/ServingPredictionTableController.php');
+
+        $this->assertStringContainsString('$model->statistics_metrics->trades > 0;', $controller);
+        $this->assertStringContainsString('$model->strategy_selectable = $model->training_selectable;', $controller);
+        $this->assertStringContainsString('($model->training_selectable ?? false)', $controller);
+        $this->assertStringNotContainsString('&& $model->walk_forward_passed;', $controller);
     }
 }

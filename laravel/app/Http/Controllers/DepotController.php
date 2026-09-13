@@ -396,6 +396,9 @@ final class DepotController extends Controller
             ->where(fn ($query) => $query->where('user_id', $userId)
                 ->when($includePublic, fn ($query) => $query->orWhere('is_public_readonly', true)))
             ->where('active', true)
+            // Hidden shadow portfolios that track every strategy's real
+            // signals in the background - not a Musterdepot a user manages.
+            ->where('type', '!=', \App\Console\Commands\EnsureStrategyTrackingPortfolios::PORTFOLIO_TYPE)
             ->when($type, fn ($query) => $query->where('type', $type))
             ->with(['strategies', 'cashAccount', 'positions' => fn ($query) => $query
                 ->whereHas('instrument', fn ($instrument) => $instrument
@@ -658,6 +661,8 @@ final class DepotController extends Controller
                     'sell_price' => round((float) $transaction->price, 4),
                     'performance' => is_numeric($performance) ? round((float) $performance, 2) : ($buyPrice > 0 ? round((((float) $transaction->price - $buyPrice) / $buyPrice) * 100, 2) : null),
                     'realized_profit' => is_numeric(data_get($transaction->meta, 'realized_profit')) ? round((float) data_get($transaction->meta, 'realized_profit'), 2) : null,
+                    'simulated_tax' => is_numeric(data_get($transaction->meta, 'simulated_tax')) ? round((float) data_get($transaction->meta, 'simulated_tax'), 2) : null,
+                    'realized_profit_after_tax' => is_numeric(data_get($transaction->meta, 'realized_profit_after_tax')) ? round((float) data_get($transaction->meta, 'realized_profit_after_tax'), 2) : null,
                     'strategies' => $strategyIds->map(fn ($id) => $strategyNames->get($id, '#'.$id))->values()->all(),
                 ];
             })
@@ -746,6 +751,7 @@ final class DepotController extends Controller
         $liveSimulationEnabled = (bool) data_get($portfolio->meta, 'automation.live_enabled', false);
         $transactionEmailsEnabled = (bool) data_get($portfolio->meta, 'automation.transaction_email_enabled', false);
         $canActivateStrategyAccount = app(PlanAccessService::class)->allows($request->user(), PlanLevel::Pro);
+        $preparedExitDatasetAvailable = StockSpecificExitPortfolioSimulationService::preparedPayloadAvailable();
         $livePortfolioPositions = $portfolio->positions->map(fn ($position): array => [
             'symbol' => (string) $position->instrument->symbol,
             'quantity' => (float) $position->quantity,
@@ -787,7 +793,8 @@ final class DepotController extends Controller
             'canViewSignalChanges', 'positionSignalChanges',
             'positionEntryData', 'portfolioValueCurve',
             'performance', 'backUrl', 'backLabel', 'availableStrategies', 'strategyNames', 'strategyPerformance',
-            'simulationRun', 'simulationSummary', 'chartTrades', 'homeIndexSeries', 'homeIndexLabel', 'canEditPortfolio', 'isFollowingPortfolio'
+            'simulationRun', 'simulationSummary', 'chartTrades', 'homeIndexSeries', 'homeIndexLabel', 'canEditPortfolio', 'isFollowingPortfolio',
+            'preparedExitDatasetAvailable'
         ));
     }
 
@@ -907,10 +914,19 @@ final class DepotController extends Controller
                 'string',
                 'in:'.implode(',', array_keys(StockSpecificExitPortfolioSimulationService::selectablePolicies())),
             ],
+            'tax_simulation_enabled' => ['nullable', 'boolean'],
         ]);
+        $taxSimulationEnabled = $request->boolean('tax_simulation_enabled');
+        $annualTaxAllowance = $taxSimulationEnabled ? max(0.0, (float) ($request->user()->tax_allowance_eur ?? 1000)) : 0.0;
+        $taxRatePercent = $taxSimulationEnabled ? max(0.0, min(100.0, (float) ($request->user()->tax_rate_percent ?? 25))) : 0.0;
         $exitPolicy = (string) ($validated['exit_policy']
             ?? StockSpecificExitPortfolioSimulationService::STRATEGY_DEFAULT);
         $usesPreparedExitPolicy = StockSpecificExitPortfolioSimulationService::isPreparedExitPolicy($exitPolicy);
+        if ($usesPreparedExitPolicy && ! StockSpecificExitPortfolioSimulationService::preparedPayloadAvailable()) {
+            return back()->withErrors([
+                'simulation' => __('Der vorbereitete Exit-Vergleich ist auf diesem System nicht installiert. Bitte verwende den bisherigen Strategie-Exit.'),
+            ])->withInput(['exit_policy' => StockSpecificExitPortfolioSimulationService::STRATEGY_DEFAULT]);
+        }
 
         $assignments = DB::table('portfolio_strategy_assignments as assignment')
             ->join('saved_prediction_filters as strategy', 'strategy.id', '=', 'assignment.saved_prediction_filter_id')
@@ -954,6 +970,11 @@ final class DepotController extends Controller
 
         $initial = max(1000.0, (float) data_get($portfolio->meta, 'automation.initial_capital', 10000));
         $usesServingConfigurations = $servingSimulation->hasServingConfigurations($assignments);
+        if ($taxSimulationEnabled && ! $usesPreparedExitPolicy && ! $usesServingConfigurations) {
+            return back()->withErrors([
+                'simulation' => __('Die Steuersimulation ist für dieses alte Strategieformat noch nicht verfügbar. Bitte verwende eine Serving-Modellkonfiguration.'),
+            ])->withInput();
+        }
         if (! $usesPreparedExitPolicy
             && $usesServingConfigurations
             && ! $servingSimulation->allAssignmentsUseServingConfigurations($assignments)) {
@@ -975,6 +996,8 @@ final class DepotController extends Controller
                         (string) $allocationSettings['allocation_mode'],
                         (int) $allocationSettings['maximum_positions'],
                         (float) $allocationSettings['max_stock_allocation_percent'],
+                        $annualTaxAllowance,
+                        $taxRatePercent,
                     )
                     : $servingSimulation->calculate(
                         $portfolio,
@@ -983,6 +1006,8 @@ final class DepotController extends Controller
                         (string) $allocationSettings['allocation_mode'],
                         (int) $allocationSettings['maximum_positions'],
                         (float) $allocationSettings['max_stock_allocation_percent'],
+                        $annualTaxAllowance,
+                        $taxRatePercent,
                     );
             } catch (Throwable $exception) {
                 report($exception);
@@ -1002,6 +1027,9 @@ final class DepotController extends Controller
                 $servingResult,
                 $servingSimulation,
                 $exitPolicy,
+                $taxSimulationEnabled,
+                $annualTaxAllowance,
+                $taxRatePercent,
             ): void {
                 DB::table('python_engine_jobs')
                     ->whereIn('status', ['queued', 'running'])
@@ -1078,6 +1106,9 @@ final class DepotController extends Controller
                             'initial_equal_weight_budget' => $servingResult['initial_equal_weight_budget'],
                             'fee_rate' => ServingPortfolioSimulationService::FEE_RATE,
                             'minimum_fee' => ServingPortfolioSimulationService::MINIMUM_FEE,
+                            'tax_simulation_enabled' => $taxSimulationEnabled,
+                            'tax_allowance_eur' => $annualTaxAllowance,
+                            'tax_rate_percent' => $taxRatePercent,
                         ], JSON_THROW_ON_ERROR),
                         'created_at' => now(),
                         'updated_at' => now(),

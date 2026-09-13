@@ -101,6 +101,14 @@ Schedule::command('markets:generate-daily-report')
     ->onOneServer()
     ->runInBackground();
 
+// Every strategy gets a hidden tracking portfolio, independent of the
+// portfolio_automation.enabled switch below, so tracking is instantly
+// complete the moment that switch is turned on - no separate rollout step.
+Schedule::command('strategies:ensure-tracking-portfolios')
+    ->everyTenMinutes()
+    ->withoutOverlapping(5)
+    ->runInBackground();
+
 if (config('aktienki.portfolio_automation.enabled', false)) {
     Schedule::command('portfolios:send-trade-emails --limit=100')
         ->everyMinute()

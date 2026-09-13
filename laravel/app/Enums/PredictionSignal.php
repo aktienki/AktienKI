@@ -11,7 +11,7 @@ enum PredictionSignal: string
     public function label(): string
     {
         return match ($this) {
-            self::Buy => 'Kaufen',
+            self::Buy => 'Positiv',
             self::Hold => 'Halten',
             self::Sell => 'Verkaufen',
         };

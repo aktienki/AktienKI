@@ -35,7 +35,7 @@
                     $change = (int) ($distributionChanges[$signal] ?? 0);
                 @endphp
                 <div class="ak-signal-distribution-cell" data-signal="{{ strtolower($signal) }}" style="--signal-share:{{ number_format($share, 2, '.', '') }};">
-                    <span>{{ $signal }}</span>
+                    <span>{{ signal_label($signal) }}</span>
                     <strong>{{ number_format($count, 0, ',', '.') }}</strong>
                     <em class="absolute right-2 top-1.5 text-[8px] font-black not-italic tabular-nums text-cyan-500" title="{{ __('Änderung zur vorherigen Auswertung') }}">{{ $change > 0 ? '+' : ($change < 0 ? '−' : '±') }}{{ abs($change) }}</em>
                     <small>{{ number_format($share, 0, ',', '.') }} %</small>

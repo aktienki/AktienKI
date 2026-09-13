@@ -27,7 +27,10 @@ final class PortfolioTradeNotification extends Notification
         app()->setLocale(in_array($locale, ['de', 'en'], true) ? $locale : 'de');
         $logo = app(RecommendationEmailLogo::class)->render();
         $isSale = $this->trade['action'] === 'sell';
-        $subjectAction = $isSale ? __('Verkauf') : ($this->trade['action'] === 'increase' ? __('Position aufgestockt') : __('Kauf'));
+        // Deliberately neutral wording (no "Kauf"/"Verkauf"): this is an automated
+        // depot booking based on a model signal, not investment advice or a trade
+        // recommendation - see resources/views/legal/show.blade.php §Risikohinweise.
+        $subjectAction = $isSale ? __('Entfernt') : ($this->trade['action'] === 'increase' ? __('Aufgestockt') : __('Hinzugefügt'));
         $subjectPrefix = ($this->trade['simulation'] ?? false) ? __('aKI Simulation') : __('aKI Depot');
 
         return (new MailMessage)

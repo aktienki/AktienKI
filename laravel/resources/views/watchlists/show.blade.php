@@ -212,7 +212,7 @@
                                             <td class="ak-watchlist-signal-change px-4 py-4 text-center">
                                                 @if ($signalChange)
                                                     <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-cyan-400/25 bg-cyan-400/[.07] px-2 py-1.5 text-[9px] font-black text-cyan-300" title="{{ __('Letzter Signalwechsel') }}">
-                                                        {{ $signalChange['from'] }} <span aria-hidden="true">→</span> {{ $signalChange['to'] }}
+                                                        {{ signal_label($signalChange['from']) }} <span aria-hidden="true">→</span> {{ signal_label($signalChange['to']) }}
                                                         <time class="text-[var(--ak-muted)]" datetime="{{ \Illuminate\Support\Carbon::parse($signalChange['date'])->toDateString() }}">{{ \Illuminate\Support\Carbon::parse($signalChange['date'])->format('d.m.') }}</time>
                                                     </span>
                                                 @else

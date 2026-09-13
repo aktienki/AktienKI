@@ -392,6 +392,50 @@
     height: 5.75rem;
 }
 
+/* Composite score gauge: a fixed 10-sector ring from red to green (one
+   sector per decile of the 0-100 score), with a marker pointing at the
+   current value. The ring itself never changes - only the marker rotation
+   and the center label depend on the score. */
+.screener-score-decile-donut {
+    background: conic-gradient(
+        from -90deg,
+        #f43f5e 0deg 32deg, transparent 32deg 36deg,
+        #fb7185 36deg 68deg, transparent 68deg 72deg,
+        #f97316 72deg 104deg, transparent 104deg 108deg,
+        #fb923c 108deg 140deg, transparent 140deg 144deg,
+        #f59e0b 144deg 176deg, transparent 176deg 180deg,
+        #fbbf24 180deg 212deg, transparent 212deg 216deg,
+        #a3e635 216deg 248deg, transparent 248deg 252deg,
+        #4ade80 252deg 284deg, transparent 284deg 288deg,
+        #34d399 288deg 320deg, transparent 320deg 324deg,
+        #10b981 324deg 356deg, transparent 356deg 360deg
+    ) !important;
+}
+
+.screener-score-decile-donut-marker {
+    position: absolute;
+    inset: 0;
+    transform: rotate(var(--score-angle, 0deg));
+    pointer-events: none;
+}
+
+.screener-score-decile-donut-marker::before {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    width: 4px;
+    height: 12px;
+    margin-left: -2px;
+    border-radius: 2px;
+    background: var(--ak-text);
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--ak-card) 80%, transparent), 0 1px 3px rgba(0, 0, 0, .45);
+    content: '';
+}
+
+.screener-score-decile-donut span {
+    color: var(--ak-text) !important;
+}
+
 /* Index cards use four compact donuts in their own grid row. The generic
    ranking layout is absolutely positioned, which otherwise lets it overlap
    the summary row below when the index card is kept viewport-height. */
@@ -9413,4 +9457,79 @@ input.peer:focus-visible + .serving-selection-checkbox {
 :root[data-theme="light"] body:not(.welcome-background) #personal-dashboard [data-dashboard-tile] > span > span:first-child {
     border-color:#d4d4d8 !important;
     background:#fafafa !important;
+}
+
+/* Strategy assistant: it is a dark dialog in the dark theme and a genuinely
+   light dialog in the light theme. This prevents the global light-theme text
+   overrides from producing dark copy on the former navy dialog surface. */
+.ak-strategy-wizard-progress {
+    background:rgba(255,255,255,.12);
+}
+
+.ak-strategy-wizard-progress.is-active {
+    background:#22d3ee;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard {
+    border-color:#94a3b8 !important;
+    background:#f8fafc !important;
+    color:#0f172a !important;
+    box-shadow:0 24px 65px rgba(15,23,42,.24) !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard :is(h2,h3,.text-white) {
+    color:#0f172a !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard :is(.text-slate-300,.text-slate-400,.text-slate-500) {
+    color:#475569 !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard :is(.text-cyan-200,.text-cyan-300) {
+    color:#08758a !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard .text-emerald-100,
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard .text-emerald-300 {
+    color:#047857 !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard .text-rose-300 {
+    color:#be123c !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard :is(.text-amber-200,.text-teal-200) {
+    color:#8a4b05 !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard [class*="border-white"] {
+    border-color:#cbd5e1 !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard div.rounded-xl {
+    background:#ffffff !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard p[class*="bg-emerald"] {
+    border-color:#6ee7b7 !important;
+    background:#ecfdf5 !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard p[class*="bg-amber"] {
+    border-color:#fcd34d !important;
+    background:#fffbeb !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard .ak-strategy-wizard-progress {
+    background:#dbe4ea !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard .ak-strategy-wizard-progress.is-active {
+    background:#0891b2 !important;
+}
+
+:root[data-theme="light"] body:not(.welcome-background) .ak-strategy-wizard .ak-strategy-wizard-save {
+    border-color:#5eead4 !important;
+    background:#ccfbf1 !important;
+    color:#0f766e !important;
 }

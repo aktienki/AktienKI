@@ -39,7 +39,7 @@
                     <x-heroicon-o-chevron-down class="index-tile-chev h-4 w-4 transition" x-bind:class="expanded&&'rotate-180'"/>
                 </span>
                 <span class="index-tile-metrics">
-                    <i class="index-tile-signal" data-signal="{{ strtolower($signal) }}"><small>{{ __('Signal') }}</small><b>{{ $signal }}</b></i>
+                    <i class="index-tile-signal" data-signal="{{ strtolower($signal) }}"><small>{{ __('Signal') }}</small><b>{{ signal_label($signal) }}</b></i>
                     <i><small>{{ __('Bewertung') }}</small><b style="color:{{ $scoreColor }}">{{ $scoreLabel }}</b></i>
                     <i><small>{{ __('Risiko') }}</small><b style="color:{{ $riskColor }}">{{ $riskLabel }}</b></i>
                 </span>
@@ -48,7 +48,7 @@
             <div x-cloak x-show="expanded" x-collapse class="index-card-details index-tile-details">
                 <section class="index-card-chart"><header><span>{{ __('Chart · 1 Jahr') }}</span><b>{{ __($sector->sector) }}</b></header>@if($line)<svg viewBox="0 0 600 118" preserveAspectRatio="none"><polyline points="{{ $line }}" fill="none" stroke="var(--ak-accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>@else<p>{{ __('Der Kurschart ist momentan nicht verfügbar.') }}</p>@endif</section>
                 <section class="index-card-copy"><h3>{{ __('Marktausblick') }}</h3><p>{{ $info?:__('Für diesen Sektor liegt derzeit keine zusätzliche Marktanalyse vor.') }}</p><dl><div><dt>{{ __('Ø Konfidenz') }}</dt><dd>{{ is_numeric($sector->average_confidence)?number_format((float)$sector->average_confidence,0,',','.').' %':'—' }}</dd></div><div><dt>{{ __('Ø Hit-Rate') }}</dt><dd>{{ is_numeric($sector->average_hit_rate)?number_format((float)$sector->average_hit_rate,1,',','.').' %':'—' }}</dd></div><div><dt>{{ __('Aktien') }}</dt><dd>{{ (int)$sector->stocks_count }}</dd></div></dl></section>
-                <section class="index-card-members"><h3>{{ __('Führende Aktien') }}</h3>@forelse(collect($sector->top_stocks??[])->take(3) as $member)<a href="{{ route('stocks.show',['symbol'=>$member->symbol]) }}"><span>{{ \App\Support\CountryFlag::emoji($member->country) }} {{ $member->name?:$member->symbol }}</span><b>{{ $member->personalized_signal??'—' }}</b></a>@empty<p>{{ __('Keine Aktien verfügbar.') }}</p>@endforelse<a class="index-card-all" href="{{ route('stocks.index',['sector'=>$sector->sector]) }}">{{ __('Alle Sektoraktien') }} →</a></section>
+                <section class="index-card-members"><h3>{{ __('Führende Aktien') }}</h3>@forelse(collect($sector->top_stocks??[])->take(3) as $member)<a href="{{ route('stocks.show',['symbol'=>$member->symbol]) }}"><span>{{ \App\Support\CountryFlag::emoji($member->country) }} {{ $member->name?:$member->symbol }}</span><b>{{ $member->personalized_signal ? signal_label($member->personalized_signal) : '—' }}</b></a>@empty<p>{{ __('Keine Aktien verfügbar.') }}</p>@endforelse<a class="index-card-all" href="{{ route('stocks.index',['sector'=>$sector->sector]) }}">{{ __('Alle Sektoraktien') }} →</a></section>
             </div>
         </article>
     @empty

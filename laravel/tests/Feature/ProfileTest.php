@@ -112,6 +112,23 @@ class ProfileTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
+    public function test_user_can_update_tax_simulation_settings(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->patch('/profile', [
+            'name' => $user->name,
+            'email' => $user->email,
+            'country_code' => 'DE',
+            'tax_allowance_eur' => '1250.50',
+            'tax_rate_percent' => '26.375',
+        ])->assertSessionHasNoErrors()->assertRedirect('/profile');
+
+        $user->refresh();
+        $this->assertSame('1250.50', $user->tax_allowance_eur);
+        $this->assertSame('26.38', $user->tax_rate_percent);
+    }
+
     public function test_profile_rejects_an_unsupported_locale(): void
     {
         $user = User::factory()->create();

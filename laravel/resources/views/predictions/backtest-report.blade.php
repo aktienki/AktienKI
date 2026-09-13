@@ -181,7 +181,7 @@
     </table>
     @if (! empty($filters['entry_wait_5d_enabled']) || ! empty($filters['signal_change_exit_enabled']))
         <table style="margin-top:6px">
-            <tr><th>WAIT &amp; BUY</th><th>Tatsächliche WAIT-Einstiege</th><th>Exit bei Signal-/Marktphasenwechsel</th><th>Tatsächliche Wechsel-Exits</th></tr>
+            <tr><th>WAIT &amp; POSITIV</th><th>Tatsächliche WAIT-Einstiege</th><th>Exit bei Signal-/Marktphasenwechsel</th><th>Tatsächliche Wechsel-Exits</th></tr>
             <tr>
                 <td>{{ ! empty($filters['entry_wait_5d_enabled']) ? 'Aktiv · maximal 5 Tage' : 'Deaktiviert' }}</td>
                 <td><strong>{{ number_format((int) ($result['wait_entry_count'] ?? 0), 0, ',', '.') }}</strong></td>

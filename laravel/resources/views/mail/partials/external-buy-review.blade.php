@@ -18,9 +18,9 @@
     $reviewDecision = $reviewIsYes ? __('JA') : __('NEIN');
     $reviewDecisionColor = $reviewIsYes ? '#169c77' : '#c43d52';
     $reviewAdjustment = match ($reviewStatus === 'completed' ? $reviewVerdict : $reviewStatus) {
-        'NO_OBJECTION' => __('BUY bestätigt'),
-        'CAUTION', 'OBJECTION' => __('BUY extern abgestuft'),
-        'INSUFFICIENT_EVIDENCE', 'failed' => __('BUY nicht bestätigt'),
+        'NO_OBJECTION' => __('POSITIV bestätigt'),
+        'CAUTION', 'OBJECTION' => __('POSITIV extern abgestuft'),
+        'INSUFFICIENT_EVIDENCE', 'failed' => __('POSITIV nicht bestätigt'),
         default => __('Prüfung offen'),
     };
     $reviewAdjustmentColor = in_array($reviewVerdict, ['CAUTION', 'OBJECTION'], true)
@@ -50,7 +50,7 @@
 </div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border:1px solid {{ $border }};border-radius:10px;border-collapse:separate;overflow:hidden;font-size:12px">
 <tr style="color:{{ $muted }};font-size:10px;text-transform:uppercase"><th align="left" style="padding:7px 9px">{{ __('System') }}</th><th align="left" style="padding:7px 9px">{{ __('Urteil') }}</th><th align="right" style="padding:7px 9px">{{ __('Konfidenz') }}</th></tr>
-<tr><td style="border-top:1px solid {{ $border }};padding:8px 9px;font-weight:800">AktienKI ML</td><td style="border-top:1px solid {{ $border }};padding:8px 9px;color:#169c77;font-weight:900">BUY</td><td align="right" style="border-top:1px solid {{ $border }};padding:8px 9px">{{ is_numeric($mlConfidence) ? number_format((float) $mlConfidence, 0, ',', '.').' %' : '—' }}</td></tr>
+<tr><td style="border-top:1px solid {{ $border }};padding:8px 9px;font-weight:800">AktienKI ML</td><td style="border-top:1px solid {{ $border }};padding:8px 9px;color:#169c77;font-weight:900">POSITIV</td><td align="right" style="border-top:1px solid {{ $border }};padding:8px 9px">{{ is_numeric($mlConfidence) ? number_format((float) $mlConfidence, 0, ',', '.').' %' : '—' }}</td></tr>
 <tr><td style="border-top:1px solid {{ $border }};padding:8px 9px;font-weight:800">GPT‑5.6 Terra</td><td style="border-top:1px solid {{ $border }};padding:8px 9px;color:{{ $verdictColor }};font-weight:900">{{ $reviewAdjustment }}</td><td align="right" style="border-top:1px solid {{ $border }};padding:8px 9px">{{ is_numeric($review?->confidence) ? (int) $review->confidence.' %' : '—' }}</td></tr>
 </table>
 @if($reviewStatus === 'completed')
@@ -91,9 +91,9 @@
 </div>
 @endif
 @elseif($reviewStatus === 'failed')
-<div style="margin-top:12px;color:{{ $muted }};font-size:13px;line-height:1.55">{{ __('Der unabhängige Webcheck konnte technisch nicht abgeschlossen werden. Das BUY-Signal wurde dadurch weder bestätigt noch abgelehnt.') }}</div>
+<div style="margin-top:12px;color:{{ $muted }};font-size:13px;line-height:1.55">{{ __('Der unabhängige Webcheck konnte technisch nicht abgeschlossen werden. Das POSITIV-Signal wurde dadurch weder bestätigt noch abgelehnt.') }}</div>
 @else
-<div style="margin-top:12px;color:{{ $muted }};font-size:13px;line-height:1.55">{{ __('Für dieses BUY-Signal liegt noch keine abgeschlossene externe Einschätzung vor.') }}</div>
+<div style="margin-top:12px;color:{{ $muted }};font-size:13px;line-height:1.55">{{ __('Für dieses POSITIV-Signal liegt noch keine abgeschlossene externe Einschätzung vor.') }}</div>
 @endif
 <div style="margin-top:15px;padding-top:12px;border-top:1px solid {{ $border }};color:{{ $muted }};font-size:11px;line-height:1.5">{{ __('Shadow-Modus: Das externe Urteil verändert das ML-Signal nicht.') }} {{ __('Die externe Recherche ist keine Anlageberatung.') }}</div>
 </div>

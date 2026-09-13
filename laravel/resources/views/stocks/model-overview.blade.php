@@ -89,7 +89,7 @@
                         [__('Horizonte'), $horizons->count(), __('vollständig veröffentlicht'), 'text-cyan-500'],
                         [__('Prediction aktiv'), $predictionEnabledCount, __('von :count Horizonten', ['count' => $horizons->count()]), 'text-emerald-400'],
                         [__('Quality Gate'), $qualityGateCount, __('aktive Varianten bestanden'), 'text-amber-400'],
-                        [__('Datenstand'), \Illuminate\Support\Carbon::parse($release['dataset_cutoff'])->format('d.m.Y'), $release['pipeline_version'], 'text-violet-400'],
+                        [__('Datenstand'), \Illuminate\Support\Carbon::parse($release['dataset_cutoff'])->format('d.m.Y'), __('Aktualisierte Marktdaten'), 'text-violet-400'],
                     ] as [$summaryLabel, $summaryValue, $summaryNote, $summaryTone])
                         <div class="rounded-xl border border-[var(--ak-border)] bg-cyan-400/[.025] p-3">
                             <small class="text-[8px] font-black uppercase tracking-[.14em] text-[var(--ak-muted)]">{{ $summaryLabel }}</small>
@@ -136,7 +136,7 @@
                             @endforelse
                         </div>
                     </div>
-                    <p class="mt-4 text-[9px] leading-4 text-[var(--ak-muted)]">{{ __('Gesamtergebnis der im aktiven Release veröffentlichten, nicht überlappenden OOS-Trades.') }}</p>
+                    <p class="mt-4 text-[9px] leading-4 text-[var(--ak-muted)]">{{ __('Gesamtergebnis der veröffentlichten, nicht überlappenden OOS-Trades des aktiven Modells.') }}</p>
                 </section>
 
                 <section
@@ -156,7 +156,7 @@
                     </div>
 
                     @if(empty($tradeChart['series']))
-                        <div class="mt-5 rounded-xl border border-[var(--ak-border)] px-4 py-12 text-center text-sm text-[var(--ak-muted)]">{{ __('Für dieses Release sind noch keine geprüften Einzeltrades veröffentlicht.') }}</div>
+                        <div class="mt-5 rounded-xl border border-[var(--ak-border)] px-4 py-12 text-center text-sm text-[var(--ak-muted)]">{{ __('Für dieses Modell sind noch keine geprüften Einzeltrades veröffentlicht.') }}</div>
                     @else
                         <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
                             <div class="flex flex-wrap gap-1.5">
@@ -247,7 +247,7 @@
                         @endforeach
                     @endif
 
-                    <p class="mt-4 text-[9px] leading-4 text-[var(--ak-muted)]">{{ __('Gezeigt werden nur Serving-Einzeltrades, deren Trades, Hit-Rate, Rendite und Drawdown mit dem aktiven Release übereinstimmen. Tägliche Kurszeilen werden nicht gespeichert.') }}</p>
+                    <p class="mt-4 text-[9px] leading-4 text-[var(--ak-muted)]">{{ __('Gezeigt werden nur Serving-Einzeltrades, deren Trades, Hit-Rate, Rendite und Drawdown mit dem aktiven Modell übereinstimmen. Tägliche Kurszeilen werden nicht gespeichert.') }}</p>
                 </section>
             </div>
 
@@ -309,7 +309,7 @@
                                     </div>
 
                                     @if($prediction)
-                                        <div class="model-latest-prediction mt-3 rounded-xl border border-violet-400/20 bg-violet-400/[.035] p-3"><div class="flex items-center justify-between"><b class="text-[9px] uppercase text-violet-400">{{ __('Letzte Prediction') }}</b><span class="text-[8px] text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($prediction['as_of'])->format('d.m.Y H:i') }}</span></div><div class="mt-2 grid grid-cols-4 gap-2 text-center"><span><small class="block text-[7px] text-[var(--ak-muted)]">{{ __('Signal') }}</small><b class="text-xs">{{ $prediction['signal'] }}</b></span><span><small class="block text-[7px] text-[var(--ak-muted)]">{{ __('Rendite') }}</small><b class="text-xs {{ ($prediction['expected_return_percent'] ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $prediction['expected_return_percent'] !== null ? sprintf('%+.2f %%', $prediction['expected_return_percent']) : '—' }}</b></span><span><small class="block text-[7px] text-[var(--ak-muted)]">{{ __('Konf.') }}</small><b class="text-xs">{{ $prediction['confidence_percent'] !== null ? number_format($prediction['confidence_percent'], 1, ',', '.').' %' : '—' }}</b></span><span><small class="block text-[7px] text-[var(--ak-muted)]">{{ __('Ziel') }}</small><b class="text-xs">{{ $prediction['target_price'] !== null ? number_format($prediction['target_price'], 2, ',', '.') : '—' }}</b></span></div></div>
+                                        <div class="model-latest-prediction mt-3 rounded-xl border border-violet-400/20 bg-violet-400/[.035] p-3"><div class="flex items-center justify-between"><b class="text-[9px] uppercase text-violet-400">{{ __('Letzte Prediction') }}</b><span class="text-[8px] text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($prediction['as_of'])->format('d.m.Y H:i') }}</span></div><div class="mt-2 grid grid-cols-4 gap-2 text-center"><span><small class="block text-[7px] text-[var(--ak-muted)]">{{ __('Signal') }}</small><b class="text-xs">{{ signal_label($prediction['signal']) }}</b></span><span><small class="block text-[7px] text-[var(--ak-muted)]">{{ __('Rendite') }}</small><b class="text-xs {{ ($prediction['expected_return_percent'] ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $prediction['expected_return_percent'] !== null ? sprintf('%+.2f %%', $prediction['expected_return_percent']) : '—' }}</b></span><span><small class="block text-[7px] text-[var(--ak-muted)]">{{ __('Konf.') }}</small><b class="text-xs">{{ $prediction['confidence_percent'] !== null ? number_format($prediction['confidence_percent'], 1, ',', '.').' %' : '—' }}</b></span><span><small class="block text-[7px] text-[var(--ak-muted)]">{{ __('Ziel') }}</small><b class="text-xs">{{ $prediction['target_price'] !== null ? number_format($prediction['target_price'], 2, ',', '.') : '—' }}</b></span></div></div>
                                     @endif
 
                                     <div class="mt-3"><p class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Prüfkriterien') }}</p><div class="mt-2 flex flex-wrap gap-1.5">@forelse($variant['quality_gates'] as $gate => $passed)<span class="rounded-md border px-2 py-1 text-[7px] font-black {{ $passed ? 'border-emerald-400/30 text-emerald-400' : 'border-rose-400/30 text-rose-400' }}">{{ $passed ? '✓' : '×' }} {{ $gateLabel((string) $gate) }}</span>@empty<span class="text-[8px] text-[var(--ak-muted)]">{{ __('Keine Quality-Gate-Prüfung veröffentlicht.') }}</span>@endforelse</div></div>
@@ -340,17 +340,6 @@
                         @endif
                     </div>
                 @endforeach
-            </section>
-
-            <section class="ak-card mt-4 border-cyan-400/20 p-4 sm:p-5">
-                <p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-500">{{ __('Release-Nachweis') }}</p>
-                <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div><small class="block text-[8px] uppercase text-[var(--ak-muted)]">Release-ID</small><b class="mt-1 block truncate font-mono text-[9px] text-[var(--ak-text)]" title="{{ $release['id'] }}">{{ $release['id'] }}</b></div>
-                    <div><small class="block text-[8px] uppercase text-[var(--ak-muted)]">Source Commit</small><b class="mt-1 block font-mono text-[9px] text-[var(--ak-text)]">{{ substr($release['source_commit'], 0, 12) }}</b></div>
-                    <div><small class="block text-[8px] uppercase text-[var(--ak-muted)]">{{ __('Aktiviert') }}</small><b class="mt-1 block text-[9px] text-[var(--ak-text)]">{{ \Illuminate\Support\Carbon::parse($release['activated_at'])->format('d.m.Y H:i') }}</b></div>
-                    <div><small class="block text-[8px] uppercase text-[var(--ak-muted)]">{{ __('Evidenz') }}</small><b class="mt-1 block text-[9px] text-[var(--ak-text)]">{{ $release['evidence_level'] }}</b></div>
-                </div>
-                @if($release['tracking_comment'])<p class="mt-4 border-t border-[var(--ak-border)] pt-3 text-[9px] leading-5 text-[var(--ak-muted)]">{{ $release['tracking_comment'] }}</p>@endif
             </section>
 
             <p class="mt-4 text-[9px] leading-4 text-[var(--ak-muted)]">{{ __('Historische Backtests und Modellprognosen sind keine Garantie für zukünftige Ergebnisse und stellen keine Anlageberatung dar.') }}</p>

@@ -66,7 +66,6 @@
                             <div><dt>{{ __('Sektorrang') }}</dt><dd>{{ $stock->sector_rank ? '#'.$stock->sector_rank : '—' }}</dd></div>
                             <div><dt>{{ __('Modellqualität') }}</dt><dd>{{ $stock->model_quality_tier_name ?: '—' }}</dd></div>
                             <div><dt>{{ __('Quality Gate') }}</dt><dd class="{{ $stock->trigger_model_quality_gate_passed ? 'text-emerald-400' : 'text-rose-400' }}">{{ $stock->trigger_model_quality_gate_passed ? __('Bestanden') : __('Nicht bestanden') }}</dd></div>
-                            <div title="{{ $stock->trigger_model_release_id }}"><dt>{{ __('Release') }}</dt><dd>{{ $stock->trigger_model_release_id ? \Illuminate\Support\Str::limit($stock->trigger_model_release_id, 8, '') : '—' }}</dd></div>
                         </dl>
                     </section>
                     <div class="stock-matrix-detail-meta">

@@ -18,16 +18,16 @@
     <div style="color:#62e6f4;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase">{{ __('AKTUELLES LABEL-SIGNAL') }}</div>
     <div style="margin-top:7px;color:{{ $text }};font-size:14px;font-weight:800">{{ $strategy->name }} <span style="color:#62e6f4">· {{ $instrument->symbol }}</span></div>
     <div style="font-size:25px;font-weight:800;margin-top:7px;color:{{ $text }}"><span style="font-size:22px">{{ $countryFlag ?? '🌐' }}</span> {{ $instrument->name }} <span style="color:#62e6f4;font-size:15px">{{ $instrument->symbol }}</span></div>
-    <div style="color:{{ $muted }};font-size:13px;margin-top:4px">{{ __('Dein Label :name hat ein neues Kaufsignal erhalten.', ['name' => $strategy->name]) }}</div>
+    <div style="color:{{ $muted }};font-size:13px;margin-top:4px">{{ __('Dein Label :name hat ein neues Positiv-Signal erhalten.', ['name' => $strategy->name]) }}</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="8" style="margin:20px -8px 8px;border-collapse:separate">
         <tr>
-            <td width="27%" valign="middle" style="background:{{ $mutedCardBg }};border:1px solid {{ $border }};border-radius:10px;padding:13px"><div style="color:{{ $muted }};font-size:10px;text-transform:uppercase">{{ __('Signal') }}</div><div style="color:{{ $signalColor }};font-size:21px;font-weight:800">{{ strtoupper($signal) }}</div></td>
+            <td width="27%" valign="middle" style="background:{{ $mutedCardBg }};border:1px solid {{ $border }};border-radius:10px;padding:13px"><div style="color:{{ $muted }};font-size:10px;text-transform:uppercase">{{ __('Signal') }}</div><div style="color:{{ $signalColor }};font-size:21px;font-weight:800">{{ signal_label($signal) }}</div></td>
             <td width="73%" align="center" valign="middle" style="background:{{ $mutedCardBg }};border:1px solid {{ $border }};border-radius:10px;padding:3px 8px"><img src="cid:aki-signal-score-risk.png" width="310" alt="{{ __('KI-Score') }} {{ $score !== null ? number_format($score, 1, ',', '.').' / 10' : '–' }} · {{ __('Risiko') }} {{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.').' %' : '–' }}" style="display:block;width:310px;max-width:100%;height:auto;margin:0 auto;border:0"></td>
         </tr>
     </table>
     <table role="presentation" width="100%" cellpadding="8" cellspacing="0" style="margin-top:10px;color:#dce6ef;font-size:13px">
         <tr><td style="color:{{ $muted }}">{{ __('Aktueller Kurs') }}</td><td align="right" style="font-weight:800;color:{{ $text }}">{{ number_format($current, 2, ',', '.') }} {{ $instrument->currency }}</td></tr>
-        <tr><td style="color:{{ $muted }};border-top:1px solid {{ $border }}">{{ __('Vorheriges Signal') }}</td><td align="right" style="font-weight:700;color:{{ $text }};border-top:1px solid {{ $border }}">{{ strtoupper($previousSignal) }}</td></tr>
+        <tr><td style="color:{{ $muted }};border-top:1px solid {{ $border }}">{{ __('Vorheriges Signal') }}</td><td align="right" style="font-weight:700;color:{{ $text }};border-top:1px solid {{ $border }}">{{ signal_label($previousSignal) }}</td></tr>
     </table>
     <div style="margin-top:15px;color:#169db6;font-size:11px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase">{{ __('PROGNOSE-ZIELKURSE') }}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="6" style="margin:7px -6px 0;border-collapse:separate">

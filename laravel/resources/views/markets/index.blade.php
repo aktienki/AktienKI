@@ -167,8 +167,8 @@
                                                         class="ak-market-signal-pie mx-auto mt-0.5"
                                                         style="{{ $signalPieStyle }}"
                                                         role="img"
-                                                        aria-label="{{ __('Signalanteile') }}: SELL {{ $signalCounts['SELL'] }}, HOLD {{ $signalCounts['HOLD'] }}, WATCH {{ $signalCounts['WATCH'] }}, BUY {{ $signalCounts['BUY'] }}"
-                                                        title="SELL {{ $signalCounts['SELL'] }} · HOLD {{ $signalCounts['HOLD'] }} · WATCH {{ $signalCounts['WATCH'] }} · BUY {{ $signalCounts['BUY'] }}"
+                                                        aria-label="{{ __('Signalanteile') }}: SELL {{ $signalCounts['SELL'] }}, HOLD {{ $signalCounts['HOLD'] }}, WATCH {{ $signalCounts['WATCH'] }}, POSITIV {{ $signalCounts['BUY'] }}"
+                                                        title="SELL {{ $signalCounts['SELL'] }} · HOLD {{ $signalCounts['HOLD'] }} · WATCH {{ $signalCounts['WATCH'] }} · POSITIV {{ $signalCounts['BUY'] }}"
                                                     ></span>
                                                 </span>
                                             </div>

@@ -2,10 +2,10 @@
 <div style="margin:0 0 14px;padding:11px 14px;border-radius:10px;background:#f5fafb;border:1px solid #c8e4e8;color:#17283e;font-size:16px;font-weight:800;line-height:1.45">{{ __('Hallo :name,', ['name' => $recipientName]) }}</div>
 
 <div style="background:#122034;border:1px solid #29445a;border-radius:14px;padding:22px;color:#e7edf5">
-<div style="color:{{ $signal === 'BUY' ? '#42d6b8' : '#e5b95d' }};font-size:11px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase">{{ $signal === 'BUY' ? __('Kaufsignal erkannt') : __('Weiter beobachten') }}</div>
+<div style="color:{{ $signal === 'BUY' ? '#42d6b8' : '#e5b95d' }};font-size:11px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase">{{ $signal === 'BUY' ? __('Positiv-Signal erkannt') : __('Weiter beobachten') }}</div>
 <div style="font-size:25px;font-weight:800;margin-top:7px;color:#ffffff">{{ $instrument->name }} <span style="color:#64e5f2;font-size:15px">{{ $instrument->symbol }}</span></div>
 <div style="color:#9db0c5;font-size:13px;line-height:1.55;margin-top:6px">{{ $signal === 'BUY'
-    ? __('Der zuvor beobachtete Status WAIT hat auf BUY gewechselt.')
+    ? __('Der zuvor beobachtete Status WAIT hat auf POSITIV gewechselt.')
     : __('Der Status ist weiterhin WAIT. Der langfristige Ausblick bleibt positiv, kurzfristig wird weiter abgewartet.') }}</div>
 
 <div style="margin:20px 0 12px">

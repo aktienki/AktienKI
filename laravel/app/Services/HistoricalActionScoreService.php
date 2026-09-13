@@ -7,11 +7,12 @@ use Illuminate\Support\Collection;
 
 final class HistoricalActionScoreService
 {
-    public const VERSION = 'historical-action-v3-fully-non-overlapping';
+    public const VERSION = 'historical-action-v4-composite-score';
 
     public function __construct(
         private readonly ActionScoreFormula $formula,
         private readonly MacdStochasticMarketPhaseService $marketPhaseService,
+        private readonly CompositeScoreService $compositeScore,
     ) {}
 
     /**
@@ -69,7 +70,21 @@ final class HistoricalActionScoreService
                     'hard_blockers' => [],
                 ], $marketPhase);
 
+                // Use the same central score definition as the screener.
+                // Indicator, panel and cross-sectional rank are deliberately
+                // omitted because they are not persisted point-in-time for
+                // every historical signal. CompositeScoreService redistributes
+                // their weights over the evidence that is actually available.
+                $historicalCompositeScore = $this->compositeScore->score(
+                    aiScoreOutOf10: max(0.0, min(10.0, 5.0 + ($expectedReturn / 4))),
+                    qualityGatePassed: $qualityGatePassed,
+                    profitFactor: $profitFactor,
+                    confidencePercent: $confidence,
+                    riskPercent: $drawdown,
+                );
+
                 $row->historical_action_score = $result['score'];
+                $row->historical_composite_score = $historicalCompositeScore;
                 $row->historical_action_signal = $result['signal'];
                 $row->historical_action_components = [
                     'version' => self::VERSION,
@@ -80,6 +95,11 @@ final class HistoricalActionScoreService
                     'metrics' => compact('profitFactor', 'averageTrade', 'hitRate', 'tradeCount', 'expectedReturn', 'drawdown', 'stability'),
                     'market_phase' => $marketPhase,
                     'blocked' => $result['blocked'],
+                    'composite_score' => [
+                        'version' => CompositeScoreService::VERSION,
+                        'value' => $historicalCompositeScore,
+                        'missing_components' => ['indicator', 'panel', 'ai_score_percentile'],
+                    ],
                     'execution_policy' => [
                         'one_position_per_instrument' => true,
                         'held_through_horizon_exit_date' => true,

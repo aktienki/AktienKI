@@ -110,7 +110,11 @@ final class HistoricalOptimizationStatisticsCalculator
         }
 
         $qualityScores = $selected
-            ->pluck('historical_action_score')
+            ->map(fn (array|object $trade): mixed => data_get(
+                $trade,
+                'historical_composite_score',
+                data_get($trade, 'historical_action_score'),
+            ))
             ->filter(fn (mixed $score): bool => is_numeric($score));
 
         return [

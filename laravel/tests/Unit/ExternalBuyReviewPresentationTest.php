@@ -14,12 +14,12 @@ final class ExternalBuyReviewPresentationTest extends TestCase
         $mail = (string) file_get_contents($root.'/resources/views/mail/partials/external-buy-review.blade.php');
 
         foreach ([$screener, $stock, $mail] as $view) {
-            $this->assertStringContainsString("'NO_OBJECTION' => __('BUY bestätigt')", $view);
-            $this->assertStringContainsString("'CAUTION', 'OBJECTION' => __('BUY extern abgestuft')", $view);
+            $this->assertStringContainsString("'NO_OBJECTION' => __('POSITIV bestätigt')", $view);
+            $this->assertStringContainsString("'CAUTION', 'OBJECTION' => __('POSITIV extern abgestuft')", $view);
             $this->assertStringContainsString("? __('JA') : __('NEIN')", $view);
         }
 
-        $this->assertStringContainsString("__('BUY auf :signal abgestuft'", $screener);
+        $this->assertStringContainsString("__('POSITIV auf :signal abgestuft'", $screener);
         $this->assertStringContainsString('$internalAssessmentDecision', $screener);
     }
 }

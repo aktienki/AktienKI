@@ -48,6 +48,9 @@ class User extends Authenticatable implements MustVerifyEmail
             'tariff_ends_at' => 'datetime',
             'last_login_at' => 'datetime',
 
+            'tax_allowance_eur' => 'decimal:2',
+            'tax_rate_percent' => 'decimal:2',
+
             'preferences' => 'array',
             'meta' => 'array',
             'risk_profile' => 'array',

@@ -11,7 +11,7 @@
 
 <div style="background:#101f33;border:1px solid #29475e;border-radius:14px;padding:20px;color:#f7fbfc">
 <table role="presentation" width="100%" cellpadding="7" cellspacing="0" style="font-size:12px">
-<tr><td style="color:#91a8bb">{{ __('Aktuelles Signal') }}</td><td align="right" style="font-weight:800;color:#e5b95d">{{ $currentSignal }}</td></tr>
+<tr><td style="color:#91a8bb">{{ __('Aktuelles Signal') }}</td><td align="right" style="font-weight:800;color:#e5b95d">{{ signal_label($currentSignal) }}</td></tr>
 <tr><td style="color:#91a8bb;border-top:1px solid #29445e">{{ $purchased ? __('Kaufkurs') : __('Kurs bei Vormerkung') }}</td><td align="right" style="font-weight:800;border-top:1px solid #29445e">{{ number_format($reminder->purchase_price, 2, ',', '.') }} {{ $instrument->currency }}</td></tr>
 <tr><td style="color:#91a8bb;border-top:1px solid #29445e">{{ __('Aktueller Kurs') }}</td><td align="right" style="font-weight:800;border-top:1px solid #29445e">{{ number_format($currentPrice, 2, ',', '.') }} {{ $instrument->currency }}</td></tr>
 <tr><td style="color:#91a8bb;border-top:1px solid #29445e">{{ __('Entwicklung') }}</td><td align="right" style="font-weight:800;border-top:1px solid #29445e;color:{{ $performance >= 0 ? '#34d399' : '#fb7185' }}">{{ $performance >= 0 ? '+' : '' }}{{ number_format($performance, 2, ',', '.') }} %</td></tr>

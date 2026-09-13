@@ -41,7 +41,7 @@ $badgeClass = match (true) {
         </div>
 
         <span class="rounded-full border px-2 py-1 text-[10px] font-bold uppercase {{ $badgeClass }}">
-            {{ $signal['signal'] }}
+            {{ signal_label($signal['signal']) }}
         </span>
 
     </div>

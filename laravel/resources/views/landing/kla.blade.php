@@ -47,10 +47,6 @@
         </div>
     </div>
 </header>
-<aside class="kla-beta-ribbon" aria-label="Informationen zur Betaphase">
-    <div class="kla-beta-current"><span class="pulse"></span><span><small>AKTUELLE PHASE</small><b>Geschlossener Betatest</b></span></div>
-    <div class="kla-beta-preview"><span class="kla-beta-preview-copy"><strong>ÖFFENTLICHE BETA STARTET BALD</strong><span><b>Nur noch {{ max(0, $betaTesterLimit - $betaTesterCount) }} von {{ $betaTesterLimit }} Plätzen verfügbar</b> · 1 Jahr Pro kostenlos · Möchtest du von Anfang an dabei sein?</span></span><button type="button" class="kla-beta-request" data-kla-beta-open>Beta-Zugang anfragen →</button></div>
-</aside>
 <dialog class="kla-beta-dialog" data-kla-beta-dialog>
     <form method="POST" action="{{ route('contact.store') }}" class="kla-beta-form">
         @csrf<input type="hidden" name="source" value="beta_request"><input type="hidden" name="subject" value="Anfrage als AktienKI-Betatester"><input name="website" type="hidden" value="">

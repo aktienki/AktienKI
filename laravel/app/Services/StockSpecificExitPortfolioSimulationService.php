@@ -43,6 +43,20 @@ final class StockSpecificExitPortfolioSimulationService
         return in_array($policy, self::EXIT_POLICIES, true);
     }
 
+    public static function preparedPayloadAvailable(): bool
+    {
+        $path = (string) config('aktienki.portfolio_exit_backtest.payload_path');
+        $expectedSha256 = strtolower(trim((string) config('aktienki.portfolio_exit_backtest.payload_sha256')));
+
+        if ($path === '' || $expectedSha256 === '' || ! is_file($path) || ! is_readable($path)) {
+            return false;
+        }
+
+        $actualSha256 = hash_file('sha256', $path);
+
+        return is_string($actualSha256) && hash_equals($expectedSha256, $actualSha256);
+    }
+
     /** @return array<string, mixed> */
     public function calculate(
         Portfolio $portfolio,
@@ -52,6 +66,8 @@ final class StockSpecificExitPortfolioSimulationService
         string $allocationMode,
         int $maximumPositions,
         float $maxStockAllocationPercent,
+        float $annualTaxAllowance = 0.0,
+        float $taxRatePercent = 0.0,
     ): array {
         if (strtoupper((string) $portfolio->currency) !== 'EUR') {
             throw new RuntimeException('Der vorbereitete Exit-Depottest verwendet ausschließlich EUR-Kurse.');
@@ -100,6 +116,8 @@ final class StockSpecificExitPortfolioSimulationService
             $maxStockAllocationPercent / 100,
             ServingPortfolioSimulationService::FEE_RATE,
             ServingPortfolioSimulationService::MINIMUM_FEE,
+            $annualTaxAllowance,
+            $taxRatePercent,
         );
 
         return [

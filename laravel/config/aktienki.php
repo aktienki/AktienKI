@@ -61,6 +61,15 @@ return [
         ),
         'window' => env('AKTIENKI_PORTFOLIO_EXIT_BACKTEST_WINDOW', 'full_common'),
     ],
+    'serving_strategy_backtest' => [
+        // serving_strategy_trades contains every TCN-confirmed trade, but most
+        // come from instrument/horizon/variant combinations whose own
+        // three-year quality gate (serving_releases.compact_metrics) never
+        // passed. Backtested split: gate passed -> profit factor ~4-5 vs.
+        // ~1.1 for the rest. Default on; keep the switch to compare against
+        // the unfiltered universe.
+        'require_quality_gate' => (bool) env('AKTIENKI_SERVING_STRATEGY_REQUIRE_QUALITY_GATE', true),
+    ],
     'production_models' => [
         'version' => env('AKTIENKI_PRODUCTION_MODEL_VERSION', 'horizon-fusion-v1'),
         'root' => env('AKTIENKI_PRODUCTION_MODEL_ROOT', '/var/lib/aktienki/models/horizon-fusion-v1'),
@@ -109,6 +118,11 @@ return [
         // Shadow mode: the external verdict is stored and displayed but never
         // changes the ML signal, ranking or portfolio automation.
         'enabled' => (bool) env('EXTERNAL_BUY_REVIEW_ENABLED', false),
+        // 'openai' or 'perplexity'. Perplexity's Sonar models are purpose-built
+        // for cited web research, which matches this feature's "Verifizierte
+        // Webquellen" output better than a general model with a bolted-on
+        // search tool.
+        'provider' => env('EXTERNAL_BUY_REVIEW_PROVIDER', 'openai'),
         'api_key' => env('OPENAI_API_KEY'),
         'model' => env('EXTERNAL_BUY_REVIEW_V3_MODEL', 'gpt-5.6-luna'),
         'reasoning_effort' => env('EXTERNAL_BUY_REVIEW_REASONING_EFFORT', 'low'),
@@ -122,6 +136,30 @@ return [
         'input_price_per_million_usd' => (float) env('EXTERNAL_BUY_REVIEW_V3_INPUT_PRICE_USD', 0.2),
         'output_price_per_million_usd' => (float) env('EXTERNAL_BUY_REVIEW_V3_OUTPUT_PRICE_USD', 1.2),
         'search_price_per_call_usd' => (float) env('EXTERNAL_BUY_REVIEW_SEARCH_PRICE_USD', 0.01),
+        // Perplexity (used only when provider = 'perplexity' above).
+        'perplexity_api_key' => env('PERPLEXITY_API_KEY'),
+        'perplexity_endpoint' => env('EXTERNAL_BUY_REVIEW_PERPLEXITY_ENDPOINT', 'https://api.perplexity.ai/v1/sonar'),
+        'perplexity_model' => env('EXTERNAL_BUY_REVIEW_PERPLEXITY_MODEL', 'sonar'),
+        'perplexity_search_context_size' => env('EXTERNAL_BUY_REVIEW_PERPLEXITY_SEARCH_CONTEXT_SIZE', 'low'),
+        // Fallback estimate only - Perplexity reports the real cost per
+        // request (usage.cost.total_cost), which is used whenever present.
+        'perplexity_input_price_per_million_usd' => (float) env('EXTERNAL_BUY_REVIEW_PERPLEXITY_INPUT_PRICE_USD', 1.0),
+        'perplexity_output_price_per_million_usd' => (float) env('EXTERNAL_BUY_REVIEW_PERPLEXITY_OUTPUT_PRICE_USD', 1.0),
+        'perplexity_request_price_per_call_usd' => (float) env('EXTERNAL_BUY_REVIEW_PERPLEXITY_REQUEST_PRICE_USD', 0.008),
+    ],
+    'stock_ai_assessment' => [
+        // A short written opportunities/risks/key-factors assessment per
+        // POSITIV stock, generated from data AktienKI already has (no web
+        // search needed) - unlike external_buy_review, this is a plain
+        // writing task, so a general-purpose model via The Grid's spot
+        // market is a good, cheap fit.
+        'enabled' => (bool) env('STOCK_AI_ASSESSMENT_ENABLED', false),
+        'provider' => env('STOCK_AI_ASSESSMENT_PROVIDER', 'grid'),
+        'grid_api_key' => env('GRID_API_KEY'),
+        'grid_endpoint' => env('STOCK_AI_ASSESSMENT_GRID_ENDPOINT', 'https://api.thegrid.ai/v1/chat/completions'),
+        // Instrument string: <task>-<tier>, e.g. text-standard/text-prime/text-max.
+        'grid_model' => env('STOCK_AI_ASSESSMENT_GRID_MODEL', 'text-standard'),
+        'max_output_tokens' => (int) env('STOCK_AI_ASSESSMENT_MAX_OUTPUT_TOKENS', 900),
     ],
     'final_entry_shadow' => [
         // Writes only the isolated FINAL-entry decision/lifecycle tables.

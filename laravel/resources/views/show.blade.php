@@ -840,7 +840,7 @@
                     : ($signal === 'WAIT'
                         ? 'border-emerald-300/70 bg-emerald-400/25 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,.22)]'
                         : 'border-amber-300/30 bg-amber-300/10 text-amber-300')));
-        $signalLabel = $signal;
+        $signalLabel = signal_label($signal);
         $trendValue = strtolower((string) ($predictionMetadata['trend'] ?? $prediction?->higher_timeframe_trend ?? 'neutral'));
         $trendLabel = match ($trendValue) {
             'bullish', 'up', 'uptrend' => __('Bullisch'),
@@ -1280,8 +1280,8 @@
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-400">{{ __('Performance seit Signal') }}</p>
-                            <h2 class="mt-1 text-lg font-black">{{ __('Entwicklung seit dem letzten BUY') }}</h2>
-                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Ausschließlich realisierte Kurse nach dem letzten Signalwechsel auf BUY.') }}</p>
+                            <h2 class="mt-1 text-lg font-black">{{ __('Entwicklung seit dem letzten POSITIV') }}</h2>
+                            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Ausschließlich realisierte Kurse nach dem letzten Signalwechsel auf POSITIV.') }}</p>
                         </div>
                         <button type="button" onclick="this.closest('dialog').close()" aria-label="{{ __('Schließen') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)] hover:text-cyan-400">
                             <x-heroicon-o-x-mark class="h-5 w-5" />
@@ -1291,7 +1291,7 @@
                 <div class="p-5">
                     @if ($performanceBuyTransition && $performanceBuyPrice !== null)
                         <div class="mb-4 grid grid-cols-3 gap-2">
-                            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('BUY-Signal') }}</small><strong class="mt-1 block text-xs">{{ \Carbon\CarbonImmutable::createFromTimestampMs($performanceBuyAt)->format('d.m.Y') }}</strong></div>
+                            <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('POSITIV-Signal') }}</small><strong class="mt-1 block text-xs">{{ \Carbon\CarbonImmutable::createFromTimestampMs($performanceBuyAt)->format('d.m.Y') }}</strong></div>
                             <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Signalkurs') }}</small><strong class="mt-1 block text-xs">{{ number_format($performanceBuyPrice, 2, ',', '.') }} {{ $currency }}</strong></div>
                             <div class="rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3"><small class="block text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Bis heute') }}</small><strong class="mt-1 block text-xs {{ $performanceCurrentReturn >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $performanceCurrentReturn !== null ? (($performanceCurrentReturn > 0 ? '+' : '').number_format($performanceCurrentReturn, 2, ',', '.').' %') : '—' }}</strong></div>
                         </div>
@@ -1321,7 +1321,7 @@
                             @endforeach
                         </tbody>
                     </table>
-                    @unless ($performanceBuyTransition && $performanceBuyPrice !== null)<p class="py-6 text-center text-sm text-[var(--ak-muted)]">{{ __('Kein auswertbares BUY-Signal im verfügbaren Kurszeitraum.') }}</p>@endunless
+                    @unless ($performanceBuyTransition && $performanceBuyPrice !== null)<p class="py-6 text-center text-sm text-[var(--ak-muted)]">{{ __('Kein auswertbares POSITIV-Signal im verfügbaren Kurszeitraum.') }}</p>@endunless
                     <p class="mt-4 text-[10px] leading-5 text-[var(--ak-muted)]">{{ __('Berechnung auf Basis der tatsächlichen Tages-Schlusskurse. Der Signalhandelstag zählt als Ausgangspunkt; Gebühren sind nicht berücksichtigt.') }}</p>
                 </div>
             </dialog>
@@ -1337,7 +1337,7 @@
                             <x-heroicon-o-clock class="h-4 w-4" />{{ $signalLabel }}
                         </button>
                     @else
-                        <span data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isStrongBuy ? __('Alle Qualitätskriterien und Prognosehorizonte sind positiv') : ($isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel) }}" class="ak-signal-badge inline-flex h-8 min-w-20 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-black {{ $signalClass }}"><span>{{ $isStrongBuy ? 'STRONG BUY' : $signalLabel }} · {{ $signalStrength }}</span>@if($isQualityGateRestrictedBuy)<small class="ak-restricted-buy-label">BUY*</small>@endif</span>
+                        <span data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isStrongBuy ? __('Alle Qualitätskriterien und Prognosehorizonte sind positiv') : ($isQualityGateRestrictedBuy ? __('POSITIV durch Quality Gate eingeschränkt') : $signalLabel) }}" class="ak-signal-badge inline-flex h-8 min-w-20 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-black {{ $signalClass }}"><span>{{ $isStrongBuy ? signal_label('STRONG_BUY') : $signalLabel }} · {{ $signalStrength }}</span>@if($isQualityGateRestrictedBuy)<small class="ak-restricted-buy-label">POSITIV*</small>@endif</span>
                     @endif
                 </div>
 
@@ -1461,7 +1461,7 @@
                                                 <input type="date" name="remind_on" x-model="reminderDate" min="{{ now()->toDateString() }}" required @click="$event.target.showPicker?.()" class="mt-1 block w-full cursor-pointer border-0 bg-transparent p-0 text-base font-black text-amber-500 outline-none focus:ring-0" aria-label="{{ __('Datum der Erinnerung') }}">
                                             </label>
                                         </div>
-                                        @if($signal === 'WAIT')<p class="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] p-3 text-xs font-bold text-emerald-300">{{ __('WAIT: Eine spätere Kaufprüfung ist hier besonders sinnvoll. Die E-Mail zeigt auch, ob das Signal inzwischen auf BUY gewechselt ist.') }}</p>@endif
+                                        @if($signal === 'WAIT')<p class="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] p-3 text-xs font-bold text-emerald-300">{{ __('WAIT: Eine spätere Kaufprüfung ist hier besonders sinnvoll. Die E-Mail zeigt auch, ob das Signal inzwischen auf POSITIV gewechselt ist.') }}</p>@endif
                                         <fieldset class="mt-4">
                                             <legend class="mb-2 text-xs font-black uppercase tracking-wide text-slate-300">{{ __('Was möchtest du tun?') }}</legend>
                                             <div class="grid gap-2 sm:grid-cols-2">
@@ -1534,16 +1534,16 @@
                             </div>
                             <button type="button" onclick="this.closest('dialog').close()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--ak-border)] text-[var(--ak-muted)]"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
                         </div>
-                        <p class="mt-4 text-sm leading-6 text-[var(--ak-muted)]">{{ __('Du erhältst einmalig eine E-Mail, sobald sich der Status von WAIT auf BUY ändert. Danach wird der Alarm automatisch beendet.') }}</p>
+                        <p class="mt-4 text-sm leading-6 text-[var(--ak-muted)]">{{ __('Du erhältst einmalig eine E-Mail, sobald sich der Status von WAIT auf POSITIV ändert. Danach wird der Alarm automatisch beendet.') }}</p>
                         <fieldset class="mt-4 space-y-2">
                             <legend class="mb-2 text-[9px] font-black uppercase tracking-wide text-emerald-400">{{ __('Wann informieren?') }}</legend>
                             <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] p-3">
                                 <input type="radio" name="notification_mode" value="buy_only" checked class="mt-0.5 text-emerald-500 focus:ring-emerald-400/30">
-                                <span><strong class="block text-sm text-[var(--ak-text)]">{{ __('Nur bei BUY') }}</strong><small class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('E-Mail erst beim tatsächlichen Wechsel auf BUY.') }}</small></span>
+                                <span><strong class="block text-sm text-[var(--ak-text)]">{{ __('Nur bei POSITIV') }}</strong><small class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('E-Mail erst beim tatsächlichen Wechsel auf POSITIV.') }}</small></span>
                             </label>
                             <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3">
                                 <input type="radio" name="notification_mode" value="wait_or_buy" class="mt-0.5 text-emerald-500 focus:ring-emerald-400/30">
-                                <span><strong class="block text-sm text-[var(--ak-text)]">{{ __('Bei WAIT oder BUY') }}</strong><small class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Bei der nächsten positiven Tagesprognose informieren – auch wenn WAIT bestehen bleibt.') }}</small></span>
+                                <span><strong class="block text-sm text-[var(--ak-text)]">{{ __('Bei WAIT oder POSITIV') }}</strong><small class="mt-1 block text-xs leading-5 text-[var(--ak-muted)]">{{ __('Bei der nächsten positiven Tagesprognose informieren – auch wenn WAIT bestehen bleibt.') }}</small></span>
                             </label>
                         </fieldset>
                         <p class="mt-3 rounded-lg border border-rose-400/15 bg-rose-400/[.05] px-3 py-2 text-[10px] leading-4 text-[var(--ak-muted)]">{{ __('Bei HOLD oder SELL wird keine E-Mail gesendet. Der Alarm bleibt für eine spätere positive Prognose aktiv.') }}</p>
@@ -2748,7 +2748,7 @@
 
                 const latestSignalTransition = historicalSignalTransitions.at(-1) ?? null;
                 const signalColors = {
-                    BUY: '#22c55e', WATCH: '#84cc16', HOLD: '#facc15', WAIT: '#22d3ee', SELL: '#fb7185',
+                    POSITIV: '#22c55e', WATCH: '#84cc16', HOLD: '#facc15', WAIT: '#22d3ee', SELL: '#fb7185',
                 };
 
                 const latestSignalAnchor = () => {
@@ -3858,7 +3858,7 @@
                     }
 
                     const signalColors = {
-                        BUY: '#22c55e',
+                        POSITIV: '#22c55e',
                         WATCH: '#84cc16',
                         HOLD: '#f59e0b',
                         SELL: '#ef4444',

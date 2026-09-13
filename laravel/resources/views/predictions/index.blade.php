@@ -428,7 +428,7 @@
                                     && (bool) ($prediction->ranking_stability_passed ?? false)
                                     && (int) ($prediction->ranking_trade_count ?? 0) >= 20;
                                 if ($isStrongBuy) {
-                                    $signalLabel = 'STRONG BUY';
+                                    $signalLabel = signal_label('STRONG_BUY');
                                     $signalIcon = 'heroicon-s-bolt';
                                 }
                                 $mobilePriceDirection = $horizonDirections->get(20);
@@ -568,7 +568,7 @@
                                 </td>
                                 <td class="border-b border-[var(--ak-border)] px-1 py-2 text-center">
                                     <div class="flex flex-col items-center justify-center gap-1">
-                                        <span class="ak-prediction-signal-badge" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – BUY durch Quality Gate eingeschränkt') : $signalLabel }}">
+                                        <span class="ak-prediction-signal-badge" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('POSITIV durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – POSITIV durch Quality Gate eingeschränkt') : $signalLabel }}">
                                             <x-dynamic-component :component="$signalIcon" class="h-3.5 w-3.5" />
                                             <b class="ak-notebook-signal-label hidden">{{ $signalLabel }}</b>
                                         </span>
@@ -598,7 +598,7 @@
                                                 <span>{{ $scoreGrade ?? '—' }}</span>
                                             </div>
                                         @endif
-                                        <span class="ak-prediction-signal-badge ak-mobile-horizon-signal hidden" data-label="{{ __('Signal') }}" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – BUY durch Quality Gate eingeschränkt') : $signalLabel }}">
+                                        <span class="ak-prediction-signal-badge ak-mobile-horizon-signal hidden" data-label="{{ __('Signal') }}" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('POSITIV durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – POSITIV durch Quality Gate eingeschränkt') : $signalLabel }}">
                                             <b class="ak-mobile-signal-letter">{{ mb_substr($signalLabel, 0, 1) }}</b>
                                         </span>
                                         @foreach ($horizonDirections as $days => $horizonReturn)

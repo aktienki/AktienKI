@@ -32,7 +32,7 @@
             <li class="flex items-center gap-2">
                 <span class="ak-market-point h-2.5 w-2.5 shrink-0 rounded-full bg-cyan-300"></span>
                 <span>{{ $isServing
-                    ? __(':positive von :total Aktien mit BUY', ['positive' => $assessment['positiveMarkets'] ?? 0, 'total' => $assessment['marketCount'] ?? 0])
+                    ? __(':positive von :total Aktien mit POSITIV', ['positive' => $assessment['positiveMarkets'] ?? 0, 'total' => $assessment['marketCount'] ?? 0])
                     : __(':positive von :total Märkten im Plus', ['positive' => $assessment['positiveMarkets'] ?? 0, 'total' => $assessment['marketCount'] ?? 0]) }}</span>
             </li>
             <li class="flex items-center gap-2">

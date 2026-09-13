@@ -54,7 +54,11 @@ final class GenerateServingBuyReviews extends Command
                             [
                                 'instrument_id' => $instrument->id, 'prediction_id' => null,
                                 'previous_prediction_id' => null, 'triggered_at' => $row->as_of,
-                                'status' => 'pending', 'provider' => 'openai', 'model' => 'gpt-5.6-luna',
+                                'status' => 'pending',
+                                'provider' => (string) config('aktienki.external_buy_review.provider', 'openai'),
+                                'model' => config('aktienki.external_buy_review.provider', 'openai') === 'perplexity'
+                                    ? (string) config('aktienki.external_buy_review.perplexity_model', 'sonar')
+                                    : (string) config('aktienki.external_buy_review.model', 'gpt-5.6-luna'),
                                 'prompt_version' => 'buy-twelve-data-luna-v3',
                                 'request_identity' => array_filter([
                                     'company_name' => $row->name, 'ticker' => $row->provider_symbol ?: $row->symbol,

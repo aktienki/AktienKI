@@ -34,8 +34,24 @@ final class DepotExitPolicyContractTest extends TestCase
         $this->assertStringContainsString('name="exit_policy" value="stock_specific_final_exit"', $view);
         $this->assertStringContainsString('name="exit_policy" value="fixed_horizon_20t"', $view);
         $this->assertStringContainsString('name="exit_policy" value="strategy_default"', $view);
-        $this->assertStringContainsString('final gefilterten BUY-Übergänge', $view);
+        $this->assertStringContainsString('final gefilterten POSITIV-Übergänge', $view);
         $this->assertStringContainsString('exakt denselben gefilterten Einstiegen', $view);
         $this->assertStringContainsString('denselben eingefrorenen und geprüften Eintrittsdatensatz', $view);
+    }
+
+    public function test_model_reconciliation_is_a_sortable_and_filterable_table(): void
+    {
+        $view = (string) file_get_contents(
+            dirname(__DIR__, 2).'/resources/views/depots/show.blade.php',
+        );
+
+        $this->assertStringContainsString('data-model-reference-table', $view);
+        $this->assertStringContainsString('data-reference-search', $view);
+        $this->assertStringContainsString('data-reference-variant', $view);
+        $this->assertStringContainsString('data-reference-horizon', $view);
+        $this->assertStringContainsString("['return', __('Rendite')]", $view);
+        $this->assertStringContainsString("['net_profit', __('Gewinn je Aktie')]", $view);
+        $this->assertStringContainsString('class="ak-state-checkbox', $view);
+        $this->assertStringContainsString('.ak-state-checkbox:checked', $view);
     }
 }

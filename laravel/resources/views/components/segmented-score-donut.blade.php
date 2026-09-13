@@ -1,15 +1,18 @@
-@props(['score' => 0, 'display' => null, 'level' => null, 'type' => 'chance', 'label' => null])
+@props(['score' => 0, 'display' => null, 'level' => null, 'type' => 'chance', 'label' => null, 'segments' => 5])
 @php
     $value = max(0, min(100, (float) $score));
+    $segmentCount = (int) $segments === 10 ? 10 : 5;
     $gradeLevel = $level !== null
-        ? max(0, min(5, (int) $level))
-        : ($value > 0 ? max(1, min(5, (int) ceil($value / 20))) : 0);
+        ? max(0, min($segmentCount, (int) $level))
+        : ($value > 0 ? max(1, min($segmentCount, (int) ceil($value / (100 / $segmentCount)))) : 0);
     $activeLevel = $type === 'risk' && $gradeLevel > 0
-        ? 6 - $gradeLevel
+        ? ($segmentCount + 1) - $gradeLevel
         : $gradeLevel;
-    $palette = $type === 'risk'
-        ? ['#df4d5f', '#ed8a32', '#e1be32', '#8fca45', '#35b779']
+    $palette = $segmentCount === 10
+        ? ['#df4d5f', '#e45f4d', '#e8753a', '#ed8a32', '#eaa632', '#e1be32', '#bed23b', '#8fca45', '#5fc060', '#35b779']
         : ['#df4d5f', '#ed8a32', '#e1be32', '#8fca45', '#35b779'];
+    $sectorLength = $segmentCount === 10 ? 8.0 : 15.5;
+    $sectorOffset = $segmentCount === 10 ? 10.0 : 18.5;
 @endphp
 <div class="segmented-score" role="meter" aria-label="{{ $label ?: ucfirst($type) }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ number_format($value, 1, '.', '') }}">
     <svg class="segmented-score-ring" viewBox="0 0 120 120" aria-hidden="true">
@@ -19,8 +22,8 @@
                 class="segmented-score-sector {{ $segment <= $activeLevel ? 'is-active' : '' }} {{ $segment === $activeLevel ? 'is-end' : '' }}"
                 cx="60" cy="60" r="48" pathLength="100"
                 stroke="{{ $segment <= $activeLevel ? $color : '#dfe8ea' }}"
-                stroke-dasharray="15.5 84.5"
-                stroke-dashoffset="{{ -($index * 18.5) }}"
+                stroke-dasharray="{{ $sectorLength }} {{ 100 - $sectorLength }}"
+                stroke-dashoffset="{{ -($index * $sectorOffset) }}"
             />
         @endforeach
     </svg>

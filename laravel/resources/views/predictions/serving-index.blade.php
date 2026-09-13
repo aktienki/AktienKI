@@ -6,7 +6,8 @@
                     <p class="text-[10px] font-black uppercase tracking-[.22em] text-cyan-500">{{ __('Service Datenbank') }}</p>
                     <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)] sm:text-3xl">Aktien, Modelle und Predictions</h1>
                     <p class="mt-2 max-w-4xl text-sm leading-6 text-[var(--ak-muted)]">
-                        {{ __('Angezeigt werden die Standard- und TCN-Backtests der aktiven Releases. Der grüne Status kennzeichnet das aktuell aktive Modell.') }}
+                        {{ __('Angezeigt werden die Standard- und TCN-Backtests der aktiven Modelle. Der grüne Status kennzeichnet das aktuell aktive Modell.') }}
+                        {{ __('Die Auswählbarkeit wird für jede Modellvariante separat aus ihrem einjährigen Walk Forward bestimmt.') }}
                     </p>
                     <div class="mt-3 flex flex-wrap items-center gap-2 text-[8px] font-black uppercase tracking-[.1em]">
                         <span class="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/55 bg-emerald-500/15 px-2 py-1 text-emerald-600"><i class="h-1.5 w-1.5 rounded-full bg-emerald-500"></i>{{ __('Aktives Modell') }}</span>
@@ -20,12 +21,10 @@
                                     name="select_all"
                                     value="1"
                                     data-total="{{ $bulkSelectableModelKeys->count() }}"
-                                    class="peer sr-only"
+                                    data-initial-all="{{ $bulkSelectableModelKeys->isNotEmpty() && $initialSelectedModelKeys->sort()->values()->all() === $bulkSelectableModelKeys->sort()->values()->all() ? 'true' : 'false' }}"
+                                    class="serving-model-checkbox h-5 w-5 shrink-0 cursor-pointer"
                                     @checked($bulkSelectableModelKeys->isNotEmpty() && $initialSelectedModelKeys->sort()->values()->all() === $bulkSelectableModelKeys->sort()->values()->all())
                                 >
-                                <span class="serving-selection-checkbox" aria-hidden="true">
-                                    <svg viewBox="0 0 16 16" fill="none"><path d="m3.25 8.25 3 3 6.5-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                                </span>
                                 <span id="serving-select-all-label">{{ __('Alle auswählen') }}</span>
                             </label>
                             <button type="submit" form="serving-model-selection-form" class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-[9px] font-black normal-case tracking-normal text-white shadow-sm transition hover:bg-slate-800">
@@ -58,12 +57,6 @@
                 </div>
             </header>
 
-            @if($strategySelectionToken)
-                <form id="serving-model-selection-form" method="POST" action="{{ route('setup.models.strategy') }}" class="hidden">
-                    @csrf
-                    <input type="hidden" name="selection_token" value="{{ $strategySelectionToken }}">
-                </form>
-            @endif
             @error('models')<p class="mb-3 rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs font-bold text-rose-600">{{ $message }}</p>@enderror
 
             @php
@@ -118,12 +111,12 @@
                     <select name="signal" class="ak-input">
                         <option value="">{{ __('Alle Signale') }}</option>
                         @foreach(['BUY', 'WATCH', 'HOLD', 'SELL'] as $signal)
-                            <option value="{{ $signal }}" @selected(strtoupper((string) request('signal')) === $signal)>{{ $signal }}</option>
+                            <option value="{{ $signal }}" @selected(strtoupper((string) request('signal')) === $signal)>{{ signal_label($signal) }}</option>
                         @endforeach
                     </select>
-                    <div class="col-span-full grid grid-cols-3 gap-2">
+                    <div class="col-span-full grid grid-cols-2 gap-2 lg:grid-cols-4">
                     <label class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]/45 px-3 py-2" x-data="{ value: {{ (float) request('profit_per_trade_min', $metricRanges->profit_per_trade->min) }} }">
-                        <span class="block text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('Median pro Trade ab') }}</span>
+                        <span class="block text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('Walk Forward · Median pro Trade ab') }}</span>
                         <div class="relative mt-2 h-2.5 rounded-full border border-slate-400/25 shadow-inner" style="background:linear-gradient(90deg,rgba(244,63,94,.30),rgba(251,191,36,.27) 50%,rgba(16,185,129,.32))">
                             <span class="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-cyan-500 shadow-[0_1px_5px_rgba(15,23,42,.35)]" :style="`left:${Math.max(0,Math.min(100,((value-({{ $metricRanges->profit_per_trade->min }}))/(({{ $metricRanges->profit_per_trade->max }})-({{ $metricRanges->profit_per_trade->min }})))*100))}%`"></span>
                             <input type="range" name="profit_per_trade_min" value="{{ request('profit_per_trade_min', $metricRanges->profit_per_trade->min) }}" @input="value = Number($event.target.value)" @change="$el.form.requestSubmit()" min="{{ $metricRanges->profit_per_trade->min }}" max="{{ $metricRanges->profit_per_trade->max }}" step="{{ $metricRanges->profit_per_trade->step }}" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
@@ -131,7 +124,7 @@
                         <span class="mt-1 flex justify-between text-[7px] tabular-nums text-[var(--ak-muted)]"><span>{{ number_format($metricRanges->profit_per_trade->min, 1, ',', '.') }} %</span><span>{{ number_format($metricRanges->profit_per_trade->max, 1, ',', '.') }} %</span></span>
                     </label>
                     <label class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]/45 px-3 py-2" x-data="{ value: {{ (float) request('drawdown_max', $metricRanges->drawdown->max) }} }">
-                        <span class="block text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('Drawdown bis') }}</span>
+                        <span class="block text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('Walk Forward · Drawdown bis') }}</span>
                         <div class="relative mt-2 h-2.5 rounded-full border border-slate-400/25 shadow-inner" style="background:linear-gradient(90deg,rgba(16,185,129,.32),rgba(251,191,36,.27) 50%,rgba(244,63,94,.30))">
                             <span class="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-amber-500 shadow-[0_1px_5px_rgba(15,23,42,.35)]" :style="`left:${Math.max(0,Math.min(100,((value-{{ $metricRanges->drawdown->min }})/({{ $metricRanges->drawdown->max }}-{{ $metricRanges->drawdown->min }}))*100))}%`"></span>
                             <input type="range" name="drawdown_max" value="{{ request('drawdown_max', $metricRanges->drawdown->max) }}" @input="value = Number($event.target.value)" @change="$el.form.requestSubmit()" min="{{ $metricRanges->drawdown->min }}" max="{{ $metricRanges->drawdown->max }}" step="{{ $metricRanges->drawdown->step }}" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
@@ -139,12 +132,20 @@
                         <span class="mt-1 flex justify-between text-[7px] tabular-nums text-[var(--ak-muted)]"><span>{{ number_format($metricRanges->drawdown->min, 1, ',', '.') }} %</span><span>{{ number_format($metricRanges->drawdown->max, 1, ',', '.') }} %</span></span>
                     </label>
                     <label class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]/45 px-3 py-2" x-data="{ value: {{ (float) request('hit_rate_min', $metricRanges->hit_rate->min) }} }">
-                        <span class="block text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('Hit-Rate ab') }}</span>
+                        <span class="block text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('Walk Forward · Hit-Rate ab') }}</span>
                         <div class="relative mt-2 h-2.5 rounded-full border border-slate-400/25 shadow-inner" style="background:linear-gradient(90deg,rgba(244,63,94,.30),rgba(251,191,36,.27) 50%,rgba(16,185,129,.32))">
                             <span class="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-500 shadow-[0_1px_5px_rgba(15,23,42,.35)]" :style="`left:${Math.max(0,Math.min(100,((value-{{ $metricRanges->hit_rate->min }})/({{ $metricRanges->hit_rate->max }}-{{ $metricRanges->hit_rate->min }}))*100))}%`"></span>
                             <input type="range" name="hit_rate_min" value="{{ request('hit_rate_min', $metricRanges->hit_rate->min) }}" @input="value = Number($event.target.value)" @change="$el.form.requestSubmit()" min="{{ $metricRanges->hit_rate->min }}" max="{{ $metricRanges->hit_rate->max }}" step="{{ $metricRanges->hit_rate->step }}" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
                         </div>
                         <span class="mt-1 flex justify-between text-[7px] tabular-nums text-[var(--ak-muted)]"><span>{{ number_format($metricRanges->hit_rate->min, 1, ',', '.') }} %</span><span>{{ number_format($metricRanges->hit_rate->max, 1, ',', '.') }} %</span></span>
+                    </label>
+                    <label class="min-w-0 rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)]/45 px-3 py-2" x-data="{ value: {{ (int) request('minimum_trades', $metricRanges->trades->min) }} }">
+                        <span class="block text-[8px] font-black uppercase tracking-[.08em] text-[var(--ak-muted)]">{{ __('Walk Forward · Anzahl Trades ab') }}</span>
+                        <div class="relative mt-2 h-2.5 rounded-full border border-slate-400/25 shadow-inner" style="background:linear-gradient(90deg,rgba(148,163,184,.28),rgba(6,182,212,.30),rgba(16,185,129,.34))">
+                            <span class="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-violet-500 shadow-[0_1px_5px_rgba(15,23,42,.35)]" :style="`left:${Math.max(0,Math.min(100,((value-{{ $metricRanges->trades->min }})/({{ $metricRanges->trades->max }}-{{ $metricRanges->trades->min }}))*100))}%`"></span>
+                            <input type="range" name="minimum_trades" value="{{ request('minimum_trades', $metricRanges->trades->min) }}" @input="value = Number($event.target.value)" @change="$el.form.requestSubmit()" min="{{ (int) $metricRanges->trades->min }}" max="{{ (int) $metricRanges->trades->max }}" step="1" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
+                        </div>
+                        <span class="mt-1 flex justify-between text-[7px] tabular-nums text-[var(--ak-muted)]"><span x-text="`${Math.round(value)} Trades`">{{ number_format((int) request('minimum_trades', $metricRanges->trades->min), 0, ',', '.') }} Trades</span><span>{{ number_format((int) $metricRanges->trades->max, 0, ',', '.') }}</span></span>
                     </label>
                     </div>
                     <div class="col-span-full flex flex-nowrap items-center justify-end gap-2">
@@ -161,6 +162,11 @@
                 </form>
             </section>
 
+            @if($strategySelectionToken)
+                <form id="serving-model-selection-form" method="POST" action="{{ route('setup.models.strategy') }}">
+                    @csrf
+                    <input type="hidden" name="selection_token" value="{{ $strategySelectionToken }}">
+            @endif
             <section class="ak-card overflow-hidden border-cyan-400/25">
                 <div class="serving-model-scroll overflow-auto" style="max-height:75vh">
                     <table class="serving-model-table w-full table-fixed border-collapse text-left" style="min-width:1076px">
@@ -218,43 +224,39 @@
                                         $scope = $stock->horizons->get($horizon);
                                         $model = $scope?->model_variants?->get($variantKey);
                                         $modelIsActive = (bool) ($model?->is_active ?? false);
-                                        $matchesModelFilter = $model?->matches_active_filter ?? true;
+                                        $matchesModelFilter = $model?->matches_selection_filter ?? true;
                                         $modelCellTone = $modelFilterActive && ! $matchesModelFilter
                                             ? 'is-filtered-out'
                                             : '';
                                         $modelSelectable = $model
                                             && $matchesModelFilter
-                                            && $model->strategy_selectable;
+                                            && ($model->training_selectable ?? false);
                                         $modelSelectionKey = $model
                                             ? strtoupper((string) $stock->symbol).'|'.$horizon.'|'.$model->variant
                                             : null;
+                                        $modelSelectionFrame = $model && $model->strategy_selectable
+                                            ? (($modelSelectable && $initialSelectedModelKeys->contains($modelSelectionKey)) ? 'is-model-selected' : 'is-model-unselected')
+                                            : '';
                                     @endphp
-                                    <td data-model-active="{{ $modelIsActive && ($model?->strategy_selectable ?? false) ? 'true' : 'false' }}" data-model-variant="{{ $model?->variant }}" class="serving-model-cell px-2 py-3 transition-all {{ $modelCellTone }}" @if($modelIsActive && $model?->strategy_selectable && $model?->variant === 'pure_tcn') style="background:rgba(6,182,212,.08)!important;border-color:rgba(8,145,178,.42)!important;box-shadow:inset 0 0 0 1px rgba(8,145,178,.26),inset 4px 0 0 #0891b2!important" @endif>
-                                        @if($model && $model->strategy_selectable)
+                                    <td data-model-active="{{ $modelIsActive && ($model?->strategy_selectable ?? false) ? 'true' : 'false' }}" data-model-variant="{{ $model?->variant }}" class="serving-model-cell px-2 py-3 transition-all {{ $modelCellTone }} {{ $modelSelectionFrame }}">
+                                        @if($model)
                                             <div class="flex items-center gap-2">
                                                 @if($modelSelectable)
                                                     <label class="inline-flex shrink-0 cursor-pointer items-center">
                                                         <input
-                                                            form="serving-model-selection-form"
                                                             type="checkbox"
                                                             name="models[]"
                                                             value="{{ $modelSelectionKey }}"
                                                             data-serving-model-checkbox
-                                                            data-serving-select-all-eligible="{{ $modelIsActive ? 'true' : 'false' }}"
-                                                            class="peer sr-only"
+                                                            data-serving-select-all-eligible="true"
+                                                            class="serving-model-checkbox h-5 w-5 shrink-0 cursor-pointer"
                                                             @checked($initialSelectedModelKeys->contains($modelSelectionKey))
                                                             aria-label="{{ __('Modell auswählen') }}: {{ $stock->symbol }} · {{ $horizon }}T · {{ $model->variant_label }}"
                                                         >
-                                                        <span class="serving-selection-checkbox" aria-hidden="true">
-                                                            <svg viewBox="0 0 16 16" fill="none"><path d="m3.25 8.25 3 3 6.5-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                                                        </span>
                                                     </label>
                                                 @else
-                                                    <span class="inline-flex shrink-0 cursor-not-allowed items-center" title="{{ __('Dieses Modell entspricht nicht den aktuell gesetzten Modellfiltern.') }}">
-                                                        <input type="checkbox" disabled class="peer sr-only" aria-label="{{ __('Modell nicht für Strategieberechnung verfügbar') }}: {{ $stock->symbol }} · {{ $horizon }}T · {{ $model->variant_label }}">
-                                                        <span class="serving-selection-checkbox is-disabled" aria-hidden="true">
-                                                            <svg viewBox="0 0 16 16" fill="none"><path d="m3.25 8.25 3 3 6.5-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                                                        </span>
+                                                    <span class="inline-flex shrink-0 cursor-not-allowed items-center" title="{{ !($model->training_selectable ?? false) ? __('Dieses Modell hat im zweijährigen Trainingsfenster keine Trades.') : __('Dieses Modell entspricht nicht den aktuell gesetzten Trainingsfiltern.') }}">
+                                                        <input type="checkbox" disabled class="serving-model-checkbox h-5 w-5 shrink-0 cursor-not-allowed opacity-60" aria-label="{{ __('Modell nicht für Strategieberechnung verfügbar') }}: {{ $stock->symbol }} · {{ $horizon }}T · {{ $model->variant_label }}">
                                                     </span>
                                                 @endif
                                                 <b class="text-[var(--ak-text)]">{{ $model->variant_label }}</b>
@@ -264,8 +266,28 @@
                                                     <span class="serving-model-state rounded border border-slate-400/40 bg-slate-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-slate-600">{{ __('Verfügbar') }}</span>
                                                 @endif
                                             </div>
-                                            <small class="mt-1 block text-[9px] text-[var(--ak-muted)]">HR {{ is_numeric($model->metrics->hit_rate) ? number_format($model->metrics->hit_rate, 1, ',', '.').' %' : '—' }} · PF {{ is_numeric($model->metrics->profit_factor) ? number_format($model->metrics->profit_factor, 2, ',', '.') : '—' }}</small>
-                                            <small class="block text-[8px] text-[var(--ak-muted)]">{{ $model->metrics->trades }} Trades · Ø {{ is_numeric($model->metrics->average_return) ? sprintf('%+.2f %%', $model->metrics->average_return) : '—' }}</small>
+                                            @if($model->training_selectable ?? false)
+                                                <small class="mt-1 block text-[9px] text-[var(--ak-muted)]" title="{{ data_get($model, 'statistics_from', '—') }}–{{ data_get($model, 'statistics_to', '—') }}"><b>{{ __('Statistik 2J') }}</b> · HR {{ is_numeric($model->metrics->hit_rate) ? number_format($model->metrics->hit_rate, 1, ',', '.').' %' : '—' }} · PF {{ is_numeric($model->metrics->profit_factor) ? number_format($model->metrics->profit_factor, 2, ',', '.') : '—' }}</small>
+                                                <small class="block text-[8px] text-[var(--ak-muted)]">{{ $model->metrics->trades }} Trades · Ø {{ is_numeric($model->metrics->average_return) ? sprintf('%+.2f %%', $model->metrics->average_return) : '—' }}</small>
+                                            @else
+                                                <small class="mt-1 block text-[9px] font-bold text-amber-600 dark:text-amber-300">{{ __('Statistik 2J · keine Trainingstrades') }}</small>
+                                            @endif
+                                            @php
+                                                $walkForward = $model->walk_forward_metrics ?? null;
+                                                $walkForwardTrades = (int) ($walkForward?->trades ?? 0);
+                                                $walkForwardTone = $walkForwardTrades === 0
+                                                    ? 'text-[var(--ak-muted)]'
+                                                    : (($model->walk_forward_passed ?? false) ? 'text-cyan-700 dark:text-cyan-300' : 'text-rose-600 dark:text-rose-300');
+                                            @endphp
+                                            <small class="mt-1 block border-t border-slate-400/20 pt-1 text-[8px] {{ $walkForwardTone }}" title="{{ data_get($model, 'walk_forward_from', '—') }}–{{ data_get($model, 'walk_forward_to', '—') }}">
+                                                <b>{{ __('Walk Forward 1J') }}</b>
+                                                @if($walkForwardTrades > 0)
+                                                    · HR {{ is_numeric($walkForward?->hit_rate) ? number_format($walkForward->hit_rate, 1, ',', '.').' %' : '—' }} · PF {{ is_numeric($walkForward?->profit_factor) ? number_format($walkForward->profit_factor, 2, ',', '.') : '—' }}
+                                                    <span class="block text-[8px]">{{ $walkForwardTrades }} Trades · Median {{ is_numeric($walkForward?->median_return) ? sprintf('%+.2f %%', $walkForward->median_return) : '—' }} · Ø {{ is_numeric($walkForward?->average_return) ? sprintf('%+.2f %%', $walkForward->average_return) : '—' }}</span>
+                                                @else
+                                                    · {{ __('Keine Walk-Forward-Daten') }}
+                                                @endif
+                                            </small>
                                         @else
                                             <span class="text-slate-500">Keine Daten</span>
                                         @endif
@@ -274,15 +296,71 @@
                                 @endforeach
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="px-6 py-14 text-center text-sm text-[var(--ak-muted)]">Keine aktiven Releases mit diesen Filtern vorhanden.</td></tr>
+                            <tr><td colspan="8" class="px-6 py-14 text-center text-sm text-[var(--ak-muted)]">Keine aktiven Modelle mit diesen Filtern vorhanden.</td></tr>
                         @endforelse
                         </tbody>
                     </table>
                 </div>
             </section>
+            @if($strategySelectionToken)
+                </form>
+            @endif
             @once
                 <style>
                     .serving-model-scroll { -webkit-overflow-scrolling: touch; }
+                    .serving-model-checkbox {
+                        appearance: none !important;
+                        -webkit-appearance: none !important;
+                        display: inline-grid !important;
+                        place-content: center;
+                        border: 1px solid #94a3b8 !important;
+                        border-radius: .3rem !important;
+                        background: #fff !important;
+                        color: #fff !important;
+                        box-shadow: 0 1px 2px rgba(15, 23, 42, .08);
+                    }
+                    .serving-model-checkbox::before {
+                        width: .68rem;
+                        height: .38rem;
+                        content: "";
+                        border: solid currentColor;
+                        border-width: 0 0 2px 2px;
+                        opacity: 0;
+                        transform: translateY(-.06rem) rotate(-45deg) scale(.65);
+                        transition: opacity .1s ease, transform .1s ease;
+                    }
+                    .serving-model-checkbox:checked {
+                        border-color: #0891b2 !important;
+                        background: #0891b2 !important;
+                        box-shadow: 0 0 0 2px rgba(6, 182, 212, .2);
+                    }
+                    .serving-model-checkbox:checked::before {
+                        opacity: 1;
+                        transform: translateY(-.06rem) rotate(-45deg) scale(1);
+                    }
+                    .serving-model-checkbox:indeterminate {
+                        border-color: #0891b2 !important;
+                        background: linear-gradient(#fff, #fff) center / .7rem 2px no-repeat #0891b2 !important;
+                    }
+                    .serving-model-checkbox:focus-visible {
+                        outline: 2px solid rgba(6, 182, 212, .65) !important;
+                        outline-offset: 2px;
+                    }
+                    .serving-model-checkbox:disabled {
+                        border-color: #cbd5e1 !important;
+                        background: #f1f5f9 !important;
+                        box-shadow: none;
+                    }
+                    .serving-model-cell.is-model-selected {
+                        outline: 2px solid rgba(16, 185, 129, .78);
+                        outline-offset: -2px;
+                        background: rgba(16, 185, 129, .08);
+                    }
+                    .serving-model-cell.is-model-unselected {
+                        outline: 2px solid rgba(245, 158, 11, .68);
+                        outline-offset: -2px;
+                        background: rgba(245, 158, 11, .055);
+                    }
                     @media (min-width: 1024px) { .serving-model-scroll { max-height: none; } }
                     /* Fixed first column + fixed header while the rest scrolls horizontally. */
                     .serving-model-table thead th,
@@ -305,6 +383,7 @@
                     const selectAllBadge = document.getElementById('serving-select-all-badge');
                     const selectAllLabel = document.getElementById('serving-select-all-label');
                     const counter = document.getElementById('serving-selected-model-count');
+                    const selectionForm = document.getElementById('serving-model-selection-form');
                     const modelCheckboxes = [...document.querySelectorAll('[data-serving-model-checkbox]')];
                     const bulkCheckboxes = modelCheckboxes.filter((checkbox) => checkbox.dataset.servingSelectAllEligible === 'true');
 
@@ -312,6 +391,13 @@
                     selectAll.dataset.bound = 'true';
 
                     const total = Number(selectAll.dataset.total || modelCheckboxes.length);
+                    const renderModelFrames = () => {
+                        modelCheckboxes.forEach((checkbox) => {
+                            const cell = checkbox.closest('.serving-model-cell');
+                            cell?.classList.toggle('is-model-selected', checkbox.checked);
+                            cell?.classList.toggle('is-model-unselected', !checkbox.checked);
+                        });
+                    };
                     const renderSelectAllState = () => {
                         const allSelected = selectAll.checked && !selectAll.indeterminate;
                         selectAllBadge?.classList.toggle('is-selected', allSelected);
@@ -324,11 +410,13 @@
                     const updateFromModels = () => {
                         const checked = modelCheckboxes.filter((checkbox) => checkbox.checked).length;
                         const checkedBulk = bulkCheckboxes.filter((checkbox) => checkbox.checked).length;
-                        const checkedOutsideBulk = modelCheckboxes.some((checkbox) => checkbox.checked && checkbox.dataset.servingSelectAllEligible !== 'true');
-                        selectAll.checked = total > 0 && checkedBulk === total && !checkedOutsideBulk;
+                        const allVisibleSelected = bulkCheckboxes.length > 0 && checkedBulk === bulkCheckboxes.length;
+                        selectAll.checked = total > 0 && allVisibleSelected
+                            && (selectAll.checked || bulkCheckboxes.length === total);
                         selectAll.indeterminate = checked > 0 && !selectAll.checked;
-                        counter.textContent = String(checked);
+                        counter.textContent = String(selectAll.checked ? total : checked);
                         renderSelectAllState();
+                        renderModelFrames();
                     };
 
                     selectAll.addEventListener('change', () => {
@@ -338,12 +426,13 @@
                         selectAll.indeterminate = false;
                         counter.textContent = String(selectAll.checked ? total : 0);
                         renderSelectAllState();
+                        renderModelFrames();
                     });
 
                     modelCheckboxes.forEach((checkbox) => {
                         checkbox.addEventListener('change', updateFromModels);
                     });
-                    renderSelectAllState();
+                    updateFromModels();
                 };
 
                 initialiseModelSelection();

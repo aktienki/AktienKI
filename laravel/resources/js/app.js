@@ -136,6 +136,8 @@ const chartTargetSelector = [
     '#stock-detail-page',
     '#strategy-depot-page',
     '#filtered-backtest-result-chart',
+    '#filtered-backtest-statistics-chart',
+    '#filtered-backtest-walk-forward-chart',
     '.ak-top3-chart',
     '.aki-indicator-card__chart',
     '[data-screener-chart]',

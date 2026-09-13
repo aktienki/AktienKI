@@ -43,6 +43,26 @@ return [
             'sslmode' => env('SERVING_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
         ],
 
+        // Read-only source for strategy heatmaps and historical serving
+        // trades. On a developer machine this may point through the SSH
+        // tunnel to production without moving the application's users,
+        // portfolios or generated backtest results away from local Postgres.
+        'strategy_source' => [
+            'driver' => 'pgsql',
+            'url' => env('STRATEGY_DB_URL'),
+            'host' => env('STRATEGY_DB_HOST', env('SERVING_DB_HOST', '127.0.0.1')),
+            'port' => env('STRATEGY_DB_PORT', env('SERVING_DB_PORT', '5432')),
+            'database' => env('STRATEGY_DB_DATABASE', env('SERVING_DB_DATABASE', 'aktienki_serving_next')),
+            'username' => env('STRATEGY_DB_USERNAME', env('SERVING_DB_USERNAME', env('DB_USERNAME', 'aktienki_app'))),
+            'password' => env('STRATEGY_DB_PASSWORD', env('SERVING_DB_PASSWORD', env('DB_PASSWORD'))),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('STRATEGY_DB_SSLMODE', env('SERVING_DB_SSLMODE', 'prefer')),
+            'application_name' => 'aktienki-strategy-source',
+        ],
+
     ],
     'migrations' => [
         'table' => 'migrations',

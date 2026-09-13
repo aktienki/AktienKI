@@ -53,6 +53,8 @@ final class ServingPortfolioSimulationService
         string $allocationMode = ServingPortfolioCalculator::ALLOCATION_EQUAL_WEIGHT,
         int $maximumPositions = self::DEFAULT_MAXIMUM_POSITIONS,
         float $maxStockAllocationPercent = self::DEFAULT_MAX_STOCK_ALLOCATION_PERCENT,
+        float $annualTaxAllowance = 0.0,
+        float $taxRatePercent = 0.0,
     ): array {
         if (strtoupper((string) $portfolio->currency) !== 'EUR') {
             throw new RuntimeException('Serving-Depotsimulationen verwenden derzeit ausschließlich EUR-Kurse.');
@@ -82,6 +84,8 @@ final class ServingPortfolioSimulationService
             $maxStockAllocationPercent / 100,
             self::FEE_RATE,
             self::MINIMUM_FEE,
+            $annualTaxAllowance,
+            $taxRatePercent,
         );
         $result['skipped_configurations'] = $this->skippedConfigurations;
 
@@ -196,9 +200,13 @@ final class ServingPortfolioSimulationService
                     throw new RuntimeException('Eine simulierte Serving-Position fehlt beim Verkauf.');
                 }
                 $balanceAfterGross = $balance + $gross;
-                $balance = $balanceAfterGross - $fee;
+                $balanceAfterFee = $balanceAfterGross - $fee;
+                $tax = (float) ($event['tax_eur'] ?? 0);
+                $balance = $balanceAfterFee - $tax;
                 $realizedProfit = $gross - $fee - (float) $position['cost'];
                 $meta['realized_profit'] = round($realizedProfit, 6);
+                $meta['simulated_tax'] = round($tax, 6);
+                $meta['realized_profit_after_tax'] = round($realizedProfit - $tax, 6);
                 $meta['performance_percent'] = (float) $position['cost'] > 0
                     ? round($realizedProfit / (float) $position['cost'] * 100, 6)
                     : 0.0;
@@ -227,8 +235,11 @@ final class ServingPortfolioSimulationService
             } else {
                 $ledger = [
                     ['sale_credit', $gross, $balanceAfterGross],
-                    ['fee', -$fee, $balance],
+                    ['fee', -$fee, $balanceAfterFee],
                 ];
+                if (abs($tax) > 0.000001) {
+                    $ledger[] = ['tax', -$tax, $balance];
+                }
             }
 
             foreach ($ledger as [$type, $amount, $balanceAfter]) {

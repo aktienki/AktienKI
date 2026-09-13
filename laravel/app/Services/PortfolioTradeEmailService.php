@@ -12,6 +12,16 @@ final class PortfolioTradeEmailService
     public function sendPending(int $limit = 100): array
     {
         $stats = ['checked' => 0, 'sent' => 0, 'failed' => 0, 'disabled' => 0];
+        // Hidden strategy-tracking portfolios (EnsureStrategyTrackingPortfolios)
+        // go through the exact same automation engine as real Musterdepots so
+        // their ledger stays consistent, but they must never trigger an email
+        // - nobody is meant to see them as an actual depot.
+        DB::table('portfolio_automation_executions')
+            ->where('email_status', 'pending')
+            ->whereIn('portfolio_id', fn ($query) => $query->select('id')->from('portfolios')
+                ->where('type', \App\Console\Commands\EnsureStrategyTrackingPortfolios::PORTFOLIO_TYPE))
+            ->update(['email_status' => 'ignored', 'updated_at' => now()]);
+
         $ids = DB::table('portfolio_automation_executions')
             ->where('email_status', 'pending')
             ->whereIn('action', ['buy', 'increase', 'sell'])

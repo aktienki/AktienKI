@@ -25,7 +25,7 @@ class EntrySignalAlertController extends Controller
             ['source_prediction_id' => $prediction->id, 'initial_signal' => 'WAIT', 'notification_mode' => $validated['notification_mode']]
         );
 
-        return back()->with('status', __('Einstiegsalarm aktiviert. Du erhältst eine E-Mail, sobald der Status auf BUY wechselt.'));
+        return back()->with('status', __('Einstiegsalarm aktiviert. Du erhältst eine E-Mail, sobald der Status auf POSITIV wechselt.'));
     }
 
     public function disable(Request $request, EntrySignalAlert $alert): RedirectResponse

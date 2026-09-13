@@ -21,12 +21,156 @@ final class ServingScreenerService
         private readonly FreeRegionalStockUniverseService $regionalUniverse,
         private readonly PersonalizedSignalService $personalizedSignals,
         private readonly TradeEligibilityStatusService $tradeEligibility,
+        private readonly CompositeScoreService $compositeScore,
     ) {}
 
-    /** @return array<string, mixed> */
-    public function data(Request $request): array
+    /**
+     * Batch-computed technical indicator score per instrument: the sample-size
+     * weighted rise probability across positive-tone ChartView pattern events
+     * at the 20-day horizon. Mirrors DashboardController::topIndicatorScoreStock()
+     * but for every instrument at once instead of only the single best one.
+     *
+     * @param  list<int>  $instrumentIds
+     * @return Collection<int, float> keyed by instrument_id
+     */
+    private function indicatorProbabilities(array $instrumentIds, string $snapshotKey): Collection
     {
-        $isFreeRegional = $this->plans->level($request->user()) === PlanLevel::Free;
+        if ($instrumentIds === [] || ! $this->hasTable('chartview_instrument_signal_statistics') || ! $this->hasTable('chartview_signal_statistics')) {
+            return collect();
+        }
+
+        return Cache::store('file')->remember('screener.serving.indicator-scores.v1.'.$snapshotKey, now()->addMinutes(30), function () use ($instrumentIds): Collection {
+            $positiveKeys = DB::table('chartview_signal_statistics')
+                ->where('tone', 'positive')
+                ->distinct()
+                ->pluck('event_key');
+            if ($positiveKeys->isEmpty()) {
+                return collect();
+            }
+
+            return DB::table('chartview_instrument_signal_statistics')
+                ->whereIn('instrument_id', $instrumentIds)
+                ->whereIn('event_key', $positiveKeys)
+                ->where('horizon_days', 20)
+                ->where('sample_size', '>=', 15)
+                ->groupBy('instrument_id')
+                ->havingRaw('sum(sample_size) >= 40')
+                ->havingRaw('count(*) >= 2')
+                ->get([
+                    'instrument_id',
+                    DB::raw('sum(rise_probability * sample_size) / nullif(sum(sample_size), 0) as weighted_prob'),
+                ])
+                ->mapWithKeys(fn (object $row): array => [(int) $row->instrument_id => round((float) $row->weighted_prob, 0)]);
+        });
+    }
+
+    /**
+     * Cross-sectional panel model (frozen research table, linked to
+     * instruments): the latest full cross-section, keyed by instrument.
+     * Missing rows just mean no panel score for that stock.
+     *
+     * @return array{rows: Collection, asOf: ?string}
+     */
+    private function panelScores(array $instrumentIds, string $snapshotKey): array
+    {
+        if ($instrumentIds === [] || ! $this->hasTable('panel_predictions')) {
+            return ['rows' => collect(), 'asOf' => null];
+        }
+
+        return Cache::store('file')->remember('screener.serving.panel-scores.v1.'.$snapshotKey, now()->addMinutes(30), function (): array {
+            try {
+                $panelVersion = 'panel-price-risk-freeze-2026-09-07';
+                // Skip the shrinking right-edge cross-section (20d forward target
+                // not yet observable): take the latest date near the fullest universe.
+                $panelPeakCount = (int) DB::table('panel_predictions')
+                    ->where('model_version', $panelVersion)
+                    ->groupBy('as_of_date')
+                    ->orderByDesc(DB::raw('count(*)'))
+                    ->value(DB::raw('count(*)'));
+                $panelAsOf = DB::table('panel_predictions')
+                    ->where('model_version', $panelVersion)
+                    ->groupBy('as_of_date')
+                    ->havingRaw('count(*) >= ?', [max(50, (int) ($panelPeakCount * 0.85))])
+                    ->orderByDesc('as_of_date')
+                    ->value('as_of_date');
+                if (! $panelAsOf) {
+                    return ['rows' => collect(), 'asOf' => null];
+                }
+
+                $rows = DB::table('panel_predictions')
+                    ->where('model_version', $panelVersion)
+                    ->where('as_of_date', $panelAsOf)
+                    ->get(['instrument_id', 'raw_score', 'xsec_pctile', 'decile'])
+                    ->keyBy('instrument_id');
+
+                return ['rows' => $rows, 'asOf' => $panelAsOf];
+            } catch (\Throwable $e) {
+                return ['rows' => collect(), 'asOf' => null];
+            }
+        });
+    }
+
+    /**
+     * Mid-rank percentile (0-100) of each stock's trigger_model_expected_return_percent
+     * within the given universe - ties split the difference instead of clustering
+     * at one edge. Ranked on the trigger model's own expected return, not the
+     * cross-scope blended score_10/buy_rating: the composite score's ai_score
+     * component must reflect the exact horizon+variant driving the displayed
+     * signal, the same one quality_gate_passed/profit_factor/confidence use.
+     * O(n log n): group into a frequency map by exact value, sort once, then
+     * derive every stock's rank from cumulative counts instead of comparing
+     * each stock against every other one.
+     *
+     * @return Collection<int, float> keyed by instrument_id
+     */
+    private function scorePercentiles(Collection $stocks): Collection
+    {
+        $counts = [];
+        foreach ($stocks as $stock) {
+            if (! is_numeric($stock->trigger_model_expected_return_percent ?? null)) {
+                continue;
+            }
+            $key = (string) round((float) $stock->trigger_model_expected_return_percent, 6);
+            $counts[$key] = ($counts[$key] ?? 0) + 1;
+        }
+        $total = array_sum($counts);
+        if ($total < 2) {
+            return collect();
+        }
+        uksort($counts, fn (string $a, string $b): int => (float) $a <=> (float) $b);
+
+        $midRankByValue = [];
+        $cumulative = 0;
+        foreach ($counts as $key => $freq) {
+            $atOrBelow = $cumulative + $freq;
+            $midRankByValue[$key] = ($cumulative + $atOrBelow) / 2;
+            $cumulative = $atOrBelow;
+        }
+
+        return $stocks
+            ->filter(fn (object $stock): bool => is_numeric($stock->trigger_model_expected_return_percent ?? null))
+            ->mapWithKeys(function (object $stock) use ($midRankByValue, $total): array {
+                $key = (string) round((float) $stock->trigger_model_expected_return_percent, 6);
+
+                return [(int) $stock->instrument_id => round(($midRankByValue[$key] / $total) * 100, 2)];
+            });
+    }
+
+    /**
+     * Builds the full stock collection with every score field - including
+     * composite_score - fully assigned, exactly once. Both the screener page
+     * (data(), scoped to the viewing user's free-regional restriction) and
+     * compositeScores() (the canonical, unrestricted lookup other pages use)
+     * go through this single method, so the two can never compute the
+     * composite score differently again.
+     *
+     * @return array{stocks: Collection<int, object>, indexMemberships: Collection<int, object>, isFreeRegional: bool}
+     */
+    private function scoredUniverse(Request $request, bool $applyFreeRegionalFilter = true): array
+    {
+        $isFreeRegional = $applyFreeRegionalFilter
+            && $request->user()
+            && $this->plans->level($request->user()) === PlanLevel::Free;
         $allowedInstrumentIds = $isFreeRegional
             ? $this->regionalUniverse->instrumentIds($request->user())->map(fn ($id): int => (int) $id)
             : collect();
@@ -47,6 +191,20 @@ final class ServingScreenerService
                 ->orderByDesc('as_of')
                 ->orderByDesc('id')
                 ->get())
+                // A serving-pipeline bug produces duplicate batches for the
+                // same instrument/horizon/variant/as_of with confidence
+                // pinned to exactly 1.0 alongside an implausible (~8x normal)
+                // expected_return - confirmed via a sibling batch carrying the
+                // correct, differently-shaped values. Genuine calibrated
+                // confidences are never a clean 1.0 (observed range e.g.
+                // 0.55-0.86 with several decimals), so this is a reliable
+                // data-error signal, not a legitimate deterministic case.
+                // 636 rows across 178 instruments were affected when found -
+                // exclude them everywhere predictions feed the screener
+                // (selection, ranking, composite score, display) rather than
+                // letting "higher confidence/return wins" tie-breaks always
+                // pick the corrupted row over the real one.
+                ->reject(fn (object $prediction): bool => is_numeric($prediction->confidence) && (float) $prediction->confidence >= 0.999)
                 ->groupBy('instrument_id');
         $statuses = $instrumentIds === []
             ? collect()
@@ -79,7 +237,7 @@ final class ServingScreenerService
                 $request,
             );
         });
-        $canUsePro = $this->plans->allowsTariff($request->user(), PlanLevel::Pro);
+        $canUsePro = $request->user() && $this->plans->allowsTariff($request->user(), PlanLevel::Pro);
         if ($canUsePro) {
             $this->tradeEligibility->apply($stocks);
             $this->applyExternalReviewAdjustments($stocks);
@@ -94,13 +252,97 @@ final class ServingScreenerService
                 ->get(['membership.instrument_id', 'market_index.symbol', 'market_index.name'])
             : collect();
         $membershipsByInstrument = $indexMemberships->groupBy(fn (object $membership): int => (int) $membership->instrument_id);
-        $stocks->each(function (object $stock) use ($membershipsByInstrument): void {
+        $indicatorProbabilities = $this->indicatorProbabilities($instrumentIds, $snapshotKey);
+        $panel = $this->panelScores($instrumentIds, $snapshotKey);
+        $panelByInstrument = $panel['rows'];
+        // Backtested rank curve for the AI score (see CompositeScoreService):
+        // its edge is concentrated in the top of the current universe rather
+        // than spread linearly, so it needs the whole page's score
+        // distribution, not just one stock's own value.
+        $scorePercentiles = $this->scorePercentiles($stocks);
+        $stocks->each(function (object $stock) use ($membershipsByInstrument, $indicatorProbabilities, $panelByInstrument, $panel, $scorePercentiles): void {
             $primaryIndex = $membershipsByInstrument->get((int) $stock->instrument_id)?->first();
             if ($primaryIndex) {
                 $stock->primary_index_symbol = (string) $primaryIndex->symbol;
                 $stock->primary_index_name = (string) ($primaryIndex->name ?: $primaryIndex->symbol);
             }
+            $stock->indicator_score = $indicatorProbabilities->get((int) $stock->instrument_id);
+            $panelRow = $panelByInstrument->get((int) $stock->instrument_id);
+            $stock->panel_percentile = is_numeric($panelRow?->xsec_pctile) ? (int) round($panelRow->xsec_pctile * 100) : null;
+            $stock->panel_decile = is_numeric($panelRow?->decile) ? (int) $panelRow->decile : null;
+            $stock->panel_raw_score = is_numeric($panelRow?->raw_score) ? (float) $panelRow->raw_score : null;
+            $stock->panel_as_of = $panel['asOf'];
+            // ai_score is bound to the trigger model's own horizon+variant
+            // (trigger_model_expected_return_percent), the same one
+            // quality_gate_passed/profit_factor/confidence use - not the
+            // cross-scope blended score_10/buy_rating.
+            $triggerExpectedReturn = $stock->trigger_model_expected_return_percent ?? null;
+            $stock->composite_score = $this->compositeScore->score(
+                aiScoreOutOf10: $triggerExpectedReturn !== null
+                    ? max(0.0, min(10.0, 5.0 + ((float) $triggerExpectedReturn / 4)))
+                    : (is_numeric($stock->score_10 ?? null) ? (float) $stock->score_10 : null),
+                qualityGatePassed: $stock->trigger_model_quality_gate_passed ?? null,
+                profitFactor: is_numeric($stock->ranking_profit_factor ?? null) ? (float) $stock->ranking_profit_factor : null,
+                confidencePercent: is_numeric($stock->confidence_percent ?? null) ? (float) $stock->confidence_percent : null,
+                riskPercent: is_numeric($stock->risk_percent ?? null) ? (float) $stock->risk_percent : null,
+                indicatorProbabilityPercent: $stock->indicator_score,
+                panelPercentile: $stock->panel_percentile !== null ? (float) $stock->panel_percentile : null,
+                aiScorePercentile: $scorePercentiles->get((int) $stock->instrument_id),
+            );
         });
+
+        return [
+            'stocks' => $stocks,
+            'indexMemberships' => $indexMemberships,
+            'isFreeRegional' => $isFreeRegional,
+        ];
+    }
+
+    /**
+     * The same composite score every screener view assigns each stock -
+     * computed once against the full, unrestricted universe (no free-regional
+     * filter, no personalization - neither affects any composite-score input)
+     * and cached briefly, so other pages (e.g. the stock detail page) can
+     * show the identical number instead of a page-local approximation that
+     * risks silently drifting from the screener's.
+     *
+     * @return Collection<int, int> composite_score keyed by instrument_id
+     */
+    public function compositeScores(): Collection
+    {
+        return Cache::store('file')->remember('screener.serving.composite-scores.v1', now()->addMinutes(5), function (): Collection {
+            $stocks = $this->scoredUniverse(Request::create('/'), applyFreeRegionalFilter: false)['stocks'];
+
+            return $stocks
+                ->filter(fn (object $stock): bool => $stock->composite_score !== null)
+                ->mapWithKeys(fn (object $stock): array => [(int) $stock->instrument_id => (int) $stock->composite_score]);
+        });
+    }
+
+    /**
+     * The full, unfiltered stock universe for consumers that are not an
+     * HTTP request - console commands generating something for every
+     * current POSITIV stock, for example - with all the same score fields
+     * (composite_score, trigger_model_*, panel_*) the screener itself uses,
+     * cached briefly like compositeScores() so repeated calls in one run
+     * do not re-fetch the whole universe.
+     *
+     * @return Collection<int, object>
+     */
+    public function currentStocks(): Collection
+    {
+        return Cache::store('file')->remember('screener.serving.current-stocks.v1', now()->addMinutes(5), fn (): Collection => $this->scoredUniverse(Request::create('/'), applyFreeRegionalFilter: false)['stocks']);
+    }
+
+    /** @return array<string, mixed> */
+    public function data(Request $request): array
+    {
+        [
+            'stocks' => $stocks,
+            'indexMemberships' => $indexMemberships,
+            'isFreeRegional' => $isFreeRegional,
+        ] = $this->scoredUniverse($request);
+
         $indices = $indexMemberships->unique('symbol')->map(fn (object $membership): object => (object) [
             'symbol' => (string) $membership->symbol,
             'name' => (string) ($membership->name ?: $membership->symbol),
@@ -150,6 +392,7 @@ final class ServingScreenerService
         $minimumMaximumReturn = is_numeric($request->query('min_max_return'))
             ? (float) $request->query('min_max_return')
             : null;
+        $qualityGateOnly = $request->boolean('quality_gate_only');
 
         $ranked = $ranked
             ->when($queryText !== '', fn (Collection $items) => $items->filter(fn (object $stock): bool => str_contains(mb_strtolower((string) $stock->symbol), $queryText)
@@ -178,6 +421,10 @@ final class ServingScreenerService
                     : $items->where('primary_index_symbol', $selectedIndex);
             })
             ->when(in_array($requestedSignal, ['BUY', 'WATCH'], true), fn (Collection $items) => $items->where('personalized_signal', $requestedSignal))
+            // Backtested on serving_strategy_trades (standard-tcn-confirmed,
+            // 3 years): instruments whose own quality gate passed had a
+            // profit factor of ~4.9 vs. ~1.1 for the 94% that never passed.
+            ->when($qualityGateOnly, fn (Collection $items) => $items->where('trigger_model_quality_gate_passed', true))
             ->when($holdingSource !== '', fn (Collection $items) => $items->whereIn('instrument_id', $holdingInstrumentIds))
             ->when($minimumMaximumReturn !== null, fn (Collection $items) => $items->filter(function (object $stock) use ($minimumMaximumReturn): bool {
                 $maximum = collect(self::HORIZONS)
@@ -494,6 +741,13 @@ final class ServingScreenerService
             'trigger_model_horizon' => is_numeric($primaryPrediction?->horizon) ? (int) $primaryPrediction->horizon : null,
             'trigger_model_release_id' => (string) ($primaryPrediction?->release_id ?: ''),
             'trigger_model_quality_gate_passed' => $qualityGatePassed,
+            // The composite score's "ai_score" input must be bound to the same
+            // horizon+variant as quality_gate_passed/profit_factor/confidence
+            // above - not the cross-scope blended buy_rating, which can reflect
+            // a completely different horizon/model than the one actually shown.
+            'trigger_model_expected_return_percent' => is_numeric($primaryPrediction?->expected_return)
+                ? (float) $primaryPrediction->expected_return * 100
+                : null,
             'quality_gate_blockers' => $failedGates,
             'stock_signal_calibration' => ['quality_percent' => $ratingPercent, 'quality_gate_passed' => $qualityGatePassed],
             'trailing_pe' => $row->trailing_pe,
@@ -789,8 +1043,9 @@ final class ServingScreenerService
 
     private function rankingPriority(object $stock): float
     {
-        return ($stock->personalized_signal === 'BUY' ? 1_000_000 : 0)
-            + ((bool) $stock->serving_quality_gate_buy ? 100_000 : 0)
+        // The visible 0-100 composite score is the primary ranking criterion.
+        // Legacy model score, forecast and risk only resolve equal score values.
+        return ((float) ($stock->composite_score ?? -1) * 1_000_000)
             + ((float) $stock->ranking_score * 1_000)
             + ((float) ($stock->expected_return_20d ?? 0) * 10)
             - (float) ($stock->risk_percent ?? 100);

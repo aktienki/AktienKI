@@ -82,7 +82,7 @@
                                 <x-heroicon-o-chevron-down class="index-tile-chev h-4 w-4 shrink-0 text-cyan-300 transition" x-bind:class="expanded&&'rotate-180'" />
                             </span>
                             <span class="index-tile-metrics">
-                                <i class="index-tile-signal" data-signal="{{ strtolower($index->view_signal) }}"><small>{{ __('Signal') }}</small><b>{{ $index->view_signal }}</b></i>
+                                <i class="index-tile-signal" data-signal="{{ strtolower($index->view_signal) }}"><small>{{ __('Signal') }}</small><b>{{ signal_label($index->view_signal) }}</b></i>
                                 <i><small>{{ __('Bewertung') }}</small><b style="color:{{ $index->view_score_color }}">{{ $index->view_score_label }}</b></i>
                                 <i><small>{{ __('Risiko') }}</small><b style="color:{{ $index->view_risk_color }}">{{ $index->view_risk_label }}</b></i>
                             </span>
@@ -112,7 +112,7 @@
             <article class="screener-stock-card index-screener-card ak-card ak-dashboard-card overflow-hidden p-3" x-data="{ expanded:false }">
                 <button type="button" class="screener-mobile-summary screener-mobile-summary-v2" @click="expanded=!expanded" :aria-expanded="expanded.toString()">
                     <span class="sms-v2-head"><b>#{{ $index->global_rank }}</b><i>{{ $indexFlags[$index->symbol] ?? '🌐' }}</i><span><strong>{{ $index->name }}</strong><small>{{ $index->symbol }} · {{ $index->region }}</small></span><em>{{ number_format((int)($index->members_count ?? 0),0,',','.') }}</em><x-heroicon-o-chevron-down class="h-4 w-4 text-cyan-300 transition" x-bind:class="expanded&&'rotate-180'" /></span>
-                    <span class="sms-v2-forecast"><strong data-signal="{{ strtolower($index->view_signal) }}">{{ $index->view_signal }}</strong>@foreach($index->view_forecasts as $days=>$value)<i><small>{{ $days }}T</small><b class="{{ $value===null?'text-slate-400':($value>=0?'text-emerald-400':'text-rose-400') }}">{{ $value===null?'—':(($value>0?'+':'').number_format($value,1,',','.').' %') }}</b></i>@endforeach</span>
+                    <span class="sms-v2-forecast"><strong data-signal="{{ strtolower($index->view_signal) }}">{{ signal_label($index->view_signal) }}</strong>@foreach($index->view_forecasts as $days=>$value)<i><small>{{ $days }}T</small><b class="{{ $value===null?'text-slate-400':($value>=0?'text-emerald-400':'text-rose-400') }}">{{ $value===null?'—':(($value>0?'+':'').number_format($value,1,',','.').' %') }}</b></i>@endforeach</span>
                     <span class="sms-v2-scales"><i><small>{{ __('Bewertung') }} · {{ $index->view_score_label }}</small><span class="sms-v2-scale signal" style="--position:{{ $index->view_score_percent }}%;--marker:{{ $index->view_score_color }}"><em></em></span></i><i><small>{{ __('Risiko') }} · {{ $index->view_risk_label }}</small><span class="sms-v2-scale risk" style="--position:{{ 100-($index->view_risk_percent??0) }}%;--marker:{{ $index->view_risk_color }}"><em></em></span></i></span>
                 </button>
                 <div x-cloak x-show="expanded" x-collapse class="index-card-details">

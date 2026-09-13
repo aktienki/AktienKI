@@ -92,7 +92,7 @@
             </g>
             @if ($transitionX !== null)
                 <line x1="{{ number_format($transitionX, 1, '.', '') }}" y1="4" x2="{{ number_format($transitionX, 1, '.', '') }}" y2="108" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="4 4">
-                    <title>{{ __('Signalwechsel') }} {{ $transitionFrom }} → {{ $signal }} · {{ $transitionDate }}</title>
+                    <title>{{ __('Signalwechsel') }} {{ signal_label($transitionFrom) }} → {{ signal_label($signal) }} · {{ $transitionDate }}</title>
                 </line>
             @endif
             <polygon points="{{ $chartPolyline }} 500,108 0,108" fill="url(#{{ $areaGradientId }})"/>

@@ -64,14 +64,14 @@ class EntrySignalBuyNotification extends Notification
         $assessment = DB::table('stock_ai_assessments')->where('instrument_id', $instrument->id)
             ->latest('assessment_date')->latest('id')->first();
         $assessmentSummary = $assessment?->summary ?: ($this->prediction->quality_gate_explanation
-            ?: __('Das Modell bewertet :name derzeit mit dem Signal :signal. Die Prognosen der einzelnen Zeithorizonte sollten gemeinsam betrachtet werden.', ['name' => $instrument->name, 'signal' => strtoupper($this->signal)]));
+            ?: __('Das Modell bewertet :name derzeit mit dem Signal :signal. Die Prognosen der einzelnen Zeithorizonte sollten gemeinsam betrachtet werden.', ['name' => $instrument->name, 'signal' => signal_label($this->signal)]));
         $assessmentSummary = collect(preg_split('/(?<=[.!?])\s+|[,;]\s+/u', $assessmentSummary) ?: [])
             ->reject(fn (string $part): bool => preg_match('/\b(?:Konfidenz|confidence|Risiko\w*|risk\w*)\b/iu', $part) === 1)
             ->map(fn (string $part): string => trim($part))
             ->filter()->implode(' ');
 
         return (new MailMessage)
-            ->subject(__('Einstiegsstatus für :symbol: :signal', ['symbol' => $instrument->symbol, 'signal' => $this->signal]))
+            ->subject(__('Einstiegsstatus für :symbol: :signal', ['symbol' => $instrument->symbol, 'signal' => signal_label($this->signal)]))
             ->markdown('mail.entry-signal', [
                 'recipientName' => $notifiable->name,
                 'instrument' => $instrument,

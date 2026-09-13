@@ -12,7 +12,10 @@ final class ServingChartCacheService
 
     private const TRADING_DAYS = 280;
 
-    public function __construct(private readonly TwelveDataService $marketData) {}
+    public function __construct(
+        private readonly TwelveDataService $marketData,
+        private readonly YahooIndexService $yahoo,
+    ) {}
 
     public function providerSymbol(object $instrument): string
     {
@@ -55,10 +58,27 @@ final class ServingChartCacheService
                 $history = method_exists($this->marketData, 'chartHistory')
                     ? $this->marketData->chartHistory($providerSymbol, self::TRADING_DAYS)
                     : $this->marketData->dailyHistory($providerSymbol, self::TRADING_DAYS);
+                $source = 'twelve_data';
                 $bars = collect($history)
                     ->filter(fn (array $bar): bool => is_numeric($bar['close'] ?? null) && is_numeric($bar['timestamp'] ?? null))
                     ->sortBy('timestamp')
                     ->values();
+
+                // Twelve Data has no candles for this symbol (delisted, too new,
+                // an exchange it does not cover, ...) - Yahoo Finance covers a
+                // different set of exchanges, so a second, independent source
+                // shows a chart in cases the primary one otherwise leaves blank.
+                if ($bars->isEmpty()) {
+                    $yahooHistory = $this->yahoo->dailyHistory($providerSymbol, '3y');
+                    $yahooBars = collect($yahooHistory)
+                        ->filter(fn (array $bar): bool => is_numeric($bar['close'] ?? null) && is_numeric($bar['timestamp'] ?? null))
+                        ->sortBy('timestamp')
+                        ->values();
+                    if ($yahooBars->isNotEmpty()) {
+                        $source = 'yahoo_finance';
+                        $bars = $yahooBars;
+                    }
+                }
 
                 if ($bars->isEmpty()) {
                     $empty = [
@@ -66,6 +86,7 @@ final class ServingChartCacheService
                         'provider_symbol' => $providerSymbol,
                         'currency' => $currency,
                         'points' => [],
+                        'source' => null,
                         'cached_at' => now()->toIso8601String(),
                         'cache_hit' => false,
                     ];
@@ -93,6 +114,7 @@ final class ServingChartCacheService
                         'close' => (float) $bar['close'],
                         'volume' => is_numeric($bar['volume'] ?? null) ? (float) $bar['volume'] : null,
                     ])->all(),
+                    'source' => $source,
                     'cached_at' => now()->toIso8601String(),
                     'cache_hit' => false,
                 ];
@@ -115,6 +137,7 @@ final class ServingChartCacheService
                 'provider_symbol' => $providerSymbol,
                 'currency' => $currency,
                 'points' => [],
+                'source' => null,
                 'cached_at' => now()->toIso8601String(),
                 'cache_hit' => false,
             ];

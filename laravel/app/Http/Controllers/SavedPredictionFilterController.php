@@ -21,10 +21,10 @@ final class SavedPredictionFilterController extends Controller
         'score_min', 'confidence_min', 'drawdown_max', 'risk_max', 'profit_per_trade_min', 'median_return_min', 'volatility_max', 'minimum_trades', 'sector_score_min',
         'predicted_return_min', 'noise_score_min', 'profit_factor_min', 'signal_quality_min', 'model_quality_min', 'heatmap_selection',
         'pe_max', 'dividend_yield_min', 'dividend_yield_operator', 'market_cap_min', 'market_cap_group', 'revenue_growth_min', 'hit_rate_min',
-        'gate_mode', 'sector_score_rotation', 'index_score_rotation', 'entry_strategy', 'entry_risk_style', 'automatic_strategy_comparison', 'automatic_selected_strategy', 'forecast_score_rotation_5d_enabled', 'strategy_priority', 'initial_capital', 'trade_cost',
+        'gate_mode', 'positive_prediction_required', 'ensemble_veto_required', 'sector_score_rotation', 'index_score_rotation', 'entry_strategy', 'entry_risk_style', 'automatic_strategy_comparison', 'automatic_selected_strategy', 'forecast_score_rotation_5d_enabled', 'strategy_priority', 'initial_capital', 'trade_cost',
         'combined_area_forecast_priority', 'stock_forecast_weight', 'sector_forecast_weight', 'index_forecast_weight', 'drawdown_penalty_weight',
         'max_positions', 'position_factor', 'dynamic_capital_weighting', 'entry_wait_5d_enabled',
-        'automatic_optimization', 'optimization_goal',
+        'automatic_optimization', 'optimization_goal', 'serving_fixed_horizon_exit_enabled',
     ];
 
     public const FILTER_DEFAULTS = [
@@ -37,11 +37,17 @@ final class SavedPredictionFilterController extends Controller
         'pe_max' => 100, 'dividend_yield_min' => 0, 'dividend_yield_operator' => 'gte', 'market_cap_min' => 0, 'market_cap_group' => 'all',
         'revenue_growth_min' => -50, 'hit_rate_min' => 0,
         'gate_mode' => 'system',
+        'positive_prediction_required' => 0, 'ensemble_veto_required' => 0,
         'sector_score_rotation' => 0, 'index_score_rotation' => 0, 'entry_strategy' => 'direct_buy', 'entry_risk_style' => 'balanced', 'automatic_strategy_comparison' => 0, 'automatic_selected_strategy' => '', 'forecast_score_rotation_5d_enabled' => 0, 'strategy_priority' => 'rotation_first',
         'combined_area_forecast_priority' => 0, 'stock_forecast_weight' => .20, 'sector_forecast_weight' => .30, 'index_forecast_weight' => .50, 'drawdown_penalty_weight' => .30,
         'initial_capital' => 10000, 'trade_cost' => 10, 'max_positions' => 5, 'position_factor' => 1, 'dynamic_capital_weighting' => 0,
         'entry_wait_5d_enabled' => 0,
         'automatic_optimization' => 0, 'optimization_goal' => '',
+        // Backtested 2026-09-13 across all serving strategies: the scheduled
+        // (held-to-fixed-horizon) outcome beats the actual TCN-signal early
+        // exit wherever it fires meaningfully, and is a no-op everywhere else
+        // - so this defaults to on.
+        'serving_fixed_horizon_exit_enabled' => 1,
     ];
 
     public function index(Request $request, SavedFilterLimitService $limits): View
@@ -233,7 +239,7 @@ final class SavedPredictionFilterController extends Controller
         $filters['automatic_selected_strategy'] = in_array($filters['automatic_selected_strategy'] ?? null, [
             'selected_strategy', 'forecast_entry', 'sector_entry', 'index_entry', 'auto_entry_wait_5d',
         ], true) ? $filters['automatic_selected_strategy'] : '';
-        foreach (['sector_score_rotation', 'index_score_rotation', 'automatic_strategy_comparison', 'forecast_score_rotation_5d_enabled', 'entry_wait_5d_enabled', 'dynamic_capital_weighting'] as $booleanFilter) {
+        foreach (['positive_prediction_required', 'ensemble_veto_required', 'sector_score_rotation', 'index_score_rotation', 'automatic_strategy_comparison', 'forecast_score_rotation_5d_enabled', 'entry_wait_5d_enabled', 'dynamic_capital_weighting'] as $booleanFilter) {
             $filters[$booleanFilter] = $request->boolean($booleanFilter) ? 1 : 0;
         }
         $filters['forecast_score_rotation_5d_enabled'] = $filters['entry_strategy'] === 'forecast_score_rotation_5d' ? 1 : 0;

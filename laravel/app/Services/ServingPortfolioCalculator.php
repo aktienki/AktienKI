@@ -24,6 +24,8 @@ final class ServingPortfolioCalculator
         float $maxStockAllocationRate = 0.30,
         float $feeRate = 0.003,
         float $minimumFee = 10.0,
+        float $annualTaxAllowance = 0.0,
+        float $taxRatePercent = 0.0,
     ): array {
         if ($sources === []) {
             throw new InvalidArgumentException('Keine Serving-Modellkonfigurationen vorhanden.');
@@ -111,6 +113,7 @@ final class ServingPortfolioCalculator
         $skippedCapacity = 0;
         $skippedCash = 0;
         $skippedOverlap = 0;
+        $taxLedger = new AnnualTaxLedger($annualTaxAllowance, $taxRatePercent);
 
         $closePositions = function (string $date, bool $sameDay) use (
             &$positions,
@@ -119,6 +122,7 @@ final class ServingPortfolioCalculator
             &$completed,
             $feeRate,
             $minimumFee,
+            $taxLedger,
         ): void {
             $closingKeys = array_keys(array_filter(
                 $positions,
@@ -134,14 +138,17 @@ final class ServingPortfolioCalculator
                 $grossProceeds = $position['quantity'] * $position['exit_price'];
                 $sellFee = $this->fee($grossProceeds, $feeRate, $minimumFee);
                 $netProceeds = $grossProceeds - $sellFee;
-                $cash += $netProceeds;
-                $totalCosts += $sellFee;
                 $profit = $netProceeds - $position['position_notional'] - $position['buy_fee'];
+                $tax = $taxLedger->book($position['exit_date'], $profit);
+                $cash += $netProceeds - $tax;
+                $totalCosts += $sellFee;
                 $completed[] = [
                     ...$position,
                     'sell_fee' => $sellFee,
                     'gross_proceeds' => round($grossProceeds, 6),
                     'profit' => round($profit, 6),
+                    'tax_eur' => round($tax, 6),
+                    'profit_after_tax' => round($profit - $tax, 6),
                     'performance_percent' => round(
                         $profit / ($position['position_notional'] + $position['buy_fee']) * 100,
                         6,
@@ -244,6 +251,7 @@ final class ServingPortfolioCalculator
             $equityCurve[] = [
                 'date' => $date,
                 'equity' => round($equity, 2),
+                'equity_without_tax' => round($equity + $taxLedger->totalTax(), 2),
                 'cash' => round($cash, 2),
                 'positions' => count($positions),
             ];
@@ -306,6 +314,12 @@ final class ServingPortfolioCalculator
             'hit_rate_percent' => $completed !== [] ? round($winners / count($completed) * 100, 2) : 0.0,
             'profit_factor' => $grossLosses > 0 ? round($grossWins / $grossLosses, 3) : null,
             'total_costs' => round($totalCosts, 2),
+            'tax_simulation_enabled' => $taxRatePercent > 0,
+            'tax_allowance_eur' => round(max(0.0, $annualTaxAllowance), 2),
+            'tax_rate_percent' => round(max(0.0, min(100.0, $taxRatePercent)), 2),
+            'total_taxes' => $taxLedger->totalTax(),
+            'tax_years' => $taxLedger->years(),
+            'final_capital_without_tax' => round($finalCapital + $taxLedger->totalTax(), 2),
             'average_capital_utilization_percent' => $utilizationSamples !== []
                 ? round(array_sum($utilizationSamples) / count($utilizationSamples), 2)
                 : 0.0,

@@ -21,7 +21,9 @@ final class PublicPortfolioTradeNotification extends Notification
         $locale = data_get($notifiable->preferences, 'locale', 'de');
         app()->setLocale(in_array($locale, ['de', 'en'], true) ? $locale : 'de');
         $logo = app(RecommendationEmailLogo::class)->render();
-        $action = $this->trade['type'] === 'sell' ? __('Verkauf') : __('Kauf');
+        // Deliberately neutral wording (no "Kauf"/"Verkauf"): this describes an
+        // automated depot booking, not investment advice or a trade recommendation.
+        $action = $this->trade['type'] === 'sell' ? __('Entfernt') : __('Hinzugefügt');
 
         return (new MailMessage)
             ->subject(__('Musterdepot :portfolio · :action :symbol', ['portfolio' => $this->trade['portfolio_name'], 'action' => $action, 'symbol' => $this->trade['symbol']]))

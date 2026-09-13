@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Console\Commands\EnsureStrategyTrackingPortfolios;
 use App\Models\Portfolio;
 use App\Models\PortfolioPosition;
 use App\Models\PortfolioTransaction;
@@ -29,8 +30,18 @@ final class AutomatedPortfolioService
             ->join('saved_prediction_filters as strategy', 'strategy.id', '=', 'assignment.saved_prediction_filter_id')
             ->where('assignment.enabled', true)
             ->where('portfolio.active', true)
-            ->where('portfolio.type', 'paper')
-            ->where('strategy.automatic_portfolio_enabled', true)
+            ->where(function (Builder $query): void {
+                // Real (user-visible) paper depots still require the owner to
+                // have opted into live automation for that strategy. Hidden
+                // strategy-tracking portfolios (EnsureStrategyTrackingPortfolios)
+                // run for every strategy regardless of that flag - tracking is
+                // meant to happen independent of whether the owner automated
+                // their own real depot.
+                $query->where(function (Builder $paper): void {
+                    $paper->where('portfolio.type', 'paper')
+                        ->where('strategy.automatic_portfolio_enabled', true);
+                })->orWhere('portfolio.type', EnsureStrategyTrackingPortfolios::PORTFOLIO_TYPE);
+            })
             ->select('assignment.id', 'assignment.portfolio_id', 'assignment.saved_prediction_filter_id')
             ->orderBy('assignment.id')
             ->chunkById(50, function ($assignments) use (&$stats): void {
@@ -211,6 +222,7 @@ final class AutomatedPortfolioService
             ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
             ->selectRaw('COUNT(*) AS historical_trades')
             ->selectRaw('AVG(signal_quality_score) AS signal_quality')
+            ->selectRaw('AVG(COALESCE(composite_score, signal_quality_score)) AS composite_score')
             ->selectRaw('AVG(net_return) * 100 AS average_net_return')
             ->selectRaw('PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY net_return) * 100 AS median_net_return')
             ->groupBy('instrument_id', 'trained_model_id', 'model_definition_id', 'horizon_days');
@@ -354,6 +366,7 @@ final class AutomatedPortfolioService
                 'prediction.trained_model_id', 'prediction.prediction_horizon_minutes',
                 'prediction.current_price', 'prediction.predicted_price_5d', 'prediction.predicted_price_10d',
                 'prediction.predicted_price_15d', 'prediction.predicted_price_20d', 'instrument.symbol', 'instrument.name',
+                'prediction.risk_score', 'prediction.drawdown_risk_factor',
                 'instrument.sector', 'instrument.currency', 'quote.price as quote_price',
                 'model_definition.id as model_definition_id', 'backtest_stat.horizon_days',
                 'backtest_stat.profit_factor', 'backtest_stat.hit_rate', 'backtest_stat.drawdown_percent',
@@ -371,7 +384,19 @@ final class AutomatedPortfolioService
             return $candidates;
         }
         $cellFor = static function (string $map, object $row): ?string {
+            $rawRisk = is_numeric($row->risk_score ?? null)
+                ? (float) $row->risk_score
+                : (is_numeric($row->drawdown_risk_factor ?? null) ? (float) $row->drawdown_risk_factor : null);
+            $riskPercent = $rawRisk === null ? null : match (true) {
+                $rawRisk <= 1 => $rawRisk * 100,
+                $rawRisk <= 5 => ($rawRisk - 1) * 25,
+                default => $rawRisk,
+            };
             [$x, $y, $xMin, $xMax, $xStep, $yMin, $yMax, $yStep] = match ($map) {
+                'score_risk' => [$row->composite_score, $riskPercent, 0, 100, 10, 0, 100, 10],
+                'score_drawdown' => [$row->composite_score, $row->drawdown_percent, 0, 100, 10, 0, 50, 5],
+                'score_profit_factor' => [$row->composite_score, $row->profit_factor, 0, 100, 10, 0, 3, .3],
+                'score_volatility' => [$row->composite_score, $row->volatility_percent, 0, 100, 10, 0, 100, 10],
                 'profit_factor_hit_rate' => [$row->profit_factor, $row->hit_rate, 0, 3, .3, 0, 100, 10],
                 'signal_risk' => [$row->signal_quality, $row->drawdown_percent, 0, 100, 10, 0, 50, 5],
                 'volatility_drawdown' => [(float) $row->model_quality_score * 100, $row->drawdown_percent, 0, 100, 10, 0, 50, 5],

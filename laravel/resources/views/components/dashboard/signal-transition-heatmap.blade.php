@@ -29,13 +29,13 @@
             <div class="ak-transition-axis flex items-end justify-end pr-1 text-[7px] font-black uppercase tracking-wider">{{ __('Von') }}</div>
             <div class="grid grid-cols-4 gap-1">
                 @foreach ($signals as $signal)
-                    <div class="ak-transition-signal-label" data-signal="{{ strtolower($signal) }}">{{ $signal }}</div>
+                    <div class="ak-transition-signal-label" data-signal="{{ strtolower($signal) }}">{{ signal_label($signal) }}</div>
                 @endforeach
             </div>
 
             <div class="grid grid-rows-4 gap-1 pr-1">
                 @foreach ($signals as $signal)
-                    <div class="ak-transition-row-label" data-signal="{{ strtolower($signal) }}">{{ $signal }}</div>
+                    <div class="ak-transition-row-label" data-signal="{{ strtolower($signal) }}">{{ signal_label($signal) }}</div>
                 @endforeach
             </div>
 
@@ -55,7 +55,7 @@
                         <div
                             class="ak-transition-cell is-{{ $direction }} {{ $count > 0 ? 'has-value' : 'is-empty' }}"
                             @if ($count > 0) style="background-color:rgba({{ $color }},{{ number_format($intensity, 2, '.', '') }});" @endif
-                            title="{{ $fromSignal }} → {{ $toSignal }}: {{ $count }}"
+                            title="{{ signal_label($fromSignal) }} → {{ signal_label($toSignal) }}: {{ $count }}"
                         >
                             <strong>{{ $count }}</strong>
                             @if ($count > 0 && $direction !== 'neutral')

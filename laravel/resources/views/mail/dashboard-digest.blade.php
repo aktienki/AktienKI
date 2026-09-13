@@ -42,7 +42,7 @@
 <div style="color:#d9a84e;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase">{{ __('Top-Aktie des Tages') }}</div>
 <div style="color:#ffffff;font-size:21px;font-weight:800;margin-top:6px">{!! str_ireplace('.com', '.&#8203;com', e($topStock['name'])) !!} <span style="color:#d9a84e;font-size:12px">{{ $topStock['symbol'] }}</span></div>
 <table role="presentation" width="100%" cellpadding="8" cellspacing="0" style="margin-top:10px;color:#dce6ef;font-size:12px">
-<tr><td style="color:#91a6ba">{{ __('Signal') }}</td><td align="right" style="font-weight:800;color:#42d6b8">{{ $topStock['signal'] }}</td></tr>
+<tr><td style="color:#91a6ba">{{ __('Signal') }}</td><td align="right" style="font-weight:800;color:#42d6b8">{{ signal_label($topStock['signal']) }}</td></tr>
 <tr><td style="color:#91a6ba;border-top:1px solid #263d52">{{ __('Aktueller Kurs') }}</td><td align="right" style="font-weight:700;border-top:1px solid #263d52">{{ number_format($topStock['price'], 2, ',', '.') }} {{ $topStock['currency'] }}</td></tr>
 <tr><td style="color:#91a6ba;border-top:1px solid #263d52">{{ __('KI-Score') }}</td><td align="right" style="font-weight:700;border-top:1px solid #263d52">{{ number_format($topStock['score'], 1, ',', '.') }} /10</td></tr>
 <tr><td style="color:#91a6ba;border-top:1px solid #263d52">{{ __('Rendite-Prognose 20 Tage') }}</td><td align="right" style="font-weight:800;color:{{ ($topStock['expected_return'] ?? 0) >= 0 ? '#42d6b8' : '#d77987' }};border-top:1px solid #263d52">{{ $topStock['expected_return'] !== null ? number_format($topStock['expected_return'], 2, ',', '.').' %' : '–' }}</td></tr>
@@ -68,7 +68,7 @@
 <div style="color:#d9a84e;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px">{{ __('Top 5 nach KI-Score') }}</div>
 <table role="presentation" width="100%" cellpadding="7" cellspacing="0" style="margin-top:7px;color:#dce6ef;font-size:11px">
 @foreach(collect($signalCockpit['topScores'] ?? [])->take(5) as $stock)
-<tr><td style="border-top:1px solid #3d3b30;font-weight:800">{{ $stock['symbol'] }}</td><td style="border-top:1px solid #3d3b30;color:#9eb1c3">{{ $stock['signal'] }}</td><td align="right" style="border-top:1px solid #3d3b30;color:#d9a84e;font-weight:800">{{ $stock['score'] !== null ? number_format($stock['score'], 1, ',', '.').' /10' : '–' }}</td></tr>
+<tr><td style="border-top:1px solid #3d3b30;font-weight:800">{{ $stock['symbol'] }}</td><td style="border-top:1px solid #3d3b30;color:#9eb1c3">{{ signal_label($stock['signal']) }}</td><td align="right" style="border-top:1px solid #3d3b30;color:#d9a84e;font-weight:800">{{ $stock['score'] !== null ? number_format($stock['score'], 1, ',', '.').' /10' : '–' }}</td></tr>
 @endforeach
 </table>
 </div>

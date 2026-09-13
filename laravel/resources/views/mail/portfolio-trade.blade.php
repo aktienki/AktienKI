@@ -5,7 +5,9 @@
 @php
     $accent = $isSale ? '#f08a8a' : '#22d3ee';
     $soft = $isSale ? 'rgba(240,138,138,.13)' : 'rgba(34, 211, 238,.13)';
-    $actionLabel = $isSale ? __('Verkauf ausgeführt') : ($trade['action'] === 'increase' ? __('Position aufgestockt') : __('Kauf ausgeführt'));
+    // Deliberately neutral wording (no "Kauf"/"Verkauf"): describes an automated
+    // depot booking, not investment advice or a trade recommendation.
+    $actionLabel = $isSale ? __('Aktie aus dem Depot entfernt') : ($trade['action'] === 'increase' ? __('Position aufgestockt') : __('Aktie dem Depot hinzugefügt'));
     if ($trade['simulation'] ?? false) $actionLabel = __('Simulation') . ' · ' . $actionLabel;
 @endphp
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;margin:0 auto;background:#101f33;border:1px solid #263d55;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.35)">

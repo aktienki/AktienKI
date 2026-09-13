@@ -49,7 +49,7 @@ final class ServingModelOverviewController extends Controller
         $data = $models->data($symbol);
         if (! hash_equals((string) $data['release']['id'], (string) $validated['release_id'])) {
             return redirect()->route('stocks.models', ['symbol' => $symbol])
-                ->withErrors(['model_configuration' => __('Das aktive Modell-Release wurde inzwischen aktualisiert. Bitte prüfe die neue Konfiguration und füge sie erneut hinzu.')]);
+                ->withErrors(['model_configuration' => __('Das aktive Modell wurde inzwischen aktualisiert. Bitte prüfe die neue Konfiguration und füge sie erneut hinzu.')]);
         }
 
         $horizon = $data['horizons']->firstWhere('days', (int) $validated['horizon']);
@@ -128,11 +128,10 @@ final class ServingModelOverviewController extends Controller
                 'name' => $name,
                 'filters' => $filters,
                 'visibility' => 'private',
-                'description' => __('Persönliche Modellkonfiguration für :symbol: :horizon Handelstage mit :variant. Quelle ist das aktive Serving-Release :release.', [
+                'description' => __('Persönliche Modellkonfiguration für :symbol: :horizon Handelstage mit :variant.', [
                     'symbol' => $data['instrument']->symbol,
                     'horizon' => $horizon['days'],
                     'variant' => $variantLabel,
-                    'release' => substr((string) $data['release']['id'], 0, 8),
                 ]),
                 'published_at' => null,
             ]);

@@ -95,7 +95,7 @@
                     <option value="">{{ __('Signal') }}</option>
                     @foreach (['BUY', 'WAIT', 'WATCH', 'HOLD', 'SELL'] as $signal)
                         @continue(! $signals->contains($signal))
-                        <option value="{{ $signal }}" @selected(strtoupper((string) request('signal')) === $signal)>{{ $signal }}</option>
+                        <option value="{{ $signal }}" @selected(strtoupper((string) request('signal')) === $signal)>{{ signal_label($signal) }}</option>
                     @endforeach
                 </select>
                 <div class="flex min-w-0 gap-1">
@@ -267,7 +267,7 @@
                                     <select form="prediction-table-filters" name="model" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 min-w-0 flex-[1.2] px-1 text-[9px]" title="{{ __('Modell') }}"><option value="">{{ __('Modell') }}</option>@foreach ($models as $model)<option value="{{ $model->id }}" @selected((int) request('model') === (int) $model->id)>{{ $model->public_alias }}</option>@endforeach</select>
                                     <select form="prediction-table-filters" name="ai_type" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 min-w-0 flex-1 px-1 text-[9px]" title="{{ __('KI-Typ') }}"><option value="">{{ __('KI') }}</option>@foreach ($aiTypes as $aiType)<option value="{{ $aiType }}" @selected(request('ai_type') === $aiType)>{{ ucfirst((string) $aiType) }}</option>@endforeach</select>
                                     <select form="prediction-table-filters" name="quality_tier" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 min-w-0 flex-[1.15] px-1 text-[9px]" title="{{ __('Modellstufe mindestens') }}"><option value="">{{ __('Min. Stufe') }}</option>@foreach ($qualityTiers as $qualityTier)<option value="{{ $qualityTier->code }}" @selected(request('quality_tier') === $qualityTier->code)>{{ __($qualityTier->name) }}</option>@endforeach</select>
-                                    <select form="prediction-table-filters" name="signal" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 min-w-0 flex-1 px-1 text-[9px]" title="{{ __('Signal') }}"><option value="">{{ __('Signal') }}</option>@foreach (['BUY', 'WAIT', 'WATCH', 'HOLD', 'SELL'] as $signal)@continue(! $signals->contains($signal))<option value="{{ $signal }}" @selected(strtoupper((string) request('signal')) === $signal)>{{ $signal }}</option>@endforeach</select>
+                                    <select form="prediction-table-filters" name="signal" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 min-w-0 flex-1 px-1 text-[9px]" title="{{ __('Signal') }}"><option value="">{{ __('Signal') }}</option>@foreach (['BUY', 'WAIT', 'WATCH', 'HOLD', 'SELL'] as $signal)@continue(! $signals->contains($signal))<option value="{{ $signal }}" @selected(strtoupper((string) request('signal')) === $signal)>{{ signal_label($signal) }}</option>@endforeach</select>
                                     <select form="prediction-table-filters" name="score_min" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 min-w-0 flex-1 px-1 text-[9px]" title="{{ __('KI-Score') }}"><option value="">{{ __('KI-Score') }}</option>@foreach ([8 => '≥ 8', 7 => '≥ 7', 6 => '≥ 6', 5 => '≥ 5'] as $value => $label)<option value="{{ $value }}" @selected((string) request('score_min') === (string) $value)>{{ $label }}</option>@endforeach</select>
                                     <select form="prediction-table-filters" name="confidence_min" onchange="this.form.requestSubmit()" class="ak-input ak-table-filter h-8 min-w-0 flex-1 px-1 text-[9px]" title="{{ __('Konfidenz') }}"><option value="">{{ __('Konfidenz') }}</option>@foreach ([90, 80, 70, 60, 50] as $value)<option value="{{ $value }}" @selected((string) request('confidence_min') === (string) $value)>≥ {{ $value }} %</option>@endforeach</select>
                                 </div>
@@ -288,7 +288,7 @@
                                     'SELL' => 'heroicon-o-arrow-trending-down',
                                     default => 'heroicon-o-pause',
                                 };
-                                $signalLabel = $signal;
+                                $signalLabel = signal_label($signal);
                                 $currency = $prediction->currency ?: 'EUR';
                                 $score = is_numeric($prediction->score_10) ? max(0, min(10, (float) $prediction->score_10)) : null;
                                 $scorePercent = is_numeric($prediction->score_10) ? max(0, min(100, (float) $prediction->score_10 * 10)) : null;
@@ -429,7 +429,7 @@
                                     && (bool) ($prediction->ranking_stability_passed ?? false)
                                     && (int) ($prediction->ranking_trade_count ?? 0) >= 20;
                                 if ($isStrongBuy) {
-                                    $signalLabel = 'STRONG BUY';
+                                    $signalLabel = signal_label('STRONG_BUY');
                                     $signalIcon = 'heroicon-s-bolt';
                                 }
                                 $mobilePriceDirection = $horizonDirections->get(20);
@@ -569,7 +569,7 @@
                                 </td>
                                 <td class="border-b border-[var(--ak-border)] px-1 py-2 text-center">
                                     <div class="flex flex-col items-center justify-center gap-1">
-                                        <span class="ak-prediction-signal-badge" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – BUY durch Quality Gate eingeschränkt') : $signalLabel }}">
+                                        <span class="ak-prediction-signal-badge" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('POSITIV durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – POSITIV durch Quality Gate eingeschränkt') : $signalLabel }}">
                                             <x-dynamic-component :component="$signalIcon" class="h-3.5 w-3.5" />
                                             <b class="ak-notebook-signal-label hidden">{{ $signalLabel }}</b>
                                         </span>
@@ -600,7 +600,7 @@
                                                 <span>{{ $scoreGrade ?? '—' }}</span>
                                             </div>
                                         @endif
-                                        <span class="ak-prediction-signal-badge ak-mobile-horizon-signal hidden" data-label="{{ __('Signal') }}" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('BUY durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – BUY durch Quality Gate eingeschränkt') : $signalLabel }}">
+                                        <span class="ak-prediction-signal-badge ak-mobile-horizon-signal hidden" data-label="{{ __('Signal') }}" data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isQualityGateRestrictedBuy ? __('POSITIV durch Quality Gate eingeschränkt') : $signalLabel }}" aria-label="{{ $isQualityGateRestrictedBuy ? __('HOLD – POSITIV durch Quality Gate eingeschränkt') : $signalLabel }}">
                                             <b class="ak-mobile-signal-letter">{{ mb_substr($signalLabel, 0, 1) }}</b>
                                         </span>
                                         @foreach ($horizonDirections as $days => $horizonReturn)

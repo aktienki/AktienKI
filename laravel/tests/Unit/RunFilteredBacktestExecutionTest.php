@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Http\Controllers\PredictionController;
 use App\Jobs\RunFilteredBacktest;
+use App\Services\CompositeScoreService;
 use Tests\TestCase;
 
 final class RunFilteredBacktestExecutionTest extends TestCase
@@ -14,6 +15,8 @@ final class RunFilteredBacktestExecutionTest extends TestCase
         $selected = new RunFilteredBacktest(1, 1, ['serving_model_configurations' => [['symbol' => 'PUM.DE']]]);
         $usesServing = fn (): bool => $this->usesServingConfigurations();
 
+        $this->assertSame('backtests', $empty->connection);
+        $this->assertSame('backtests', $empty->queue);
         $this->assertFalse(\Closure::bind($usesServing, $empty, $empty)());
         $this->assertTrue(\Closure::bind($usesServing, $selected, $selected)());
     }
@@ -131,6 +134,38 @@ final class RunFilteredBacktestExecutionTest extends TestCase
         $this->assertSame($workerTrades->count(), $result['executed']);
         $this->assertEqualsWithDelta($workerSummary['cash'], $result['final'], .001);
         $this->assertSame($workerSummary['total_costs'], $result['total_costs']);
+    }
+
+    public function test_historical_candidates_use_the_canonical_composite_score(): void
+    {
+        $job = $this->job(maxPositions: 5);
+        $trade = $this->trade(1, 11, '2026-01-01', '2026-01-10');
+        $trade->horizon_days = 20;
+        $trade->trained_model_id = 7;
+        $trade->model_definition_id = 3;
+        $trade->ki_score = 8.0;
+        $trade->net_return = .05;
+        $trade->composite_score = null;
+        $trade->metadata = json_encode(['action_score' => ['metrics' => [
+            'profitFactor' => 2.0,
+            'averageTrade' => 1.2,
+            'hitRate' => 70.0,
+            'tradeCount' => 20,
+            'drawdown' => 10.0,
+        ]]], JSON_THROW_ON_ERROR);
+        $scorer = app(CompositeScoreService::class);
+        $attach = \Closure::bind(
+            fn ($rows) => $this->attachCompositeScores($rows, $scorer),
+            $job,
+            $job,
+        );
+
+        $scored = $attach(collect([$trade]))->first();
+
+        $this->assertSame(
+            $scorer->score(8.0, true, 2.0, 70.0, 10.0),
+            $scored->composite_score,
+        );
     }
 
     private function job(int $maxPositions): RunFilteredBacktest

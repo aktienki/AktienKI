@@ -3,7 +3,11 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\ServingModelOverviewController;
+use App\Http\Controllers\ServingPredictionTableController;
 use App\Http\Controllers\ServingStockController;
+use Illuminate\Http\Request;
+use Illuminate\Session\ArraySessionHandler;
+use Illuminate\Session\Store;
 use Tests\TestCase;
 
 final class ServingStockRouteTest extends TestCase
@@ -43,5 +47,72 @@ final class ServingStockRouteTest extends TestCase
         $this->assertSame(ServingModelOverviewController::class.'@storeStrategy', $route->getActionName());
         $this->assertContains('POST', $route->methods());
         $this->assertContains('plan:pro', $route->gatherMiddleware());
+    }
+
+    public function test_an_individually_checked_model_is_kept_in_the_strategy_selection(): void
+    {
+        $sourceToken = str_repeat('A', 40);
+        $visiblePageToken = str_repeat('B', 40);
+        $configuration = [
+            'symbol' => 'HDPHA.DE',
+            'horizon' => 20,
+            'variant' => 'standard',
+            'selection_active' => true,
+        ];
+        $session = new Store('model-selection-test', new ArraySessionHandler(120));
+        $session->put('serving_strategy_selections', [
+            $sourceToken => [[
+                'symbol' => 'TEG.DE',
+                'horizon' => 40,
+                'variant' => 'pure_tcn',
+                'selection_active' => true,
+            ]],
+            $visiblePageToken => [$configuration],
+        ]);
+        $request = Request::create('/setup/models/strategy', 'POST', [
+            'selection_token' => $sourceToken,
+            'models' => ['HDPHA.DE|20|standard'],
+        ]);
+        $request->setLaravelSession($session);
+
+        $response = app(ServingPredictionTableController::class)->storeStrategySelection(
+            $request,
+            app(\App\Services\ServingReadService::class),
+        );
+
+        parse_str((string) parse_url($response->getTargetUrl(), PHP_URL_QUERY), $query);
+        $stored = $session->get('serving_strategy_selections.'.$query['serving_selection']);
+        $this->assertCount(1, $stored);
+        $this->assertSame('HDPHA.DE', $stored[0]['symbol']);
+        $this->assertSame(20, $stored[0]['horizon']);
+        $this->assertArrayNotHasKey('selection_active', $stored[0]);
+    }
+
+    public function test_select_all_uses_the_complete_filtered_snapshot_across_pages(): void
+    {
+        $sourceToken = str_repeat('C', 40);
+        $configurations = [
+            ['symbol' => 'AAA.DE', 'horizon' => 10, 'variant' => 'standard'],
+            ['symbol' => 'BBB.DE', 'horizon' => 40, 'variant' => 'pure_tcn'],
+        ];
+        $session = new Store('model-select-all-test', new ArraySessionHandler(120));
+        $session->put('serving_strategy_selections', [$sourceToken => $configurations]);
+        $request = Request::create('/setup/models/strategy', 'POST', [
+            'selection_token' => $sourceToken,
+            'select_all' => '1',
+            // A paginated table only mirrors the currently visible boxes.
+            'models' => ['AAA.DE|10|standard'],
+        ]);
+        $request->setLaravelSession($session);
+
+        $response = app(ServingPredictionTableController::class)->storeStrategySelection(
+            $request,
+            app(\App\Services\ServingReadService::class),
+        );
+
+        parse_str((string) parse_url($response->getTargetUrl(), PHP_URL_QUERY), $query);
+        $stored = $session->get('serving_strategy_selections.'.$query['serving_selection']);
+        $this->assertCount(2, $stored);
+        $this->assertSame(['AAA.DE', 'BBB.DE'], array_column($stored, 'symbol'));
     }
 }

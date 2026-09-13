@@ -56,6 +56,6 @@ class EasyAccessController extends Controller
         );
 
         return redirect()->route('easy-access', $data['invite'] ? ['invite' => $data['invite']] : [])
-            ->with('easy_access_subscribed', __('Deine Anmeldung ist gespeichert. Du erhältst ausschließlich E-Mails zu BUY- und SELL-Signalen dieser Strategie – keine Werbung.'));
+            ->with('easy_access_subscribed', __('Deine Anmeldung ist gespeichert. Du erhältst ausschließlich E-Mails zu POSITIV- und SELL-Signalen dieser Strategie – keine Werbung.'));
     }
 }

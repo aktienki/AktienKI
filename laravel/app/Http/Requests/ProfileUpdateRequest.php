@@ -29,6 +29,8 @@ class ProfileUpdateRequest extends FormRequest
             'locale' => ['sometimes', Rule::in(['de', 'en'])],
             'country_code' => ['required', 'string', 'size:2', 'regex:/^[A-Za-z]{2}$/'],
             'risk_level' => ['sometimes', Rule::in(['cautious', 'normal', 'opportunity_oriented', 'risk'])],
+            'tax_allowance_eur' => ['sometimes', 'numeric', 'min:0', 'max:1000000'],
+            'tax_rate_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'email_service' => ['sometimes', 'boolean'],
             'email_market_summary' => ['sometimes', 'boolean'],
             'email_signal_cockpit' => ['sometimes', 'boolean'],

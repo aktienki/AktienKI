@@ -49,7 +49,7 @@
             >
                 <option value="">{{ __('Alle Signale') }}</option>
                 @foreach ($signals as $option)
-                    <option value="{{ $option }}">{{ $option }}</option>
+                    <option value="{{ $option }}">{{ signal_label($option) }}</option>
                 @endforeach
             </select>
         </label>
@@ -77,7 +77,7 @@
                     {{ $signal === 'WATCH' ? 'border-lime-400/60 bg-lime-600/70' : '' }}
                     {{ $signal === 'HOLD' ? 'border-amber-400/60 bg-amber-600/70' : '' }}
                     {{ $signal === 'SELL' ? 'border-rose-400/60 bg-rose-600/75' : '' }}">
-                    {{ __('Signal') }}: {{ __($signal) }}
+                    {{ __('Signal') }}: {{ signal_label($signal) }}
                 </span>
             @endif
             <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-lg border border-teal-500/25 bg-teal-500/10 px-2 font-black text-teal-700">{{ count($comparisonSelection) }}/5</span>
@@ -305,7 +305,7 @@
                                 @else<span class="text-[var(--ak-muted)]">—</span>@endif
                             </div>
                         </td>
-                        <td class="px-3 py-3"><span class="inline-flex h-7 w-20 items-center justify-center rounded-lg border px-2 text-center text-[10px] font-black {{ $signalClass }}">{{ str_replace('_', ' ', $signalName) }}</span></td>
+                        <td class="px-3 py-3"><span class="inline-flex h-7 w-20 items-center justify-center rounded-lg border px-2 text-center text-[10px] font-black {{ $signalClass }}">{{ signal_label($signalName) }}</span></td>
                         <td class="px-3 py-3 text-[10px] text-[var(--ak-muted)]">{{ $row->prediction_time ? \Carbon\Carbon::parse($row->prediction_time)->format('d.m.Y H:i') : '—' }}</td>
                     </tr>
                 @empty

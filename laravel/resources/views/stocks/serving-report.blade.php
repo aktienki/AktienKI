@@ -59,7 +59,7 @@ $prediction=$latestPrediction; $current=is_numeric($prediction?->current_price??
 @if($externalBuyReview)
 @php
 $reviewState=$externalBuyReview->status==='completed'?$externalBuyReview->verdict:$externalBuyReview->status;
-$reviewLabel=match($reviewState){'NO_OBJECTION'=>$t('BUY bestätigt','BUY confirmed'),'CAUTION','OBJECTION'=>$t('BUY extern herabgestuft','BUY externally downgraded'),'INSUFFICIENT_EVIDENCE','failed'=>$t('BUY nicht bestätigt','BUY not confirmed'),default=>$t('Prüfung offen','Review pending')};
+$reviewLabel=match($reviewState){'NO_OBJECTION'=>$t('POSITIV bestätigt','POSITIV confirmed'),'CAUTION','OBJECTION'=>$t('POSITIV extern herabgestuft','POSITIV externally downgraded'),'INSUFFICIENT_EVIDENCE','failed'=>$t('POSITIV nicht bestätigt','POSITIV not confirmed'),default=>$t('Prüfung offen','Review pending')};
 $reviewTone=match($reviewState){'NO_OBJECTION'=>'positive','CAUTION','OBJECTION'=>'negative','INSUFFICIENT_EVIDENCE','failed'=>'amber',default=>''};
 $reviewStatus=match($externalBuyReview->status){'completed'=>$t('Abgeschlossen','Completed'),'failed'=>$t('Fehlgeschlagen','Failed'),'running'=>$t('Läuft','Running'),default=>$t('Ausstehend','Pending')};
 $reviewComment=$externalBuyReview->summary?:($externalBuyReview->error_message?:$t('Kein externer Kommentar vorhanden.','No external comment available.'));
@@ -78,6 +78,6 @@ $reviewComment=$externalBuyReview->summary?:($externalBuyReview->error_message?:
 @foreach([[ $t('Marktkapitalisierung','Market cap'),$stock->market_cap,'KGV',$stock->trailing_pe],[ $t('Forward-KGV','Forward P/E'),$stock->forward_pe,$t('Kurs/Buchwert','Price/book'),$stock->price_to_book],[ $t('Dividendenrendite','Dividend yield'),$pct($stock->dividend_yield),$t('Nettomarge','Net margin'),$pct($stock->profit_margin)],[ $t('Umsatz','Revenue'),$stock->revenue,'EBITDA',$stock->ebitda],[ $t('Liquide Mittel','Cash'),$stock->total_cash,$t('Gesamtverschuldung','Total debt'),$stock->total_debt]] as $row)<tr><td>{{ $row[0] }}</td><td class="right"><strong>{{ is_numeric($row[1])?$large($row[1]):$row[1] }}</strong></td><td>{{ $row[2] }}</td><td class="right"><strong>{{ is_numeric($row[3])?$large($row[3]):$row[3] }}</strong></td></tr>@endforeach
 </tbody></table></div>
 
-<p class="note">{{ $t('Datenquelle: Service Datenbank, aktives Release. Dieser Bericht dient ausschließlich Informationszwecken und stellt keine Anlageberatung dar.','Data source: Service database, active release. This report is for information only and does not constitute investment advice.') }}</p>
+<p class="note">{{ $t('Datenquelle: Service-Datenbank. Dieser Bericht dient ausschließlich Informationszwecken und stellt keine Anlageberatung dar.','Data source: service database. This report is for information only and does not constitute investment advice.') }}</p>
 <div class="footer">aktienKI.com · {{ $stock->symbol }} · {{ $t('Seite','Page') }} <span class="page"></span></div>
 </body></html>

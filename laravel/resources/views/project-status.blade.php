@@ -113,7 +113,7 @@
                 [__('Markt- und Fundamentaldaten'), __('Aktiv'), __('Aktien, Indizes, Sektoren, Kursreihen und Fundamentalkennzahlen werden strukturiert zusammengeführt.'), 'emerald'],
                 [__('Machine-Learning-Modelle'), __('Aktiv'), __('Mehrere Modelle analysieren parallel und konkurrieren innerhalb des Champion-Challenger-Systems.'), 'emerald'],
                 [__('Prognosen und Validierung'), __('Beta'), __('Historische Prognosen, Trefferquoten und Renditen werden nachvollziehbar gespeichert und ausgewertet.'), 'amber'],
-                [__('Risikoprofile und Signale'), __('Beta'), __('BUY, WATCH, HOLD und SELL werden abhängig vom gewählten Risikoprofil personalisiert.'), 'amber'],
+                [__('Risikoprofile und Signale'), __('Beta'), __('POSITIV, WATCH, HOLD und SELL werden abhängig vom gewählten Risikoprofil personalisiert.'), 'amber'],
                 [__('Watchlists und Performance'), __('Beta'), __('Einstiegskurs und zugehörige Prognose werden gespeichert; Aktien lassen sich zwischen Listen verschieben.'), 'amber'],
                 [__('Aki Analyse-Assistent'), __('In Planung'), __('Interaktive, aktienbezogene Erklärungen und Rückfragen werden schrittweise vorbereitet.'), 'violet'],
             ];

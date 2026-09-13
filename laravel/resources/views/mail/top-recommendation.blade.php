@@ -10,7 +10,7 @@
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="8" style="margin:12px -8px 4px;border-collapse:separate">
 <tr>
-<td style="background:#192b42;border:1px solid #2f4b61;border-radius:9px;padding:12px"><div style="color:#8fa4ba;font-size:10px;text-transform:uppercase">{{ __('Signal') }}</div><div style="color:#42d6b8;font-size:18px;font-weight:800">{{ $signal }}</div></td>
+<td style="background:#192b42;border:1px solid #2f4b61;border-radius:9px;padding:12px"><div style="color:#8fa4ba;font-size:10px;text-transform:uppercase">{{ __('Signal') }}</div><div style="color:#42d6b8;font-size:18px;font-weight:800">{{ signal_label($signal) }}</div></td>
 <td style="background:#192b42;border:1px solid #2f4b61;border-radius:9px;padding:12px"><div style="color:#8fa4ba;font-size:10px;text-transform:uppercase">{{ __('KI-Score') }}</div><div style="color:#ffffff;font-size:18px;font-weight:800">{{ number_format($score, 1, ',', '.') }} <span style="font-size:11px;color:#8fa4ba">/10</span></div></td>
 <td style="background:#192b42;border:1px solid #2f4b61;border-radius:9px;padding:12px"><div style="color:#8fa4ba;font-size:10px;text-transform:uppercase">{{ __('Model Qualität') }}</div><div style="color:#ffffff;font-size:18px;font-weight:800">{{ number_format($confidence, 1, ',', '.') }}%</div></td>
 </tr>

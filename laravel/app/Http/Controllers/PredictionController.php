@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\PlanLevel;
 use App\Jobs\RunFilteredBacktest;
+use App\Services\CompositeScoreService;
 use App\Services\CorrelationAnalysisService;
 use App\Services\EuroPriceConverter;
 use App\Services\FreeRegionalStockUniverseService;
@@ -16,6 +17,7 @@ use App\Services\HistoricalPortfolioExecutionCalculator;
 use App\Services\PersonalizedSignalService;
 use App\Services\PlanAccessService;
 use App\Services\SavedFilterLimitService;
+use App\Services\ServingWalkForwardStatisticsService;
 use App\Services\StockRiskClassificationService;
 use App\Services\UserQualityGateService;
 use App\Services\YahooIndexService;
@@ -281,6 +283,24 @@ final class PredictionController extends Controller
         ]));
         $data['indices'] = $this->activeIndexOptions();
         $data['setupMode'] = true;
+        if ($request->filled('serving_selection')) {
+            $selectedServingInstrumentCount = collect(
+                $request->attributes->get('serving_selection_configurations', []),
+            )
+                ->pluck('symbol')
+                ->filter()
+                ->map(fn (string $symbol): string => strtoupper(trim($symbol)))
+                ->unique()
+                ->count();
+            if (isset($data['heatmapSummary']) && is_object($data['heatmapSummary'])) {
+                // A locked model selection may intentionally include models
+                // without a currently published prediction. The heatmap
+                // query then contains zero rows even though the historical
+                // backtest has selected instruments. In this mode the modal
+                // must report the exact selected symbol universe instead.
+                $data['heatmapSummary']->instruments = $selectedServingInstrumentCount;
+            }
+        }
         // A previous personal result must never become the data source for a
         // newly adjusted filter. Only keep a run active while its public ID is
         // explicitly present in the URL (directly after starting/opening it).
@@ -337,6 +357,10 @@ final class PredictionController extends Controller
                 ->leftJoinSub($latestFundamentalIds, 'latest_fundamental', fn ($join) => $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
                 ->leftJoin('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental.fundamental_id')
                 ->where('trade.backtest_run_id', $run->id)
+                // All filter statistics are fitted on the first 24 months.
+                // The most recent twelve months stay untouched for validation.
+                ->whereDate('trade.exit_date', '>=', now()->subYears(3)->toDateString())
+                ->whereDate('trade.exit_date', '<', now()->subYear()->toDateString())
                 ->when(is_array($request->attributes->get('serving_quality_symbols')), fn ($query) => $query->whereIn('instrument.symbol', $request->attributes->get('serving_quality_symbols')))
                 ->when($tariffInstrumentIds !== null, fn ($query) => $query->whereIn('instrument.id', $tariffInstrumentIds))
                 ->when($request->filled('q'), fn ($query) => $query->where(function ($nested) use ($request): void {
@@ -380,14 +404,19 @@ final class PredictionController extends Controller
                 })
                 ->when(is_numeric($request->query('revenue_growth_min')) && (float) $request->query('revenue_growth_min') > -50, fn ($query) => $query->whereRaw($fundamentalValue('revenue_growth', 'revenueGrowth').' >= ?', [(float) $request->query('revenue_growth_min') / 100]))
                 ->get([
-                    'trade.net_return', 'trade.max_drawdown', 'trade.entry_date',
+                    'trade.net_return', 'trade.max_drawdown', 'trade.entry_date', 'trade.exit_date',
                     'trade.ki_score', 'trade.confidence', 'trade.predicted_return', 'trade.signal',
                     'instrument.id as instrument_id',
                     'instrument.symbol', 'instrument.name',
                     'instrument.type', 'instrument.country', 'instrument.sector',
                     'exchange.code as exchange_code',
                 ]);
-            $backtestRows = $backtestQuery;
+            $statisticsStart = now()->utc()->subYears(3)->toDateString();
+            $walkForwardStart = now()->utc()->subYear()->toDateString();
+            $backtestRows = $backtestQuery
+                ->filter(fn (object $row): bool => (string) $row->exit_date >= $statisticsStart
+                    && (string) $row->exit_date < $walkForwardStart)
+                ->values();
             // Candidates reflect the tariff and all selected dropdown/range
             // filters. Qualification may reduce this number further through
             // the per-stock performance requirements below.
@@ -916,18 +945,34 @@ final class PredictionController extends Controller
         $lookbackYears = 3;
         $periodEnd = now()->utc()->toDateString();
         $periodStart = Carbon::parse($periodEnd, 'UTC')->subYears($lookbackYears)->toDateString();
+        $walkForwardStart = Carbon::parse($periodEnd, 'UTC')->subYear()->toDateString();
+        $statisticsEnd = Carbon::parse($walkForwardStart, 'UTC')->subDay()->toDateString();
         $filters['period_start'] = $periodStart;
         $filters['period_end'] = $periodEnd;
+        $filters['statistics_start'] = $periodStart;
+        $filters['statistics_end'] = $statisticsEnd;
+        $filters['walk_forward_start'] = $walkForwardStart;
+        $filters['walk_forward_end'] = $periodEnd;
         $settings = [
             'run_type' => 'user_filter',
             'initiated_by_user_id' => $request->user()->id,
             'source_run_id' => $sourceRun->id,
             'action_score_version' => HistoricalActionScoreService::VERSION,
+            'composite_score_version' => CompositeScoreService::VERSION,
             'point_in_time_scores' => true,
             'lookback_years' => $lookbackYears,
             'as_of_date' => $periodEnd,
             'period_start' => $periodStart,
             'period_end' => $periodEnd,
+            'validation_split' => [
+                'mode' => 'chronological_exit_date',
+                'statistics_months' => 24,
+                'walk_forward_months' => 12,
+                'statistics_start' => $periodStart,
+                'statistics_end' => $statisticsEnd,
+                'walk_forward_start' => $walkForwardStart,
+                'walk_forward_end' => $periodEnd,
+            ],
             'entry' => match ($filters['entry_strategy']) {
                 'wait_5d' => 'WAIT up to 5 trading days, then BUY at current price',
                 'forecast_score_rotation_5d' => 'forecast score entry selection every 5 trading days',
@@ -988,34 +1033,11 @@ final class PredictionController extends Controller
             'updated_at' => now(),
         ]);
 
-        // Filter strategies use the same Service-DB-aware implementation in
-        // web requests and manual runs. The legacy Python dispatcher cannot
-        // resolve heatmap selections to serving releases and otherwise
-        // completes successfully with an incorrect zero-trade result.
-        // Local development shares the application database (and therefore
-        // the jobs table) with the remote installation. A normal queued job
-        // could otherwise be claimed by the remote worker and executed with
-        // the currently deployed, potentially older code. Execute locally
-        // and synchronously during development; production keeps using its
-        // dedicated asynchronous worker.
-        if (app()->environment('local')) {
-            try {
-                RunFilteredBacktest::dispatchSync($runId, (int) $sourceRun->id, $filters);
-            } catch (\RuntimeException $exception) {
-                DB::table('backtest_runs')->where('id', $runId)->update([
-                    'status' => 'failed',
-                    'finished_at' => now(),
-                    'error_message' => mb_substr($exception->getMessage(), 0, 4000),
-                    'updated_at' => now(),
-                ]);
-
-                return back()
-                    ->withInput()
-                    ->withErrors(['backtest' => $exception->getMessage()]);
-            }
-        } else {
-            RunFilteredBacktest::dispatch($runId, (int) $sourceRun->id, $filters);
-        }
+        // A three-year strategy calculation is too memory-intensive for the
+        // web process. It must always run on the dedicated backtest queue;
+        // otherwise a local synchronous queue configuration can terminate the
+        // request before Laravel persists the session response.
+        RunFilteredBacktest::dispatch($runId, (int) $sourceRun->id, $filters);
 
         return redirect()->route($returnRoute, array_merge($redirectFilters, ['backtest_run' => $publicId, 'show_result' => 1]))
             ->with('status', __('Der Drei-Jahres-Backtest wurde gestartet.'));
@@ -1327,7 +1349,7 @@ final class PredictionController extends Controller
     public function filteredBacktestResult(Request $request, string $publicId, ?YahooIndexService $indices = null): JsonResponse
     {
         $indices ??= app(YahooIndexService::class);
-        $resultCacheKey = 'filtered-backtest-result:v12:'.$request->user()->id.':'.$publicId;
+        $resultCacheKey = 'filtered-backtest-result:v19:'.$request->user()->id.':'.$publicId;
         $cachedResult = Cache::store('file')->get($resultCacheKey);
         if (is_array($cachedResult)) {
             return response()->json($cachedResult)->header('Cache-Control', 'private, max-age=60');
@@ -1353,6 +1375,7 @@ final class PredictionController extends Controller
             ? json_decode($pythonJob->result, true)
             : (array) ($pythonJob?->result ?? []);
         $earlyRunSettings = is_string($run->settings) ? (json_decode($run->settings, true) ?: []) : (array) $run->settings;
+        $requiresChronologicalSplit = data_get($earlyRunSettings, 'validation_split.mode') === 'chronological_exit_date';
         $scoreRotationRequested = (bool) data_get($earlyRunSettings, 'selection_filters.forecast_score_rotation_5d_enabled', false);
         if ($scoreRotationRequested && ! DB::table('backtest_strategy_trades')
             ->where('backtest_run_id', $run->id)
@@ -1390,7 +1413,7 @@ final class PredictionController extends Controller
         // round trip and therefore produced materially more optimistic values
         // than the strategy-depot simulator. Only reuse engine payloads that
         // explicitly implement the depot-compatible transaction accounting.
-        if (data_get($pythonResult, 'calculation_version') === 'filtered-portfolio-v3-depot' && ! $adaptiveResultIsImplausible && ! $scoreRotationRequested) {
+        if (data_get($pythonResult, 'calculation_version') === 'filtered-portfolio-v3-depot' && ! $adaptiveResultIsImplausible && ! $scoreRotationRequested && ! $requiresChronologicalSplit) {
             // Rebuild the DAX comparison from current price bars on every
             // request. Older worker results may contain isolated provider
             // values in the wrong unit, producing artificial -100% spikes.
@@ -1407,6 +1430,10 @@ final class PredictionController extends Controller
                 (float) data_get($pythonResult, 'initial_capital', 10000),
                 'dax',
             ));
+            $pythonResult = $this->completeBacktestTimeline($pythonResult, (int) data_get($pythonResult, 'period_end', 0));
+            $pythonResult['last_trade_exit'] = DB::table('backtest_trades')
+                ->where('backtest_run_id', $run->id)
+                ->max('exit_date');
             Cache::store('file')->put($resultCacheKey, $pythonResult, now()->addHours(12));
 
             return response()->json($pythonResult)->header('Cache-Control', 'private, max-age=60');
@@ -1418,6 +1445,18 @@ final class PredictionController extends Controller
         if ($tradePeriod?->starts_at === null || $tradePeriod?->ends_at === null) {
             $runSettings = is_string($run->settings) ? (json_decode($run->settings, true) ?: []) : (array) $run->settings;
             $initialCapital = max(1000.0, (float) data_get($runSettings, 'capital.initial', 10000));
+            $emptyPeriodEnd = (string) data_get($runSettings, 'period_end', data_get($runSettings, 'as_of_date', now()->utc()->toDateString()));
+            $emptyPeriodStart = (string) data_get($runSettings, 'period_start', Carbon::parse($emptyPeriodEnd, 'UTC')->subYears(3)->toDateString());
+            $emptyWalkForwardStart = (string) data_get($runSettings, 'validation_split.walk_forward_start', Carbon::parse($emptyPeriodEnd, 'UTC')->subYear()->toDateString());
+            $emptyStatisticsEnd = (string) data_get($runSettings, 'validation_split.statistics_end', Carbon::parse($emptyWalkForwardStart, 'UTC')->subDay()->toDateString());
+            $emptyPhase = static fn (string $startsAt, string $endsAt): array => [
+                'starts_at' => $startsAt, 'ends_at' => $endsAt,
+                'initial_capital' => $initialCapital, 'final_capital' => $initialCapital,
+                'performance' => 0.0, 'executed_trades' => 0, 'hit_rate' => 0.0,
+                'max_drawdown' => 0.0, 'total_costs' => 0.0,
+                'average_capital_binding' => 0.0, 'maximum_capital_binding' => 0.0,
+                'passed' => false,
+            ];
             $emptyResult = [
                 'strategy' => [],
                 'benchmark' => [],
@@ -1431,6 +1470,14 @@ final class PredictionController extends Controller
                 'skipped_trades' => 0,
                 'total_costs' => 0.0,
                 'hit_rate' => 0.0,
+                'statistics_window' => $emptyPhase($emptyPeriodStart, $emptyStatisticsEnd),
+                'walk_forward_window' => $emptyPhase($emptyWalkForwardStart, $emptyPeriodEnd),
+                'statistics_strategy_chart' => [],
+                'walk_forward_strategy_chart' => [],
+                'statistics_benchmark_chart' => [],
+                'walk_forward_benchmark_chart' => [],
+                'statistics_dax_chart' => [],
+                'walk_forward_dax_chart' => [],
                 'average_trade_return' => 0.0,
                 'portfolio_max_drawdown' => 0.0,
                 'empty' => true,
@@ -1479,6 +1526,31 @@ final class PredictionController extends Controller
             'backtest_trades.gross_return', 'backtest_trades.max_drawdown', 'backtest_trades.metadata', 'entry_atr.atr_14 as entry_atr_14',
             'result_instrument.symbol',
         ]);
+        $walkForwardStart = (string) data_get(
+            $runSettings,
+            'validation_split.walk_forward_start',
+            Carbon::parse((string) $period->ends_at, 'UTC')->subYear()->toDateString(),
+        );
+        $statisticsEnd = (string) data_get(
+            $runSettings,
+            'validation_split.statistics_end',
+            Carbon::parse($walkForwardStart, 'UTC')->subDay()->toDateString(),
+        );
+        // Purge positions crossing the split boundary. Training may only use
+        // trades whose outcome was known before validation began, while walk
+        // forward may only use signals opened after that date. Assigning a
+        // pre-split entry to validation merely because it exited later would
+        // contaminate the genuinely out-of-sample result.
+        $statisticsCandidates = $candidates
+            ->filter(fn (object $trade): bool => (string) $trade->exit_date < $walkForwardStart)
+            ->values();
+        $walkForwardCandidates = $candidates
+            ->filter(fn (object $trade): bool => (string) $trade->entry_date >= $walkForwardStart)
+            ->values();
+        $purgedBoundaryTrades = $candidates
+            ->filter(fn (object $trade): bool => (string) $trade->entry_date < $walkForwardStart
+                && (string) $trade->exit_date >= $walkForwardStart)
+            ->count();
         $portfolioSimulation = $this->simulatePortfolio(
             $candidates,
             $initialCapital,
@@ -1488,7 +1560,62 @@ final class PredictionController extends Controller
             (string) $period->starts_at,
             (string) $period->ends_at,
             $dynamicCapitalWeighting,
+            false,
         );
+        $statisticsSimulation = $this->simulatePortfolio(
+            $statisticsCandidates,
+            $initialCapital,
+            $maxPositions,
+            $positionFactor,
+            $tradeCost,
+            (string) $period->starts_at,
+            $statisticsEnd,
+            $dynamicCapitalWeighting,
+            true,
+        );
+        $walkForwardSimulation = $this->simulatePortfolio(
+            $walkForwardCandidates,
+            $initialCapital,
+            $maxPositions,
+            $positionFactor,
+            $tradeCost,
+            $walkForwardStart,
+            (string) $period->ends_at,
+            $dynamicCapitalWeighting,
+            true,
+        );
+        $phaseSummary = static function (array $simulation, string $startsAt, string $endsAt) use ($initialCapital): array {
+            /** @var Collection<int, object> $phaseTrades */
+            $phaseTrades = $simulation['executed_collection'];
+            $winners = $phaseTrades->filter(fn (object $trade): bool => (float) ($trade->net_return_after_cost ?? 0) > 0)->count();
+            $normalizedTrades = $phaseTrades->filter(fn (object $trade): bool => (float) ($trade->entry_price ?? 0) > 0
+                && (float) ($trade->entry_atr_14 ?? 0) > 0);
+            $averageTradeReturn = $normalizedTrades->isNotEmpty()
+                ? (float) $normalizedTrades->avg(fn (object $trade): float => (float) ($trade->net_return_after_cost ?? 0)
+                    / ((float) $trade->entry_atr_14 / (float) $trade->entry_price))
+                : 0.0;
+            $averageNetReturn = $phaseTrades->isNotEmpty()
+                ? (float) $phaseTrades->avg(fn (object $trade): float => (float) ($trade->net_return_after_cost ?? 0)) * 100
+                : 0.0;
+
+            return [
+                'starts_at' => $startsAt,
+                'ends_at' => $endsAt,
+                'initial_capital' => $initialCapital,
+                'final_capital' => (float) $simulation['final'],
+                'performance' => (float) $simulation['performance'],
+                'executed_trades' => (int) $simulation['executed'],
+                'skipped_trades' => (int) $simulation['skipped'],
+                'hit_rate' => $phaseTrades->isNotEmpty() ? round(($winners / $phaseTrades->count()) * 100, 2) : 0.0,
+                'average_trade_return' => round($averageTradeReturn, 2),
+                'average_net_return' => round($averageNetReturn, 2),
+                'max_drawdown' => (float) $simulation['max_drawdown'],
+                'total_costs' => (float) $simulation['total_costs'],
+                'average_capital_binding' => (float) $simulation['average_capital_binding'],
+                'maximum_capital_binding' => (float) $simulation['maximum_capital_binding'],
+                'passed' => (int) $simulation['executed'] > 0 && (float) $simulation['performance'] > 0,
+            ];
+        };
         $executed = $portfolioSimulation['executed_collection'];
         $waitEntryCount = $executed->filter(function (object $trade): bool {
             $metadata = is_string($trade->metadata ?? null)
@@ -1609,6 +1736,56 @@ final class PredictionController extends Controller
             ? round(($benchmarkProfit / $benchmarkStartCapital) * 100, 2)
             : null;
         $benchmarkDrawdown = $this->maximumSeriesDrawdown($benchmark);
+        $statisticsStrategyChart = $this->windowPerformanceSeries(
+            $statisticsSimulation['series'],
+            (string) $period->starts_at,
+            $statisticsEnd,
+        );
+        $walkForwardStrategyChart = $this->windowPerformanceSeries(
+            $walkForwardSimulation['series'],
+            $walkForwardStart,
+            (string) $period->ends_at,
+        );
+        $statisticsBenchmarkChart = $this->windowPerformanceSeries(
+            $benchmark,
+            (string) $period->starts_at,
+            $statisticsEnd,
+        );
+        $walkForwardBenchmarkChart = $this->windowPerformanceSeries(
+            $benchmark,
+            $walkForwardStart,
+            (string) $period->ends_at,
+        );
+        $periodStartTimestamp = strtotime((string) $period->starts_at) * 1000;
+        $periodEndTimestamp = strtotime((string) $period->ends_at) * 1000;
+        $this->ensureIndexComparisonHistory('^GDAXI', $periodStartTimestamp, $periodEndTimestamp, $indices);
+        $daxComparison = $this->indexComparison(
+            '^GDAXI',
+            $periodStartTimestamp,
+            $periodEndTimestamp,
+            $initialCapital,
+            'dax',
+        );
+        $statisticsDaxChart = $this->windowPerformanceSeries(
+            $daxComparison['dax'],
+            (string) $period->starts_at,
+            $statisticsEnd,
+        );
+        $walkForwardDaxChart = $this->windowPerformanceSeries(
+            $daxComparison['dax'],
+            $walkForwardStart,
+            (string) $period->ends_at,
+        );
+        $windowReturn = static fn (array $series): ?float => $series === []
+            ? null
+            : round((float) data_get($series[array_key_last($series)], 'y', 0), 2);
+
+        $statisticsWindow = $phaseSummary($statisticsSimulation, (string) $period->starts_at, $statisticsEnd);
+        $statisticsWindow['sp500_performance'] = $windowReturn($statisticsBenchmarkChart);
+        $statisticsWindow['dax_performance'] = $windowReturn($statisticsDaxChart);
+        $walkForwardWindow = $phaseSummary($walkForwardSimulation, $walkForwardStart, (string) $period->ends_at);
+        $walkForwardWindow['sp500_performance'] = $windowReturn($walkForwardBenchmarkChart);
+        $walkForwardWindow['dax_performance'] = $windowReturn($walkForwardDaxChart);
 
         $adaptiveCandidates = DB::table('backtest_strategy_trades')
             ->where('backtest_run_id', $run->id)
@@ -1667,6 +1844,16 @@ final class PredictionController extends Controller
             'calculation_version' => 'historical-portfolio-ledger-v1',
             'period_start' => strtotime((string) $period->starts_at) * 1000,
             'period_end' => strtotime((string) $period->ends_at) * 1000,
+            'statistics_window' => $statisticsWindow,
+            'walk_forward_window' => $walkForwardWindow,
+            'purged_boundary_trades' => $purgedBoundaryTrades,
+            'statistics_strategy_chart' => $statisticsStrategyChart,
+            'walk_forward_strategy_chart' => $walkForwardStrategyChart,
+            'statistics_benchmark_chart' => $statisticsBenchmarkChart,
+            'walk_forward_benchmark_chart' => $walkForwardBenchmarkChart,
+            'statistics_dax_chart' => $statisticsDaxChart,
+            'walk_forward_dax_chart' => $walkForwardDaxChart,
+            'last_trade_exit' => $executed->max('exit_date'),
             'strategy' => $strategy,
             'adaptive_rotation' => $adaptive['series'],
             'buy_and_hold' => $buyAndHold['series'],
@@ -1694,6 +1881,7 @@ final class PredictionController extends Controller
             'benchmark_final_capital' => $benchmarkFinalCapital,
             'benchmark_profit' => $benchmarkProfit !== null ? round($benchmarkProfit, 2) : null,
             'benchmark_performance' => $benchmarkPerformance,
+            ...$daxComparison,
             'adaptive_rotation_performance' => $adaptive['performance'],
             'adaptive_rotation_gross_performance' => $adaptiveGross['performance'],
             'adaptive_rotation_final_capital' => $adaptive['final'],
@@ -2965,7 +3153,7 @@ final class PredictionController extends Controller
             ->orderBy('exchange.code')
             ->get();
 
-        $tradeScoreBucketSql = 'LEAST(9, GREATEST(0, FLOOR(backtest_trade.ki_score)))::integer';
+        $tradeScoreBucketSql = 'LEAST(9, GREATEST(0, FLOOR(COALESCE(backtest_trade.composite_score, backtest_trade.signal_quality_score, backtest_trade.ki_score * 10) / 10)))::integer';
         $tradeConfidenceBucketSql = 'LEAST(9, GREATEST(0, FLOOR(backtest_trade.confidence / 10)))::integer';
         $latestFundamentalIds = DB::table('instrument_fundamentals')
             ->selectRaw('instrument_id, MAX(id) AS fundamental_id')
@@ -3129,7 +3317,7 @@ final class PredictionController extends Controller
         // the simulation. They must not remove the historical values from
         // the remaining heatmap cells, which stay visible for comparison.
         $heatmapSummaryQuery = (clone $heatmapQuery)
-            ->when($request->filled('score_min') && is_numeric($request->query('score_min')), fn (Builder $query) => $query->where('backtest_trade.ki_score', '>=', max(0, min(10, (float) $request->query('score_min')))))
+            ->when($request->filled('score_min') && is_numeric($request->query('score_min')), fn (Builder $query) => $query->whereRaw('COALESCE(backtest_trade.composite_score, backtest_trade.signal_quality_score, backtest_trade.ki_score * 10) >= ?', [max(0, min(10, (float) $request->query('score_min'))) * 10]))
             ->when($request->filled('confidence_min') && is_numeric($request->query('confidence_min')), fn (Builder $query) => $query->where('backtest_trade.confidence', '>=', max(0, min(100, (float) $request->query('confidence_min')))))
             ->when($request->filled('predicted_return_min') && is_numeric($request->query('predicted_return_min')), fn (Builder $query) => $query->where('backtest_trade.predicted_return', '>=', max(-50, min(100, (float) $request->query('predicted_return_min'))) / 100));
 
@@ -3161,7 +3349,7 @@ final class PredictionController extends Controller
 
         $scoreProfitFactorRows = Cache::remember($heatmapCacheKey.':score-profit-factor-correlation:v2', now()->addMinutes(15), fn () => (clone $heatmapSummaryQuery)
             ->selectRaw('backtest_trade.instrument_id')
-            ->selectRaw('AVG(backtest_trade.ki_score) AS average_score')
+            ->selectRaw('AVG(COALESCE(backtest_trade.composite_score, backtest_trade.signal_quality_score, backtest_trade.ki_score * 10)) AS average_score')
             ->selectRaw('LEAST(3.0, SUM(CASE WHEN backtest_trade.net_return > 0 THEN backtest_trade.net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN backtest_trade.net_return < 0 THEN backtest_trade.net_return ELSE 0 END)), 0)) AS profit_factor')
             ->selectRaw('COUNT(*) AS trade_count')
             ->groupBy('backtest_trade.instrument_id')
@@ -3177,7 +3365,7 @@ final class PredictionController extends Controller
                 now()->addMinutes(15),
                 fn () => (clone $heatmapBaseQuery)
                     ->selectRaw('backtest_trade.instrument_id')
-                    ->selectRaw('AVG(backtest_trade.ki_score) AS average_score')
+                    ->selectRaw('AVG(COALESCE(backtest_trade.composite_score, backtest_trade.signal_quality_score, backtest_trade.ki_score * 10)) AS average_score')
                     ->selectRaw('LEAST(3.0, SUM(CASE WHEN backtest_trade.net_return > 0 THEN backtest_trade.net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN backtest_trade.net_return < 0 THEN backtest_trade.net_return ELSE 0 END)), 0)) AS profit_factor')
                     ->groupBy('backtest_trade.instrument_id')
                     ->havingRaw('COUNT(*) >= 10')
@@ -3220,16 +3408,16 @@ final class PredictionController extends Controller
         // the legacy training/backtest tables here: only active releases and
         // prediction-enabled horizon/variant configurations are eligible.
         $comparisonRows = Cache::remember(
-            'serving:strategy-heatmaps:v1:'.sha1(json_encode($heatmapCacheQuery)),
+            'serving:strategy-heatmaps:v3-statistics-24m:'.sha1(json_encode($heatmapCacheQuery)),
             now()->addMinutes(5),
             fn (): Collection => $this->servingHeatmapRows($request),
         );
         $heatmapUniverseInstruments = $comparisonRows->pluck('instrument_id')->unique()->count();
         $comparisonDefinitions = [
-            'profit_factor_hit_rate' => ['max' => 100.0, 'step' => 10.0, 'y_field' => 'hit_rate', 'x_field' => 'profit_factor', 'x_max' => 3.0, 'x_step' => .3],
-            'signal_risk' => ['max' => 100.0, 'step' => 10.0, 'y_field' => 'risk', 'x_field' => 'signal_quality', 'x_max' => 100.0, 'x_step' => 10.0],
-            'volatility_drawdown' => ['max' => 50.0, 'step' => 5.0, 'y_field' => 'risk_drawdown', 'x_field' => 'model_quality', 'x_max' => 100.0, 'x_step' => 10.0],
-            'trades_return' => ['max' => 15.0, 'step' => 2.0, 'min' => -5.0, 'y_field' => 'average_net_return', 'x_field' => 'confidence', 'x_max' => 100.0, 'x_step' => 10.0],
+            'score_risk' => ['max' => 100.0, 'step' => 10.0, 'y_field' => 'risk', 'x_field' => 'score', 'x_max' => 100.0, 'x_step' => 10.0],
+            'score_drawdown' => ['max' => 50.0, 'step' => 5.0, 'y_field' => 'risk_drawdown', 'x_field' => 'score', 'x_max' => 100.0, 'x_step' => 10.0],
+            'score_profit_factor' => ['max' => 3.0, 'step' => .3, 'y_field' => 'profit_factor', 'x_field' => 'score', 'x_max' => 100.0, 'x_step' => 10.0],
+            'score_volatility' => ['max' => 100.0, 'step' => 10.0, 'y_field' => 'volatility', 'x_field' => 'score', 'x_max' => 100.0, 'x_step' => 10.0],
         ];
         $comparisonHeatmaps = collect($comparisonDefinitions)->map(function (array $definition, string $metric) use ($comparisonRows): array {
             $cells = $comparisonRows
@@ -3255,7 +3443,7 @@ final class PredictionController extends Controller
                     // counted once even when several eligible models for it
                     // occupy the same cell. The remaining maps continue to
                     // describe model configurations.
-                    'stocks' => $metric === 'signal_risk'
+                    'stocks' => $metric === 'score_risk'
                         ? $rows->pluck('instrument_id')->unique()->count()
                         : $rows->count(),
                     'trades' => (int) $rows->sum('trades'),
@@ -3283,7 +3471,7 @@ final class PredictionController extends Controller
 
                     return is_numeric($row->{$xField} ?? null) && is_numeric($row->{$yField} ?? null);
                 }), fn () => null)->when(
-                    $metric === 'signal_risk',
+                    $metric === 'score_risk',
                     fn (Collection $rows): Collection => $rows->unique('instrument_id'),
                 )->count(),
                 'min_profit_factor' => $comparisonRows
@@ -3448,6 +3636,7 @@ final class PredictionController extends Controller
             ->whereIn('status', ['completed', 'completed_with_errors'])
             ->whereRaw("settings->>'source_walk_forward_run_id' = ?", [(string) $walkForwardRun->id])
             ->whereRaw("settings->>'action_score_version' = ?", [HistoricalActionScoreService::VERSION])
+            ->whereRaw("settings->>'composite_score_version' = ?", [CompositeScoreService::VERSION])
             ->whereRaw("settings->>'model_score_source' = ?", ['validation_direction_accuracy_v1'])
             ->where('trades_count', '>', 0)
             ->orderByDesc('id')
@@ -3478,6 +3667,7 @@ final class PredictionController extends Controller
                     'run_type' => 'system_walk_forward_source',
                     'source_walk_forward_run_id' => (int) $walkForwardRun->id,
                     'action_score_version' => HistoricalActionScoreService::VERSION,
+                    'composite_score_version' => CompositeScoreService::VERSION,
                     'model_score_source' => 'validation_direction_accuracy_v1',
                     'point_in_time_scores' => true,
                     'lookback_years' => 3,
@@ -3543,10 +3733,9 @@ final class PredictionController extends Controller
                             'net_return' => $trade->net_return,
                             'transaction_cost' => (float) $trade->gross_return - (float) $trade->net_return,
                             'max_drawdown' => ((float) ($trade->historical_action_components['metrics']['drawdown'] ?? 0)) / 100,
-                            // The strategy tester deliberately uses the raw,
-                            // point-in-time model result on its score axis. The
-                            // composed final action score remains available in
-                            // signal_quality_score and metadata.
+                            // Keep the raw point-in-time model result separate
+                            // from both the legacy action score and the new
+                            // canonical composite score used by the tester.
                             'ki_score' => max(0, min(10,
                                 (float) ($trade->validation_direction_accuracy ?? 0)
                                 * ((float) ($trade->validation_direction_accuracy ?? 0) <= 1 ? 10 : 0.1)
@@ -3554,6 +3743,7 @@ final class PredictionController extends Controller
                             'confidence' => max(0, min(100, $confidence)),
                             'quality_gate_score' => ($trade->historical_action_components['blocked'] ?? true) ? 0 : 1,
                             'signal_quality_score' => $trade->historical_action_score,
+                            'composite_score' => $trade->historical_composite_score,
                             'metadata' => json_encode([
                                 ...$metadata,
                                 'action_score' => $trade->historical_action_components,
@@ -3608,7 +3798,7 @@ final class PredictionController extends Controller
      */
     private function servingHeatmapRows(Request $request): Collection
     {
-        $serving = DB::connection('serving');
+        $serving = DB::connection('strategy_source');
         $lockedConfigurations = $request->attributes->get('serving_selection_configurations');
         if (! is_array($lockedConfigurations)) {
             $lockedConfigurations = $this->servingSelectionConfigurations($request);
@@ -3656,12 +3846,19 @@ final class PredictionController extends Controller
             ->get([
                 'status.instrument_id', 'status.release_id', 'status.horizon', 'status.variant',
                 'status.performance', 'status.model_quality_class', 'status.model_quality_label',
-                'status.quality_gate_passed', 'instrument.symbol', 'instrument.name',
+                'status.quality_gate_passed', 'status.dataset_cutoff', 'instrument.symbol', 'instrument.name',
             ]);
 
         if ($statuses->isEmpty()) {
             return collect();
         }
+
+        // The strategy heatmaps are selection statistics. Their performance
+        // axes and visible values must be fitted exclusively on the first 24
+        // months; the following twelve months remain untouched walk-forward
+        // evidence and must never feed back into filter selection.
+        $statisticsByConfiguration = app(ServingWalkForwardStatisticsService::class)
+            ->forActiveStocks($statuses, 'strategy_source');
 
         $predictions = $serving->table('serving_predictions')
             ->whereIn('instrument_id', $statuses->pluck('instrument_id')->unique())
@@ -3694,16 +3891,46 @@ final class PredictionController extends Controller
             };
         };
 
-        return $statuses->map(function (object $status) use ($predictions, $qualityPercent, $scorePercent): ?object {
+        $compositeScore = app(CompositeScoreService::class);
+
+        return $statuses->map(function (object $status) use ($predictions, $qualityPercent, $scorePercent, $compositeScore, $statisticsByConfiguration): ?object {
             $key = implode('|', [(int) $status->instrument_id, (string) $status->release_id, (int) $status->horizon, (string) $status->variant]);
             $prediction = $predictions->get($key);
             if (! $prediction) {
                 return null;
             }
-            $performance = is_array($status->performance)
-                ? $status->performance
-                : (json_decode((string) $status->performance, true) ?: []);
-            $riskScore = is_numeric($prediction->risk_score) ? max(1, min(5, (float) $prediction->risk_score)) : 5;
+            $statisticsKey = implode('|', [(int) $status->instrument_id, (int) $status->horizon, (string) $status->variant]);
+            $statistics = data_get($statisticsByConfiguration->get($statisticsKey), 'statistics');
+            if (! is_object($statistics) || (int) ($statistics->trades ?? 0) < 1) {
+                return null;
+            }
+            $riskPercent = min(100.0,
+                min(50.0, abs((float) ($statistics->max_drawdown ?? 0)))
+                + min(50.0, abs((float) ($statistics->volatility ?? 0)) / 2)
+            );
+            $confidencePercent = is_numeric($statistics->hit_rate ?? null)
+                ? max(0.0, min(100.0, (float) $statistics->hit_rate))
+                : null;
+            $expectedReturnPercent = is_numeric($prediction->expected_return)
+                ? (float) $prediction->expected_return * (abs((float) $prediction->expected_return) <= 1 ? 100 : 1)
+                : null;
+            $profitFactor = is_numeric($statistics->profit_factor ?? null)
+                ? min(3, max(0, (float) $statistics->profit_factor))
+                : null;
+            $aiScore = is_numeric($statistics->average_entry_score ?? null)
+                ? max(0.0, min(10.0, 5.0 + ((float) $statistics->average_entry_score * 100)))
+                : max(0.0, min(10.0, 5.0 + ((float) ($statistics->average_return ?? 0) / 4)));
+            $statisticsQualityGatePassed = (int) $statistics->trades >= 10
+                && (float) ($statistics->average_return ?? -INF) >= 0
+                && $profitFactor !== null
+                && $profitFactor >= 1.05;
+            $strategyCompositeScore = $compositeScore->score(
+                aiScoreOutOf10: $aiScore,
+                qualityGatePassed: $statisticsQualityGatePassed,
+                profitFactor: $profitFactor,
+                confidencePercent: $confidencePercent,
+                riskPercent: $riskPercent,
+            );
 
             return (object) [
                 'instrument_id' => (int) $status->instrument_id,
@@ -3714,27 +3941,26 @@ final class PredictionController extends Controller
                 'variant' => (string) $status->variant,
                 'symbol' => (string) $status->symbol,
                 'signal' => strtoupper((string) $prediction->signal),
+                'score' => $strategyCompositeScore,
                 'signal_quality' => $scorePercent($prediction->calibrated_score),
-                'risk' => ($riskScore - 1) * 25,
-                'confidence' => is_numeric($prediction->confidence) ? min(100, (float) $prediction->confidence * ((float) $prediction->confidence <= 1 ? 100 : 1)) : 0,
-                'expected_return' => is_numeric($prediction->expected_return)
-                    ? (float) $prediction->expected_return * (abs((float) $prediction->expected_return) <= 1 ? 100 : 1)
-                    : 0.0,
+                'risk' => $riskPercent,
+                'confidence' => $confidencePercent ?? 0,
+                'expected_return' => $expectedReturnPercent ?? 0.0,
                 'model_quality' => $qualityPercent((string) $status->model_quality_class),
-                'profit_factor' => min(3, max(0, (float) ($performance['profit_factor'] ?? 0))),
-                'hit_rate' => max(0, min(100, (float) ($performance['hit_rate'] ?? 0) * 100)),
-                'average_net_return' => (float) ($performance['average_net_trade'] ?? 0) * 100,
-                'median_net_return' => is_numeric($performance['median_net_trade'] ?? null)
-                    ? (float) $performance['median_net_trade'] * 100
+                'profit_factor' => $profitFactor ?? 0,
+                'hit_rate' => max(0, min(100, (float) ($statistics->hit_rate ?? 0))),
+                'average_net_return' => (float) ($statistics->average_return ?? 0),
+                'median_net_return' => is_numeric($statistics->median_return ?? null)
+                    ? (float) $statistics->median_return
                     : null,
-                'risk_drawdown' => abs((float) ($performance['max_drawdown'] ?? 0)) * 100,
-                'volatility' => abs((float) ($performance['stddev_net_trade'] ?? 0)) * 100,
-                'trades' => (int) ($performance['trades'] ?? 0),
-                'trades_per_year' => (float) ($performance['trades'] ?? 0) / 3,
+                'risk_drawdown' => abs((float) ($statistics->max_drawdown ?? 0)),
+                'volatility' => abs((float) ($statistics->volatility ?? 0)),
+                'trades' => (int) $statistics->trades,
+                'trades_per_year' => (float) $statistics->trades / 2,
             ];
         })->filter()
             ->when($request->filled('signal'), fn (Collection $rows) => $rows->where('signal', strtoupper((string) $request->input('signal'))))
-            ->when((float) $request->input('score_min', 0) > 0, fn (Collection $rows) => $rows->where('signal_quality', '>=', (float) $request->input('score_min') * 10))
+            ->when((float) $request->input('score_min', 0) > 0, fn (Collection $rows) => $rows->where('score', '>=', (float) $request->input('score_min') * 10))
             ->when((float) $request->input('confidence_min', 0) > 0, fn (Collection $rows) => $rows->where('confidence', '>=', (float) $request->input('confidence_min')))
             ->when((float) $request->input('model_quality_min', 0) > 0, fn (Collection $rows) => $rows->where('model_quality', '>=', (float) $request->input('model_quality_min')))
             ->when((float) $request->input('signal_quality_min', 0) > 0, fn (Collection $rows) => $rows->where('signal_quality', '>=', (float) $request->input('signal_quality_min')))
@@ -3799,10 +4025,10 @@ final class PredictionController extends Controller
         $selections = json_decode((string) $request->input('heatmap_selection', ''), true);
         $selections = is_array($selections) ? $selections : [];
         $definitions = [
-            'profit_factor_hit_rate' => ['x' => 'profit_factor', 'x_max' => 3.0, 'x_step' => .3, 'y' => 'hit_rate', 'y_min' => 0.0, 'y_max' => 100.0, 'y_step' => 10.0],
-            'signal_risk' => ['x' => 'signal_quality', 'x_max' => 100.0, 'x_step' => 10.0, 'y' => 'risk', 'y_min' => 0.0, 'y_max' => 100.0, 'y_step' => 10.0],
-            'volatility_drawdown' => ['x' => 'model_quality', 'x_max' => 100.0, 'x_step' => 10.0, 'y' => 'risk_drawdown', 'y_min' => 0.0, 'y_max' => 50.0, 'y_step' => 5.0],
-            'trades_return' => ['x' => 'confidence', 'x_max' => 100.0, 'x_step' => 10.0, 'y' => 'average_net_return', 'y_min' => -5.0, 'y_max' => 15.0, 'y_step' => 2.0],
+            'score_risk' => ['x' => 'score', 'x_max' => 100.0, 'x_step' => 10.0, 'y' => 'risk', 'y_min' => 0.0, 'y_max' => 100.0, 'y_step' => 10.0],
+            'score_drawdown' => ['x' => 'score', 'x_max' => 100.0, 'x_step' => 10.0, 'y' => 'risk_drawdown', 'y_min' => 0.0, 'y_max' => 50.0, 'y_step' => 5.0],
+            'score_profit_factor' => ['x' => 'score', 'x_max' => 100.0, 'x_step' => 10.0, 'y' => 'profit_factor', 'y_min' => 0.0, 'y_max' => 3.0, 'y_step' => .3],
+            'score_volatility' => ['x' => 'score', 'x_max' => 100.0, 'x_step' => 10.0, 'y' => 'volatility', 'y_min' => 0.0, 'y_max' => 100.0, 'y_step' => 10.0],
         ];
 
         return $rows->filter(function (object $row) use ($selections, $definitions): bool {
@@ -3864,7 +4090,8 @@ final class PredictionController extends Controller
 
         return DB::table('backtest_trades as eligibility_trade')
             ->where('eligibility_trade.backtest_run_id', $runId)
-            ->where('eligibility_trade.entry_date', '>=', now()->subYears(3)->toDateString())
+            ->where('eligibility_trade.exit_date', '>=', now()->subYears(3)->toDateString())
+            ->where('eligibility_trade.exit_date', '<', now()->subYear()->toDateString())
             ->groupBy('eligibility_trade.instrument_id')
             ->select('eligibility_trade.instrument_id')
             ->when($drawdownMaximum < (float) ($rangeMaxima['drawdown'] ?? 50.0), fn (Builder $query) => $query->havingRaw('MAX(ABS(eligibility_trade.max_drawdown)) <= ?', [max(0, $drawdownMaximum) / 100]))
@@ -3920,10 +4147,12 @@ final class PredictionController extends Controller
         ?string $periodStart = null,
         ?string $periodEnd = null,
         bool $dynamicCapitalWeighting = false,
+        bool $assignWindowByExitDate = false,
     ): array {
         $basePositionCapital = $initialCapital / max(1, $maxPositions);
         $allCandidates = collect($candidates);
-        $eligibleCandidates = $allCandidates->filter(fn (object $trade): bool => ($periodStart === null || (string) $trade->entry_date >= $periodStart)
+        $eligibleCandidates = $allCandidates->filter(fn (object $trade): bool => ($periodStart === null
+                || ($assignWindowByExitDate ? (string) $trade->exit_date : (string) $trade->entry_date) >= $periodStart)
             && ($periodEnd === null || (string) $trade->exit_date <= $periodEnd)
         )->values();
         $execution = app(HistoricalPortfolioExecutionCalculator::class)->calculate(
@@ -4035,6 +4264,62 @@ final class PredictionController extends Controller
         }
 
         return round($maximumDrawdown, 2);
+    }
+
+    /**
+     * Keep every event-based result line visible through the configured test
+     * end. A strategy with no newer signal still holds its last cash value;
+     * stopping the line at the last exit incorrectly suggests missing months.
+     *
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function completeBacktestTimeline(array $result, int $periodEnd): array
+    {
+        if ($periodEnd <= 0) {
+            return $result;
+        }
+
+        foreach ([
+            'strategy', 'strategy_chart', 'adaptive_rotation', 'adaptive_rotation_chart',
+            'forecast_score_rotation', 'forecast_score_rotation_chart',
+            'sector_entry_rotation_chart', 'index_entry_rotation_chart',
+            'buy_and_hold', 'buy_and_hold_chart',
+        ] as $key) {
+            if (isset($result[$key]) && is_array($result[$key])) {
+                $result[$key] = $this->extendSeriesTo($result[$key], $periodEnd);
+            }
+        }
+
+        foreach ((array) ($result['automatic_exit_variants'] ?? []) as $key => $variant) {
+            if (is_array($variant) && isset($variant['chart']) && is_array($variant['chart'])) {
+                $result['automatic_exit_variants'][$key]['chart'] = $this->extendSeriesTo(
+                    $variant['chart'],
+                    $periodEnd,
+                );
+            }
+        }
+
+        return $result;
+    }
+
+    /** @param array<int, array<string, mixed>> $series */
+    private function extendSeriesTo(array $series, int $periodEnd): array
+    {
+        if ($series === []) {
+            return $series;
+        }
+
+        $lastKey = array_key_last($series);
+        $lastTimestamp = (int) data_get($series[$lastKey], 'x', 0);
+        if ($lastTimestamp > 0 && $lastTimestamp < $periodEnd) {
+            $series[] = [
+                'x' => $periodEnd,
+                'y' => (float) data_get($series[$lastKey], 'y', 0),
+            ];
+        }
+
+        return $series;
     }
 
     private function indexComparison(string $symbol, int $periodStart, int $periodEnd, float $initialCapital, string $prefix): array
@@ -4234,6 +4519,47 @@ final class PredictionController extends Controller
             'x' => (int) $point['x'],
             'y' => round((((float) $point['y'] / $initialCapital) - 1) * 100, 2),
         ])->values()->all();
+    }
+
+    /**
+     * Rebase a capital series to zero percent at the beginning of one
+     * chronological validation phase.
+     *
+     * @param  array<int, array{x: int|float, y: int|float}>  $series
+     * @return array<int, array{x: int, y: float}>
+     */
+    private function windowPerformanceSeries(array $series, string $startsAt, string $endsAt): array
+    {
+        $start = strtotime($startsAt) * 1000;
+        $end = strtotime($endsAt) * 1000;
+        $points = collect($series)
+            ->filter(fn (array $point): bool => (int) ($point['x'] ?? 0) >= $start
+                && (int) ($point['x'] ?? 0) <= $end
+                && is_numeric($point['y'] ?? null))
+            ->sortBy(fn (array $point): int => (int) $point['x'])
+            ->values();
+
+        if ($points->isEmpty()) {
+            return [];
+        }
+
+        $baseline = (float) $points->first()['y'];
+        if ($baseline <= 0) {
+            return [];
+        }
+
+        $rebased = $points->map(fn (array $point): array => [
+            'x' => (int) $point['x'],
+            'y' => round((((float) $point['y'] / $baseline) - 1) * 100, 2),
+        ]);
+        if ((int) $rebased->first()['x'] > $start) {
+            $rebased->prepend(['x' => $start, 'y' => 0.0]);
+        }
+        if ((int) $rebased->last()['x'] < $end) {
+            $rebased->push(['x' => $end, 'y' => (float) $rebased->last()['y']]);
+        }
+
+        return $rebased->values()->all();
     }
 
     private function simulateBuyAndHold(

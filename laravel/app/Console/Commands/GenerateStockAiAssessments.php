@@ -1,0 +1,77 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Services\ServingScreenerService;
+use App\Services\StockAiAssessmentService;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Throwable;
+
+final class GenerateStockAiAssessments extends Command
+{
+    protected $signature = 'reports:stock-ai-assessments {--force : Regenerate even if today\'s assessment already exists}';
+
+    protected $description = 'Writes a short opportunities/risks/key-factors assessment (via The Grid) for every current POSITIV stock';
+
+    public function handle(ServingScreenerService $screener, StockAiAssessmentService $assessments): int
+    {
+        if (! config('aktienki.stock_ai_assessment.enabled', false)) {
+            $this->warn('STOCK_AI_ASSESSMENT_ENABLED is off - nothing done.');
+
+            return self::SUCCESS;
+        }
+
+        $today = now()->toDateString();
+        $stocks = $screener->currentStocks()
+            ->filter(fn (object $stock): bool => strtoupper((string) ($stock->personalized_signal ?? '')) === 'BUY')
+            ->values();
+
+        if (! $this->option('force')) {
+            $existingInstrumentIds = DB::table('stock_ai_assessments')
+                ->where('assessment_date', $today)
+                ->pluck('instrument_id')
+                ->map(fn ($id): int => (int) $id)
+                ->flip();
+            $stocks = $stocks->reject(fn (object $stock): bool => $existingInstrumentIds->has((int) $stock->instrument_id))->values();
+        }
+
+        $this->info("POSITIV stocks: {$stocks->count()} to assess.");
+
+        $generated = 0;
+        $failed = 0;
+        foreach ($stocks as $stock) {
+            try {
+                $generation = $assessments->generate($stock);
+                $result = $generation['result'];
+
+                DB::table('stock_ai_assessments')->updateOrInsert(
+                    ['instrument_id' => $stock->instrument_id, 'assessment_date' => $today],
+                    [
+                        'prediction_id' => null,
+                        'model' => mb_substr($generation['model'], 0, 100),
+                        'recommendation' => $result['recommendation'],
+                        'confidence' => $result['confidence'],
+                        'summary' => $result['summary'],
+                        'opportunities' => json_encode($result['opportunities'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        'risks' => json_encode($result['risks'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        'key_factors' => json_encode($result['key_factors'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        'input_snapshot' => json_encode($generation['input_snapshot'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        'raw_response' => json_encode($generation['raw_response'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ],
+                );
+                $generated++;
+            } catch (Throwable $exception) {
+                $failed++;
+                report($exception);
+                $this->error("{$stock->symbol}: ".$exception->getMessage());
+            }
+        }
+
+        $this->info("Generated: {$generated}, failed: {$failed}.");
+
+        return self::SUCCESS;
+    }
+}
