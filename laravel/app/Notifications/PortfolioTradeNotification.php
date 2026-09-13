@@ -2,7 +2,7 @@
 
 namespace App\Notifications;
 
-use App\Services\RecommendationEmailLogo;
+use App\Services\RecommendationEmailChart;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
@@ -25,15 +25,18 @@ final class PortfolioTradeNotification extends Notification
     {
         $locale = data_get($notifiable->preferences, 'locale', 'de');
         app()->setLocale(in_array($locale, ['de', 'en'], true) ? $locale : 'de');
-        $logo = app(RecommendationEmailLogo::class)->render();
         $isSale = $this->trade['action'] === 'sell';
         // Deliberately neutral wording (no "Kauf"/"Verkauf"): this is an automated
         // depot booking based on a model signal, not investment advice or a trade
         // recommendation - see resources/views/legal/show.blade.php §Risikohinweise.
         $subjectAction = $isSale ? __('Entfernt') : ($this->trade['action'] === 'increase' ? __('Aufgestockt') : __('Hinzugefügt'));
         $subjectPrefix = ($this->trade['simulation'] ?? false) ? __('aKI Simulation') : __('aKI Depot');
+        $candles = (array) ($this->trade['candles'] ?? []);
+        $chart = $candles !== []
+            ? app(RecommendationEmailChart::class)->render($candles, $this->trade['target_price'] ?? null)
+            : null;
 
-        return (new MailMessage)
+        $mail = (new MailMessage)
             ->subject(__(':prefix · :action :symbol', [
                 'prefix' => $subjectPrefix,
                 'action' => $subjectAction,
@@ -43,10 +46,15 @@ final class PortfolioTradeNotification extends Notification
                 'trade' => $this->trade,
                 'isSale' => $isSale,
                 'depotUrl' => route('depots.show', $this->trade['portfolio_id']),
-            ])
-            ->withSymfonyMessage(function (Email $email) use ($logo): void {
-                $email->embed($logo, 'aktienki-logo.png', 'image/png');
+            ]);
+
+        if ($chart !== null) {
+            $mail->withSymfonyMessage(function (Email $email) use ($chart): void {
+                $email->embed($chart, 'aki-trade-chart.png', 'image/png');
             });
+        }
+
+        return $mail;
     }
 
     public function failed(Throwable $exception): void

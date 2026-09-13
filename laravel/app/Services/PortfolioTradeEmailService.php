@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ExternalBuyReview;
 use App\Models\User;
 use App\Notifications\PortfolioTradeNotification;
 use Illuminate\Support\Facades\DB;
@@ -9,6 +10,10 @@ use Throwable;
 
 final class PortfolioTradeEmailService
 {
+    public function __construct(
+        private readonly ServingScreenerService $screener,
+    ) {}
+
     public function sendPending(int $limit = 100): array
     {
         $stats = ['checked' => 0, 'sent' => 0, 'failed' => 0, 'disabled' => 0];
@@ -46,7 +51,7 @@ final class PortfolioTradeEmailService
                         'strategy.filters as strategy_filters',
                         'strategy.user_id', 'portfolio.id as portfolio_id', 'portfolio.name as portfolio_name',
                         'portfolio.currency as portfolio_currency', 'portfolio.meta as portfolio_meta',
-                        'instrument.symbol', 'instrument.name as instrument_name',
+                        'instrument.id as instrument_id', 'instrument.symbol', 'instrument.name as instrument_name',
                         'instrument.currency as instrument_currency', 'instrument.sector', 'transaction.quantity',
                         'transaction.price', 'transaction.fees', 'transaction.transaction_date',
                         'transaction.meta as transaction_meta',
@@ -157,6 +162,26 @@ final class PortfolioTradeEmailService
         $sectorRotationEnabled = (bool) data_get($strategyFilters, 'sector_score_rotation', false);
         $indexRotationEnabled = (bool) data_get($strategyFilters, 'index_score_rotation', false);
 
+        // Same 0-100 composite score shown everywhere else (screener, dashboard,
+        // stock detail page) - not the legacy per-model prediction_score below,
+        // which lives on a different scale and would not "passen" next to it.
+        $compositeScore = $this->screener->compositeScores()->get((int) $row->instrument_id);
+
+        // Serving-derived reviews (the large majority since the Perplexity
+        // rollout) have prediction_id = null; instrument_id is always set.
+        $review = ExternalBuyReview::query()
+            ->where('instrument_id', (int) $row->instrument_id)
+            ->orderByDesc('triggered_at')->orderByDesc('id')
+            ->first();
+
+        $candles = DB::table('price_bars')->where('instrument_id', (int) $row->instrument_id)
+            ->where('interval', '1d')->orderByDesc('bar_time')->limit(32)
+            ->get(['bar_time', 'open', 'high', 'low', 'close'])->reverse()->values()
+            ->map(fn (object $bar): array => [
+                'x' => \Illuminate\Support\Carbon::parse($bar->bar_time)->getTimestampMs(),
+                'y' => [(float) $bar->open, (float) $bar->high, (float) $bar->low, (float) $bar->close],
+            ])->all();
+
         return [
             'action' => (string) $row->action, 'symbol' => (string) $row->symbol,
             'instrument_name' => (string) $row->instrument_name,
@@ -174,7 +199,10 @@ final class PortfolioTradeEmailService
             'sector_average_score' => $row->sector_average_score !== null ? (float) $row->sector_average_score : null,
             'index_average_score' => is_numeric(data_get($executionDetails, 'index_average_score'))
                 ? (float) data_get($executionDetails, 'index_average_score') : null,
-            'score' => $score / 10, 'confidence' => $confidence,
+            'score' => $compositeScore !== null ? (float) $compositeScore : $score,
+            'confidence' => $confidence,
+            'review' => $review,
+            'candles' => $candles,
             'target_price' => $target ?: null,
             'expected_return' => $price > 0 && $target > 0 ? (($target / $price) - 1) * 100 : null,
             'performance_percent' => $performance,
