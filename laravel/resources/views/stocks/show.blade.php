@@ -1924,7 +1924,7 @@
                                             $externalReviewVerdict === 'CAUTION' => __('Vorsicht - externe Recherche stuft das Signal ab.'),
                                             $externalReviewVerdict === 'OBJECTION' => __('Wesentlicher Einwand der externen Recherche.'),
                                             $externalReviewVerdict === 'INSUFFICIENT_EVIDENCE' => __('Datenlage für die externe Recherche unzureichend.'),
-                                            $externalBuyReview->status === 'failed' => __('Externe Recherche fehlgeschlagen.'),
+                                            $externalBuyReview?->status === 'failed' => __('Externe Recherche fehlgeschlagen.'),
                                             default => __('Externe Webrecherche läuft noch.'),
                                         };
 
@@ -2012,6 +2012,9 @@
                                     <div class="flex items-center gap-3 text-[8px] font-bold text-[var(--ak-muted)]">
                                         <span><i class="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400"></i>{{ __('Kauf') }}</span>
                                         <span><i class="mr-1 inline-block h-2 w-2 rounded-full bg-rose-400"></i>{{ __('Verkauf') }}</span>
+                                        @if($chartCandles->isNotEmpty())
+                                            <span><i class="mr-1 inline-block h-2 w-2 rounded-full bg-slate-400"></i>{{ __('Kurs (Buy & Hold)') }}</span>
+                                        @endif
                                     </div>
                                 </div>
                                 <div id="stock-signal-trade-chart" class="h-[180px] w-full"></div>
@@ -2079,6 +2082,22 @@
                                         y: Number(point.equity_percent),
                                         point,
                                     }));
+                                    // Buy & Hold reference: the real close-price series over the same
+                                    // window, indexed to 0 % at the first candle in range - same axis
+                                    // and scale as the strategy curve, so "does the strategy actually
+                                    // beat just holding the stock" is a direct visual comparison.
+                                    const candles = @json($chartCandles->values());
+                                    let buyHoldSeries = [];
+                                    if (candles.length) {
+                                        const rangeStart = Number(points[0].timestamp) * 1000;
+                                        const rangeEnd = Number(points[points.length - 1].timestamp) * 1000;
+                                        const inRange = candles.filter(candle => Number(candle.x) >= rangeStart && Number(candle.x) <= rangeEnd);
+                                        const baseline = inRange.length ? Number(inRange[0].y[3]) : 0;
+                                        if (baseline > 0) {
+                                            buyHoldSeries = inRange.map(candle => ({ x: Number(candle.x), y: ((Number(candle.y[3]) / baseline) - 1) * 100 }));
+                                        }
+                                    }
+                                    const hasBuyHold = buyHoldSeries.length > 1;
                                     const annotations = points.map((point, index) => ({
                                         x: Number(point.timestamp) * 1000,
                                         y: Number(point.equity_percent),
@@ -2094,11 +2113,13 @@
                                         },
                                         label: { text: '' },
                                     }));
+                                    const series = [{ name: @json(__('Strategie-Ergebnis')), data: seriesData }];
+                                    if (hasBuyHold) series.push({ name: @json(__('Kurs (Buy & Hold)')), data: buyHoldSeries });
                                     new window.ApexCharts(node, {
                                         chart: { type: 'line', height: 180, toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, background: 'transparent' },
-                                        series: [{ name: @json(__('Strategie-Ergebnis')), data: seriesData }],
-                                        colors: [light ? '#007c87' : '#22d3ee'],
-                                        stroke: { width: 3.2, curve: 'straight', lineCap: 'round' },
+                                        series,
+                                        colors: hasBuyHold ? [light ? '#007c87' : '#22d3ee', light ? '#64748b' : '#94a3b8'] : [light ? '#007c87' : '#22d3ee'],
+                                        stroke: { width: hasBuyHold ? [3.2, 1.2] : [3.2], curve: 'straight', lineCap: 'round', dashArray: hasBuyHold ? [0, 4] : [0] },
                                         fill: { type: 'solid', opacity: 0 },
                                         states: { normal: { filter: { type: 'none' } }, hover: { filter: { type: 'none' } }, active: { filter: { type: 'none' } } },
                                         annotations: { points: annotations },
