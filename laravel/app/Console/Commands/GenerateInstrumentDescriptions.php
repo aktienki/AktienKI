@@ -19,9 +19,9 @@ class GenerateInstrumentDescriptions extends Command
 
     public function handle(): int
     {
-        $apiKey = (string) env('OPENAI_API_KEY');
+        $apiKey = trim((string) config('aktienki.instrument_descriptions.grid_api_key'));
         if ($apiKey === '') {
-            $this->error('OPENAI_API_KEY ist nicht konfiguriert.');
+            $this->error('GRID_API_KEY ist für die Firmenbeschreibungen nicht konfiguriert.');
 
             return self::FAILURE;
         }
@@ -34,7 +34,8 @@ class GenerateInstrumentDescriptions extends Command
             }
         }
 
-        $model = (string) env('OPENAI_DESCRIPTION_MODEL', 'gpt-5.4-mini');
+        $model = (string) config('aktienki.instrument_descriptions.grid_model', 'text-prime');
+        $endpoint = (string) config('aktienki.instrument_descriptions.grid_endpoint', 'https://api.thegrid.ai/v1/chat/completions');
         $query = DB::table('instruments')
             ->where('instruments.type', 'stock')
             ->where('instruments.is_active', true)
@@ -57,33 +58,44 @@ class GenerateInstrumentDescriptions extends Command
         $success = $failed = 0;
         foreach ($stocks as $stock) {
             try {
-                $prompt = 'Erstelle für dieses börsennotierte Unternehmen jeweils eine deutsche und englische Version. '
-                    .'compact_de und compact_en: jeweils 3–4 informative, gut lesbare Sätze für eine Screener-Karte. '
-                    .'expanded_de und expanded_en: jeweils 6–8 kompakte, aber umfassende Sätze für eine Detailseite. '
-                    .'Beschreibe Geschäftsmodell, wichtigste Produkte/Dienstleistungen, Kundengruppen, Hauptmärkte, Branche und relevante Wertschöpfung. '
-                    .'Keine Anlageberatung, keine Kursprognose und keine erfundenen Details. Wenn Angaben fehlen, formuliere allgemein. '
-                    .'Antworte ausschließlich als JSON mit den Schlüsseln compact_de, expanded_de, compact_en und expanded_en. Daten: '
-                    .json_encode([
-                        'symbol' => $stock->symbol,
-                        'name' => $stock->name,
-                        'country' => $stock->country,
-                        'sector' => $stock->sector,
-                        'industry' => $stock->industry,
-                        'currency' => $stock->currency,
-                    ], JSON_UNESCAPED_UNICODE);
+                $input = [
+                    'symbol' => $stock->symbol,
+                    'name' => $stock->name,
+                    'country' => $stock->country,
+                    'sector' => $stock->sector,
+                    'industry' => $stock->industry,
+                    'currency' => $stock->currency,
+                ];
 
-                $response = Http::withToken($apiKey)->acceptJson()->asJson()->timeout(60)->post('https://api.openai.com/v1/responses', [
+                $response = Http::withToken($apiKey)->acceptJson()->asJson()->timeout(60)->post($endpoint, [
                     'model' => $model,
-                    'instructions' => 'Du bist ein sachlicher Unternehmensredakteur. Liefere valides JSON ohne Markdown.',
-                    'input' => $prompt,
-                    'max_output_tokens' => 700,
-                    'metadata' => ['feature' => 'instrument-business-descriptions'],
+                    'messages' => [
+                        [
+                            'role' => 'system',
+                            'content' => 'Du bist ein sachlicher Unternehmensredakteur. '
+                                .'Erstelle für ein börsennotiertes Unternehmen jeweils eine deutsche und englische Version. '
+                                .'compact_de/compact_en: jeweils 3-4 informative, gut lesbare Sätze für eine Screener-Karte. '
+                                .'expanded_de/expanded_en: jeweils 6-8 kompakte, aber umfassende Sätze für eine Detailseite. '
+                                .'Beschreibe Geschäftsmodell, wichtigste Produkte/Dienstleistungen, Kundengruppen, Hauptmärkte, Branche und relevante Wertschöpfung. '
+                                .'Keine Anlageberatung, keine Kursprognose und keine erfundenen Details. Wenn Angaben fehlen, formuliere allgemein. '
+                                .'Antworte ausschließlich mit einem einzigen JSON-Objekt gemäß dem vorgegebenen Schema - kein Fließtext davor oder danach.',
+                        ],
+                        [
+                            'role' => 'user',
+                            'content' => json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                        ],
+                    ],
+                    'response_format' => [
+                        'type' => 'json_schema',
+                        'json_schema' => ['schema' => $this->resultSchema()],
+                    ],
+                    'max_tokens' => max(400, (int) config('aktienki.instrument_descriptions.max_output_tokens', 900)),
                 ]);
                 if ($response->failed()) {
-                    throw new \RuntimeException('HTTP '.$response->status().': '.(string) data_get($response->json(), 'error.message', 'OpenAI-Fehler'));
+                    throw new \RuntimeException('HTTP '.$response->status().': '.(string) data_get($response->json(), 'error.message', 'The Grid liefert einen Fehler.'));
                 }
 
-                $raw = (string) ($response->json('output_text') ?: data_get($response->json(), 'output.0.content.0.text', ''));
+                $raw = (string) data_get($response->json(), 'choices.0.message.content', '');
                 $json = json_decode(trim($raw), true);
                 $compact = trim((string) ($json['compact_de'] ?? ''));
                 $expanded = trim((string) ($json['expanded_de'] ?? ''));
@@ -114,5 +126,20 @@ class GenerateInstrumentDescriptions extends Command
         $this->info("Abgeschlossen: {$success} erfolgreich, {$failed} fehlgeschlagen.");
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function resultSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => ['compact_de', 'expanded_de', 'compact_en', 'expanded_en'],
+            'properties' => [
+                'compact_de' => ['type' => 'string', 'maxLength' => 700],
+                'expanded_de' => ['type' => 'string', 'maxLength' => 1400],
+                'compact_en' => ['type' => 'string', 'maxLength' => 700],
+                'expanded_en' => ['type' => 'string', 'maxLength' => 1400],
+            ],
+        ];
     }
 }

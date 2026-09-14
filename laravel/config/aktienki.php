@@ -124,17 +124,17 @@ return [
         // search tool.
         'provider' => env('EXTERNAL_BUY_REVIEW_PROVIDER', 'openai'),
         'api_key' => env('OPENAI_API_KEY'),
-        'model' => env('EXTERNAL_BUY_REVIEW_V3_MODEL', 'gpt-5.6-luna'),
+        'model' => env('EXTERNAL_BUY_REVIEW_MODEL', 'gpt-5.6-luna'),
         'reasoning_effort' => env('EXTERNAL_BUY_REVIEW_REASONING_EFFORT', 'low'),
-        'prompt_version' => env('EXTERNAL_BUY_REVIEW_V3_PROMPT_VERSION', 'buy-twelve-data-luna-v3'),
-        'max_search_calls' => (int) env('EXTERNAL_BUY_REVIEW_V3_MAX_SEARCH_CALLS', 1),
+        'prompt_version' => env('EXTERNAL_BUY_REVIEW_PROMPT_VERSION', 'buy-twelve-data-luna-v3'),
+        'max_search_calls' => (int) env('EXTERNAL_BUY_REVIEW_MAX_SEARCH_CALLS', 1),
         'minimum_source_domains' => (int) env('EXTERNAL_BUY_REVIEW_MIN_SOURCE_DOMAINS', 2),
         // Includes invisible reasoning tokens as well as the compact JSON.
-        'max_output_tokens' => (int) env('EXTERNAL_BUY_REVIEW_V3_MAX_OUTPUT_TOKENS', 1600),
+        'max_output_tokens' => (int) env('EXTERNAL_BUY_REVIEW_MAX_OUTPUT_TOKENS', 1600),
         // Pricing is snapshotted with every result so later price changes do
         // not rewrite the historical cost estimate.
-        'input_price_per_million_usd' => (float) env('EXTERNAL_BUY_REVIEW_V3_INPUT_PRICE_USD', 0.2),
-        'output_price_per_million_usd' => (float) env('EXTERNAL_BUY_REVIEW_V3_OUTPUT_PRICE_USD', 1.2),
+        'input_price_per_million_usd' => (float) env('EXTERNAL_BUY_REVIEW_INPUT_PRICE_USD', 0.2),
+        'output_price_per_million_usd' => (float) env('EXTERNAL_BUY_REVIEW_OUTPUT_PRICE_USD', 1.2),
         'search_price_per_call_usd' => (float) env('EXTERNAL_BUY_REVIEW_SEARCH_PRICE_USD', 0.01),
         // Perplexity (used only when provider = 'perplexity' above).
         'perplexity_api_key' => env('PERPLEXITY_API_KEY'),
@@ -158,8 +158,20 @@ return [
         'grid_api_key' => env('GRID_API_KEY'),
         'grid_endpoint' => env('STOCK_AI_ASSESSMENT_GRID_ENDPOINT', 'https://api.thegrid.ai/v1/chat/completions'),
         // Instrument string: <task>-<tier>, e.g. text-standard/text-prime/text-max.
-        'grid_model' => env('STOCK_AI_ASSESSMENT_GRID_MODEL', 'text-standard'),
+        'grid_model' => env('STOCK_AI_ASSESSMENT_GRID_MODEL', 'gpt-sol-latest'),
         'max_output_tokens' => (int) env('STOCK_AI_ASSESSMENT_MAX_OUTPUT_TOKENS', 900),
+    ],
+    'instrument_descriptions' => [
+        // Bilingual business descriptions for newly imported stocks - same
+        // reasoning as stock_ai_assessment (plain writing task, no live web
+        // data needed), moved off OpenAI to The Grid's cheaper spot market.
+        // High volume/low individual stakes, so a cheaper tier than the
+        // user-facing stock_ai_assessment is the right fit.
+        'provider' => env('INSTRUMENT_DESCRIPTIONS_PROVIDER', 'grid'),
+        'grid_api_key' => env('GRID_API_KEY'),
+        'grid_endpoint' => env('INSTRUMENT_DESCRIPTIONS_GRID_ENDPOINT', 'https://api.thegrid.ai/v1/chat/completions'),
+        'grid_model' => env('INSTRUMENT_DESCRIPTIONS_GRID_MODEL', 'text-prime'),
+        'max_output_tokens' => (int) env('INSTRUMENT_DESCRIPTIONS_MAX_OUTPUT_TOKENS', 900),
     ],
     'final_entry_shadow' => [
         // Writes only the isolated FINAL-entry decision/lifecycle tables.
