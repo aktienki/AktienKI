@@ -61,7 +61,9 @@
             .screener-page .screener-filter-shell{margin-bottom:.8rem!important}
             .screener-page .screener-filter-shell>button{height:2.6rem!important;padding-inline:.85rem!important;font-size:.78rem!important}
             .screener-page .screener-filter-bar{gap:.45rem!important;margin-top:.45rem!important;padding:.6rem!important}
-            .screener-page .screener-filter-bar :is(input,select,button,.screener-custom-select-trigger),.screener-page .screener-filter-bar>a{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-height:2.5rem!important;height:2.5rem!important;zoom:1!important;padding-block:0!important;font-size:.88rem!important;line-height:1.1!important}
+            .screener-page .screener-filter-bar :is(input:not([type=checkbox]):not([type=radio]),select,button,.screener-custom-select-trigger),.screener-page .screener-filter-bar>a{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-height:2.5rem!important;height:2.5rem!important;zoom:1!important;padding-block:0!important;font-size:.88rem!important;line-height:1.1!important}
+            .screener-page .screener-filter-bar>label{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-height:2.5rem!important;height:2.5rem!important;font-size:.88rem!important;line-height:1.1!important}
+            .screener-page .screener-filter-bar>label input[type=checkbox]{width:1rem!important;height:1rem!important;min-height:0!important;flex:none!important}
             .screener-page .screener-risk-choice{width:100%!important;min-width:0!important;min-height:2.5rem!important;height:2.5rem!important}
             .screener-page .screener-risk-choice span{display:grid!important;height:100%!important;place-items:center!important;padding:0!important}
             .screener-page .screener-risk-choice svg{width:1.2rem!important;height:1.2rem!important;stroke-width:2!important}
