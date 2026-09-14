@@ -120,6 +120,9 @@
                     'index' => filled(request('index')) ? request('index') : null,
                     'signal' => filled(request('signal')) ? signal_label(request('signal')) : null,
                     'quality_gate_only' => request()->boolean('quality_gate_only') ? __('Nur Quality-Gate bestanden') : null,
+                    'external_confirmed' => in_array(request('external_confirmed'), ['yes', 'no'], true)
+                        ? (request('external_confirmed') === 'yes' ? __('Extern bestätigt: Ja') : __('Extern bestätigt: Nein'))
+                        : null,
                     'min_max_return' => filled(request('min_max_return')) ? __('Max. Rendite') . ' ≥ ' . (request('min_max_return') > 0 ? '+' : '') . request('min_max_return') . ' %' : null,
                     'transition_days' => filled(request('transition_days')) ? trans_choice('Letzter :days Tag|Letzte :days Tage', (int) request('transition_days'), ['days' => request('transition_days')]) : null,
                     'bestand' => filled(request('bestand')) ? (
@@ -175,10 +178,15 @@
             <fieldset class="screener-risk-choice"><legend class="sr-only">{{ __('Profil') }}</legend><input type="hidden" name="risk_profiles" value="1"><button type="button" aria-label="{{ __('Alle') }}" title="{{ __('Alle') }}" @click="$el.closest('fieldset').querySelectorAll('input[type=checkbox]').forEach(input => input.checked = true); submitFilters($el.form)"><span><x-heroicon-o-squares-2x2 /><b class="risk-profile-text">{{ __('Alle') }}</b></span></button><label title="{{ __('Defensiv') }}"><input type="checkbox" name="risk_class[]" value="defensive" aria-label="{{ __('Defensiv') }}" @checked($defaultRiskProfiles||$selectedRiskProfiles->contains('defensive')) @change="submitFilters($el.form)"><span><x-heroicon-o-shield-check /><b class="risk-profile-text">{{ __('Defensiv') }}</b></span></label><label title="{{ __('Ausgewogen') }}"><input type="checkbox" name="risk_class[]" value="balanced" aria-label="{{ __('Ausgewogen') }}" @checked($defaultRiskProfiles||$selectedRiskProfiles->contains('balanced')) @change="submitFilters($el.form)"><span><x-heroicon-o-scale /><b class="risk-profile-text">{{ __('Ausgewogen') }}</b></span></label><label title="{{ __('Offensiv') }}"><input type="checkbox" name="risk_class[]" value="offensive" aria-label="{{ __('Offensiv') }}" @checked($defaultRiskProfiles||$selectedRiskProfiles->contains('offensive')) @change="submitFilters($el.form)"><span><x-heroicon-o-bolt /><b class="risk-profile-text">{{ __('Offensiv') }}</b></span></label></fieldset>
             <select name="index" @change="submitFilters($el.form)" class="ak-input h-10 min-w-[125px] flex-1 text-sm"><option value="">{{ __('Alle Indizes') }}</option>@foreach($indices as $index)<option value="{{ $index->symbol }}" @selected(request('index') === $index->symbol)>{{ $index->name ?: $index->symbol }}</option>@endforeach</select>
             <select name="signal" @change="submitFilters($el.form)" class="ak-input h-10 min-w-[125px] flex-1 text-sm"><option value="">{{ __('POSITIV, WAIT und WATCH') }}</option>@foreach(['BUY','WAIT','WATCH'] as $signal)<option value="{{ $signal }}" @selected(request('signal') === $signal)>{{ signal_label($signal) }}</option>@endforeach</select>
-            <label class="ak-input flex h-10 min-w-[260px] flex-1 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-xs font-bold" title="{{ __('Nur Aktien zeigen, deren Modell den eigenen Drei-Jahres-Qualitäts-Gate bestanden hat.') }}">
+            <label class="ak-input flex h-10 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-xs font-bold" style="width:280px;min-width:280px;max-width:280px;flex:0 0 280px" title="{{ __('Nur Aktien zeigen, deren Modell den eigenen Drei-Jahres-Qualitäts-Gate bestanden hat.') }}">
                 <input type="checkbox" name="quality_gate_only" value="1" @checked(request()->boolean('quality_gate_only')) @change="submitFilters($el.form)" class="h-4 w-4 shrink-0" />
                 <span>{{ __('Nur Quality-Gate bestanden') }}</span>
             </label>
+            <select name="external_confirmed" @change="submitFilters($el.form)" class="ak-input h-10 min-w-[170px] flex-1 text-sm" title="{{ __('Filtert nach dem Ergebnis der unabhängigen externen KI-Recherche (Webrecherche) zu diesem Signal.') }}">
+                <option value="" @selected(request('external_confirmed') === null || request('external_confirmed') === '')>{{ __('Extern bestätigt: alle') }}</option>
+                <option value="yes" @selected(request('external_confirmed') === 'yes')>{{ __('Extern bestätigt: Ja') }}</option>
+                <option value="no" @selected(request('external_confirmed') === 'no')>{{ __('Extern bestätigt: Nein') }}</option>
+            </select>
             <select name="min_max_return" @change="submitFilters($el.form)" class="ak-input h-10 min-w-[185px] flex-1 text-base font-bold" aria-label="{{ __('Maximale Rendite') }}">
                 <option value="">{{ __('Max. Rendite') }} · {{ __('Alle') }}</option>
                 @foreach(range(0,10,2) as $minimum)<option value="{{ $minimum }}" @selected((string)request('min_max_return')===(string)$minimum)>{{ __('Max. Rendite') }} ≥ {{ $minimum > 0 ? '+' : '' }}{{ $minimum }} %</option>@endforeach

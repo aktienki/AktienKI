@@ -4112,5 +4112,9 @@
     "bestanden": "passed",
     "nicht bestanden": "not passed",
     "Suche": "Search",
-    "Top": "Top"
+    "Top": "Top",
+    "Extern bestätigt: Ja": "Externally confirmed: Yes",
+    "Extern bestätigt: Nein": "Externally confirmed: No",
+    "Extern bestätigt: alle": "Externally confirmed: all",
+    "Filtert nach dem Ergebnis der unabhängigen externen KI-Recherche (Webrecherche) zu diesem Signal.": "Filters by the result of the independent external AI research (web search) for this signal."
 }

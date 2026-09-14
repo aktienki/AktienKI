@@ -393,6 +393,7 @@ final class ServingScreenerService
             ? (float) $request->query('min_max_return')
             : null;
         $qualityGateOnly = $request->boolean('quality_gate_only');
+        $externalConfirmed = (string) $request->query('external_confirmed', '');
 
         $ranked = $ranked
             ->when($queryText !== '', fn (Collection $items) => $items->filter(fn (object $stock): bool => str_contains(mb_strtolower((string) $stock->symbol), $queryText)
@@ -425,6 +426,11 @@ final class ServingScreenerService
             // 3 years): instruments whose own quality gate passed had a
             // profit factor of ~4.9 vs. ~1.1 for the 94% that never passed.
             ->when($qualityGateOnly, fn (Collection $items) => $items->where('trigger_model_quality_gate_passed', true))
+            ->when(in_array($externalConfirmed, ['yes', 'no'], true), fn (Collection $items) => $items->filter(function (object $stock) use ($externalConfirmed): bool {
+                $confirmed = ($stock->external_review_is_current ?? false) && $stock->external_review_verdict === 'NO_OBJECTION';
+
+                return $externalConfirmed === 'yes' ? $confirmed : ! $confirmed;
+            }))
             ->when($holdingSource !== '', fn (Collection $items) => $items->whereIn('instrument_id', $holdingInstrumentIds))
             ->when($minimumMaximumReturn !== null, fn (Collection $items) => $items->filter(function (object $stock) use ($minimumMaximumReturn): bool {
                 $maximum = collect(self::HORIZONS)
