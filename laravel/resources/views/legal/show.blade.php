@@ -20,7 +20,7 @@
     $missingCorporateDetails = blank($legal['register_court']) || blank($legal['register_number']);
     $pages = ['impressum'=>'Impressum','agb'=>'AGB','datenschutz'=>'Datenschutz','risikohinweise'=>'Risikohinweise','widerruf'=>'Widerruf','ki-transparenz'=>'KI-Transparenz'];
 @endphp
-<header class="top"><div class="top-inner"><a class="brand" href="{{ route('welcome') }}"><img src="{{ asset('brand/generated/bull-icon.png') }}" alt=""><span>aktien<b>KI</b>.com</span></a><a class="back" href="{{ url()->previous() === url()->current() ? route('welcome') : url()->previous() }}">← Zurück</a></div></header>
+<header class="top"><div class="top-inner"><a class="brand" href="{{ route('welcome') }}"><img src="{{ asset('brand/generated/instagram-bull-logo-1x1.png') }}" alt=""><span>aktien<b>KI</b>.com</span></a><a class="back" href="{{ url()->previous() === url()->current() ? route('welcome') : url()->previous() }}">← Zurück</a></div></header>
 <main class="wrap">
     <section class="hero"><div class="eyebrow">Rechtliche Informationen</div><h1>{{ $title }}</h1><div class="meta">Version {{ $legal['legal_version'] }} · Stand {{ \Illuminate\Support\Carbon::parse($legal['effective_date'])->format('d.m.Y') }}</div>
         @if($missingCorporateDetails)<div class="notice"><strong>Vor Veröffentlichung vervollständigen:</strong> Registergericht, Handelsregisternummer und gegebenenfalls Gründungszusatz/USt‑IdNr. fehlen noch. Diese Fassung ist für Entwicklung und rechtliche Prüfung vorgesehen.</div>@endif

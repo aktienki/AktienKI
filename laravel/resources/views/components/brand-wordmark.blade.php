@@ -1,13 +1,13 @@
 <span {{ $attributes->class(['ak-brand-wordmark inline-flex items-center']) }}>
-    {{-- Cropped to just the icon portion of the same orange artwork used
-         below - no separate square asset exists, and object-position keeps
-         it transparent (unlike the Instagram export, which has a white
-         matte background). Single asset regardless of theme, as before. --}}
+    {{-- A dedicated square icon asset (not a crop of the wide lockup below -
+         cropping a large, detailed 1610x669 image down to 40px looked
+         blurry and mispositioned). Single asset regardless of theme, as
+         before. --}}
     <img
-        src="{{ asset('brand/generated/bull-logo-light-clean.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-light-clean.png')) }}"
+        src="{{ asset('brand/generated/instagram-bull-logo-1x1.png') }}?v={{ filemtime(public_path('brand/generated/instagram-bull-logo-1x1.png')) }}"
         alt="aktienKI.com"
         class="ak-brand-icon h-10 w-10 min-[480px]:hidden"
-        style="object-fit: cover; object-position: left center;"
+        style="object-fit: contain;"
     >
     {{-- Light artwork is the default desktop display (no theme attribute
          needed), since the app defaults every user to the light theme - see

@@ -37,7 +37,7 @@
 <body>
 <header class="nav">
     <div class="wrap nav-inner">
-        <a class="brand" href="{{ route('welcome') }}"><img src="{{ asset('brand/generated/bull-logo-light-clean.png') }}" alt="AktienKI Bulle"><span class="brand-copy"><span>aktien<b>KI</b>.com</span><small class="brand-claim">Research • Intelligence • Decisions</small></span></a>
+        <a class="brand" href="{{ route('welcome') }}"><img src="{{ asset('brand/generated/instagram-bull-logo-1x1.png') }}" alt="AktienKI Bulle"><span class="brand-copy"><span>aktien<b>KI</b>.com</span><small class="brand-claim">Research • Intelligence • Decisions</small></span></a>
         <nav class="nav-links" aria-label="Seitennavigation"><a href="#analyse">Analyse</a><a href="#prozess">Qualität</a><a href="#chancen">Chancen & Risiken</a></nav>
         <div class="kla-nav-actions">
             <details class="kla-language"><summary aria-label="{{ __('Sprache wählen') }}"><span>{{ app()->getLocale() === 'en' ? '🇬🇧' : '🇩🇪' }}</span><span>{{ strtoupper(app()->getLocale()) }}</span><span>⌄</span></summary><div class="kla-language-menu">
