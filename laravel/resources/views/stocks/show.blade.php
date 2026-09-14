@@ -2275,6 +2275,15 @@
 
         </section>
 
+        @php $companyDescriptionText = ($businessDescription ?? null) ?: ($businessSummary ?? null); @endphp
+        @if (filled($companyDescriptionText))
+        <section data-stock-collapsible="company" data-stock-collapsible-title="{{ __('Unternehmensbeschreibung') }}">
+            <div class="rounded-xl border border-[var(--ak-border)] bg-transparent p-3">
+                <p class="text-sm leading-6 text-[var(--ak-text)]">{{ $companyDescriptionText }}</p>
+            </div>
+        </section>
+        @endif
+
         @if ($canUseChartIndicators && $indicatorCards->isNotEmpty())
         @php
             $indicatorDataPointCount = $indicatorCards->max(fn (array $card): int => count($card['points'])) ?? 0;
@@ -3325,6 +3334,10 @@
             }
 
             const sectionMeta = {
+                company: {
+                    description: @json(__('Geschäftstätigkeit und Profil des Unternehmens.')),
+                    icon: '<path d="M4 17V7l6-3 6 3v10M4 17h12M8 17v-3h4v3M7 10h1m4 0h1m-6 3h1m4 0h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+                },
                 indicators: {
                     description: @json(__('Historische Einzelcharts und Heatmaps der technischen Indikatoren.')),
                     icon: '<path d="M3 16V9m4 7V5m4 11v-4m4 4V3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
@@ -3367,7 +3380,10 @@
                 const toggle = document.createElement('button');
                 toggle.type = 'button';
                 toggle.className = 'stock-collapsible-toggle';
-                const startsOpen = key === 'analysis' && section.dataset.stockBuyReport === 'true';
+                // Collapsed by default is a mobile-space concession only -
+                // on desktop there's room to just show everything.
+                const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+                const startsOpen = isDesktop || (key === 'analysis' && section.dataset.stockBuyReport === 'true');
                 toggle.setAttribute('aria-expanded', String(startsOpen));
                 toggle.innerHTML = `<span class="stock-collapsible-icon"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true">${meta.icon}</svg></span><span class="stock-collapsible-copy"><span class="flex items-center gap-2">${title}${proLocked ? '<span class="ak-plan-badge ak-plan-badge--pro">PRO</span>' : ''}</span><small class="stock-collapsible-description">${meta.description}</small></span><svg class="stock-collapsible-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
                 content.hidden = !startsOpen;
