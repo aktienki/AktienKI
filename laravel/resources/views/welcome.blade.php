@@ -366,6 +366,9 @@
         @endauth
     </div>
 </div></header>
+<aside class="beta-ribbon" aria-label="{{ __('Informationen zur Betaphase') }}">
+    <div class="beta-current"><span class="pulse"></span><span class="beta-current-copy"><small>{{ __('AKTUELLE PHASE') }}</small><b>{{ __('Geschlossener Betatest') }}</b></span></div>
+</aside>
 <script>
 window.waitForWelcomeAnimation=panel=>{
     if(!panel||panel.classList.contains('animation-started'))return Promise.resolve();
