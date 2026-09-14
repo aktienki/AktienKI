@@ -45,10 +45,15 @@
 >
     <div class="ak-container flex h-full items-center gap-2 sm:gap-4 lg:gap-5">
         <a href="{{ route('dashboard') }}" class="ak-brand-link relative flex w-14 shrink-0 items-center overflow-hidden sm:w-auto">
-            <x-welcome-brand-logo class="ak-brand-logo ak-brand-logo-dark h-14 transition duration-300" />
-            <img src="{{ asset('brand/generated/bull-logo-light-clean.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-light-clean.png')) }}" alt="aktienKI.com" class="ak-brand-logo ak-brand-logo-light hidden h-14 max-w-none transition duration-300">
-            <img src="{{ asset('brand/generated/bull-logo-light-clean.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-light-clean.png')) }}" alt="" aria-hidden="true" class="ak-brand-logo ak-brand-logo-light-accent pointer-events-none absolute inset-0 hidden h-14 max-w-none transition duration-300">
-            <img src="{{ asset('brand/generated/bull-logo-light-clean.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-light-clean.png')) }}" alt="" aria-hidden="true" class="ak-brand-logo ak-brand-logo-light-ki pointer-events-none absolute inset-0 hidden h-14 max-w-none transition duration-300">
+            {{-- Light artwork is the default (theme defaults to light for
+                 every user - see resources/js/preferences.js's light-default
+                 versioning), visible before theme JS even runs. Dark-theme
+                 users see the CSS below swap to the dark-background variant
+                 instead - both use the same orange bull artwork. --}}
+            <img src="{{ asset('brand/generated/bull-logo-dark.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-dark.png')) }}" alt="aktienKI.com" class="ak-brand-logo ak-brand-logo-dark hidden h-14 max-w-none transition duration-300">
+            <img src="{{ asset('brand/generated/bull-logo-light-clean.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-light-clean.png')) }}" alt="aktienKI.com" class="ak-brand-logo ak-brand-logo-light h-14 max-w-none transition duration-300">
+            <img src="{{ asset('brand/generated/bull-logo-light-clean.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-light-clean.png')) }}" alt="" aria-hidden="true" class="ak-brand-logo ak-brand-logo-light-accent pointer-events-none absolute inset-0 h-14 max-w-none transition duration-300">
+            <img src="{{ asset('brand/generated/bull-logo-light-clean.png') }}?v={{ filemtime(public_path('brand/generated/bull-logo-light-clean.png')) }}" alt="" aria-hidden="true" class="ak-brand-logo ak-brand-logo-light-ki pointer-events-none absolute inset-0 h-14 max-w-none transition duration-300">
         </a>
 
         <button

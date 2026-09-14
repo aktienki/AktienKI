@@ -110,5 +110,11 @@ Gesammelt aus der laufenden Session. Status: ✅ behoben · 🟡 teilweise/mitig
 - Perplexity Sonar als wählbarer Provider für externe Bewertungen eingebaut
 - PHP `memory_limit` (lokal) 128M → 512M nach Fatal Error auf der Aktienseite
 
+## ✅ Heute behoben (4)
+
+27. ✅ **Falsches Logo im Light Theme (Topbar zeigte den cyanfarbenen Dark-Theme-Bullen statt des orangenen) + zwei tiefere Bugs dahinter.** Ursache: `data-theme` wird ausschließlich clientseitig per JS gesetzt (`preferences.js`, erst nach `DOMContentLoaded`); die CSS-Regeln basierten auf `:root:not([data-theme="light"])`, was vor Ablauf des JS (und damit bei jedem Seitenaufruf kurz) fälschlich als "dark" galt, obwohl Light das echte Standard-Theme aller Nutzer ist. Zusätzlich zeigte `brand-wordmark.blade.php` (Login/Registrierung/Preise/Kontakt/Roadmap/… — 11 Seiten) die Dark-Variante am Desktop nie an, da schlicht keine `display:block`-Regel dafür existierte. Behoben: Light-Artwork ist jetzt ohne Attribut-Abhängigkeit der Standard (kein Flash mehr möglich), Dark ist ein expliziter `[data-theme="dark"]`-Override; beide Kopfzeilen-Logos nutzen jetzt außerdem denselben orangenen Bullen (`bull-logo-dark.png` für dunkle, `bull-logo-light-clean.png` für helle Hintergründe) statt des bisherigen cyanfarbenen `bull-icon.png`.
+    *Dateien:* `resources/views/components/app-topbar.blade.php`, `resources/views/components/brand-wordmark.blade.php`, `resources/css/app.css`
+    *Hinweis:* `welcome-brand-logo.blade.php` wird dadurch nirgends mehr referenziert (totes Component-File, nicht gelöscht).
+
 ---
 *Format-Vorschlag: dieses Dokument einfach der Reihe nach abarbeiten, erledigte Punkte auf ✅ setzen statt löschen (Historie bleibt nachvollziehbar).*

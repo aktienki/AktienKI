@@ -1380,16 +1380,21 @@ body:not(.welcome-background) :is(
     color: #0891b2;
 }
 
-:root[data-theme="light"] .ak-brand-logo-dark {
+/* Light artwork is the default (no attribute needed yet), since the app
+   defaults every user to the light theme - see preferences.js's
+   light-default versioning. This avoids a flash of the wrong logo before
+   theme JS runs on first paint. Dark theme is an explicit opt-in override. */
+:root[data-theme="dark"] .ak-brand-logo-dark {
+    display: block;
+}
+
+:root[data-theme="dark"] .ak-brand-logo-light,
+:root[data-theme="dark"] .ak-brand-logo-light-accent,
+:root[data-theme="dark"] .ak-brand-logo-light-ki {
     display: none;
 }
 
-:root[data-theme="light"] .ak-brand-logo-light {
-    display: block;
-}
-
-:root[data-theme="light"] .ak-brand-logo-light-accent {
-    display: block;
+.ak-brand-logo-light-accent {
     clip-path: inset(0 55% 0 0);
     filter:
         hue-rotate(155deg)
@@ -1399,8 +1404,7 @@ body:not(.welcome-background) :is(
         drop-shadow(0 1px 2px rgba(8, 145, 178, .22));
 }
 
-:root[data-theme="light"] .ak-brand-logo-light-ki {
-    display: block;
+.ak-brand-logo-light-ki {
     clip-path: inset(0 11% 0 76%);
     filter: hue-rotate(155deg) saturate(1.2) brightness(1.02) contrast(1.08);
 }
@@ -1410,10 +1414,6 @@ body:not(.welcome-background) :is(
     position: relative;
     border-radius: .75rem;
     isolation: isolate;
-}
-
-:root:not([data-theme="light"]) .ak-brand-link .ak-brand-logo-dark {
-    filter: none;
 }
 
 :root:not([data-theme="light"]) .ak-welcome-brand-logo img {
@@ -1432,11 +1432,13 @@ body:not(.welcome-background) :is(
     background: radial-gradient(circle at 38% 50%, rgba(6, 182, 212, .06), transparent 68%);
 }
 
-:root:not([data-theme="light"]) .ak-brand-wordmark-dark {
-    filter: none;
+/* .ak-brand-wordmark-light (see component) is the default desktop display
+   with no attribute dependency; dark is an explicit opt-in override. */
+:root[data-theme="dark"] .ak-brand-wordmark-dark {
+    display: inline-flex;
 }
 
-:root[data-theme="light"] .ak-brand-wordmark-dark {
+:root[data-theme="dark"] .ak-brand-wordmark-light {
     display: none;
 }
 
@@ -1444,18 +1446,8 @@ body:not(.welcome-background) :is(
     filter: drop-shadow(0 2px 3px rgba(14, 116, 144, .14));
 }
 
-:root:not([data-theme="light"]) .ak-brand-icon {
-    filter: brightness(1.08) contrast(1.06) saturate(1.04) drop-shadow(0 0 7px rgba(245, 158, 11, .18));
-}
-
 :root[data-theme="light"] .ak-brand-icon {
     filter: drop-shadow(0 2px 3px rgba(14, 116, 144, .12));
-}
-
-@media (min-width: 480px) {
-    :root[data-theme="light"] .ak-brand-wordmark-light {
-        display: block;
-    }
 }
 
 :root[data-theme="light"] body:not(.welcome-background) [class*="text-violet-"] {
