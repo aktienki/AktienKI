@@ -16,8 +16,7 @@
     @forelse($sectors as $position=>$sector)
         @php
             $forecasts=collect([10=>$sector->average_expected_return_10d,20=>$sector->average_expected_return_20d,40=>$sector->average_expected_return_40d])->map(fn($v)=>is_numeric($v)?(float)$v:null);
-            $scoreTen=is_numeric($sector->average_score)?\App\Support\AiScore::toTen($sector->average_score):null;
-            $scorePct=$scoreTen===null?0:max(0,min(100,$scoreTen*10));
+            $scorePct=is_numeric($sector->average_score)?max(0,min(100,\App\Support\AiScore::toPercent($sector->average_score))):0;
             $riskRaw=is_numeric($sector->average_risk)?(float)$sector->average_risk:null;
             $riskPct=$riskRaw===null?null:max(0,min(100,$riskRaw<=1?$riskRaw*100:($riskRaw<=10?$riskRaw*10:$riskRaw)));
             $scoreLabel=\App\Support\QualityGrade::fromPercent($scorePct)??'—';

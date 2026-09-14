@@ -248,6 +248,17 @@ final class ServingStockLegacyViewService
         // both pages go through) - not a page-local approximation, which
         // previously used a different ai_score formula and no universe
         // percentile, and could silently drift from the screener's value.
+        // Same raw inputs CompositeScoreService blends into the Gesamtscore -
+        // exposed individually so the "KI-Bewertung" donuts can show every
+        // component that actually feeds it, not just a subset.
+        $qualityGatePassed = $primaryModel ? (bool) ($primaryModel['quality_gate_passed'] ?? false) : null;
+        $profitFactorValue = is_numeric($modelMetrics['profit_factor'] ?? null) ? (float) $modelMetrics['profit_factor'] : null;
+        $confidencePercentValue = is_numeric($primaryPrediction['confidence_percent'] ?? null) ? (float) $primaryPrediction['confidence_percent'] : null;
+        $cappedProfitFactor = \App\Support\ProfitFactor::cap($profitFactorValue);
+        $profitFactorPercent = $cappedProfitFactor !== null
+            ? max(0.0, min(100.0, (($cappedProfitFactor - .5) / 2) * 100))
+            : null;
+
         $compositeScore = $this->screener->compositeScores()->get((int) $stock->instrument_id);
         if ($compositeScore === null) {
             // Instrument not in the screener's universe (e.g. inactive/
@@ -255,9 +266,9 @@ final class ServingStockLegacyViewService
             // instead of showing nothing.
             $compositeScore = $this->compositeScore->score(
                 aiScoreOutOf10: $qualityPercent / 10,
-                qualityGatePassed: $primaryModel ? (bool) ($primaryModel['quality_gate_passed'] ?? false) : null,
-                profitFactor: is_numeric($modelMetrics['profit_factor'] ?? null) ? (float) $modelMetrics['profit_factor'] : null,
-                confidencePercent: is_numeric($primaryPrediction['confidence_percent'] ?? null) ? (float) $primaryPrediction['confidence_percent'] : null,
+                qualityGatePassed: $qualityGatePassed,
+                profitFactor: $profitFactorValue,
+                confidencePercent: $confidencePercentValue,
                 riskPercent: $riskPercent,
                 panelPercentile: is_numeric($panelSector['percentile'] ?? null) ? (float) $panelSector['percentile'] : null,
             );
@@ -422,6 +433,10 @@ final class ServingStockLegacyViewService
             'displayHorizons' => $displayHorizons,
             'servingMode' => true,
             'compositeScore' => $compositeScore,
+            'qualityGatePassed' => $qualityGatePassed,
+            'profitFactorValue' => $profitFactorValue,
+            'profitFactorPercent' => $profitFactorPercent,
+            'confidencePercentValue' => $confidencePercentValue,
             'servingReleaseId' => (string) $stock->release_id,
             'canViewModelOverview' => true,
         ];

@@ -102,7 +102,8 @@ class IndexAiScoreService
 
     public function dailyAverages(int $days = 14): array
     {
-        return Cache::remember("dashboard_daily_ai_averages_{$days}", now()->addMinutes(2), fn (): array => DB::table('predictions')
+        // v2: score moved from a 0-10 to a 0-100 scale.
+        return Cache::remember("dashboard_daily_ai_averages_v2_{$days}", now()->addMinutes(2), fn (): array => DB::table('predictions')
             ->whereNotNull('prediction_score')
             ->selectRaw('DATE(prediction_time) AS day, AVG(prediction_score) AS score')
             ->groupByRaw('DATE(prediction_time)')
@@ -113,7 +114,7 @@ class IndexAiScoreService
             ->map(function ($row) {
                 return [
                     'x' => (string) $row->day,
-                    'y' => round(AiScore::toTen($row->score) ?? 0, 2),
+                    'y' => round(AiScore::toPercent($row->score) ?? 0, 2),
                 ];
             })
             ->values()

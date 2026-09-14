@@ -55,7 +55,7 @@ class EntrySignalBuyNotification extends Notification
                     'days' => $days,
                     'target' => $target,
                     'return' => $target !== null && $current > 0 ? (($target / $current) - 1) * 100 : null,
-                    'score' => AiScore::toTen($row->ai_score ?? $row->prediction_score ?? null),
+                    'score' => AiScore::toPercent($row->ai_score ?? $row->prediction_score ?? null),
                     'signal' => strtoupper((string) ($row->signal ?? 'HOLD')),
                 ]];
             })->sortKeys()->all();

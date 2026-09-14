@@ -104,9 +104,10 @@ class IndexScreenerController extends Controller
         ]));
         $indices = Cache::remember($aggregateCacheKey, now()->addMinutes(2), fn () => $query
             ->orderBy('market_index.global_rank')->get()->each(function ($index) {
+                // 0-100 scale, matching the composite score everywhere else.
                 $index->rating_value = is_numeric($index->calculated_rating)
-                    ? AiScore::toTen($index->calculated_rating)
-                    : (is_numeric($index->rating) ? (float) $index->rating : null);
+                    ? AiScore::toPercent($index->calculated_rating)
+                    : (is_numeric($index->rating) ? (float) $index->rating * 10 : null);
             }));
         $this->applyServingOutlooks($indices);
         $indices = $indices

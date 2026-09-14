@@ -87,7 +87,7 @@ $volatilityColor = match ($market['volatility_label'] ?? null) {
         <div class="min-w-0 border-l border-white/5 pl-2">
             <p class="text-[9px] uppercase tracking-wide text-slate-500">{{ __('KI-Score') }}</p>
             <p class="mt-1 text-xs font-bold text-violet-300">
-                {{ \App\Support\AiScore::toTen($market['ai_score'] ?? null) !== null ? number_format(\App\Support\AiScore::toTen($market['ai_score']), 1, ',', '.').' / 10' : '—' }}
+                {{ \App\Support\AiScore::toPercent($market['ai_score'] ?? null) !== null ? number_format(\App\Support\AiScore::toPercent($market['ai_score']), 0, ',', '.').' / 100' : '—' }}
             </p>
         </div>
     </div>

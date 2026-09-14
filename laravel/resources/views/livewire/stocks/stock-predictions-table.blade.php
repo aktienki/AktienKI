@@ -154,7 +154,6 @@
             <tbody>
                 @forelse ($rows as $row)
                     @php
-                        $score = \App\Support\AiScore::toTen($row->prediction_score);
                         $scorePercent = \App\Support\AiScore::toPercent($row->prediction_score);
                         $confidencePercent = is_numeric($row->confidence) ? max(0, min(100, (float) $row->confidence <= 1 ? (float) $row->confidence * 100 : (float) $row->confidence)) : null;
                         $riskPercent = \App\Support\RiskScore::toPercent($row->risk_score, $row->drawdown_risk_factor ?? null);
@@ -278,10 +277,10 @@
                         <td class="px-3 py-3 text-xs font-black {{ ($row->expected_return_5d ?? 0) > 0 ? 'text-emerald-400' : (($row->expected_return_5d ?? 0) < 0 ? 'text-rose-400' : 'text-[var(--ak-muted)]') }}">{{ is_numeric($row->expected_return_5d) ? (($row->expected_return_5d > 0 ? '+' : '').number_format($row->expected_return_5d, 2, ',', '.').' %') : '—' }}</td>
                         <td class="px-3 py-2">
                             <div class="flex h-full flex-col justify-center">
-                                @if ($score !== null)
+                                @if ($scorePercent !== null)
                                     <div class="mb-1.5 flex items-baseline justify-between">
-                                        <strong class="text-sm font-black">{{ number_format($score, 1, ',', '.') }}</strong>
-                                        <small class="text-[8px] text-[var(--ak-muted)]">/ 10</small>
+                                        <strong class="text-sm font-black">{{ number_format($scorePercent, 0, ',', '.') }}</strong>
+                                        <small class="text-[8px] text-[var(--ak-muted)]">/ 100</small>
                                     </div>
                                     <x-dashboard.score-stripes :percent="$scorePercent" />
                                 @else<span class="text-center text-[var(--ak-muted)]">—</span>@endif

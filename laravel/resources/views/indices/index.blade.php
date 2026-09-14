@@ -31,7 +31,7 @@
 
         collect($indices)->each(function ($index) use ($outlookColumns) {
             $forecastValues = collect($outlookColumns)->mapWithKeys(fn ($field, $days) => [$days => is_numeric($index->{$field} ?? null) ? (float) $index->{$field} : null]);
-            $scorePercent = is_numeric($index->rating_value ?? null) ? max(0, min(100, (float) $index->rating_value * 10)) : 0;
+            $scorePercent = is_numeric($index->rating_value ?? null) ? max(0, min(100, (float) $index->rating_value)) : 0;
             $riskRaw = is_numeric($index->average_risk ?? null) ? (float) $index->average_risk : null;
             $riskPercent = $riskRaw === null ? null : max(0, min(100, $riskRaw <= 1 ? $riskRaw * 100 : ($riskRaw <= 10 ? $riskRaw * 10 : $riskRaw)));
             $mainOutlook = $forecastValues->get(20);

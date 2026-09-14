@@ -379,26 +379,26 @@
                                 <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Mobile Ansicht') }}</small>
                             </a>
                             @if ($topStockToday)
-                                @php $topStockScore = \App\Support\AiScore::toTen(is_numeric($topStockToday->ai_score) ? $topStockToday->ai_score : $topStockToday->prediction_score); @endphp
+                                @php $topStockScore = \App\Support\AiScore::toPercent(is_numeric($topStockToday->ai_score) ? $topStockToday->ai_score : $topStockToday->prediction_score); @endphp
                                 <a href="{{ route('stocks.show', ['symbol' => $topStockToday->symbol, 'prediction' => $topStockToday->prediction_id, 'return_to' => '/dashboard']) }}" data-dashboard-tile="best-buy" data-dashboard-tile-label="{{ __('Beste POSITIV-Aktie') }}" class="group min-w-0 rounded-xl border border-emerald-400/25 bg-emerald-400/[.055] px-3 py-3 transition hover:border-emerald-300/50 hover:bg-emerald-400/[.11] {{ $dashboardTileVisible('best-buy') ? '' : 'hidden' }}" title="{{ $topStockToday->name }}">
-                                    <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-emerald-400/25 bg-emerald-400/10 text-emerald-400"><x-heroicon-o-trophy class="h-4 w-4" /></span><span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $topStockToday->symbol }}</b><small class="block text-[8px] font-black text-emerald-400">{{ $topStockScore !== null ? number_format($topStockScore, 1, ',', '.').'/10' : '—' }}</small></span></span>
+                                    <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-emerald-400/25 bg-emerald-400/10 text-emerald-400"><x-heroicon-o-trophy class="h-4 w-4" /></span><span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $topStockToday->symbol }}</b><small class="block text-[8px] font-black text-emerald-400">{{ $topStockScore !== null ? number_format($topStockScore, 0, ',', '.').'/100' : '—' }}</small></span></span>
                                     <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Beste POSITIV-Aktie') }}</small>
                                 </a>
                             @else
                                 <div data-dashboard-tile="best-buy" data-dashboard-tile-label="{{ __('Beste POSITIV-Aktie') }}" class="min-w-0 rounded-xl border border-orange-400/15 bg-orange-400/[.025] px-3 py-3 opacity-70 {{ $dashboardTileVisible('best-buy') ? '' : 'hidden' }}"><span class="flex items-center gap-2"><span class="grid h-8 w-8 place-items-center rounded-lg border border-orange-400/20 text-orange-400"><x-heroicon-o-trophy class="h-4 w-4" /></span><b class="text-lg text-[var(--ak-muted)]">—</b></span><small class="mt-2 block truncate text-[8px] font-black uppercase text-[var(--ak-muted)]">{{ __('Beste POSITIV-Aktie') }}</small></div>
                             @endif
                             @php
-                                $topWatchScore = $topWatchStock ? \App\Support\AiScore::toTen(is_numeric($topWatchStock->ai_score) ? $topWatchStock->ai_score : $topWatchStock->prediction_score) : null;
+                                $topWatchScore = $topWatchStock ? \App\Support\AiScore::toPercent(is_numeric($topWatchStock->ai_score) ? $topWatchStock->ai_score : $topWatchStock->prediction_score) : null;
                             @endphp
                             @if ($topWatchStock && $canManageMessages)
                                 <a href="{{ route('stocks.show', ['symbol' => $topWatchStock->symbol, 'prediction' => $topWatchStock->prediction_id, 'return_to' => '/dashboard']) }}" data-dashboard-tile="best-wait" data-dashboard-tile-label="{{ __('Beste WATCH-Aktie') }}" class="group min-w-0 rounded-xl border border-amber-400/25 bg-amber-400/[.055] px-3 py-3 transition hover:border-amber-300/50 hover:bg-amber-400/[.11] {{ $dashboardTileVisible('best-wait') ? '' : 'hidden' }}" title="{{ $topWatchStock->name }}">
-                                    <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-amber-400/25 bg-amber-400/10 text-amber-400"><x-heroicon-o-eye class="h-4 w-4" /></span><span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $topWatchStock->symbol }}</b><small class="block text-[8px] font-black text-amber-400">{{ $topWatchScore !== null ? number_format($topWatchScore, 1, ',', '.').'/10' : '—' }}</small></span></span>
+                                    <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-amber-400/25 bg-amber-400/10 text-amber-400"><x-heroicon-o-eye class="h-4 w-4" /></span><span class="min-w-0"><b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $topWatchStock->symbol }}</b><small class="block text-[8px] font-black text-amber-400">{{ $topWatchScore !== null ? number_format($topWatchScore, 0, ',', '.').'/100' : '—' }}</small></span></span>
                                     <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Beste WATCH-Aktie') }}</small>
                                 </a>
                             @else
                                 <div data-dashboard-tile="best-wait" data-dashboard-tile-label="{{ __('Beste WATCH-Aktie') }}" class="relative min-w-0 rounded-xl border border-slate-500/20 bg-slate-500/[.035] px-3 py-3 opacity-55 {{ $dashboardTileVisible('best-wait') ? '' : 'hidden' }}" title="{{ $canManageMessages ? __('Keine WATCH-Aktie verfügbar') : __('Ab Pro verfügbar') }}">
                                     @unless($canManageMessages)<span class="ak-plan-badge ak-plan-badge--pro absolute right-2 top-2">PRO</span>@endunless
-                                    <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-500/25 text-slate-400"><x-heroicon-o-eye class="h-4 w-4" /></span><span class="min-w-0"><b class="block truncate text-sm font-black text-slate-400">{{ $topWatchStock?->symbol ?: '—' }}</b><small class="block text-[8px] font-black text-slate-500">{{ $topWatchScore !== null ? number_format($topWatchScore, 1, ',', '.').'/10' : '—' }}</small></span></span>
+                                    <span class="flex items-center gap-2"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-500/25 text-slate-400"><x-heroicon-o-eye class="h-4 w-4" /></span><span class="min-w-0"><b class="block truncate text-sm font-black text-slate-400">{{ $topWatchStock?->symbol ?: '—' }}</b><small class="block text-[8px] font-black text-slate-500">{{ $topWatchScore !== null ? number_format($topWatchScore, 0, ',', '.').'/100' : '—' }}</small></span></span>
                                     <small class="mt-2 block truncate text-[8px] font-black uppercase tracking-wide text-slate-500">{{ __('Beste WATCH-Aktie') }}</small>
                                 </div>
                             @endif
@@ -494,8 +494,8 @@
                         </div>
                     </article>
                     @php
-                        $compactBuyScore = $topStockToday ? \App\Support\AiScore::toTen(is_numeric($topStockToday->ai_score) ? $topStockToday->ai_score : $topStockToday->prediction_score) : null;
-                        $compactWatchScore = $topWatchStock ? \App\Support\AiScore::toTen(is_numeric($topWatchStock->ai_score) ? $topWatchStock->ai_score : $topWatchStock->prediction_score) : null;
+                        $compactBuyScore = $topStockToday ? \App\Support\AiScore::toPercent(is_numeric($topStockToday->ai_score) ? $topStockToday->ai_score : $topStockToday->prediction_score) : null;
+                        $compactWatchScore = $topWatchStock ? \App\Support\AiScore::toPercent(is_numeric($topWatchStock->ai_score) ? $topWatchStock->ai_score : $topWatchStock->prediction_score) : null;
                         $dashboardCountryFlags = ['DE' => '🇩🇪', 'US' => '🇺🇸', 'AT' => '🇦🇹', 'CH' => '🇨🇭', 'GB' => '🇬🇧', 'FR' => '🇫🇷', 'NL' => '🇳🇱', 'DK' => '🇩🇰', 'SE' => '🇸🇪', 'NO' => '🇳🇴', 'FI' => '🇫🇮', 'IT' => '🇮🇹', 'ES' => '🇪🇸', 'JP' => '🇯🇵', 'CN' => '🇨🇳', 'HK' => '🇭🇰', 'CA' => '🇨🇦', 'AU' => '🇦🇺'];
                         $compactBuyFlag = $dashboardCountryFlags[strtoupper((string) ($topStockToday->country ?? ''))] ?? '🌐';
                         $compactWatchFlag = $dashboardCountryFlags[strtoupper((string) ($topWatchStock->country ?? ''))] ?? '🌐';
@@ -622,8 +622,8 @@
                                 $rank = $rankIndex + 1;
                                 $rankFlag = $dashboardCountryFlags[strtoupper((string) ($rankedStock->country ?? ''))] ?? '🌐';
                                 $rankScore = is_numeric($rankedStock->dashboard_ranking_score ?? null)
-                                    ? (float) $rankedStock->dashboard_ranking_score / 10
-                                    : \App\Support\AiScore::toTen(is_numeric($rankedStock->ai_score) ? $rankedStock->ai_score : $rankedStock->prediction_score);
+                                    ? (float) $rankedStock->dashboard_ranking_score
+                                    : \App\Support\AiScore::toPercent(is_numeric($rankedStock->ai_score) ? $rankedStock->ai_score : $rankedStock->prediction_score);
                                 $rankReturn = is_numeric($rankedStock->current_price) && (float) $rankedStock->current_price !== 0.0 && is_numeric($rankedStock->predicted_price_20d)
                                     ? (((float) $rankedStock->predicted_price_20d / (float) $rankedStock->current_price) - 1) * 100
                                     : (is_numeric($rankedStock->market_return_20d ?? null) ? (float) $rankedStock->market_return_20d : null);

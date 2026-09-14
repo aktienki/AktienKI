@@ -64,7 +64,7 @@ final class SendDashboardDigest extends Command
             'signal' => (string) ($top->personalized_signal ?: 'BUY'),
             'price' => (float) $top->current_price,
             'currency' => (string) ($top->currency ?: 'EUR'),
-            'score' => (float) $top->score_10,
+            'score' => is_numeric($top->score_percent ?? null) ? (float) $top->score_percent : (float) $top->score_10 * 10,
             'confidence' => (float) $top->confidence_percent,
             'expected_return' => is_numeric($top->expected_return_20d) ? (float) $top->expected_return_20d : null,
             'url' => route('stocks.show', ['symbol' => $top->symbol, 'prediction' => $top->prediction_id]),

@@ -488,6 +488,7 @@
 
         #stock-detail-page .stock-serving-rating-layout .stock-analysis-donuts {
             display: flex !important;
+            flex-wrap: wrap !important;
             width: auto;
             min-height: 6.5rem;
             grid-template-columns: none !important;
@@ -501,7 +502,7 @@
         }
 
         #stock-detail-page .stock-serving-rating-layout .stock-analysis-donuts {
-            min-height: 5rem !important;
+            min-height: 11rem !important;
         }
 
         #stock-detail-page .stock-serving-rating-layout .stock-analysis-donut-item .segmented-score {
@@ -1706,7 +1707,7 @@
                             <x-heroicon-o-clock class="h-4 w-4" />{{ $signalLabel }}
                         </button>
                     @else
-                        <span data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isStrongBuy ? __('Alle Qualitätskriterien und Prognosehorizonte sind positiv') : ($isQualityGateRestrictedBuy ? __('POSITIV durch Quality Gate eingeschränkt') : ($compositeScore !== null ? __('Gesamtscore aus KI-Score, Quality-Gate, Modellqualität, Risiko und Panel-Rang.') : $signalLabel)) }}" class="ak-signal-badge inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-lg border px-2 text-[10px] font-black sm:min-w-20 sm:gap-1.5 sm:px-3 sm:text-xs {{ $signalClass }}"><span>{{ $isStrongBuy ? signal_label('STRONG_BUY') : $signalLabel }} · {{ __('Score') }} <b style="{{ $headlineScoreTone ? 'color:'.$headlineScoreTone : '' }}">{{ $headlineScore !== null ? number_format($headlineScore / 10, 1, ',', '.') : '—' }}/10</b></span>@if($isQualityGateRestrictedBuy)<small class="ak-restricted-buy-label">POSITIV*</small>@endif</span>
+                        <span data-signal="{{ strtolower($signal) }}" data-strong-buy="{{ $isStrongBuy ? 'true' : 'false' }}" data-restricted-buy="{{ $isQualityGateRestrictedBuy ? 'true' : 'false' }}" title="{{ $isStrongBuy ? __('Alle Qualitätskriterien und Prognosehorizonte sind positiv') : ($isQualityGateRestrictedBuy ? __('POSITIV durch Quality Gate eingeschränkt') : ($compositeScore !== null ? __('Gesamtscore aus KI-Score, Quality-Gate, Modellqualität, Risiko und Panel-Rang.') : $signalLabel)) }}" class="ak-signal-badge inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-lg border px-2 text-[10px] font-black sm:min-w-20 sm:gap-1.5 sm:px-3 sm:text-xs {{ $signalClass }}"><span>{{ $isStrongBuy ? signal_label('STRONG_BUY') : $signalLabel }} · {{ __('Score') }} <b style="{{ $headlineScoreTone ? 'color:'.$headlineScoreTone : '' }}">{{ $headlineScore !== null ? number_format($headlineScore, 0, ',', '.') : '—' }}/100</b></span>@if($isQualityGateRestrictedBuy)<small class="ak-restricted-buy-label">POSITIV*</small>@endif</span>
                     @endif
                     @unless ($servingMode)
                         <button type="button" onclick="document.getElementById('stock-product-finder-modal')?.showModal()" class="hidden h-8 items-center justify-center gap-1.5 rounded-lg border border-cyan-400/35 bg-cyan-400/10 px-3 text-xs font-black text-cyan-400 transition hover:bg-cyan-400/15 sm:inline-flex">
@@ -1876,7 +1877,7 @@
                         <div class="rounded-xl border border-[var(--ak-border)] bg-transparent {{ $servingMode ? 'p-2' : 'p-3' }}">
                             <p class="{{ $servingMode ? 'mb-1' : 'mb-2' }} text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('KI-Bewertung') }}</p>
                             <div class="{{ $servingMode ? 'stock-serving-rating-layout grid grid-cols-[minmax(210px,auto)_minmax(0,1fr)] items-center gap-3' : '' }}">
-                                <div class="stock-analysis-donuts flex {{ $servingMode ? 'min-h-[64px] justify-start gap-3 px-0' : 'min-h-[76px] w-full justify-center gap-10' }} flex-nowrap items-center overflow-visible">
+                                <div class="stock-analysis-donuts flex {{ $servingMode ? 'min-h-[150px] justify-start gap-3 px-0' : 'min-h-[170px] w-full justify-center gap-6' }} flex-wrap items-center overflow-visible">
                                     <div class="stock-analysis-donut-item stock-analysis-donut-item-primary" title="{{ __('Modellqualität') }}: {{ $scorePercent !== null ? number_format($scorePercent, 0, ',', '.').'/100' : '—' }}">
                                         <x-segmented-score-donut :score="$scorePercent ?? 0" :display="$qualityGrade($scorePercent)" type="chance" :label="__('Signalqualität')" />
                                         <small class="stock-analysis-donut-label">{{ __('Signalqualität') }}</small>
@@ -1888,6 +1889,24 @@
                                     <div class="stock-analysis-donut-item" title="{{ __('Panel-Sektorrang') }}: {{ $panelSectorPercent !== null ? number_format($panelSectorPercent, 1, ',', '.').' %' : '—' }} · {{ $panelSectorName }}">
                                         <x-segmented-score-donut :score="$panelSectorPercent ?? 0" :display="$panelSectorDecile !== null ? 'D'.$panelSectorDecile : '—'" type="chance" :label="__('Panel Sektor')" />
                                         <small class="stock-analysis-donut-label">{{ __('Panel Sektor') }}</small>
+                                    </div>
+                                    @php
+                                        // Remaining Gesamtscore-Komponenten (App\Services\CompositeScoreService),
+                                        // damit alle Eingangswerte des Scores sichtbar sind, nicht nur ein Teil.
+                                        $qualityGateScore = $qualityGatePassed === true ? 100 : 0;
+                                        $qualityGateDisplay = $qualityGatePassed === null ? '—' : ($qualityGatePassed ? 'OK' : __('NEIN'));
+                                    @endphp
+                                    <div class="stock-analysis-donut-item" title="{{ __('Quality Gate') }}: {{ $qualityGatePassed === null ? '—' : ($qualityGatePassed ? __('bestanden') : __('nicht bestanden')) }}">
+                                        <x-segmented-score-donut :score="$qualityGateScore" :display="$qualityGateDisplay" type="chance" :label="__('Quality Gate')" />
+                                        <small class="stock-analysis-donut-label">{{ __('Quality Gate') }}</small>
+                                    </div>
+                                    <div class="stock-analysis-donut-item" title="{{ __('Profit-Faktor') }}: {{ $profitFactorValue !== null ? number_format($profitFactorValue, 2, ',', '.') : '—' }}">
+                                        <x-segmented-score-donut :score="$profitFactorPercent ?? 0" :display="$profitFactorValue !== null ? number_format($profitFactorValue, 1, ',', '.') : '—'" type="chance" :label="__('Profit-Faktor')" />
+                                        <small class="stock-analysis-donut-label">{{ __('Profit-Faktor') }}</small>
+                                    </div>
+                                    <div class="stock-analysis-donut-item" title="{{ __('Konfidenz') }}: {{ $confidencePercentValue !== null ? number_format($confidencePercentValue, 0, ',', '.').' %' : '—' }}">
+                                        <x-segmented-score-donut :score="$confidencePercentValue ?? 0" :display="$confidencePercentValue !== null ? number_format($confidencePercentValue, 0, ',', '.') : '—'" type="chance" :label="__('Konfidenz')" />
+                                        <small class="stock-analysis-donut-label">{{ __('Konfidenz') }}</small>
                                     </div>
                                 </div>
                                 @if($servingMode)

@@ -73,7 +73,15 @@ final class BackfillShortHistoryStocks extends Command
                     'close' => $bar['close'], 'adjusted_close' => $bar['adjusted_close'],
                     'volume' => $bar['volume'], 'source' => 'twelve_data',
                     'created_at' => now(), 'updated_at' => now(),
-                ])->all();
+                ])
+                    // Some providers return duplicate bars for the same
+                    // instrument/interval/bar_time (e.g. DST-adjacent
+                    // midnight rows); Postgres' ON CONFLICT DO UPDATE
+                    // rejects the whole batch if that key repeats within
+                    // one statement, so keep only the last occurrence.
+                    ->keyBy(fn (array $row): string => $row['bar_time'])
+                    ->values()
+                    ->all();
                 foreach (array_chunk($rows, 500) as $chunk) {
                     DB::table('price_bars')->upsert($chunk, ['instrument_id', 'interval', 'bar_time'], [
                         'open', 'high', 'low', 'close', 'adjusted_close', 'volume', 'source', 'updated_at',

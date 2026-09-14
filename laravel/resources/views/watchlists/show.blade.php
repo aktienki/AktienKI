@@ -80,7 +80,6 @@
                                         $profitPercent = $entryPrice !== null && $entryPrice > 0 && $currentPrice !== null
                                             ? ($profitAbsolute / $entryPrice) * 100
                                             : null;
-                                        $score = \App\Support\AiScore::toTen($prediction?->prediction_score);
                                         $scorePercent = \App\Support\AiScore::toPercent($prediction?->prediction_score);
                                         $scoreDonutColor = is_numeric($scorePercent)
                                             ? sprintf(
@@ -195,7 +194,7 @@
                                         <td class="ak-watchlist-ai px-4 py-4">
                                             <div class="ak-watchlist-ai-metrics flex min-w-[27rem] items-center justify-center gap-3">
                                                 @foreach ([
-                                                    ['KI-Score', $scorePercent, $score !== null ? number_format($score, 1, ',', '.') : '—', $scoreDonutColor],
+                                                    ['KI-Score', $scorePercent, $scorePercent !== null ? number_format($scorePercent, 0, ',', '.') : '—', $scoreDonutColor],
                                                     ['Konf.', $confidencePercent, $confidencePercent !== null ? number_format($confidencePercent, 0, ',', '.').'%' : '—', $qualityDonutColor($confidencePercent)],
                                                     ['Hit-Rate', $hitRatePercent, $hitRatePercent !== null ? number_format($hitRatePercent, 0, ',', '.').'%' : '—', $qualityDonutColor($hitRatePercent)],
                                                     ['Ø/Trade', $profitScale, $profitPerTrade !== null ? (($profitPerTrade > 0 ? '+' : '').number_format($profitPerTrade, 2, ',', '.').'%') : '—', $qualityDonutColor($profitScale)],

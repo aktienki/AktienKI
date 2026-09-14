@@ -44,7 +44,7 @@
         <div class="rounded-xl border border-white/5 bg-white/[.025] p-3">
             <p class="text-[10px] uppercase tracking-wide text-slate-500">{{ __('Mittlere KI-Bewertung') }}</p>
             @if ($card['ai_score'] !== null)
-                <p class="mt-1 text-sm font-bold text-violet-300">{{ number_format(\App\Support\AiScore::toTen($card['ai_score']), 1, ',', '.') }} / 10</p>
+                <p class="mt-1 text-sm font-bold text-violet-300">{{ number_format(\App\Support\AiScore::toPercent($card['ai_score']), 0, ',', '.') }} / 100</p>
                 <p class="mt-0.5 text-[10px] text-slate-500">{{ trans_choice(':count Aktie|:count Aktien', $card['ai_companies'], ['count' => $card['ai_companies']]) }}</p>
             @else
                 <p class="mt-1 text-xs font-bold text-slate-400">{{ __('Keine Indexdaten') }}</p>

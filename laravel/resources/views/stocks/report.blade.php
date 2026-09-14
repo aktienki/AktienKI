@@ -6,7 +6,7 @@
 @php
 $en = app()->getLocale() === 'en';
 $t = fn($de, $english) => $en ? $english : $de;
-$score = \App\Support\AiScore::toTen($prediction?->prediction_score);
+$score = \App\Support\AiScore::toPercent($prediction?->prediction_score);
 $current = is_numeric($prediction?->current_price) ? (float)$prediction->current_price : null;
 $fmtPct = fn($v) => is_numeric($v) ? number_format((abs((float)$v)<=1?(float)$v*100:(float)$v),2,$en?'.':',',$en?',':'.').' %' : '—';
 $fmtNum = fn($v,$d=2) => is_numeric($v) ? number_format((float)$v,$d,$en?'.':',',$en?',':'.') : '—';

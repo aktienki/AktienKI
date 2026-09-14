@@ -19,19 +19,22 @@ class MarketService
             ->filter(fn ($value) => $value !== null)
             ->map(fn ($value) => (float) $value);
 
+        // Same 0-100 scale as the composite score used everywhere else
+        // (previously 0-10; $dailyAiScores itself is now 0-100 too, via
+        // IndexAiScoreService::dailyAverages()).
         $averageChange = (float) ($changes->avg() ?? 0);
         $averageVolatility = (float) ($volatilities->avg() ?? 0);
-        $latestAiScore = (float) (collect($dailyAiScores)->last()['y'] ?? 5);
-        $marketScore = max(0, min(10, 5 + ($averageChange * 1.5)));
-        $score = round(($latestAiScore * 0.65) + ($marketScore * 0.35), 1);
+        $latestAiScore = (float) (collect($dailyAiScores)->last()['y'] ?? 50);
+        $marketScore = max(0, min(100, 50 + ($averageChange * 15)));
+        $score = round(($latestAiScore * 0.65) + ($marketScore * 0.35), 0);
 
         if ($averageVolatility >= 1) {
-            $score = round(max(0, $score - 0.5), 1);
+            $score = round(max(0, $score - 5), 0);
         }
 
         [$status, $tone] = match (true) {
-            $score >= 6.5 => ['Positiv', 'positive'],
-            $score >= 4.5 => ['Neutral', 'neutral'],
+            $score >= 65 => ['Positiv', 'positive'],
+            $score >= 45 => ['Neutral', 'neutral'],
             default => ['Vorsichtig', 'cautious'],
         };
 

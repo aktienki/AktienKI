@@ -149,7 +149,7 @@ final class SendRecommendationDigest extends Command
                 'current_price' => $current,
                 'target_price' => $target,
                 'expected_return' => $target !== null && $current > 0 ? (($target / $current) - 1) * 100 : null,
-                'score' => (AiScore::toPercent($item->prediction_score) ?? 0) / 10,
+                'score' => AiScore::toPercent($item->prediction_score) ?? 0,
                 'confidence' => max(0, min(100, $confidence)),
                 'risk' => max(0, min(100, $risk)),
                 'quality_tier' => $item->quality_gate_passed ? 'Quality Gate' : __('Kandidat'),

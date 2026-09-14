@@ -72,11 +72,11 @@ $badgeClass = match (true) {
             </p>
 
             <p class="text-3xl font-bold text-white">
-                {{ \App\Support\AiScore::toTen($signal['score'] ?? null) !== null ? number_format(\App\Support\AiScore::toTen($signal['score']), 1, ',', '.') : '—' }}
+                {{ \App\Support\AiScore::toPercent($signal['score'] ?? null) !== null ? number_format(\App\Support\AiScore::toPercent($signal['score']), 0, ',', '.') : '—' }}
             </p>
 
             <p class="text-[10px] text-slate-500">
-                /10
+                /100
             </p>
 
         </div>

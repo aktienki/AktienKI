@@ -19,7 +19,7 @@
 <tr>
 @foreach([
     [__('Kurs'), number_format($recommendation['current_price'], 2, ',', '.').' '.$recommendation['currency'], '#ffffff'],
-    [__('KI-Score'), number_format($recommendation['score'], 1, ',', '.').' / 10', '#ffffff'],
+    [__('KI-Score'), number_format($recommendation['score'], 0, ',', '.').' / 100', '#ffffff'],
     [__('Model Qualität'), number_format($recommendation['confidence'], 1, ',', '.').' %', '#ffffff'],
     [__('20-Tage-Prognose'), ($recommendation['expected_return'] !== null ? number_format($recommendation['expected_return'], 2, ',', '.').' %' : '–'), ($recommendation['expected_return'] ?? 0) >= 0 ? '#4ad9bd' : '#d77987'],
 ] as [$label, $value, $color])

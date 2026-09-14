@@ -17,7 +17,7 @@ final class SignalEmailDonutChart
         imagealphablending($image, true);
         imageantialias($image, true);
 
-        $score = $metrics['score'] ?? null;
+        $scorePercent = $metrics['score_percent'] ?? null;
         $risk = $metrics['risk_percent'] ?? null;
         $this->drawDonut(
             $image,
@@ -26,7 +26,7 @@ final class SignalEmailDonutChart
             (int) ($metrics['score_level'] ?? 0),
             (string) ($metrics['score_grade'] ?? '—'),
             'KI-SCORE',
-            is_numeric($score) ? number_format((float) $score, 1, ',', '.').' / 10' : '—',
+            is_numeric($scorePercent) ? number_format((float) $scorePercent, 0, ',', '.').' / 100' : '—',
             false,
             $darkTheme,
             $scale,

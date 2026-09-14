@@ -4108,5 +4108,7 @@
     "überwunden": "crossed",
     "Nur Prognosezeiträume mit Haken fließen in diesen Backtest ein.": "Only checked forecast horizons flow into this backtest.",
     ":buy von :total Aktien liefern im aktuellen Serving-Lauf ein POSITIV-Signal. Der mittlere Modellscore liegt bei :score von 100 und die durchschnittliche kalibrierte Prognose bei :return %.": ":buy of :total stocks deliver a POSITIVE signal in the current Serving run. The average model score is :score out of 100, and the average calibrated forecast is :return %.",
-    "Der aktuelle vollständige Serving-Lauf umfasst :count Aktien. :buy davon sind als POSITIV eingestuft; der mittlere KI-Score beträgt :score von 100. Die durchschnittliche kalibrierte Prognose des bevorzugten Horizonts liegt bei :return %.": "The current complete Serving run covers :count stocks. :buy of them are classified as POSITIVE; the average AI score is :score out of 100. The average calibrated forecast for the preferred horizon is :return %."
+    "Der aktuelle vollständige Serving-Lauf umfasst :count Aktien. :buy davon sind als POSITIV eingestuft; der mittlere KI-Score beträgt :score von 100. Die durchschnittliche kalibrierte Prognose des bevorzugten Horizonts liegt bei :return %.": "The current complete Serving run covers :count stocks. :buy of them are classified as POSITIVE; the average AI score is :score out of 100. The average calibrated forecast for the preferred horizon is :return %.",
+    "bestanden": "passed",
+    "nicht bestanden": "not passed"
 }

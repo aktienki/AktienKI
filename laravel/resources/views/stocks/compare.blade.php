@@ -4,8 +4,8 @@
         $percentage = fn ($value) => is_numeric($value)
             ? number_format((float) $value * (abs((float) $value) <= 1 ? 100 : 1), 2, ',', '.').' %'
             : '—';
-        $score = fn ($value) => \App\Support\AiScore::toTen($value) !== null
-            ? number_format(\App\Support\AiScore::toTen($value), 1, ',', '.').' / 10'
+        $score = fn ($value) => \App\Support\AiScore::toPercent($value) !== null
+            ? number_format(\App\Support\AiScore::toPercent($value), 0, ',', '.').' / 100'
             : '—';
         $price = fn ($value, $currency) => is_numeric($value)
             ? number_format((float) $value, 2, ',', '.').' '.($currency ?: '')
@@ -72,7 +72,7 @@
                             [__('Land'), fn ($row) => $row->country ? (($flags[$row->country] ?? '🌐').' '.$row->country) : '—', '', null, null],
                             [__('Sektor'), fn ($row) => __($row->sector ?: '—'), 'sector', null, null],
                             [__('Signal'), fn ($row) => strtoupper((string) ($row->signal ?: '—')), 'signal', null, null],
-                            [__('KI-Score'), fn ($row) => $score($row->prediction_score), 'ai-score', fn ($row) => \App\Support\AiScore::toTen($row->prediction_score), 'high'],
+                            [__('KI-Score'), fn ($row) => $score($row->prediction_score), 'ai-score', fn ($row) => \App\Support\AiScore::toPercent($row->prediction_score), 'high'],
                             [__('Konfidenz'), fn ($row) => $percentage($row->confidence), 'ai-confidence', fn ($row) => is_numeric($row->confidence) ? (float) $row->confidence : null, 'high'],
                             [__('Risiko'), fn ($row) => $percentage($row->risk_score ?? $row->drawdown_risk_factor), 'ai-risk', fn ($row) => is_numeric($row->risk_score ?? $row->drawdown_risk_factor) ? (float) ($row->risk_score ?? $row->drawdown_risk_factor) : null, 'low'],
                             [__('Ziel 5 Tage'), fn ($row) => $price($row->predicted_price_5d, $row->currency), '', null, null],

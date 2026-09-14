@@ -23,7 +23,7 @@
     $reportText = $data['report_html'] ?? $report->report_text ?? 'Für diesen Signalwechsel liegt noch kein KI-Text vor.';
     $formatPercent = fn ($value) => is_numeric($value) ? number_format((float) $value * 100, 1, ',', '.') . ' %' : '—';
     $formatNumber = fn ($value, $suffix = '') => is_numeric($value) ? number_format((float) $value, 2, ',', '.') . $suffix : '—';
-    $scoreTen = \App\Support\AiScore::toTen($current['ai_score'] ?? $current['prediction_score'] ?? null);
+    $scorePercent = \App\Support\AiScore::toPercent($current['ai_score'] ?? $current['prediction_score'] ?? null);
     $indicatorRows = array_values($data['indicators'] ?? []);
     $buildHeatmap = function (string $xKey, string $yKey, array $xBins, array $yBins) use ($indicatorRows): array {
         $cells = [];
@@ -70,7 +70,7 @@
 
     <section class="grid">
         <article class="card metric"><div class="label">Signal</div><div class="value" style="color:{{ $accent }}">{{ $to }}</div><div class="hint">Signalwechsel am {{ $transitionDate ? date('d.m.Y H:i', strtotime($transitionDate)) : '—' }}</div></article>
-        <article class="card metric"><div class="label">KI-Score</div><div class="value">{{ $scoreTen !== null ? number_format($scoreTen, 1, ',', '.') : '—' }} <span class="hint">/ 10</span></div><div class="hint">Qualitätsband: {{ $current['quality_band'] ?? '—' }}</div></article>
+        <article class="card metric"><div class="label">KI-Score</div><div class="value">{{ $scorePercent !== null ? number_format($scorePercent, 0, ',', '.') : '—' }} <span class="hint">/ 100</span></div><div class="hint">Qualitätsband: {{ $current['quality_band'] ?? '—' }}</div></article>
         <article class="card metric"><div class="label">Konfidenz</div><div class="value" style="color:var(--teal)">{{ $formatPercent($current['confidence'] ?? null) }}</div><div class="hint">Risiko: {{ $formatPercent($current['risk_score'] ?? null) }}</div></article>
     </section>
 

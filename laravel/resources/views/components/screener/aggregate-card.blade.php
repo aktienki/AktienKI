@@ -170,7 +170,7 @@
                     <div class="screener-top-stocks-grid mt-2 grid gap-1.5">
                         @foreach(collect($topStocks)->take(3) as $topStock)
                             @php
-                                $topScore = is_numeric($topStock->ai_score ?? null) ? \App\Support\AiScore::toTen($topStock->ai_score) : null;
+                                $topScore = is_numeric($topStock->ai_score ?? null) ? \App\Support\AiScore::toPercent($topStock->ai_score) : null;
                                 $latestDailyClose = is_numeric($topStock->latest_daily_close ?? null) ? (float) $topStock->latest_daily_close : null;
                                 $previousDailyClose = is_numeric($topStock->previous_daily_close ?? null) ? (float) $topStock->previous_daily_close : null;
                                 $topPrice = $realtimeQuotes && is_numeric($topStock->live_price ?? null)
@@ -195,7 +195,7 @@
                                     : '🌐';
                             @endphp
                             <a href="{{ route('stocks.show', ['symbol' => $topStock->symbol, 'prediction' => $topStock->prediction_id, 'return_to' => request()->getRequestUri()]) }}" onclick="event.stopPropagation()" data-sector-live-symbol="{{ $topStock->symbol }}" class="relative z-30 grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-lg border border-cyan-300/10 bg-cyan-400/[.035] px-2.5 py-1.5 transition hover:border-cyan-300/30 hover:bg-cyan-400/[.08]">
-                                <span class="min-w-0 self-center"><b class="flex items-center gap-1.5 truncate text-xs text-[var(--ak-text)]"><span aria-hidden="true">{{ $countryFlag }}</span><span class="truncate">{{ $topStock->symbol }}</span></b><small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $topStock->name }}</small><small class="block text-[7px] {{ $signalClass }}">{{ signal_label($topSignal) }} · Score {{ $topScore !== null ? number_format($topScore * 10, 0, ',', '.') : '—' }}</small></span>
+                                <span class="min-w-0 self-center"><b class="flex items-center gap-1.5 truncate text-xs text-[var(--ak-text)]"><span aria-hidden="true">{{ $countryFlag }}</span><span class="truncate">{{ $topStock->symbol }}</span></b><small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $topStock->name }}</small><small class="block text-[7px] {{ $signalClass }}">{{ signal_label($topSignal) }} · Score {{ $topScore !== null ? number_format($topScore, 0, ',', '.') : '—' }}</small></span>
                                 <span class="text-right">
                                     <span class="flex items-center justify-end gap-1.5"><b data-sector-live-price data-live-currency="{{ $topStock->currency ?? '' }}" class="text-xs text-[var(--ak-text)]">{{ $topPrice !== null ? number_format($topPrice, 2, ',', '.').' '.($topStock->currency ?? '') : '—' }}</b><i class="grid h-5 min-w-5 place-items-center rounded-md bg-cyan-400/10 px-1 text-[8px] font-black not-italic text-cyan-300">#{{ (int) $topStock->sector_rank }}</i></span>
                                     <small data-sector-live-change class="block text-[8px] {{ $changeClass }}">{{ $topChange !== null ? (($topChange > 0 ? '+' : '').number_format($topChange, 2, ',', '.').' %') : '—' }}</small>

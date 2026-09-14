@@ -1,7 +1,7 @@
 <x-mail::message>
 @php
     $metrics = $signalMetrics ?? [];
-    $score = $metrics['score'] ?? null;
+    $score = $metrics['score_percent'] ?? null;
     $riskPercent = $metrics['risk_percent'] ?? null;
     $horizonTargets = $metrics['horizon_targets'] ?? [];
     $current = (float) ($prediction->current_price ?? 0);
@@ -22,7 +22,7 @@
     <table role="presentation" width="100%" cellpadding="0" cellspacing="8" style="margin:20px -8px 8px;border-collapse:separate">
         <tr>
             <td width="27%" valign="middle" style="background:{{ $mutedCardBg }};border:1px solid {{ $border }};border-radius:10px;padding:13px"><div style="color:{{ $muted }};font-size:10px;text-transform:uppercase">{{ __('Signal') }}</div><div style="color:{{ $signalColor }};font-size:21px;font-weight:800">{{ signal_label($signal) }}</div></td>
-            <td width="73%" align="center" valign="middle" style="background:{{ $mutedCardBg }};border:1px solid {{ $border }};border-radius:10px;padding:3px 8px"><img src="cid:aki-signal-score-risk.png" width="310" alt="{{ __('KI-Score') }} {{ $score !== null ? number_format($score, 1, ',', '.').' / 10' : '–' }} · {{ __('Risiko') }} {{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.').' %' : '–' }}" style="display:block;width:310px;max-width:100%;height:auto;margin:0 auto;border:0"></td>
+            <td width="73%" align="center" valign="middle" style="background:{{ $mutedCardBg }};border:1px solid {{ $border }};border-radius:10px;padding:3px 8px"><img src="cid:aki-signal-score-risk.png" width="310" alt="{{ __('KI-Score') }} {{ $score !== null ? number_format($score, 0, ',', '.').' / 100' : '–' }} · {{ __('Risiko') }} {{ $riskPercent !== null ? number_format($riskPercent, 0, ',', '.').' %' : '–' }}" style="display:block;width:310px;max-width:100%;height:auto;margin:0 auto;border:0"></td>
         </tr>
     </table>
     <table role="presentation" width="100%" cellpadding="8" cellspacing="0" style="margin-top:10px;color:#dce6ef;font-size:13px">
