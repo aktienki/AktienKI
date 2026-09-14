@@ -4116,5 +4116,14 @@
     "Extern bestätigt: Ja": "Externally confirmed: Yes",
     "Extern bestätigt: Nein": "Externally confirmed: No",
     "Extern bestätigt: alle": "Externally confirmed: all",
-    "Filtert nach dem Ergebnis der unabhängigen externen KI-Recherche (Webrecherche) zu diesem Signal.": "Filters by the result of the independent external AI research (web search) for this signal."
+    "Filtert nach dem Ergebnis der unabhängigen externen KI-Recherche (Webrecherche) zu diesem Signal.": "Filters by the result of the independent external AI research (web search) for this signal.",
+    "Keine externe Recherche vorhanden.": "No external research available.",
+    "Kein wesentlicher Einwand.": "No material objection.",
+    "Vorsicht - externe Recherche stuft das Signal ab.": "Caution - external research downgrades the signal.",
+    "Wesentlicher Einwand der externen Recherche.": "Material objection from the external research.",
+    "Datenlage für die externe Recherche unzureichend.": "Insufficient evidence for the external research.",
+    "Externe Recherche fehlgeschlagen.": "External research failed.",
+    "Externe Webrecherche läuft noch.": "External web research still in progress.",
+    "Ø Profit pro Trade": "Avg. profit per trade",
+    "Ø Profit/Trade": "Avg. profit/trade"
 }

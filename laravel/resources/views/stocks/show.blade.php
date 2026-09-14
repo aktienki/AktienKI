@@ -1893,20 +1893,62 @@
                                     @php
                                         // Remaining Gesamtscore-Komponenten (App\Services\CompositeScoreService),
                                         // damit alle Eingangswerte des Scores sichtbar sind, nicht nur ein Teil.
-                                        $qualityGateScore = $qualityGatePassed === true ? 100 : 0;
-                                        $qualityGateDisplay = $qualityGatePassed === null ? '—' : ($qualityGatePassed ? 'OK' : __('NEIN'));
+                                        $qualityGateLevel = $qualityGatePassed === null ? null : ($qualityGatePassed ? 2 : 1);
+                                        $qualityGateDisplay = $qualityGatePassed === null ? '—' : ($qualityGatePassed ? __('JA') : __('NEIN'));
+
+                                        // Vier echte Zustände statt nur ja/nein - deckungsgleich mit dem
+                                        // ausführlichen Verdict-Badge weiter unten auf dieser Seite
+                                        // (ExternalBuyReviewService::VERDICTS): 1=Einwand (rot),
+                                        // 2=Vorsicht (amber), 3=unklar/läuft/fehlgeschlagen (grau),
+                                        // 4=kein Einwand (grün). Palette und Reihenfolge im
+                                        // segmented-score-donut-Component (type="quad").
+                                        $externalReviewVerdict = ($externalBuyReview?->status ?? null) === 'completed'
+                                            ? $externalBuyReview->verdict
+                                            : null;
+                                        $externalReviewLevel = match (true) {
+                                            $externalBuyReview === null => null,
+                                            $externalReviewVerdict === 'NO_OBJECTION' => 4,
+                                            $externalReviewVerdict === 'CAUTION' => 2,
+                                            $externalReviewVerdict === 'OBJECTION' => 1,
+                                            default => 3, // INSUFFICIENT_EVIDENCE, running oder failed
+                                        };
+                                        $externalReviewDisplay = match ($externalReviewLevel) {
+                                            4 => __('JA'),
+                                            2 => '!',
+                                            1 => __('NEIN'),
+                                            default => '—',
+                                        };
+                                        $externalReviewTitle = match (true) {
+                                            $externalBuyReview === null => __('Keine externe Recherche vorhanden.'),
+                                            $externalReviewVerdict === 'NO_OBJECTION' => __('Kein wesentlicher Einwand.'),
+                                            $externalReviewVerdict === 'CAUTION' => __('Vorsicht - externe Recherche stuft das Signal ab.'),
+                                            $externalReviewVerdict === 'OBJECTION' => __('Wesentlicher Einwand der externen Recherche.'),
+                                            $externalReviewVerdict === 'INSUFFICIENT_EVIDENCE' => __('Datenlage für die externe Recherche unzureichend.'),
+                                            $externalBuyReview->status === 'failed' => __('Externe Recherche fehlgeschlagen.'),
+                                            default => __('Externe Webrecherche läuft noch.'),
+                                        };
+
+                                        $profitPerTradePercentile = data_get($backtestMetricPercentiles, 'average_net_trade.percentile');
+                                        $profitPerTradeScore = is_numeric($profitPerTradePercentile) ? (float) $profitPerTradePercentile : 0;
+                                        $profitPerTradeDisplay = $analysisProfitPerTrade !== null
+                                            ? ($analysisProfitPerTrade >= 0 ? '+' : '').number_format($analysisProfitPerTrade, 1, ',', '.').' %'
+                                            : '—';
                                     @endphp
                                     <div class="stock-analysis-donut-item" title="{{ __('Quality Gate') }}: {{ $qualityGatePassed === null ? '—' : ($qualityGatePassed ? __('bestanden') : __('nicht bestanden')) }}">
-                                        <x-segmented-score-donut :score="$qualityGateScore" :display="$qualityGateDisplay" type="chance" :label="__('Quality Gate')" />
+                                        <x-segmented-score-donut :score="$qualityGatePassed === true ? 100 : 0" :level="$qualityGateLevel" :display="$qualityGateDisplay" type="binary" :label="__('Quality Gate')" />
                                         <small class="stock-analysis-donut-label">{{ __('Quality Gate') }}</small>
+                                    </div>
+                                    <div class="stock-analysis-donut-item" title="{{ __('Externe Bewertung') }}: {{ $externalReviewTitle }}">
+                                        <x-segmented-score-donut :score="0" :level="$externalReviewLevel" :display="$externalReviewDisplay" type="quad" :label="__('Externe Bewertung')" />
+                                        <small class="stock-analysis-donut-label">{{ __('Externe Bewertung') }}</small>
                                     </div>
                                     <div class="stock-analysis-donut-item" title="{{ __('Profit-Faktor') }}: {{ $profitFactorValue !== null ? number_format($profitFactorValue, 2, ',', '.') : '—' }}">
                                         <x-segmented-score-donut :score="$profitFactorPercent ?? 0" :display="$profitFactorValue !== null ? number_format($profitFactorValue, 1, ',', '.') : '—'" type="chance" :label="__('Profit-Faktor')" />
                                         <small class="stock-analysis-donut-label">{{ __('Profit-Faktor') }}</small>
                                     </div>
-                                    <div class="stock-analysis-donut-item" title="{{ __('Konfidenz') }}: {{ $confidencePercentValue !== null ? number_format($confidencePercentValue, 0, ',', '.').' %' : '—' }}">
-                                        <x-segmented-score-donut :score="$confidencePercentValue ?? 0" :display="$confidencePercentValue !== null ? number_format($confidencePercentValue, 0, ',', '.') : '—'" type="chance" :label="__('Konfidenz')" />
-                                        <small class="stock-analysis-donut-label">{{ __('Konfidenz') }}</small>
+                                    <div class="stock-analysis-donut-item" title="{{ __('Ø Profit pro Trade') }}: {{ $analysisProfitPerTrade !== null ? number_format($analysisProfitPerTrade, 2, ',', '.').' %' : '—' }}">
+                                        <x-segmented-score-donut :score="$profitPerTradeScore" :display="$profitPerTradeDisplay" type="chance" :label="__('Ø Profit/Trade')" />
+                                        <small class="stock-analysis-donut-label">{{ __('Ø Profit/Trade') }}</small>
                                     </div>
                                 </div>
                                 @if($servingMode)

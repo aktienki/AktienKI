@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\PlanLevel;
 use App\Models\ExternalBuyReview;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -348,9 +347,12 @@ final class ServingStockLegacyViewService
             ? $returnTo
             : null;
 
+        // Shown to every tier now, not just Pro - the "KI-Bewertung" donut
+        // card (Externe Bewertung) surfaces this for all users, so the
+        // underlying fetch can no longer be Pro-only or it would silently
+        // stay empty for everyone else.
         $externalBuyReview = null;
         if ($signal === 'BUY'
-            && $this->plans->allowsTariff($request->user(), PlanLevel::Pro)
             && Schema::hasTable('external_buy_reviews')) {
             $externalBuyReview = ExternalBuyReview::query()
                 ->where('instrument_id', $instrument->id)

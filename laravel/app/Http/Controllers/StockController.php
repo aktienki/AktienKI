@@ -989,8 +989,10 @@ class StockController extends Controller
         $aiAssessmentOpportunities = $this->decodeJson($aiAssessment?->opportunities);
         $aiAssessmentRisks = $this->decodeJson($aiAssessment?->risks);
         $aiAssessmentFactors = $this->decodeJson($aiAssessment?->key_factors);
+        // Shown to every tier now, not just Pro - see the matching change in
+        // ServingStockLegacyViewService::data().
         $externalBuyReview = null;
-        if ($canViewRealtime && $prediction?->id && Schema::hasTable('external_buy_reviews')) {
+        if ($prediction?->id && Schema::hasTable('external_buy_reviews')) {
             $externalBuyReview = DB::table('external_buy_reviews')
                 ->where('prediction_id', $prediction->id)
                 ->first();
