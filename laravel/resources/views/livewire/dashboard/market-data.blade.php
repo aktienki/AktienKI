@@ -81,15 +81,15 @@
             <div class="ak-market-hero-stats">
                 <div class="ak-market-hero-stat">
                     <span>{{ __('KI-Score') }}</span>
-                    <strong>{{ $score !== null ? number_format($score, 1, ',', '.') : '—' }}</strong>
-                    <small>/ 10</small>
+                    <strong>{{ $score !== null ? number_format($score, 0, ',', '.') : '—' }}</strong>
+                    <small>/ 100</small>
                 </div>
                 <div class="ak-market-hero-stat ak-market-score-change" data-change="{{ $scoreChangeTone }}">
                     <span>{{ __('Zu gestern') }}</span>
                     <strong>
                         @if ($scoreChange !== null)
                             <i aria-hidden="true">{{ $scoreChangeTone === 'positive' ? '↗' : ($scoreChangeTone === 'negative' ? '↘' : '→') }}</i>
-                            {{ $scoreChange >= 0 ? '+' : '' }}{{ number_format($scoreChange, 1, ',', '.') }}
+                            {{ $scoreChange >= 0 ? '+' : '' }}{{ number_format($scoreChange, 0, ',', '.') }}
                         @else
                             —
                         @endif

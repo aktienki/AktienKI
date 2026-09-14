@@ -179,7 +179,8 @@
                                                 ] as $scoreStock)
                                                     @php
                                                         $stock = $scoreStock['stock'];
-                                                        $stockScore = $stock ? \App\Support\AiScore::toTen($stock->ai_score) : null;
+                                                        // 0-100 scale, matching the composite score everywhere else.
+                                                        $stockScore = $stock ? \App\Support\AiScore::toPercent($stock->ai_score) : null;
                                                         $stockPrice = $stock && is_numeric($stock->live_price)
                                                             ? (float) $stock->live_price
                                                             : ($stock && is_numeric($stock->prediction_price) ? (float) $stock->prediction_price : null);
@@ -187,10 +188,10 @@
                                                             ? min(100, max(0, (float) $stock->risk_score <= 1 ? (float) $stock->risk_score * 100 : (float) $stock->risk_score))
                                                             : null;
                                                         $stockScoreHue = $stockScore !== null
-                                                            ? round(min(120, max(0, (($stockScore - 3) / 4) * 120)))
+                                                            ? round(min(120, max(0, (($stockScore - 30) / 40) * 120)))
                                                             : 0;
                                                         $stockScoreDonutStyle = $stockScore !== null
-                                                            ? '--ak-score-angle:'.number_format(($stockScore / 10) * 360, 2, '.', '').'deg;--ak-score-color:hsl('.$stockScoreHue.' 68% 43%)'
+                                                            ? '--ak-score-angle:'.number_format(($stockScore / 100) * 360, 2, '.', '').'deg;--ak-score-color:hsl('.$stockScoreHue.' 68% 43%)'
                                                             : '--ak-score-angle:0deg;--ak-score-color:#94a3b8';
                                                         $stockRiskColor = match (true) {
                                                             $stockRisk === null => '#94a3b8',
@@ -229,8 +230,8 @@
                                                                 </span>
                                                                 <strong class="absolute left-1/2 top-[78%] z-10 inline-flex h-5 min-w-[44px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded border px-1.5 text-[8px] font-black {{ $stockSignalClass }}">{{ $stockSignal }}</strong>
                                                                 <span class="ml-auto flex shrink-0 items-center justify-end gap-1.5">
-                                                                    <span class="ak-market-score-donut" style="{{ $stockScoreDonutStyle }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="{{ $stockScore !== null ? number_format($stockScore, 1, '.', '') : 0 }}">
-                                                                        <b>{{ $stockScore !== null ? number_format($stockScore, 1, ',', '.') : '—' }}</b>
+                                                                    <span class="ak-market-score-donut" style="{{ $stockScoreDonutStyle }}" role="meter" aria-label="{{ __('KI-Score') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $stockScore !== null ? number_format($stockScore, 0, '.', '') : 0 }}">
+                                                                        <b>{{ $stockScore !== null ? number_format($stockScore, 0, ',', '.') : '—' }}</b>
                                                                     </span>
                                                                     <span class="ak-market-score-donut" style="{{ $stockRiskDonutStyle }}" role="meter" aria-label="{{ __('Risiko') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $stockRisk !== null ? round($stockRisk) : 0 }}">
                                                                         <b>{{ $stockRisk !== null ? number_format($stockRisk, 0, ',', '.').'%' : '—' }}</b>
@@ -296,14 +297,15 @@
                         <tbody>
                             @forelse ($exchanges as $exchange)
                                 @php
-                                    $score = \App\Support\AiScore::toTen($exchange->average_score);
+                                    // 0-100 scale, matching the composite score everywhere else.
+                                    $score = \App\Support\AiScore::toPercent($exchange->average_score);
                                     $confidence = is_numeric($exchange->average_confidence)
                                         ? min(100, max(0, (float) $exchange->average_confidence <= 1 ? (float) $exchange->average_confidence * 100 : (float) $exchange->average_confidence))
                                         : null;
                                     $risk = is_numeric($exchange->risk_p75)
                                         ? min(100, max(0, (float) $exchange->risk_p75 <= 1 ? (float) $exchange->risk_p75 * 100 : (float) $exchange->risk_p75))
                                         : null;
-                                    $scoreClass = $score >= 6.5 ? 'text-emerald-500' : ($score < 4.5 ? 'text-rose-500' : 'text-amber-500');
+                                    $scoreClass = $score >= 65 ? 'text-emerald-500' : ($score < 45 ? 'text-rose-500' : 'text-amber-500');
                                     $target = route('stocks.index', ['exchange' => $exchange->code]);
                                 @endphp
                                 <tr onclick="window.location.href=@js($target)" class="group cursor-pointer text-sm text-[var(--ak-text)]">
@@ -319,10 +321,10 @@
                                             <div data-column="score" data-value="{{ $score ?? '' }}" class="px-4 py-4">
                                                 @if ($score !== null)
                                                     <div class="mb-1.5 flex items-baseline justify-between">
-                                                        <strong class="font-black {{ $scoreClass }}">{{ number_format($score, 1, ',', '.') }}</strong>
-                                                        <span class="text-[9px] font-bold text-[var(--ak-muted)]">/ 10</span>
+                                                        <strong class="font-black {{ $scoreClass }}">{{ number_format($score, 0, ',', '.') }}</strong>
+                                                        <span class="text-[9px] font-bold text-[var(--ak-muted)]">/ 100</span>
                                                     </div>
-                                                    <x-dashboard.score-stripes :percent="$score * 10" palette="cyan" />
+                                                    <x-dashboard.score-stripes :percent="$score" palette="cyan" />
                                                 @else
                                                     <span class="block text-center text-[var(--ak-muted)]">—</span>
                                                 @endif

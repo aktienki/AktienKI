@@ -16,7 +16,9 @@ final class ServingMarketSnapshotService
     {
         $scope = $instrumentIds === null ? 'global' : sha1(implode(',', collect($instrumentIds)->sort()->values()->all()));
 
-        return $this->cache()->remember('serving.market-snapshot.v1.'.$scope.'.'.app()->getLocale(), now()->addMinutes(2), function () use ($instrumentIds, $scope): array {
+        // v2: score moved from a 0-10 to a 0-100 scale - a bumped cache key
+        // keeps this from mixing with old-scale cached snapshots/day scores.
+        return $this->cache()->remember('serving.market-snapshot.v2.'.$scope.'.'.app()->getLocale(), now()->addMinutes(2), function () use ($instrumentIds, $scope): array {
             try {
                 $rows = DB::connection('serving')
                     ->table(ServingCurrentSignalSource::relation().' as signal')
@@ -66,13 +68,15 @@ final class ServingMarketSnapshotService
             $watchCount = $enriched->where('normalized_signal', 'WATCH')->count();
             $holdCount = $enriched->where('normalized_signal', 'HOLD')->count();
             $sellCount = $enriched->where('normalized_signal', 'SELL')->count();
-            $score = round((float) ($enriched->avg('rating_percent') ?? 50) / 10, 1);
+            // Same 0-100 scale as the screener/dashboard/stock page composite
+            // score (previously 0-10, which looked inconsistent next to it).
+            $score = round((float) ($enriched->avg('rating_percent') ?? 50), 1);
             $averageReturn = round((float) ($enriched->pluck('expected_return_percent')->filter(fn ($value) => is_numeric($value))->avg() ?? 0), 2);
             $averageRisk = round((float) ($enriched->pluck('risk_score')->filter(fn ($value) => is_numeric($value))->avg() ?? 0), 2);
             $breadthPercent = $count > 0 ? ($buyCount / $count) * 100 : 0.0;
             [$status, $tone] = match (true) {
-                $breadthPercent >= 60 && $score >= 6.5 => [__('Positiv'), 'positive'],
-                $breadthPercent < 30 || $score < 4.0 => [__('Vorsichtig'), 'cautious'],
+                $breadthPercent >= 60 && $score >= 65 => [__('Positiv'), 'positive'],
+                $breadthPercent < 30 || $score < 40 => [__('Vorsichtig'), 'cautious'],
                 default => [__('Neutral'), 'neutral'],
             };
             $qualityCount = $enriched->filter(fn (object $row): bool => (bool) $row->has_quality_gate_buy)->count();
@@ -94,10 +98,10 @@ final class ServingMarketSnapshotService
                 $averageRisk >= 3.25 => __('erhöht'),
                 default => __('moderat'),
             };
-            $summary = __(':buy von :total Aktien liefern im aktuellen Serving-Lauf ein POSITIV-Signal. Der mittlere Modellscore liegt bei :score von 10 und die durchschnittliche kalibrierte Prognose bei :return %.', [
+            $summary = __(':buy von :total Aktien liefern im aktuellen Serving-Lauf ein POSITIV-Signal. Der mittlere Modellscore liegt bei :score von 100 und die durchschnittliche kalibrierte Prognose bei :return %.', [
                 'buy' => $buyCount,
                 'total' => $count,
-                'score' => number_format($score, 1, ',', '.'),
+                'score' => number_format($score, 0, ',', '.'),
                 'return' => ($averageReturn >= 0 ? '+' : '').number_format($averageReturn, 2, ',', '.'),
             ]);
 
@@ -188,10 +192,10 @@ final class ServingMarketSnapshotService
             'confidence' => (int) round($qualityRate),
             'riskLevel' => $averageRisk >= 4.25 ? 'HIGH' : ($averageRisk >= 3.25 ? 'MEDIUM' : 'LOW'),
             'headline' => __('Aktuelles Lagebild aus der Service Datenbank'),
-            'summary' => __('Der aktuelle vollständige Serving-Lauf umfasst :count Aktien. :buy davon sind als POSITIV eingestuft; der mittlere KI-Score beträgt :score von 10. Die durchschnittliche kalibrierte Prognose des bevorzugten Horizonts liegt bei :return %.', [
+            'summary' => __('Der aktuelle vollständige Serving-Lauf umfasst :count Aktien. :buy davon sind als POSITIV eingestuft; der mittlere KI-Score beträgt :score von 100. Die durchschnittliche kalibrierte Prognose des bevorzugten Horizonts liegt bei :return %.', [
                 'count' => $count,
                 'buy' => $buyCount,
-                'score' => number_format($score, 1, ',', '.'),
+                'score' => number_format($score, 0, ',', '.'),
                 'return' => ($averageReturn >= 0 ? '+' : '').number_format($averageReturn, 2, ',', '.'),
             ]),
             'breadth' => $bestSector && $weakestSector
