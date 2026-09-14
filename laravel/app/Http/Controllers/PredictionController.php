@@ -249,6 +249,37 @@ final class PredictionController extends Controller
         if ($request->query('gate_mode') === 'personal' && $personalGate !== null) {
             $this->applyPersonalQualityGate($request, $personalGate);
         }
+        // Importing a saved strategy used to embed its entire filter payload
+        // (every field, including large arrays like serving_model_configurations)
+        // directly in this GET URL's query string. For strategies with many
+        // selected models that routinely exceeded nginx's URI length limit
+        // (414 Request-URI Too Large). Loading the values here by ID instead
+        // means the URL only ever needs ?saved_filter=<id> - an explicit query
+        // value, if present, still takes precedence over the saved filter.
+        $savedFilterId = $request->integer('saved_filter');
+        $importedSavedFilter = $savedFilterId > 0
+            ? $request->user()->savedPredictionFilters()->whereKey($savedFilterId)->first()
+            : null;
+        if ($importedSavedFilter) {
+            $request->query->add(
+                collect((array) $importedSavedFilter->filters)
+                    ->filter(fn ($value, string $key) => $request->query($key) === null)
+                    ->all()
+            );
+            // serving_model_configurations is not one of FILTER_DEFAULTS - it
+            // never traveled through the flat query string at all, even
+            // before this fix. It is normally referenced by a short session
+            // token (see ServingPredictionTableController::__invoke(), same
+            // 'serving_strategy_selections' session key), so a saved filter
+            // that carries this array needs its own fresh token rather than
+            // being dumped into the URL raw.
+            $servingModelConfigurations = (array) data_get($importedSavedFilter->filters, 'serving_model_configurations', []);
+            if ($servingModelConfigurations !== [] && $request->query('serving_selection') === null) {
+                $token = Str::random(40);
+                $request->session()->put("serving_strategy_selections.{$token}", $servingModelConfigurations);
+                $request->query->add(['serving_selection' => $token]);
+            }
+        }
         // The strategy universe only contains stocks with a meaningful,
         // positive 20-day return expectation.
         $request->merge([

@@ -155,7 +155,7 @@
                             <select x-model="selectedStrategyUrl" class="ak-input h-12 w-full rounded-xl px-3 text-sm text-white">
                                 <option value="">{{ __('Bitte auswählen …') }}</option>
                                 @foreach ($savedFilters as $savedFilter)
-                                    <option value="{{ route('setup.filter', array_merge($savedFilter->filters ?? [], ['saved_filter' => $savedFilter->id])) }}">{{ $savedFilter->name }}</option>
+                                    <option value="{{ route('setup.filter', ['saved_filter' => $savedFilter->id]) }}">{{ $savedFilter->name }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -615,7 +615,7 @@
                 <div class="hidden">
                     @forelse ($savedFilters as $savedFilter)
                         <div class="flex shrink-0 items-center overflow-hidden rounded-md border {{ (int) request('saved_filter') === (int) $savedFilter->id ? 'border-teal-300/40 bg-teal-400/[.12]' : 'border-white/[.08] bg-white/[.035]' }}">
-                            <a href="{{ route('setup.filter', $savedFilter->filters ?? []) }}" class="px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:bg-teal-400/10 hover:text-teal-300">{{ $savedFilter->name }}</a>
+                            <a href="{{ route('setup.filter', ['saved_filter' => $savedFilter->id]) }}" class="px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:bg-teal-400/10 hover:text-teal-300">{{ $savedFilter->name }}</a>
                             <form method="POST" action="{{ route('setup.filter.saved.destroy', $savedFilter) }}" class="border-l border-white/[.08]">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="flex h-7 w-7 items-center justify-center text-slate-500 hover:bg-rose-400/10 hover:text-rose-300" title="{{ __('Filter löschen') }}"><x-heroicon-o-x-mark class="h-3.5 w-3.5" /></button>
