@@ -366,38 +366,6 @@
         @endauth
     </div>
 </div></header>
-<aside class="beta-ribbon" aria-label="{{ __('Informationen zur Betaphase') }}">
-    <div class="beta-current"><span class="pulse"></span><span class="beta-current-copy"><small>{{ __('AKTUELLE PHASE') }}</small><b>{{ __('Geschlossener Betatest') }}</b></span></div>
-    <div class="beta-preview"><span class="beta-preview-copy"><strong>{{ __('ÖFFENTLICHE BETA STARTET BALD') }}</strong><span><b>{{ __('Nur noch') }} {{ max(0, ($betaTesterLimit ?? 20) - ($betaTesterCount ?? 0)) }} {{ __('von') }} {{ $betaTesterLimit ?? 20 }} {{ __('Plätzen verfügbar') }}</b> · {{ __('1 Jahr Pro kostenlos · Möchtest du von Anfang an dabei sein?') }}</span></span><button type="button" class="beta-request-button" data-beta-request-open>{{ __('Beta-Zugang anfragen') }} →</button></div>
-</aside>
-<dialog class="beta-request-dialog" data-beta-request-dialog>
-    @if (session('beta_request_success'))
-        <section class="beta-request-form beta-request-confirmation">
-            <button type="button" class="beta-request-close" data-beta-request-close aria-label="{{ __('Schließen') }}">×</button>
-            <div class="beta-confirmation-icon" aria-hidden="true">✓</div>
-            <div class="kicker">{{ __('PLATZ RESERVIERT') }}</div>
-            <h2>{{ __('Vielen Dank für deine Anfrage!') }}</h2>
-            <p>{{ session('beta_request_success') }}</p>
-            <button type="button" class="home-btn home-btn-primary" data-beta-request-close>{{ __('Verstanden') }}</button>
-        </section>
-    @else
-    <form method="POST" action="{{ route('contact.store') }}" class="beta-request-form">
-        @csrf
-        <input type="hidden" name="source" value="beta_request">
-        <input type="hidden" name="subject" value="{{ __('Anfrage als AktienKI-Betatester') }}">
-        <input name="website" type="hidden" value="">
-        <button type="button" class="beta-request-close" data-beta-request-close aria-label="{{ __('Schließen') }}">×</button>
-        <div class="kicker">{{ __('BETATEST ANFRAGEN') }}</div>
-        <h2>{{ __('Werde Teil der AktienKI-Beta.') }}</h2>
-        <p>{{ __('Wir suchen aktive Tester, die Funktionen ausprobieren und uns zum Abschluss eine ehrliche Bewertung geben. Als Dankeschön erhältst du nach der Beta ein Jahr Pro kostenlos.') }}</p>
-        @if ($errors->any())<div class="beta-request-errors"><strong>{{ __('Bitte prüfe deine Angaben:') }}</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
-        <div class="beta-request-fields"><label>{{ __('Name') }}<input name="name" type="text" value="{{ old('name', auth()->user()?->name) }}" required>@error('name')<span class="beta-field-error">{{ $message }}</span>@enderror</label><label>{{ __('E-Mail-Adresse') }}<input name="email" type="email" value="{{ old('email', auth()->user()?->email) }}" required>@error('email')<span class="beta-field-error">{{ $message }}</span>@enderror</label></div>
-        <label>{{ __('Warum möchtest du Betatester werden?') }}<textarea name="message" rows="4" minlength="10" required>{{ old('message') }}</textarea>@error('message')<span class="beta-field-error">{{ $message }}</span>@enderror</label>
-        <small>{{ __('Mit dem Absenden stimmst du der Verarbeitung deiner Angaben zur Bearbeitung der Anfrage zu.') }}</small>
-        <button type="submit" class="home-btn home-btn-primary" data-beta-request-submit data-loading-label="{{ __('Anfrage wird gesendet …') }}">{{ __('Beta-Zugang anfragen') }} →</button>
-    </form>
-    @endif
-</dialog>
 <script>
 window.waitForWelcomeAnimation=panel=>{
     if(!panel||panel.classList.contains('animation-started'))return Promise.resolve();
