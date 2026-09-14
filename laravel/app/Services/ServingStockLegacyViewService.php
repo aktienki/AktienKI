@@ -28,6 +28,7 @@ final class ServingStockLegacyViewService
         private readonly PlanAccessService $plans,
         private readonly CompositeScoreService $compositeScore,
         private readonly ServingScreenerService $screener,
+        private readonly SignalScopeResolver $scopeResolver,
     ) {}
 
     /** @return array<string, mixed> */
@@ -56,7 +57,7 @@ final class ServingStockLegacyViewService
         // negative_top_scopes), not a hardcoded horizon=20 default - otherwise the
         // stats/donuts can look mediocre even though a different horizon triggered
         // the (e.g. strong) headline signal, or vice versa.
-        $signalScope = $this->resolveSignalScope($signal, $currentSignal, $displayHorizons);
+        $signalScope = $this->scopeResolver->resolve($signal, $currentSignal, $displayHorizons);
         $primaryHorizon = ($signalScope ? $horizons->firstWhere('days', $signalScope['horizon']) : null)
             ?? $fallbackHorizon;
         $primaryVariant = $signalScope['variant'] ?? null;
@@ -931,54 +932,6 @@ final class ServingStockLegacyViewService
             ->value('model_version');
 
         return filled($version) ? (string) $version : null;
-    }
-
-    /**
-     * Picks the horizon+variant that actually produced the displayed signal
-     * (from buy_scopes / watch_context / negative_top_scopes), so the model
-     * statistics panel reflects the same scope as the headline signal instead
-     * of a hardcoded default horizon.
-     *
-     * @param  list<int>  $availableHorizonDays
-     * @return array{horizon: int, variant: string}|null
-     */
-    private function resolveSignalScope(string $signal, ?object $currentSignal, array $availableHorizonDays): ?array
-    {
-        if (! $currentSignal) {
-            return null;
-        }
-
-        if ($signal === 'BUY') {
-            $scopes = $this->jsonList($currentSignal->buy_scopes ?? null);
-            if ($scopes !== []) {
-                $bestQuality = (string) ($currentSignal->best_buy_quality ?? '');
-                $candidates = $bestQuality !== ''
-                    ? array_values(array_filter($scopes, fn (array $scope): bool => (string) ($scope['quality'] ?? '') === $bestQuality))
-                    : [];
-                $candidates = $candidates !== [] ? $candidates : $scopes;
-                usort($candidates, fn (array $a, array $b): int => (float) ($b['expected_return'] ?? 0) <=> (float) ($a['expected_return'] ?? 0));
-                $chosen = $candidates[0] ?? null;
-                if ($chosen && in_array((int) ($chosen['horizon'] ?? 0), $availableHorizonDays, true)) {
-                    return ['horizon' => (int) $chosen['horizon'], 'variant' => (string) ($chosen['variant'] ?? '')];
-                }
-            }
-        }
-
-        if ($signal === 'WATCH') {
-            $chosen = $this->jsonList($currentSignal->watch_context ?? null)[0] ?? null;
-            if (is_array($chosen) && isset($chosen['later_buy_horizon'])
-                && in_array((int) $chosen['later_buy_horizon'], $availableHorizonDays, true)) {
-                return ['horizon' => (int) $chosen['later_buy_horizon'], 'variant' => (string) ($chosen['later_buy_variant'] ?? '')];
-            }
-        }
-
-        $chosen = $this->jsonList($currentSignal->negative_top_scopes ?? null)[0] ?? null;
-        if (is_array($chosen) && isset($chosen['horizon'])
-            && in_array((int) $chosen['horizon'], $availableHorizonDays, true)) {
-            return ['horizon' => (int) $chosen['horizon'], 'variant' => (string) ($chosen['variant'] ?? '')];
-        }
-
-        return null;
     }
 
     /** @return list<array<string, mixed>> */

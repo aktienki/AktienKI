@@ -22,6 +22,7 @@ final class ServingScreenerService
         private readonly PersonalizedSignalService $personalizedSignals,
         private readonly TradeEligibilityStatusService $tradeEligibility,
         private readonly CompositeScoreService $compositeScore,
+        private readonly SignalScopeResolver $scopeResolver,
     ) {}
 
     /**
@@ -644,7 +645,25 @@ final class ServingScreenerService
         $forecastPredictions = collect(self::HORIZONS)->mapWithKeys(fn (int $horizon): array => [
             $horizon => $this->selectPrediction($predictions, $statuses, $horizon),
         ]);
-        $primaryPrediction = $forecastPredictions->get(20)
+        // The ranking/composite score must be bound to the same horizon+
+        // variant that actually produced this row's own signal (buy_scopes/
+        // watch_context/negative_top_scopes on $row itself - the current-
+        // signal source already carries them), not a hardcoded 20T-then-40T-
+        // then-10T default - otherwise a stock whose ACTUAL triggering model
+        // failed its quality gate can still rank #1 if that unrelated
+        // default horizon's model happened to pass. Same resolver the stock
+        // detail page uses for its own headline-signal-bound figures.
+        $signalScope = $this->scopeResolver->resolve(
+            strtoupper((string) ($row->signal === 'NEUTRAL' ? 'HOLD' : $row->signal)),
+            $row,
+            self::HORIZONS,
+        );
+        $scopedPrediction = $signalScope
+            ? $predictions->first(fn (object $prediction): bool => (int) $prediction->horizon === $signalScope['horizon']
+                && (string) $prediction->variant === $signalScope['variant'])
+            : null;
+        $primaryPrediction = $scopedPrediction
+            ?? $forecastPredictions->get(20)
             ?? $forecastPredictions->get(40)
             ?? $forecastPredictions->get(10)
             ?? $this->selectPrediction($predictions, $statuses);
