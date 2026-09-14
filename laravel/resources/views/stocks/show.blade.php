@@ -2009,11 +2009,11 @@
                                         <p class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Historische Signale') }}</p>
                                         <p class="mt-0.5 text-[9px] text-[var(--ak-muted)]">{{ data_get($signalTradeChart, 'days') }}T · {{ data_get($signalTradeChart, 'label') }}</p>
                                     </div>
-                                    <div class="flex items-center gap-3 text-[8px] font-bold text-[var(--ak-muted)]">
-                                        <span><i class="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400"></i>{{ __('Kauf') }}</span>
-                                        <span><i class="mr-1 inline-block h-2 w-2 rounded-full bg-rose-400"></i>{{ __('Verkauf') }}</span>
+                                    <div class="flex items-center gap-1.5 text-[7px] font-bold text-[var(--ak-muted)]">
+                                        <span><i class="mr-0.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"></i>{{ __('Kauf') }}</span>
+                                        <span><i class="mr-0.5 inline-block h-1.5 w-1.5 rounded-full bg-rose-400"></i>{{ __('Verkauf') }}</span>
                                         @if($chartCandles->isNotEmpty())
-                                            <span><i class="mr-1 inline-block h-2 w-2 rounded-full bg-violet-400"></i>{{ __('Kurs (Buy & Hold)') }}</span>
+                                            <span><i class="mr-0.5 inline-block h-1.5 w-1.5 rounded-full bg-violet-400"></i>{{ __('Buy & Hold') }}</span>
                                         @endif
                                     </div>
                                 </div>
