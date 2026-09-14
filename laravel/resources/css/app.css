@@ -8173,12 +8173,19 @@ body .ak-topbar-menu > a:focus-visible {
     .screener-page .screener-filter-bar > :is(select[name="transition_days"],.screener-custom-select:has(select[name="transition_days"])) { grid-column:span 2; order:10; }
     .screener-page .screener-filter-bar > :is(select[name="limit"],.screener-custom-select:has(select[name="limit"])) { grid-column:span 1; order:11; }
 
-    .screener-page .screener-filter-bar :is(input,select,button,.screener-custom-select-trigger),
+    .screener-page .screener-filter-bar :is(input:not([type=checkbox]):not([type=radio]),select,button,.screener-custom-select-trigger),
     .screener-page .screener-filter-bar > a,
     .screener-page .screener-risk-choice {
         height:2.35rem !important;
         min-height:2.35rem !important;
         font-size:.76rem !important;
+    }
+
+    .screener-page .screener-filter-bar > label:has(input[name="quality_gate_only"]) input[type=checkbox] {
+        width:1rem !important;
+        height:1rem !important;
+        min-height:0 !important;
+        flex:none !important;
     }
 
     .screener-page .screener-filter-bar :is(.ak-input,.screener-custom-select-trigger),
