@@ -666,6 +666,7 @@ final class RecommendationController extends Controller
                 $latestAssessments = DB::table('stock_ai_assessments')
                     ->select([
                         'instrument_id', 'prediction_id', 'summary', 'opportunities', 'risks',
+                        'summary_en', 'opportunities_en', 'risks_en',
                         'assessment_date', 'recommendation', 'confidence', 'model',
                     ])
                     ->whereIn('instrument_id', $stocks->pluck('instrument_id')->all())
@@ -683,6 +684,7 @@ final class RecommendationController extends Controller
                     ->get([
                         'prediction_id', 'status', 'verdict', 'confidence', 'summary',
                         'positive_factors', 'risk_factors', 'key_findings',
+                        'summary_en', 'positive_factors_en', 'risk_factors_en', 'key_findings_en',
                         'research_limitations', 'sources', 'model', 'triggered_at',
                         'researched_at', 'search_call_count', 'estimated_cost_microusd',
                     ])
@@ -696,11 +698,15 @@ final class RecommendationController extends Controller
 
                 return is_array($decoded) ? array_values($decoded) : [];
             };
-            $stocks->each(function (object $stock) use ($latestAssessments, $externalReviews, $decodeAssessmentItems, $personalizedSignals, $request): void {
+            $useEnglish = app()->getLocale() === 'en';
+            $stocks->each(function (object $stock) use ($latestAssessments, $externalReviews, $decodeAssessmentItems, $personalizedSignals, $request, $useEnglish): void {
                 $assessment = $latestAssessments->get($stock->instrument_id);
-                $stock->assessment_pros = $decodeAssessmentItems($assessment?->opportunities);
-                $stock->assessment_cons = $decodeAssessmentItems($assessment?->risks);
-                $stock->assessment_summary = $assessment?->summary;
+                // English translations (TranslateAiTextToEnglish) live in
+                // the same row's _en columns; prefer them once available.
+                $assessmentUsesEnglish = $useEnglish && filled($assessment?->summary_en ?? null);
+                $stock->assessment_pros = $decodeAssessmentItems($assessmentUsesEnglish ? $assessment->opportunities_en : $assessment?->opportunities);
+                $stock->assessment_cons = $decodeAssessmentItems($assessmentUsesEnglish ? $assessment->risks_en : $assessment?->risks);
+                $stock->assessment_summary = $assessmentUsesEnglish ? $assessment->summary_en : $assessment?->summary;
                 $stock->assessment_date = $assessment?->assessment_date;
                 $stock->assessment_recommendation = $assessment?->recommendation;
                 $stock->assessment_confidence = $assessment?->confidence;
@@ -711,14 +717,15 @@ final class RecommendationController extends Controller
                     && strtoupper((string) $stock->personalized_signal) === 'BUY';
 
                 $externalReview = $externalReviews->get($stock->id);
+                $reviewUsesEnglish = $useEnglish && filled($externalReview?->summary_en ?? null);
                 $stock->external_review_is_current = $externalReview !== null;
                 $stock->external_review_status = $externalReview?->status;
                 $stock->external_review_verdict = $externalReview?->verdict;
                 $stock->external_review_confidence = $externalReview?->confidence;
-                $stock->external_review_summary = $externalReview?->summary;
-                $stock->external_review_positive_factors = $decodeAssessmentItems($externalReview?->positive_factors);
-                $stock->external_review_risk_factors = $decodeAssessmentItems($externalReview?->risk_factors);
-                $stock->external_review_key_findings = $decodeAssessmentItems($externalReview?->key_findings);
+                $stock->external_review_summary = $reviewUsesEnglish ? $externalReview->summary_en : $externalReview?->summary;
+                $stock->external_review_positive_factors = $decodeAssessmentItems($reviewUsesEnglish ? $externalReview->positive_factors_en : $externalReview?->positive_factors);
+                $stock->external_review_risk_factors = $decodeAssessmentItems($reviewUsesEnglish ? $externalReview->risk_factors_en : $externalReview?->risk_factors);
+                $stock->external_review_key_findings = $decodeAssessmentItems($reviewUsesEnglish ? $externalReview->key_findings_en : $externalReview?->key_findings);
                 $stock->external_review_limitations = $decodeAssessmentItems($externalReview?->research_limitations);
                 $stock->external_review_sources = $decodeAssessmentItems($externalReview?->sources);
                 $stock->external_review_model = $externalReview?->model;

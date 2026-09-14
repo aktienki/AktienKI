@@ -283,9 +283,13 @@ final class ServingStockLegacyViewService
             ->orderByDesc('assessment_date')
             ->orderByDesc('id')
             ->first();
-        $aiAssessmentOpportunities = $this->jsonList($aiAssessment?->opportunities);
-        $aiAssessmentRisks = $this->jsonList($aiAssessment?->risks);
-        $aiAssessmentFactors = $this->jsonList($aiAssessment?->key_factors);
+        // English translations (TranslateAiTextToEnglish) live in the same
+        // row's _en columns; prefer them once the locale is English and
+        // they exist, otherwise fall back to the German original.
+        $useEnglishAssessment = app()->getLocale() === 'en' && filled($aiAssessment?->summary_en ?? null);
+        $aiAssessmentOpportunities = $this->jsonList($useEnglishAssessment ? $aiAssessment->opportunities_en : $aiAssessment?->opportunities);
+        $aiAssessmentRisks = $this->jsonList($useEnglishAssessment ? $aiAssessment->risks_en : $aiAssessment?->risks);
+        $aiAssessmentFactors = $this->jsonList($useEnglishAssessment ? $aiAssessment->key_factors_en : $aiAssessment?->key_factors);
 
         $fundamental = (object) [
             'snapshot_date' => $stock->fundamental_snapshot_date ?? null,

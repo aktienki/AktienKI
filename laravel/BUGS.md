@@ -14,9 +14,9 @@ Gesammelt aus der laufenden Session. Status: ✅ behoben · 🟡 teilweise/mitig
 
 ## 🔴 Offen — Konfiguration
 
-3. **Env-Variablen-Mismatch bei OpenAI External-Buy-Review-Settings.**
-   `.env` setzt `EXTERNAL_BUY_REVIEW_MODEL`/`EXTERNAL_BUY_REVIEW_MAX_SEARCH_CALLS`, aber `config/aktienki.php` liest `EXTERNAL_BUY_REVIEW_V3_MODEL`/`EXTERNAL_BUY_REVIEW_V3_MAX_SEARCH_CALLS`. Solange Provider=openai aktiv war, liefen die Werte still auf die Fallback-Defaults (`gpt-5.6-luna`, 1 Suchaufruf) statt der eigentlich gewünschten (`gpt-5.6-terra`, 2 Aufrufe).
-   *Datei:* `.env` vs. `config/aktienki.php:127,130`
+3. ✅ **Env-Variablen-Mismatch bei OpenAI External-Buy-Review-Settings.**
+   `.env` setzt `EXTERNAL_BUY_REVIEW_MODEL`/`EXTERNAL_BUY_REVIEW_MAX_SEARCH_CALLS`/etc., aber `config/aktienki.php` las `EXTERNAL_BUY_REVIEW_V3_MODEL`/`EXTERNAL_BUY_REVIEW_V3_MAX_SEARCH_CALLS`/etc. Solange Provider=openai aktiv war, liefen die Werte still auf die Fallback-Defaults (`gpt-5.6-luna`, 1 Suchaufruf) statt der eigentlich gewünschten (`gpt-5.6-terra`, 2 Aufrufe). Beim Zurückwechseln von Perplexity auf OpenAI entdeckt und behoben — Config liest jetzt dieselben Namen, die `.env` tatsächlich setzt (`model`, `prompt_version`, `max_search_calls`, `max_output_tokens`, `input_price_per_million_usd`, `output_price_per_million_usd`). Live mit einer echten Aktie (JPM) verifiziert.
+   *Datei:* `config/aktienki.php`
 
 4. **`GenerateExternalBuyReview`-Job kann sich selbst blockieren.**
    `ShouldBeUnique` mit `uniqueFor = 3600` (1h) hält die Lock-Datei auch nach einem fehlgeschlagenen Versuch (z.B. ungültiger API-Key) — ein erneuter Dispatch derselben Review-ID wird dann bis zu 1h lang **ohne jede Fehlermeldung** stillschweigend ignoriert. Musste einmal manuell per `cache:clear` umgangen werden.
