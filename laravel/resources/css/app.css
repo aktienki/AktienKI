@@ -8132,33 +8132,46 @@ body .ak-topbar-menu > a:focus-visible {
         width:100%;
     }
 
+    /* NOTE: this is the search-box label (wraps input[name="q"]) - it is the
+       actual first DOM child of the form. It is NOT the quality-gate
+       checkbox label, which sits further down the markup and needs its own
+       rule below - :first-child previously looked like it targeted the
+       checkbox but never did, leaving it with no explicit grid placement at
+       all (default order:0, auto span), which is what caused it to be
+       auto-placed into - and visually collide with - this very cell. */
     .screener-page .screener-filter-bar > label:first-child {
         min-width:0 !important;
         grid-column:span 2;
         order:1;
     }
 
+    .screener-page .screener-filter-bar > label:has(input[name="quality_gate_only"]) {
+        min-width:0 !important;
+        grid-column:span 3;
+        order:2;
+    }
+
     .screener-page .screener-filter-bar .screener-risk-choice {
         min-width:0 !important;
         grid-column:span 4;
-        order:11;
+        order:12;
     }
 
     .screener-page .screener-filter-bar > :last-child {
         min-width:0 !important;
         grid-column:span 1;
-        order:12;
+        order:13;
     }
 
-    .screener-page .screener-filter-bar > :is(select[name="external_confirmed"],.screener-custom-select:has(select[name="external_confirmed"])) { grid-column:span 2; order:2; }
-    .screener-page .screener-filter-bar > :is(select[name="bestand"],.screener-custom-select:has(select[name="bestand"])) { grid-column:span 3; order:3; }
-    .screener-page .screener-filter-bar > :is(select[name="index"],.screener-custom-select:has(select[name="index"])) { grid-column:span 2; order:4; }
-    .screener-page .screener-filter-bar > :is(select[name="country"],.screener-custom-select:has(select[name="country"])) { grid-column:span 2; order:5; }
-    .screener-page .screener-filter-bar > :is(select[name="sector"],.screener-custom-select:has(select[name="sector"])) { grid-column:span 3; order:6; }
-    .screener-page .screener-filter-bar > :is(select[name="signal"],.screener-custom-select:has(select[name="signal"])) { grid-column:span 2; order:7; }
-    .screener-page .screener-filter-bar > :is(select[name="min_max_return"],.screener-custom-select:has(select[name="min_max_return"])) { grid-column:span 2; order:8; }
-    .screener-page .screener-filter-bar > :is(select[name="transition_days"],.screener-custom-select:has(select[name="transition_days"])) { grid-column:span 2; order:9; }
-    .screener-page .screener-filter-bar > :is(select[name="limit"],.screener-custom-select:has(select[name="limit"])) { grid-column:span 1; order:10; }
+    .screener-page .screener-filter-bar > :is(select[name="external_confirmed"],.screener-custom-select:has(select[name="external_confirmed"])) { grid-column:span 2; order:3; }
+    .screener-page .screener-filter-bar > :is(select[name="bestand"],.screener-custom-select:has(select[name="bestand"])) { grid-column:span 3; order:4; }
+    .screener-page .screener-filter-bar > :is(select[name="index"],.screener-custom-select:has(select[name="index"])) { grid-column:span 2; order:5; }
+    .screener-page .screener-filter-bar > :is(select[name="country"],.screener-custom-select:has(select[name="country"])) { grid-column:span 2; order:6; }
+    .screener-page .screener-filter-bar > :is(select[name="sector"],.screener-custom-select:has(select[name="sector"])) { grid-column:span 3; order:7; }
+    .screener-page .screener-filter-bar > :is(select[name="signal"],.screener-custom-select:has(select[name="signal"])) { grid-column:span 2; order:8; }
+    .screener-page .screener-filter-bar > :is(select[name="min_max_return"],.screener-custom-select:has(select[name="min_max_return"])) { grid-column:span 2; order:9; }
+    .screener-page .screener-filter-bar > :is(select[name="transition_days"],.screener-custom-select:has(select[name="transition_days"])) { grid-column:span 2; order:10; }
+    .screener-page .screener-filter-bar > :is(select[name="limit"],.screener-custom-select:has(select[name="limit"])) { grid-column:span 1; order:11; }
 
     .screener-page .screener-filter-bar :is(input,select,button,.screener-custom-select-trigger),
     .screener-page .screener-filter-bar > a,
