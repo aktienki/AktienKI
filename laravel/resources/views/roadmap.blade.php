@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="{{ __('Die öffentliche AktienKI-Roadmap mit geplanten Funktionen und Meilensteinen.') }}">
     <title>{{ __('Roadmap') }} – AktienKI</title>
-    <link rel="icon" href="{{ asset('brand/generated/bull-icon.png') }}" type="image/png">
+    <link rel="icon" href="{{ asset('brand/generated/instagram-bull-logo-1x1.png') }}" type="image/png">
     <x-preference-head :force-dark="true" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>

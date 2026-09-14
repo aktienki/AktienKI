@@ -9,7 +9,7 @@
         <meta name="realtime-market-data" content="{{ app(\App\Services\PlanAccessService::class)->allowsTariff(auth()->user(), \App\Enums\PlanLevel::Pro) ? '1' : '0' }}">
     @endauth
     <title>{{ config('app.name', 'AktienKI') }}</title>
-    <link rel="icon" href="{{ asset('brand/generated/bull-icon.png') }}" type="image/png">
+    <link rel="icon" href="{{ asset('brand/generated/instagram-bull-logo-1x1.png') }}" type="image/png">
     <link rel="manifest" href="{{ asset('brand/manifest.webmanifest') }}">
     <x-preference-head />
 
