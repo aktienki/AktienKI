@@ -173,7 +173,18 @@ final class ServingStockLegacyViewService
         $modelMetrics = (array) ($primaryModel['metrics'] ?? []);
         $tradeChart = (array) ($overview['tradeChart'] ?? []);
         $tradeChartInitial = (array) ($tradeChart['initial'] ?? []);
+        // The chart must show the same horizon+variant that actually produced
+        // the displayed headline signal ($primaryHorizon/$primaryVariant via
+        // resolveSignalScope() above), not ServingModelOverviewService's own
+        // generic "first enabled horizon" default (usually 10T/Standard) -
+        // otherwise the historical buy/sell markers can belong to a
+        // completely different strategy than the one the page is reporting
+        // on. Only fall back to that generic default when the signal's own
+        // horizon+variant has no completed trade series to show.
         $signalTradeChart = data_get(
+            $tradeChart,
+            'series.'.((int) ($primaryHorizon['days'] ?? 0)).'.'.((string) ($primaryVariant ?? '')),
+        ) ?? data_get(
             $tradeChart,
             'series.'.((int) ($tradeChartInitial['days'] ?? 0)).'.'.((string) ($tradeChartInitial['variant'] ?? '')),
             [],
