@@ -99,11 +99,47 @@
         }
     </style>
     <div data-simulate-live="{{ $simulateLiveQuotes ? '1' : '0' }}" x-data="{ filtering: false, submitFilters(form) { this.filtering = true; requestAnimationFrame(() => form.submit()) } }" @pageshow.window="filtering = false" class="screener-page mx-auto max-w-[96rem] px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
-        <header class="mb-3 flex items-center gap-2.5">
+        <header class="mb-3 flex flex-wrap items-center gap-2.5">
             <h1 class="text-3xl font-black tracking-tight">{{ __('Aktienscreener') }}</h1>
             <a href="{{ route('tutorial.index') }}" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-500/45 bg-cyan-400/10 text-cyan-600 transition hover:border-cyan-500 hover:bg-cyan-400/20 focus:outline-none focus:ring-2 focus:ring-cyan-400/40" title="{{ __('Hilfe zum Aktienscreener') }}" aria-label="{{ __('Hilfe zum Aktienscreener') }}">
                 <x-heroicon-o-question-mark-circle class="h-5 w-5" />
             </a>
+            @php
+                $activeScreenerFilters = collect([
+                    'q' => filled(request('q')) ? __('Suche') . ': ' . request('q') : null,
+                    'sector' => filled(request('sector')) ? request('sector') : null,
+                    'risk_class' => (function () {
+                        $selected = collect(request('risk_class', []));
+                        if ($selected->isEmpty() || $selected->count() >= 3) {
+                            return null;
+                        }
+                        $labels = ['defensive' => __('Defensiv'), 'balanced' => __('Ausgewogen'), 'offensive' => __('Offensiv')];
+
+                        return __('Profil') . ': ' . $selected->map(fn ($value) => $labels[$value] ?? $value)->implode(', ');
+                    })(),
+                    'index' => filled(request('index')) ? request('index') : null,
+                    'signal' => filled(request('signal')) ? signal_label(request('signal')) : null,
+                    'quality_gate_only' => request()->boolean('quality_gate_only') ? __('Nur Quality-Gate bestanden') : null,
+                    'min_max_return' => filled(request('min_max_return')) ? __('Max. Rendite') . ' ≥ ' . (request('min_max_return') > 0 ? '+' : '') . request('min_max_return') . ' %' : null,
+                    'transition_days' => filled(request('transition_days')) ? trans_choice('Letzter :days Tag|Letzte :days Tage', (int) request('transition_days'), ['days' => request('transition_days')]) : null,
+                    'bestand' => filled(request('bestand')) ? (
+                        collect($userWatchlists)->firstWhere('id', (int) str_replace('watchlist:', '', (string) request('bestand')))?->name
+                        ?? collect($paperPortfolios)->firstWhere('id', (int) str_replace('portfolio:', '', (string) request('bestand')))?->name
+                        ?? (request('bestand') === 'watchlists' ? __('Alle Watchlists') : request('bestand'))
+                    ) : null,
+                    'limit' => filled(request('limit')) && request('limit') !== 'all' ? __('Top') . ' ' . request('limit') : null,
+                ])->filter();
+            @endphp
+            @if ($activeScreenerFilters->isNotEmpty())
+                <div class="flex flex-wrap items-center gap-1.5">
+                    @foreach ($activeScreenerFilters as $filterKey => $filterLabel)
+                        <a href="{{ route('screener.index', request()->except([$filterKey, 'risk_profiles'])) }}" class="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-400/[.08] px-3 py-1 text-[11px] font-bold text-cyan-600 transition hover:border-cyan-500 hover:bg-cyan-400/[.16]">
+                            <span>{{ $filterLabel }}</span>
+                            <x-heroicon-o-x-mark class="h-3 w-3" />
+                        </a>
+                    @endforeach
+                </div>
+            @endif
         </header>
 
         @if($isFreeRegional)
@@ -129,7 +165,7 @@
             <span class="inline-flex items-center gap-2"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" />{{ __('Filter anzeigen') }}</span>
             <x-heroicon-o-chevron-down class="h-4 w-4 transition" x-bind:class="filtersOpen && 'rotate-180'" />
         </button>
-        <form x-cloak x-show.important="filtersOpen" method="GET" action="{{ route('screener.index') }}" class="screener-filter-bar mt-2 flex flex-nowrap gap-2 overflow-x-auto rounded-lg border border-cyan-400/30 bg-[var(--ak-card)] p-3 text-[17px] shadow-[var(--ak-shadow)]" style="font-size:17px">
+        <form x-cloak x-show.important="filtersOpen" method="GET" action="{{ route('screener.index') }}" class="screener-filter-bar mt-2 flex flex-wrap gap-2 rounded-lg border border-cyan-400/30 bg-[var(--ak-card)] p-3 text-[17px] shadow-[var(--ak-shadow)]" style="font-size:17px">
             <label class="relative min-w-[180px] flex-[1.5]">
                 <span class="sr-only">{{ __('Aktie suchen') }}</span>
                 <input name="q" value="{{ request('q') }}" @input.debounce.500ms="submitFilters($el.form)" placeholder="{{ __('Aktie oder Symbol') }}" class="ak-input h-10 w-full text-sm" />
