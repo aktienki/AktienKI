@@ -486,12 +486,16 @@
             text-align: center;
         }
 
+        /* 4 columns, fixed - guarantees exactly 2 rows for the current 7
+           donuts (4+3) regardless of how the browser would otherwise wrap a
+           flex row. flex-wrap previously left this to available width, which
+           silently became 3 rows (needing more height than the desktop
+           viewport-locked card had) the moment a 7th donut was added. */
         #stock-detail-page .stock-serving-rating-layout .stock-analysis-donuts {
-            display: flex !important;
-            flex-wrap: wrap !important;
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
             width: auto;
             min-height: 6.5rem;
-            grid-template-columns: none !important;
         }
 
         #stock-detail-page .stock-serving-rating-layout {
@@ -502,23 +506,23 @@
         }
 
         #stock-detail-page .stock-serving-rating-layout .stock-analysis-donuts {
-            min-height: 11rem !important;
+            min-height: 9rem !important;
         }
 
         #stock-detail-page .stock-serving-rating-layout .stock-analysis-donut-item .segmented-score {
-            width: 66px;
-            height: 66px;
-            min-width: 66px;
-            min-height: 66px;
-            flex-basis: 66px;
+            width: 50px;
+            height: 50px;
+            min-width: 50px;
+            min-height: 50px;
+            flex-basis: 50px;
         }
 
         #stock-detail-page .stock-serving-rating-layout .stock-analysis-donut-item-primary .segmented-score {
-            width: 66px;
-            height: 66px;
-            min-width: 66px;
-            min-height: 66px;
-            flex-basis: 66px;
+            width: 50px;
+            height: 50px;
+            min-width: 50px;
+            min-height: 50px;
+            flex-basis: 50px;
         }
 
         #stock-detail-page .stock-serving-forecast-list {
@@ -1699,7 +1703,6 @@
                 <div class="stock-detail-card-head flex items-center justify-between gap-2">
                     <div class="min-w-0 flex-1 text-left">
                         <p class="truncate whitespace-nowrap text-[9px] font-black uppercase tracking-[.16em] text-violet-300 sm:text-[10px]">{{ __('Aktuelle KI-Analyse') }}</p>
-                        <h2 class="mt-1 truncate text-sm font-black text-[var(--ak-text)] sm:text-base">{{ __('Persönliche Einordnung') }}</h2>
                     </div>
                     <div class="flex shrink-0 items-center justify-end gap-2">
                     @if ($signal === 'WAIT' && $canCreatePredictionReminder)
