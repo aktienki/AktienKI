@@ -2013,7 +2013,7 @@
                                         <span><i class="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400"></i>{{ __('Kauf') }}</span>
                                         <span><i class="mr-1 inline-block h-2 w-2 rounded-full bg-rose-400"></i>{{ __('Verkauf') }}</span>
                                         @if($chartCandles->isNotEmpty())
-                                            <span><i class="mr-1 inline-block h-2 w-2 rounded-full bg-slate-400"></i>{{ __('Kurs (Buy & Hold)') }}</span>
+                                            <span><i class="mr-1 inline-block h-2 w-2 rounded-full bg-violet-400"></i>{{ __('Kurs (Buy & Hold)') }}</span>
                                         @endif
                                     </div>
                                 </div>
@@ -2118,8 +2118,8 @@
                                     new window.ApexCharts(node, {
                                         chart: { type: 'line', height: 180, toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, background: 'transparent' },
                                         series,
-                                        colors: hasBuyHold ? [light ? '#007c87' : '#22d3ee', light ? '#64748b' : '#94a3b8'] : [light ? '#007c87' : '#22d3ee'],
-                                        stroke: { width: hasBuyHold ? [3.2, 1.2] : [3.2], curve: 'straight', lineCap: 'round', dashArray: hasBuyHold ? [0, 4] : [0] },
+                                        colors: hasBuyHold ? [light ? '#007c87' : '#22d3ee', light ? '#7c3aed' : '#a78bfa'] : [light ? '#007c87' : '#22d3ee'],
+                                        stroke: { width: hasBuyHold ? [3.2, 1] : [3.2], curve: 'straight', lineCap: 'round', dashArray: hasBuyHold ? [0, 4] : [0] },
                                         fill: { type: 'solid', opacity: 0 },
                                         states: { normal: { filter: { type: 'none' } }, hover: { filter: { type: 'none' } }, active: { filter: { type: 'none' } } },
                                         annotations: { points: annotations },
