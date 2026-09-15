@@ -218,6 +218,14 @@ final class AutomatedPortfolioService
             ->where('backtest_run_id', $backtestRunId)
             ->select('instrument_id', 'trained_model_id', 'model_definition_id', 'horizon_days')
             ->selectRaw('MAX(ABS(max_drawdown)) * 100 AS drawdown_percent')
+            // The strategy-level drawdown_max filter (below) walk-forward-tested
+            // as a per-trade drawdown cutoff, not "has this stock/model ever had
+            // one bad outlier trade" - AVG is the closest a live, prospective
+            // filter can get to that (there is no such thing as "this specific
+            // not-yet-executed trade's own drawdown" to filter on directly).
+            // Kept separate from drawdown_percent (MAX) above, which the hard
+            // risk-profile gate and the ranking factors still use unchanged.
+            ->selectRaw('AVG(ABS(max_drawdown)) * 100 AS average_drawdown_percent')
             ->selectRaw('SUM(CASE WHEN net_return > 0 THEN net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN net_return < 0 THEN net_return ELSE 0 END)), 0) AS profit_factor')
             ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
             ->selectRaw('COUNT(*) AS historical_trades')
@@ -374,7 +382,7 @@ final class AutomatedPortfolioService
             ->whereRaw("{$confidenceSql} >= ?", [(float) ($filters['confidence_min'] ?? 0)])
             ->when((float) ($filters['predicted_return_min'] ?? -50) > -50, fn ($query) => $query->whereRaw("{$predictedReturnSql} >= ?", [(float) $filters['predicted_return_min']]))
             ->when((float) ($filters['risk_max'] ?? 100) < 100, fn ($query) => $query->whereRaw("{$riskSql} <= ?", [(float) $filters['risk_max']]))
-            ->when((float) ($filters['drawdown_max'] ?? 50) < 50, fn ($query) => $query->where('backtest_stat.drawdown_percent', '<=', (float) $filters['drawdown_max']))
+            ->when((float) ($filters['drawdown_max'] ?? 50) < 50, fn ($query) => $query->where('backtest_stat.average_drawdown_percent', '<=', (float) $filters['drawdown_max']))
             ->when((float) ($filters['profit_per_trade_min'] ?? 0) > 0, fn ($query) => $query->where('backtest_stat.average_net_return', '>=', (float) $filters['profit_per_trade_min']))
             ->when(is_numeric($filters['median_return_min'] ?? null), fn ($query) => $query->where('backtest_stat.median_net_return', '>=', (float) $filters['median_return_min']))
             ->when((float) ($filters['profit_factor_min'] ?? 0) > 0, fn ($query) => $query->where('backtest_stat.profit_factor', '>=', (float) $filters['profit_factor_min']))
