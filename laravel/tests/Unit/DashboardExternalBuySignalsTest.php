@@ -57,12 +57,18 @@ final class DashboardExternalBuySignalsTest extends TestCase
         $this->assertStringContainsString('@forelse($threeFactorAlternatives as $alternative)', $view);
         $this->assertStringContainsString("__('Beste Alternativen')", $view);
         $this->assertStringContainsString("__('Ranking · Platz :rank'", $view);
-        $this->assertStringContainsString("\$additionalAlternative->alternative_category = 'alternative';", $controller);
-        // The "maybe interesting soon" pick shares the exact same card look
-        // (badge, label, stat line) as the ranked alternatives now - it is
-        // not called out as visually distinct, on request.
-        $this->assertStringContainsString('$additionalAlternative->alternative_rank = $threeFactorAlternatives->count() + 2;', $controller);
+        // The "maybe interesting soon" pick moved out of this ranked pool
+        // entirely (on request) - it never went through the same
+        // external-confirmation + panel pipeline the ranked ones do, so it
+        // no longer gets an alternative_category/alternative_rank at all
+        // and isn't pushed into $threeFactorAlternatives anymore.
+        $this->assertStringNotContainsString("\$threeFactorAlternatives->push(\$additionalAlternative);", $controller);
         $this->assertStringNotContainsString("__('Vielleicht in ein paar Tagen interessant')", $view);
+        // Instead it shows up as its own entry in the "Bestätigte
+        // POSITIV-Signale" card, alongside the other individual picks.
+        $this->assertStringContainsString("__('Bestätigte POSITIV-Signale')", $view);
+        $this->assertStringContainsString('@if($additionalAlternative)', $view);
+        $this->assertStringContainsString("__('Evtl. bald interessant')", $view);
         $this->assertStringContainsString('dashboard-alternative-entry', $view);
         $this->assertStringContainsString('dashboard-opportunity-card', $view);
         $this->assertStringContainsString('min-height: 3.9rem;', $view);

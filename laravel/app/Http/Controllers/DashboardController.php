@@ -256,22 +256,13 @@ class DashboardController extends Controller
                 ];
             })
             ->first();
+        // Deliberately kept OUT of $threeFactorAlternatives now - it never
+        // goes through the same external-confirmation + panel pipeline the
+        // ranked ones do, so it moved to the "Bestätigte POSITIV-Signale"
+        // card in the right column instead, alongside the other individual
+        // stock picks that also aren't part of that ranked pool.
         if ($additionalAlternative) {
             $additionalAlternative = clone $additionalAlternative;
-            $additionalAlternative->alternative_category = 'alternative';
-            // Continues the same #2/#3/... numbering the ranked alternatives
-            // use, rather than a visually distinct star badge - this pick is
-            // shown as just another candidate in the same list, not called
-            // out as special.
-            $additionalAlternative->alternative_rank = $threeFactorAlternatives->count() + 2;
-            // This pick never goes through threeFactorRanking(), so without
-            // this it had no three_factor_score at all and its donut always
-            // showed a hardcoded 0 - fall back to the same composite score
-            // every other card on the dashboard (and the screener) shows.
-            $additionalAlternative->three_factor_score = is_numeric($additionalAlternative->composite_score ?? null)
-                ? (float) $additionalAlternative->composite_score
-                : 0.0;
-            $threeFactorAlternatives->push($additionalAlternative);
         }
         $scoreRiser = $canUsePro ? $this->strongestScoreRiser($remoteDashboardStocks) : null;
         $topIndicatorStock = $canUsePro ? $this->topIndicatorScoreStock($remoteDashboardStocks) : null;
@@ -353,6 +344,7 @@ class DashboardController extends Controller
             'marketFactorSnapshot',
             'externalConfirmedBuys',
             'threeFactorAlternatives',
+            'additionalAlternative',
             'profileUniverseStats',
             'recentEarnings',
             'communityOverview',

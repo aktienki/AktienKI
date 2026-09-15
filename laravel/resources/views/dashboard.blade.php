@@ -841,14 +841,9 @@
                                     $alternativeDecile = is_numeric($alternative->panel_decile ?? null) ? (int) $alternative->panel_decile : null;
                                     $alternativePanelTone = $alternativeDecile === null ? 'border-slate-400/25 text-[var(--ak-muted)]' : ($alternativeDecile >= 6 ? 'border-emerald-400/35 bg-emerald-400/[.08] text-emerald-500' : ($alternativeDecile >= 4 ? 'border-amber-400/35 bg-amber-400/[.08] text-amber-500' : 'border-rose-400/35 bg-rose-400/[.08] text-rose-500'));
                                     $alternativeCategory = (string) ($alternative->alternative_category ?? 'score');
-                                    // 'alternative' (the "maybe interesting soon" pick, which never
-                                    // went through the ranked pool) sits in the exact same card grid,
-                                    // same size/structure as the ranked ones - only its label differs,
-                                    // as a small hint it's not from the ranked pool itself.
                                     $alternativeCategoryLabel = match($alternativeCategory) {
                                         'panel' => __('Panel-Bewertung'),
                                         'external' => __('Externe Bewertung'),
-                                        'alternative' => __('Evtl. bald interessant'),
                                         'rank' => __('Ranking · Platz :rank', ['rank' => (int) ($alternative->alternative_rank ?? 0)]),
                                         default => __('KI-Bewertung'),
                                     };
@@ -953,6 +948,20 @@
                         @empty
                             <div class="grid min-h-24 place-items-center rounded-lg border border-dashed border-emerald-400/25 px-4 text-center text-[9px] font-bold text-[var(--ak-muted)]">{{ __('Aktuell ist kein POSITIV-Signal für denselben Serving-Batch extern bestätigt.') }}</div>
                         @endforelse
+                        @if($additionalAlternative)
+                            @php
+                                $additionalFlag = $dashboardCountryFlags[strtoupper((string) ($additionalAlternative->country ?? ''))] ?? '🌐';
+                                $additionalRating = (string) ($additionalAlternative->serving_buy_rating_raw ?? $additionalAlternative->serving_buy_rating ?? '—');
+                                $additionalSignal = strtoupper((string) ($additionalAlternative->personalized_signal ?: 'WATCH'));
+                            @endphp
+                            <a href="{{ route('stocks.show', ['symbol' => $additionalAlternative->symbol, 'return_to' => '/dashboard']) }}" class="group grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-amber-400/25 bg-amber-400/[.045] px-3 py-2 transition hover:border-amber-400/55 hover:bg-amber-400/[.08]">
+                                <span class="min-w-0">
+                                    <b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $additionalFlag }} {{ $additionalAlternative->name ?: $additionalAlternative->symbol }}</b>
+                                    <small class="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide"><span class="text-[var(--ak-muted)]">{{ $additionalAlternative->symbol }}</span><span class="text-amber-400">{{ signal_label($additionalSignal) }} {{ $additionalRating }}</span></small>
+                                </span>
+                                <span class="text-right"><b class="block text-[9px] font-black uppercase tracking-wide text-amber-400">{{ __('Evtl. bald interessant') }}</b></span>
+                            </a>
+                        @endif
                     </div>
                 </article>
                 <article data-dashboard-card="earnings" data-dashboard-width="1" data-dashboard-height="6" data-dashboard-size="6" style="--dashboard-card-order:{{ $dashboardCardOrder('earnings') }}" class="dashboard-bento-earnings ak-card ak-dashboard-card flex min-h-0 flex-col overflow-hidden border-emerald-400/30 p-4 {{ $dashboardCardVisible('earnings') ? '' : 'hidden' }}">
