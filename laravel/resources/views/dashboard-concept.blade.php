@@ -97,30 +97,31 @@
         #dashboard-concept-page .concept-panel-score { margin-top: .6rem; display: grid; gap: .3rem; border-top: 1px solid var(--ak-border); padding-top: .6rem; }
         #dashboard-concept-page .concept-panel-score-label { font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--ak-muted); }
         #dashboard-concept-page .concept-panel-score-corr { margin-top: .15rem; font-size: .64rem; font-weight: 700; color: var(--ak-muted); }
-        /* "Klassisches Dashboard" tab: the real dashboard cards, laid out in
-           a simple two-column grid here instead of the real page's
-           drag/resize-customizable bento grid. */
-        #dashboard-concept-page .concept-classic-dashboard-grid { display: grid; gap: 1rem; grid-template-columns: 1fr; align-items: start; }
-        @media (min-width: 900px) {
-            #dashboard-concept-page .concept-classic-dashboard-grid { grid-template-columns: 1fr 1fr; }
-        }
-        #dashboard-concept-page .concept-classic-dashboard-col { display: grid; gap: 1rem; min-width: 0; align-content: start; }
+        /* "Klassisches Dashboard" tab: the real dashboard cards, stacked
+           full-width, one below the other - not the real page's
+           drag/resize-customizable multi-column bento grid, which these
+           cards' own CSS classes are tightly coupled to (see below). A
+           single column guarantees every card just takes its own natural
+           height and never fights another card over column width/height,
+           which a 2-column attempt here kept getting wrong. */
+        #dashboard-concept-page .concept-classic-dashboard-stack { display: grid; gap: 1rem; width: 100%; min-width: 0; }
         /* The real dashboard's own <style> block (dashboard-styles.blade.php,
            included above) pins these same card classes into an explicit
            12-column/N-row bento grid ("grid-column: 5 / span 4; grid-row:
-           1 / -1; height: 100%", etc.) - rules that keep matching here even
-           though this preview's grid has neither those columns nor rows,
-           producing empty stretched space and cards escaping their card
-           border. Force every such card back to normal block flow inside
-           this preview's own two-column grid instead. */
-        #dashboard-concept-page .concept-classic-dashboard-col [class*="dashboard-bento-"],
-        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-middle-column,
-        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-center-combined-card,
-        #dashboard-concept-page .concept-classic-dashboard-col .dashboard-center-combined-card {
+           1 / -1; height: 100%", etc.) - bare class selectors that keep
+           matching here too even though this preview's grid has none of
+           those columns/rows, producing empty stretched space and cards
+           escaping their card border. Force every such card back to normal
+           block flow, full width, natural height.  */
+        #dashboard-concept-page .concept-classic-dashboard-stack [class*="dashboard-bento-"],
+        #dashboard-concept-page .concept-classic-dashboard-stack #dashboard-middle-column,
+        #dashboard-concept-page .concept-classic-dashboard-stack #dashboard-center-combined-card,
+        #dashboard-concept-page .concept-classic-dashboard-stack .dashboard-center-combined-card {
             grid-column: auto !important;
             grid-row: auto !important;
             align-self: auto !important;
             position: static !important;
+            width: 100% !important;
             height: auto !important;
             min-height: 0 !important;
             max-height: none !important;
@@ -309,13 +310,9 @@
                         @elseif($section['kind'] === 'classic-dashboard')
                             @php extract($section['viewData']); @endphp
                             @include('partials.dashboard-styles')
-                            <div class="concept-classic-dashboard-grid">
-                                <div class="concept-classic-dashboard-col">
-                                    @include('partials.dashboard-middle-column')
-                                </div>
-                                <div class="concept-classic-dashboard-col">
-                                    @include('partials.dashboard-market-overview-column')
-                                </div>
+                            <div class="concept-classic-dashboard-stack">
+                                @include('partials.dashboard-middle-column')
+                                @include('partials.dashboard-market-overview-column')
                             </div>
                         @else
                             <p class="text-xs text-[var(--ak-muted)]">{{ $section['description'] }}</p>
