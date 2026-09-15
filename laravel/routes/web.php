@@ -48,6 +48,7 @@ use App\Http\Controllers\StockIconController;
 use App\Http\Controllers\TradeOpportunityController;
 use App\Http\Controllers\TradingIntegrationController;
 use App\Http\Controllers\TutorialController;
+use App\Http\Controllers\UpcomingEventsController;
 use App\Http\Controllers\WatchlistController;
 use App\Http\Controllers\WelcomeController;
 use App\Livewire\Stocks\Index as StocksIndex;
@@ -274,6 +275,7 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::post('/live-prices/subscribe', LivePriceSubscriptionController::class)->name('live-prices.subscribe');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/dashboard/concept', DashboardConceptController::class)->name('dashboard.concept');
+    Route::get('/anstehende-news', UpcomingEventsController::class)->name('upcoming-events.index');
     Route::get('/tabellen/performance-transparenz', PerformanceTransparencyController::class)
         ->middleware('plan:pro')
         ->name('predictions.performance-transparency');
