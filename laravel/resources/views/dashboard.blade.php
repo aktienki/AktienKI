@@ -841,18 +841,16 @@
                                     $alternativeDecile = is_numeric($alternative->panel_decile ?? null) ? (int) $alternative->panel_decile : null;
                                     $alternativePanelTone = $alternativeDecile === null ? 'border-slate-400/25 text-[var(--ak-muted)]' : ($alternativeDecile >= 6 ? 'border-emerald-400/35 bg-emerald-400/[.08] text-emerald-500' : ($alternativeDecile >= 4 ? 'border-amber-400/35 bg-amber-400/[.08] text-amber-500' : 'border-rose-400/35 bg-rose-400/[.08] text-rose-500'));
                                     $alternativeCategory = (string) ($alternative->alternative_category ?? 'score');
+                                    // 'alternative' (the "maybe interesting soon" pick, which never
+                                    // went through the ranked pool) intentionally shares the same
+                                    // "Ranking · Platz :rank" label as the ranked ones - it's shown
+                                    // as just another candidate, not called out as special.
                                     $alternativeCategoryLabel = match($alternativeCategory) {
                                         'panel' => __('Panel-Bewertung'),
                                         'external' => __('Externe Bewertung'),
-                                        'alternative' => __('Vielleicht in ein paar Tagen interessant'),
-                                        'rank' => __('Ranking · Platz :rank', ['rank' => (int) ($alternative->alternative_rank ?? 0)]),
+                                        'alternative', 'rank' => __('Ranking · Platz :rank', ['rank' => (int) ($alternative->alternative_rank ?? 0)]),
                                         default => __('KI-Bewertung'),
                                     };
-                                    $alternativeConfidence = is_numeric($alternative->confidence_percent ?? null) ? (float) $alternative->confidence_percent : null;
-                                    $alternativeRisk = is_numeric($alternative->risk_percent ?? null) ? (float) $alternative->risk_percent : null;
-                                    $alternativeReturn10 = is_numeric($alternative->expected_return_10d ?? null) ? (float) $alternative->expected_return_10d : null;
-                                    $alternativeLongDays = is_numeric($alternative->expected_return_40d ?? null) && (float) $alternative->expected_return_40d > 0 ? 40 : 20;
-                                    $alternativeLongReturn = is_numeric($alternative->{'expected_return_'.$alternativeLongDays.'d'} ?? null) ? (float) $alternative->{'expected_return_'.$alternativeLongDays.'d'} : null;
                                     $alternativeReturn20 = is_numeric($alternative->expected_return_20d ?? null) ? (float) $alternative->expected_return_20d : null;
                                     $alternativeScore = is_numeric($alternative->three_factor_score ?? null) ? (float) $alternative->three_factor_score : 0.0;
                                     $alternativeBuyScore = is_numeric($alternative->three_factor_buy_score ?? null) ? (float) $alternative->three_factor_buy_score : 0.0;
@@ -863,12 +861,12 @@
                                     $alternativeCurrency = strtoupper((string) ($alternative->currency ?: 'EUR'));
                                     $alternativeCurrencyLabel = match($alternativeCurrency) { 'EUR' => '€', 'USD' => '$', 'GBP' => '£', 'JPY' => '¥', default => $alternativeCurrency };
                                     $alternativeDaily = is_numeric($alternative->daily_change_percent ?? null) ? (float) $alternative->daily_change_percent : null;
-                                    $alternativeRankBadge = $alternativeCategory === 'alternative' ? '★' : '#'.((int) ($alternative->alternative_rank ?? 0));
+                                    $alternativeRankBadge = '#'.((int) ($alternative->alternative_rank ?? 0));
                                 @endphp
-                                <a href="{{ route('stocks.show', ['symbol' => $alternative->symbol, 'return_to' => '/dashboard']) }}" @class(['dashboard-alternative-entry group', 'dashboard-alternative-entry--soon' => $alternativeCategory === 'alternative', 'dashboard-alternative-entry--silver' => $alternativeCategory !== 'alternative' && (int) ($alternative->alternative_rank ?? 0) === 2, 'dashboard-alternative-entry--bronze' => $alternativeCategory !== 'alternative' && (int) ($alternative->alternative_rank ?? 0) === 3]) title="{{ $alternative->name }}">
+                                <a href="{{ route('stocks.show', ['symbol' => $alternative->symbol, 'return_to' => '/dashboard']) }}" @class(['dashboard-alternative-entry group', 'dashboard-alternative-entry--silver' => (int) ($alternative->alternative_rank ?? 0) === 2, 'dashboard-alternative-entry--bronze' => (int) ($alternative->alternative_rank ?? 0) === 3]) title="{{ $alternative->name }}">
                                     <span class="dashboard-alternative-rank" aria-hidden="true">{{ $alternativeRankBadge }}</span>
                                     <span class="min-w-0 flex-1">
-                                        <small class="block text-[8px] font-black uppercase tracking-[.14em] {{ $alternativeCategory === 'alternative' ? 'text-amber-600' : 'text-cyan-600' }}">{{ $alternativeCategoryLabel }}</small>
+                                        <small class="block text-[8px] font-black uppercase tracking-[.14em] text-cyan-600">{{ $alternativeCategoryLabel }}</small>
                                         <b class="flex min-w-0 items-center gap-1.5"><span class="truncate text-[13px] font-black text-[var(--ak-text)]">{{ $alternativeFlag }} {{ $alternative->name ?: $alternative->symbol }}</span></b>
                                         <small class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                                             <span>{{ $alternative->symbol }}</span>
@@ -876,15 +874,11 @@
                                             <span>{{ ($alternative->display_price_live ?? false) ? __('Livekurs') : __('Letzter Kurs') }} {{ is_numeric($alternative->display_price ?? null) ? number_format((float) $alternative->display_price, 2, ',', '.').' '.$alternativeCurrencyLabel : '—' }}</span>
                                             <span class="{{ $alternativeDaily === null ? '' : ($alternativeDaily >= 0 ? 'text-emerald-500' : 'text-rose-400') }}">{{ __('Tag') }} {{ $alternativeDaily !== null ? sprintf('%+.2f%%', $alternativeDaily) : '—' }}</span>
                                         </small>
-                                        @if($alternativeCategory === 'alternative')
-                                            <small class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]"><span class="text-emerald-500">KI {{ $alternativeRating }}</span><span>CONF. {{ $alternativeConfidence !== null ? number_format($alternativeConfidence, 0, ',', '.').'%' : '—' }}</span><span class="text-amber-500">RISK {{ $alternativeRisk !== null ? number_format($alternativeRisk, 0, ',', '.') : '—' }}</span><span class="{{ $alternativeReturn10 !== null && $alternativeReturn10 < 0 ? 'text-rose-400' : 'text-emerald-500' }}">10T {{ $alternativeReturn10 !== null ? sprintf('%+.1f%%', $alternativeReturn10) : '—' }}</span><span class="{{ $alternativeLongReturn !== null && $alternativeLongReturn >= 0 ? 'text-emerald-500' : 'text-rose-400' }}">{{ $alternativeLongDays }}T {{ $alternativeLongReturn !== null ? sprintf('%+.1f%%', $alternativeLongReturn) : '—' }}</span></small>
-                                        @else
-                                            <small class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
-                                                <span class="text-emerald-500">KI {{ $alternativeRating }}</span>
-                                                <span class="text-cyan-500">{{ __('Extern') }} {{ $alternativeExternal !== null ? number_format($alternativeExternal, 0, ',', '.').'%' : '—' }}</span>
-                                                <span class="{{ $alternativeReturn20 !== null && $alternativeReturn20 < 0 ? 'text-rose-400' : 'text-emerald-500' }}">20T {{ $alternativeReturn20 !== null ? sprintf('%+.1f%%', $alternativeReturn20) : '—' }}</span>
-                                            </small>
-                                        @endif
+                                        <small class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                            <span class="text-emerald-500">KI {{ $alternativeRating }}</span>
+                                            <span class="text-cyan-500">{{ __('Extern') }} {{ $alternativeExternal !== null ? number_format($alternativeExternal, 0, ',', '.').'%' : '—' }}</span>
+                                            <span class="{{ $alternativeReturn20 !== null && $alternativeReturn20 < 0 ? 'text-rose-400' : 'text-emerald-500' }}">20T {{ $alternativeReturn20 !== null ? sprintf('%+.1f%%', $alternativeReturn20) : '—' }}</span>
+                                        </small>
                                     </span>
                                     <span class="dashboard-alternative-scores">
                                         <span class="dashboard-champion-donut"><x-segmented-score-donut :score="$alternativeScore" :display="$alternativeScoreGrade" :level="$alternativeScoreLevel" type="chance" :label="__('Drei-Faktoren-Mittel')" /></span>

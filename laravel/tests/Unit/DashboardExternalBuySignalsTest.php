@@ -57,8 +57,12 @@ final class DashboardExternalBuySignalsTest extends TestCase
         $this->assertStringContainsString('@forelse($threeFactorAlternatives as $alternative)', $view);
         $this->assertStringContainsString("__('Beste Alternativen')", $view);
         $this->assertStringContainsString("__('Ranking · Platz :rank'", $view);
-        $this->assertStringContainsString("__('Vielleicht in ein paar Tagen interessant')", $view);
         $this->assertStringContainsString("\$additionalAlternative->alternative_category = 'alternative';", $controller);
+        // The "maybe interesting soon" pick shares the exact same card look
+        // (badge, label, stat line) as the ranked alternatives now - it is
+        // not called out as visually distinct, on request.
+        $this->assertStringContainsString('$additionalAlternative->alternative_rank = $threeFactorAlternatives->count() + 2;', $controller);
+        $this->assertStringNotContainsString("__('Vielleicht in ein paar Tagen interessant')", $view);
         $this->assertStringContainsString('dashboard-alternative-entry', $view);
         $this->assertStringContainsString('dashboard-opportunity-card', $view);
         $this->assertStringContainsString('min-height: 3.9rem;', $view);

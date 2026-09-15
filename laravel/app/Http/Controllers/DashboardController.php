@@ -259,6 +259,11 @@ class DashboardController extends Controller
         if ($additionalAlternative) {
             $additionalAlternative = clone $additionalAlternative;
             $additionalAlternative->alternative_category = 'alternative';
+            // Continues the same #2/#3/... numbering the ranked alternatives
+            // use, rather than a visually distinct star badge - this pick is
+            // shown as just another candidate in the same list, not called
+            // out as special.
+            $additionalAlternative->alternative_rank = $threeFactorAlternatives->count() + 2;
             // This pick never goes through threeFactorRanking(), so without
             // this it had no three_factor_score at all and its donut always
             // showed a hardcoded 0 - fall back to the same composite score
