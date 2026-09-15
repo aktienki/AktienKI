@@ -23,20 +23,22 @@
             grid-template-rows: repeat(8, 1fr);
             gap: .5rem;
             padding: .75rem;
+            background: none;
+            border: 0;
+            box-shadow: none;
         }
         #dashboard-concept-page .concept-icon-tile {
             display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3rem;
             aspect-ratio: 1 / 1;
             border-radius: .9rem;
             border: 1px solid var(--ak-border);
-            background: color-mix(in srgb, var(--ak-accent, #22d3ee) 6%, transparent);
+            background: none;
             color: var(--ak-text);
             text-decoration: none;
-            transition: border-color .15s ease, background .15s ease;
+            transition: border-color .15s ease;
         }
         #dashboard-concept-page .concept-icon-tile:hover {
             border-color: color-mix(in srgb, #22d3ee 45%, transparent);
-            background: color-mix(in srgb, #22d3ee 12%, transparent);
         }
         #dashboard-concept-page .concept-icon-tile svg { width: 1.15rem; height: 1.15rem; flex: none; }
         #dashboard-concept-page .concept-icon-tile small { font-size: .5rem; font-weight: 800; text-align: center; line-height: 1.05; }
