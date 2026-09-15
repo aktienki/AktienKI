@@ -733,18 +733,18 @@ class DashboardController extends Controller
     }
 
     /**
-     * The single #1 three-factor champion (externally GPT-confirmed BUY +
-     * panel coverage, same composite score/ranking the screener and the main
-     * dashboard card use) - exposed as its own public method so other pages
-     * (the concept dashboard's "Handelsmöglichkeiten" overview) can reuse
-     * the exact same pick instead of recomputing it differently.
+     * The same serving-backed stock list __invoke() builds for the main
+     * dashboard's cards - exposed publicly so other pages (the concept
+     * dashboard) can fetch it once and reuse it for several things instead
+     * of hitting ServingScreenerService again per thing.
      */
-    public function championSummary(Request $request): ?object
+    public function remoteDashboardStocks(Request $request): Collection
     {
         $user = $request->user();
         $remoteDashboardRequest = Request::create('/screener', 'GET', ['limit' => 'all']);
         $remoteDashboardRequest->setUserResolver(fn () => $user);
-        $remoteDashboardStocks = collect(app(ServingScreenerService::class)->data($remoteDashboardRequest)['stocks'])
+
+        return collect(app(ServingScreenerService::class)->data($remoteDashboardRequest)['stocks'])
             ->each(function (object $stock): void {
                 $stock->prediction_id = null;
                 $stock->ai_score = $stock->ranking_score;
@@ -758,7 +758,18 @@ class DashboardController extends Controller
                 $stock->horizon_fusion_consensus_return = $stock->expected_return_20d;
                 $stock->market_return_20d = $stock->expected_return_20d;
             });
+    }
 
+    /**
+     * The single #1 three-factor champion (externally GPT-confirmed BUY +
+     * panel coverage, same composite score/ranking the screener and the main
+     * dashboard card use) - exposed as its own public method so other pages
+     * (the concept dashboard's "Handelsmöglichkeiten" overview) can reuse
+     * the exact same pick instead of recomputing it differently.
+     */
+    public function championSummary(Request $request, ?Collection $remoteDashboardStocks = null): ?object
+    {
+        $remoteDashboardStocks ??= $this->remoteDashboardStocks($request);
         $externalConfirmedBuys = $this->externalConfirmedBuys($remoteDashboardStocks);
         $externalConfirmedRanked = $this->threeFactorRanking($externalConfirmedBuys);
 

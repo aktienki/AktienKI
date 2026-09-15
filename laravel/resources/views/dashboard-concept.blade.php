@@ -68,7 +68,23 @@
         }
         #dashboard-concept-page a.concept-list-item:hover { border-color: color-mix(in srgb, #22d3ee 45%, transparent); }
         #dashboard-concept-page .concept-open-link { margin-top: 1rem; display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 800; }
-        #dashboard-concept-page .concept-stack { display: grid; gap: 1rem; }
+        /* Full-width opportunity cards (champion / candidates / signal changes) */
+        #dashboard-concept-page .concept-opp-stack { display: grid; gap: .6rem; }
+        #dashboard-concept-page .concept-opp-card {
+            display: block; width: 100%; border-radius: .85rem; border: 1px solid var(--ak-border);
+            background: var(--ak-surface-muted, transparent); padding: .85rem 1rem; text-decoration: none; color: var(--ak-text);
+            transition: border-color .15s ease;
+        }
+        #dashboard-concept-page .concept-opp-card:hover { border-color: color-mix(in srgb, #22d3ee 45%, transparent); }
+        #dashboard-concept-page .concept-opp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: .75rem; }
+        #dashboard-concept-page .concept-opp-badge {
+            flex: none; border-radius: .4rem; border: 1px solid var(--ak-border); padding: .15rem .5rem;
+            font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--ak-muted); white-space: nowrap;
+        }
+        #dashboard-concept-page .concept-horizon-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
+        #dashboard-concept-page .concept-horizon-bar .bar-track { position: relative; height: .35rem; border-radius: .3rem; background: color-mix(in srgb, var(--ak-border) 70%, transparent); overflow: hidden; }
+        #dashboard-concept-page .concept-horizon-bar .bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: .3rem; }
+        #dashboard-concept-page .concept-opp-footer { margin-top: .8rem; padding-top: .65rem; border-top: 1px solid var(--ak-border); font-size: .72rem; line-height: 1.4; }
     </style>
 
     <div id="dashboard-concept-page" x-data="{ active: null }">
@@ -96,97 +112,48 @@
                 @endforeach
             </nav>
 
-            {{-- Right: Handelsmöglichkeiten + Musterdepot by default, swaps to the active section's short overview --}}
+            {{-- Right: Handelsmöglichkeiten by default, swaps to the active section's short overview --}}
             <div>
-                <div class="concept-stack" x-show="active === null" x-cloak>
-                    {{-- First sub-page: current trading opportunities (champion + signal changes) --}}
-                    <section class="concept-card concept-main-card">
-                        <div class="concept-main-header">
-                            <span class="concept-icon-badge border-amber-400/25 bg-amber-400/10 text-amber-400"><x-heroicon-o-bolt class="h-5 w-5" /></span>
-                            <span>
-                                <small class="text-amber-500">{{ __('Kurzübersicht') }}</small>
-                                <b>{{ __('Aktuelle Handelsmöglichkeiten') }}</b>
-                            </span>
+                <section class="concept-card concept-main-card" x-show="active === null" x-cloak>
+                    <div class="concept-main-header">
+                        <span class="concept-icon-badge border-amber-400/25 bg-amber-400/10 text-amber-400"><x-heroicon-o-bolt class="h-5 w-5" /></span>
+                        <span>
+                            <small class="text-amber-500">{{ __('Kurzübersicht') }}</small>
+                            <b>{{ __('Aktuelle Handelsmöglichkeiten') }}</b>
+                        </span>
+                    </div>
+
+                    <p class="mb-2 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Drei-Faktoren-Champion') }}</p>
+                    @if($opportunities['champion'])
+                        <div class="concept-opp-stack">
+                            <x-dashboard-concept.opportunity-card :card="$opportunities['champion']" />
                         </div>
+                    @else
+                        <div class="concept-empty">{{ __('Kein Champion aktuell verfügbar.') }}</div>
+                    @endif
 
-                        <p class="mb-2 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Drei-Faktoren-Champion') }}</p>
-                        @if($opportunities['champion'])
-                            @php($champion = $opportunities['champion'])
-                            <a href="{{ route('stocks.show', ['symbol' => $champion->symbol, 'return_to' => '/dashboard/concept']) }}" class="concept-list-item concept-champion-row">
-                                <span class="min-w-0 flex-1 truncate">{{ $champion->name }} ({{ $champion->symbol }})</span>
-                                <span class="shrink-0 tabular-nums text-amber-400">{{ number_format((float) ($champion->three_factor_score ?? 0), 1) }}</span>
-                            </a>
-                        @else
-                            <div class="concept-empty">{{ __('Kein Champion aktuell verfügbar.') }}</div>
-                        @endif
-
-                        <p class="mb-2 mt-4 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Chancen laut Marktlage') }}</p>
-                        @if(count($opportunities['marketOpportunities']))
-                            <div class="grid gap-1.5">
-                                @foreach($opportunities['marketOpportunities'] as $opportunity)
-                                    @if($opportunity['symbol'])
-                                        <a href="{{ route('stocks.show', ['symbol' => $opportunity['symbol'], 'return_to' => '/dashboard/concept']) }}" class="concept-list-item concept-opportunity-row">
-                                            <span class="min-w-0 flex-1">{{ $opportunity['text'] }}</span>
-                                        </a>
-                                    @else
-                                        <div class="concept-list-item concept-opportunity-row">
-                                            <span class="min-w-0 flex-1">{{ $opportunity['text'] }}</span>
-                                        </div>
-                                    @endif
-                                @endforeach
-                            </div>
-                        @else
-                            <div class="concept-empty">{{ __('Aktuell keine Marktchancen verfügbar.') }}</div>
-                        @endif
-
-                        <p class="mb-2 mt-4 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Signalwechsel') }}</p>
-                        @if(count($opportunities['signalChanges']))
-                            <div class="grid gap-1.5">
-                                @foreach($opportunities['signalChanges'] as $change)
-                                    <a href="{{ route('stocks.show', ['symbol' => $change['symbol'], 'prediction' => $change['prediction_id'], 'return_to' => '/dashboard/concept']) }}" class="concept-list-item concept-signal-row">
-                                        <span class="min-w-0 flex-1 truncate">{{ $change['name'] ?: $change['symbol'] }}</span>
-                                        <span class="shrink-0 text-[10px] font-black text-[var(--ak-muted)]">{{ $change['from'] }} → {{ $change['to'] }}</span>
-                                    </a>
-                                @endforeach
-                            </div>
-                        @else
-                            <div class="concept-empty">{{ __('Keine aktuellen Signalwechsel.') }}</div>
-                        @endif
-                    </section>
-
-                    <section class="concept-card concept-main-card">
-                        <div class="concept-main-header">
-                            <span class="concept-icon-badge border-emerald-400/25 bg-emerald-400/10 text-emerald-400"><x-heroicon-o-beaker class="h-5 w-5" /></span>
-                            <span>
-                                <small class="text-emerald-500">{{ __('Musterdepot') }}</small>
-                                <b>{{ $depot['name'] ?? __('Kein Musterdepot vorhanden') }}</b>
-                            </span>
+                    <p class="mb-2 mt-4 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Weitere Kandidaten') }}</p>
+                    @if(count($opportunities['candidates']))
+                        <div class="concept-opp-stack">
+                            @foreach($opportunities['candidates'] as $card)
+                                <x-dashboard-concept.opportunity-card :card="$card" />
+                            @endforeach
                         </div>
+                    @else
+                        <div class="concept-empty">{{ __('Aktuell keine weiteren Kandidaten verfügbar.') }}</div>
+                    @endif
 
-                        @if($depot)
-                            <div class="grid grid-cols-3 gap-4 border-t border-[var(--ak-border)] pt-3">
-                                <div class="concept-metric">
-                                    <b>{{ number_format($depot['cashBalance'], 0, ',', '.') }} {{ $depot['currency'] }}</b>
-                                    <small>{{ __('Barbestand') }}</small>
-                                </div>
-                                <div class="concept-metric">
-                                    <b>{{ number_format($depot['positionsValue'], 0, ',', '.') }} {{ $depot['currency'] }}</b>
-                                    <small>{{ __('Positionswert') }}</small>
-                                </div>
-                                <div class="concept-metric">
-                                    <b>{{ $depot['positionCount'] }}</b>
-                                    <small>{{ __('Positionen') }}</small>
-                                </div>
-                            </div>
-                            <a href="{{ route('paper-depots.index') }}" class="concept-open-link text-emerald-500 hover:text-emerald-400">{{ __('Musterdepot öffnen') }} →</a>
-                        @else
-                            <div class="concept-empty">
-                                {{ __('Noch kein Musterdepot angelegt.') }}
-                                <a href="{{ route('paper-depots.index') }}" class="mt-2 block text-cyan-500 hover:text-cyan-400">{{ __('Jetzt anlegen') }} →</a>
-                            </div>
-                        @endif
-                    </section>
-                </div>
+                    <p class="mb-2 mt-4 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Signalwechsel') }}</p>
+                    @if(count($opportunities['signalChanges']))
+                        <div class="concept-opp-stack">
+                            @foreach($opportunities['signalChanges'] as $card)
+                                <x-dashboard-concept.opportunity-card :card="$card" />
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="concept-empty">{{ __('Keine aktuellen Signalwechsel.') }}</div>
+                    @endif
+                </section>
 
                 @foreach($sections as $section)
                     <section class="concept-card concept-main-card" x-show="active === '{{ $section['id'] }}'" x-cloak>

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Portfolio;
 use App\Models\SmartSelectionLabel;
 use App\Services\ServingMarketSnapshotService;
 use Illuminate\Http\Request;
@@ -12,16 +11,12 @@ use Illuminate\View\View;
  * A small, standalone layout concept for the "Persönlicher Bereich" - the
  * left column keeps its fixed 1x8 icon grid, but clicking an icon now swaps
  * the main area's content instead of navigating away: each icon gets a
- * short overview of its own section, and the page defaults to a Musterdepot
- * summary when nothing is selected.
+ * short overview of its own section, and the page defaults to a current
+ * trading-opportunities overview when nothing is selected.
  */
 final class DashboardConceptController extends Controller
 {
-    /**
-     * The 8 core navigation destinations for the left column. Musterdepot
-     * is deliberately excluded here - it's the page's default view instead
-     * of being reduced to an icon among the other 8.
-     */
+    /** The 8 core navigation destinations for the left column. */
     private const LEFT_COLUMN_ICONS = [
         ['watchlists', 'Watchlists', 'heroicon-o-star'],
         ['strategies', 'Strategien', 'heroicon-o-adjustments-horizontal'],
@@ -79,65 +74,88 @@ final class DashboardConceptController extends Controller
             ]);
         })->keyBy('id');
 
-        $portfolio = $user->portfolios()
-            ->where('type', 'paper')
-            ->where('active', true)
-            ->orderByDesc('is_default')
-            ->orderBy('id')
-            ->first();
-
-        $depot = null;
-        if ($portfolio instanceof Portfolio) {
-            $positions = $portfolio->positions;
-            $depot = [
-                'id' => $portfolio->id,
-                'name' => $portfolio->name,
-                'currency' => $portfolio->currency,
-                'cashBalance' => (float) ($portfolio->cashAccount?->balance ?? 0),
-                'positionCount' => $positions->count(),
-                'positionsValue' => $positions->sum(fn ($position): float => (float) ($position->quantity ?? 0)
-                    * (float) ($position->current_price ?? $position->average_buy_price ?? 0)),
-            ];
-        }
-
         return view('dashboard-concept', [
             'leftIcons' => $leftIcons,
             'sections' => $sections,
-            'depot' => $depot,
-            'opportunities' => $this->opportunities($request, $snapshot),
+            'opportunities' => $this->opportunities($request),
         ]);
     }
 
     /**
-     * The first thing shown on the page (before Musterdepot): the same
-     * three-factor champion and recent signal changes the main dashboard's
-     * cards use, plus the broader market-snapshot "opportunities" list -
-     * unlike the champion, that list does not require external confirmation
-     * and panel coverage at once, so it stays populated even when the
-     * strict champion pool is empty.
+     * The first thing shown on the page: full-width cards for the same
+     * three-factor champion, next-best BUY candidates and recent signal
+     * changes the main dashboard's cards use - each with a small
+     * forecast-horizon chart and, where available, the external GPT
+     * review, instead of a plain text line.
      */
-    private function opportunities(Request $request, array $snapshot): array
+    private function opportunities(Request $request): array
     {
         $dashboard = app(DashboardController::class);
-        $champion = $dashboard->championSummary($request);
-        $signalChanges = collect($dashboard->signalCockpit()['signalChanges'] ?? [])->take(5)->values();
+        $remoteDashboardStocks = $dashboard->remoteDashboardStocks($request);
+        $champion = $dashboard->championSummary($request, $remoteDashboardStocks);
+        $championInstrumentId = $champion?->instrument_id !== null ? (int) $champion->instrument_id : null;
 
-        $marketOpportunities = collect($snapshot['analysis']['opportunities'] ?? [])
+        $candidates = $remoteDashboardStocks
+            ->filter(fn (object $stock): bool => strtoupper((string) ($stock->personalized_signal ?? '')) === 'BUY')
+            ->reject(fn (object $stock): bool => $championInstrumentId !== null && (int) $stock->instrument_id === $championInstrumentId)
+            ->sortByDesc(fn (object $stock): float => (float) ($stock->composite_score ?? $stock->ranking_score ?? 0))
             ->take(5)
-            ->map(function (string $line): array {
-                // Lines are always "Name (SYMBOL): ...", produced by
-                // ServingMarketSnapshotService::stockLine() - parse the
-                // symbol back out so each one can link to its stock page.
-                preg_match('/\(([^)]+)\):/', $line, $match);
-
-                return ['text' => $line, 'symbol' => $match[1] ?? null];
-            })
             ->values();
 
+        $signalChanges = collect($dashboard->signalCockpit()['signalChanges'] ?? [])->take(5)->values();
+
         return [
-            'champion' => $champion,
-            'signalChanges' => $signalChanges->all(),
-            'marketOpportunities' => $marketOpportunities->all(),
+            'champion' => $champion ? $this->stockCard($champion, __('Champion')) : null,
+            'candidates' => $candidates->map(fn (object $stock): array => $this->stockCard($stock, __('Kandidat')))->all(),
+            'signalChanges' => $signalChanges->map(fn (array $change): array => $this->signalChangeCard($change))->all(),
+        ];
+    }
+
+    /**
+     * Normalizes a screener stock object (champion or candidate - both come
+     * from the same remoteDashboardStocks() shape) into the card data the
+     * view renders: header, 10/20/40-day forecast bars, and the external
+     * GPT review when one exists.
+     */
+    private function stockCard(object $stock, string $badge): array
+    {
+        return [
+            'badge' => $badge,
+            'symbol' => $stock->symbol,
+            'name' => $stock->name ?: $stock->symbol,
+            'country' => $stock->country,
+            'url' => route('stocks.show', ['symbol' => $stock->symbol, 'return_to' => '/dashboard/concept']),
+            'compositeScore' => is_numeric($stock->composite_score ?? null) ? (float) $stock->composite_score : null,
+            'horizons' => [
+                '10T' => is_numeric($stock->expected_return_10d ?? null) ? (float) $stock->expected_return_10d : null,
+                '20T' => is_numeric($stock->expected_return_20d ?? null) ? (float) $stock->expected_return_20d : null,
+                '40T' => is_numeric($stock->expected_return_40d ?? null) ? (float) $stock->expected_return_40d : null,
+            ],
+            'externalConfidence' => is_numeric($stock->external_review_confidence ?? null) ? (int) $stock->external_review_confidence : null,
+            'externalVerdict' => $stock->external_review_verdict ?? null,
+            'externalSummary' => $stock->external_review_summary ?? null,
+        ];
+    }
+
+    private function signalChangeCard(array $change): array
+    {
+        return [
+            'badge' => ($change['from'] ?? '?').' → '.($change['to'] ?? '?'),
+            'symbol' => $change['symbol'],
+            'name' => $change['name'] ?: $change['symbol'],
+            'country' => $change['country'] ?? null,
+            'url' => route('stocks.show', ['symbol' => $change['symbol'], 'prediction' => $change['prediction_id'], 'return_to' => '/dashboard/concept']),
+            'compositeScore' => null,
+            'horizons' => [
+                '10T' => is_numeric($change['horizons'][10] ?? null) ? (float) $change['horizons'][10] : null,
+                '20T' => is_numeric($change['horizons'][20] ?? null) ? (float) $change['horizons'][20] : null,
+                '40T' => is_numeric($change['horizons'][40] ?? null) ? (float) $change['horizons'][40] : null,
+            ],
+            'externalConfidence' => null,
+            'externalVerdict' => null,
+            'externalSummary' => null,
+            'score' => $change['score'] ?? null,
+            'risk' => $change['risk'] ?? null,
         ];
     }
 
