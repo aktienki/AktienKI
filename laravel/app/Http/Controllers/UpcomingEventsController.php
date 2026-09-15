@@ -6,6 +6,7 @@ use App\Models\CorporateEvent;
 use App\Models\Watchlist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 /**
@@ -15,12 +16,27 @@ use Illuminate\View\View;
  * corporate_events table. That table already holds real, matched data -
  * this page is the first place in the app that actually shows it, grouped
  * by date, with a small badge for entries on the user's own watchlists.
+ * upcomingEvents() is public so the concept dashboard's own "Anstehende
+ * News" tab can reuse the exact same list for its short overview.
  */
 final class UpcomingEventsController extends Controller
 {
-    private const LOOKAHEAD_DAYS = 60;
+    public const LOOKAHEAD_DAYS = 60;
 
     public function __invoke(Request $request): View
+    {
+        $events = $this->upcomingEvents($request, self::LOOKAHEAD_DAYS, 200);
+
+        return view('upcoming-events', [
+            'groupedByDate' => $events->groupBy('date'),
+            'lookaheadDays' => self::LOOKAHEAD_DAYS,
+        ]);
+    }
+
+    /**
+     * @return Collection<int, array{date: string, time: ?string, symbol: string, name: string, country: ?string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, isWatched: bool, url: string}>
+     */
+    public function upcomingEvents(Request $request, int $lookaheadDays = self::LOOKAHEAD_DAYS, int $limit = 200): Collection
     {
         $user = $request->user();
 
@@ -32,14 +48,14 @@ final class UpcomingEventsController extends Controller
             ->unique()
             ->all();
 
-        $events = CorporateEvent::query()
+        return CorporateEvent::query()
             ->with('instrument:id,symbol,name,country')
             ->where('event_type', 'earnings')
-            ->whereBetween('event_date', [now()->toDateString(), now()->addDays(self::LOOKAHEAD_DAYS)->toDateString()])
+            ->whereBetween('event_date', [now()->toDateString(), now()->addDays($lookaheadDays)->toDateString()])
             ->whereHas('instrument')
             ->orderBy('event_date')
             ->orderBy('event_time')
-            ->limit(200)
+            ->limit($limit)
             ->get()
             ->filter(fn (CorporateEvent $event): bool => $event->instrument !== null)
             ->map(fn (CorporateEvent $event): array => [
@@ -54,12 +70,5 @@ final class UpcomingEventsController extends Controller
                 'isWatched' => in_array($event->instrument_id, $watchedInstrumentIds, true),
                 'url' => route('stocks.show', ['symbol' => $event->instrument->symbol, 'return_to' => '/anstehende-news']),
             ]);
-
-        $groupedByDate = $events->groupBy('date');
-
-        return view('upcoming-events', [
-            'groupedByDate' => $groupedByDate,
-            'lookaheadDays' => self::LOOKAHEAD_DAYS,
-        ]);
     }
 }

@@ -16,7 +16,7 @@ use Illuminate\View\View;
  */
 final class DashboardConceptController extends Controller
 {
-    /** The 8 core navigation destinations for the left column. */
+    /** The core navigation destinations for the left column. */
     private const LEFT_COLUMN_ICONS = [
         ['watchlists', 'Watchlists', 'heroicon-o-star'],
         ['strategies', 'Strategien', 'heroicon-o-adjustments-horizontal'],
@@ -26,6 +26,7 @@ final class DashboardConceptController extends Controller
         ['predictions', 'Prognosetabelle', 'heroicon-o-table-cells'],
         ['smart-screener', 'Smart Screener', 'heroicon-o-magnifying-glass'],
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
+        ['upcoming-news', 'Anstehende News', 'heroicon-o-calendar-days'],
     ];
 
     public function __invoke(Request $request): View
@@ -64,6 +65,7 @@ final class DashboardConceptController extends Controller
             $this->ctaSection('predictions', __('Alle aktuellen KI-Prognosen in der vollständigen Tabelle ansehen.')),
             $this->ctaSection('smart-screener', __('Aktien nach eigenen Kriterien filtern und sortieren.')),
             $this->marketSection('market-report', $snapshot),
+            $this->eventsSection('upcoming-news', $request),
         ])->map(function (array $section) use ($leftIcons): array {
             $meta = $leftIcons->firstWhere('id', $section['id']);
 
@@ -196,6 +198,24 @@ final class DashboardConceptController extends Controller
         ];
     }
 
+    /**
+     * Reuses UpcomingEventsController::upcomingEvents() - the same real,
+     * daily-synced earnings dates the standalone /anstehende-news page
+     * shows - for a short 6-item preview on this tab.
+     */
+    private function eventsSection(string $id, Request $request): array
+    {
+        $events = app(UpcomingEventsController::class)
+            ->upcomingEvents($request, lookaheadDays: 60, limit: 6);
+
+        return [
+            'id' => $id,
+            'kind' => 'events',
+            'events' => $events->all(),
+            'emptyText' => __('Aktuell keine anstehenden Termine im Zeitraum.'),
+        ];
+    }
+
     private function urlFor(string $tileId): string
     {
         return match ($tileId) {
@@ -207,6 +227,7 @@ final class DashboardConceptController extends Controller
             'predictions' => route('predictions.index'),
             'smart-screener' => route('screener.index'),
             'market-report' => route('daily-market-analysis'),
+            'upcoming-news' => route('upcoming-events.index'),
             default => route('dashboard'),
         };
     }

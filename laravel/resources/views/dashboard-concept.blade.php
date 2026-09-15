@@ -15,12 +15,12 @@
         @media (min-width: 900px) {
             #dashboard-concept-page .concept-layout { grid-template-columns: 96px minmax(0, 1fr); align-items: start; }
         }
-        /* Left column: exactly 1 wide x 8 tall - a fixed grid, not flex-wrap,
-           so it can never accidentally reflow into more than one column. */
+        /* Left column: a fixed 1-wide grid, not flex-wrap, so it can never
+           accidentally reflow into more than one column. */
         #dashboard-concept-page .concept-icon-grid {
             display: grid;
             grid-template-columns: 1fr;
-            grid-template-rows: repeat(8, 1fr);
+            grid-template-rows: repeat(9, 1fr);
             gap: .5rem;
             padding: .75rem;
             background: none;
@@ -195,6 +195,19 @@
                                 @endif
                             @else
                                 <div class="concept-empty">{{ __('Marktdaten aktuell nicht verfügbar.') }}</div>
+                            @endif
+                        @elseif($section['kind'] === 'events')
+                            @if(count($section['events']))
+                                <div class="grid gap-1.5">
+                                    @foreach($section['events'] as $event)
+                                        <a href="{{ $event['url'] }}" class="concept-list-item">
+                                            <span class="min-w-0 flex-1 truncate">{{ $event['name'] }} ({{ $event['symbol'] }})</span>
+                                            <span class="shrink-0 text-[10px] font-black text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($event['date'])->format('d.m.') }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="concept-empty">{{ $section['emptyText'] }}</div>
                             @endif
                         @else
                             <p class="text-xs text-[var(--ak-muted)]">{{ $section['description'] }}</p>
