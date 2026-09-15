@@ -1,6 +1,6 @@
 <x-app-layout>
     <style>
-        #dashboard-concept-page { max-width: 72rem; margin-inline: auto; padding: 1.25rem 1rem 3rem; }
+        #dashboard-concept-page { max-width: 96rem; margin-inline: auto; padding: 1.25rem .5rem 3rem; }
         #dashboard-concept-page .concept-card {
             border: 1px solid var(--ak-border);
             background: var(--ak-card);
@@ -35,74 +35,147 @@
             background: none;
             color: var(--ak-text);
             text-decoration: none;
-            transition: border-color .15s ease;
+            cursor: pointer;
+            width: 100%;
+            transition: border-color .15s ease, background .15s ease, color .15s ease;
         }
         #dashboard-concept-page .concept-icon-tile:hover {
             border-color: color-mix(in srgb, #22d3ee 45%, transparent);
         }
+        /* Highlighted state for the currently active section. */
+        #dashboard-concept-page .concept-icon-tile.is-active {
+            border-color: #22d3ee;
+            background: color-mix(in srgb, #22d3ee 14%, transparent);
+            color: #22d3ee;
+        }
         #dashboard-concept-page .concept-icon-tile svg { width: 1.15rem; height: 1.15rem; flex: none; }
         #dashboard-concept-page .concept-icon-tile small { font-size: .5rem; font-weight: 800; text-align: center; line-height: 1.05; }
-        #dashboard-concept-page .concept-depot-card { padding: 1.25rem; }
-        #dashboard-concept-page .concept-depot-metric { display: flex; flex-direction: column; gap: .15rem; }
-        #dashboard-concept-page .concept-depot-metric b { font-size: 1.4rem; font-weight: 900; color: var(--ak-text); }
-        #dashboard-concept-page .concept-depot-metric small { font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--ak-muted); }
+        #dashboard-concept-page .concept-main-card { padding: 1.25rem; }
+        #dashboard-concept-page .concept-main-header { display: flex; align-items: center; gap: .65rem; margin-bottom: .9rem; }
+        #dashboard-concept-page .concept-main-header b { display: block; font-size: 1rem; font-weight: 900; color: var(--ak-text); }
+        #dashboard-concept-page .concept-main-header small { display: block; font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; }
+        #dashboard-concept-page .concept-icon-badge { display: grid; height: 2.25rem; width: 2.25rem; flex: none; place-items: center; border-radius: .6rem; border: 1px solid; }
+        #dashboard-concept-page .concept-metric { display: flex; flex-direction: column; gap: .15rem; }
+        #dashboard-concept-page .concept-metric b { font-size: 1.4rem; font-weight: 900; color: var(--ak-text); }
+        #dashboard-concept-page .concept-metric small { font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--ak-muted); }
         #dashboard-concept-page .concept-empty {
             display: grid; place-items: center; min-height: 8rem; padding: 1rem; border: 1px dashed var(--ak-border); border-radius: .8rem; text-align: center; font-size: .78rem; font-weight: 700; color: var(--ak-muted);
         }
+        #dashboard-concept-page .concept-list-item {
+            display: flex; align-items: center; gap: .5rem; border-radius: .6rem; padding: .5rem .6rem;
+            border: 1px solid var(--ak-border); font-size: .78rem; font-weight: 700; color: var(--ak-text);
+        }
+        #dashboard-concept-page .concept-open-link { margin-top: 1rem; display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 800; }
     </style>
 
-    <div id="dashboard-concept-page">
+    <div id="dashboard-concept-page" x-data="{ active: null }">
         <header class="mb-5">
             <p class="text-[10px] font-black uppercase tracking-[.16em] text-cyan-500">{{ __('Konzept') }}</p>
             <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)]">{{ __('Persönlicher Bereich') }}</h1>
-            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Links: 1×8-Symbolraster für die wichtigsten Bereiche. Mitte: das Musterdepot als eigene Karte statt einer Icon-Kachel.') }}</p>
+            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Links: 1×8-Symbolraster. Ein Klick auf ein Symbol wechselt den Inhalt rechts zur Kurzübersicht dieses Bereichs.') }}</p>
             <a href="{{ route('dashboard') }}" class="mt-1 inline-flex items-center gap-1 text-[10px] font-black text-cyan-500 hover:text-cyan-400">← {{ __('Zurück zum Dashboard') }}</a>
         </header>
 
         <div class="concept-layout">
-            {{-- Left: 1x8 icon grid --}}
+            {{-- Left: 1x8 icon grid - stays exactly as-is, just gains an active state --}}
             <nav class="concept-card concept-icon-grid" aria-label="{{ __('Persönlicher Bereich') }}">
                 @foreach($leftIcons as $item)
-                    <a href="{{ $item['url'] }}" class="concept-icon-tile" title="{{ $item['label'] }}">
+                    <button
+                        type="button"
+                        class="concept-icon-tile"
+                        :class="{ 'is-active': active === '{{ $item['id'] }}' }"
+                        @click="active = (active === '{{ $item['id'] }}' ? null : '{{ $item['id'] }}')"
+                        title="{{ $item['label'] }}"
+                    >
                         <x-dynamic-component :component="$item['icon']" />
                         <small>{{ $item['label'] }}</small>
-                    </a>
+                    </button>
                 @endforeach
             </nav>
 
-            {{-- Middle: Musterdepot --}}
-            <section class="concept-card concept-depot-card">
-                <div class="mb-3 flex items-center gap-2.5">
-                    <span class="grid h-9 w-9 place-items-center rounded-lg border border-emerald-400/25 bg-emerald-400/10 text-emerald-400"><x-heroicon-o-beaker class="h-5 w-5" /></span>
-                    <span>
-                        <small class="block text-[9px] font-black uppercase tracking-[.16em] text-emerald-500">{{ __('Musterdepot') }}</small>
-                        <b class="block text-base font-black text-[var(--ak-text)]">{{ $depot['name'] ?? __('Kein Musterdepot vorhanden') }}</b>
-                    </span>
-                </div>
+            {{-- Right: Musterdepot by default, swaps to the active section's short overview --}}
+            <div>
+                <section class="concept-card concept-main-card" x-show="active === null" x-cloak>
+                    <div class="concept-main-header">
+                        <span class="concept-icon-badge border-emerald-400/25 bg-emerald-400/10 text-emerald-400"><x-heroicon-o-beaker class="h-5 w-5" /></span>
+                        <span>
+                            <small class="text-emerald-500">{{ __('Musterdepot') }}</small>
+                            <b>{{ $depot['name'] ?? __('Kein Musterdepot vorhanden') }}</b>
+                        </span>
+                    </div>
 
-                @if($depot)
-                    <div class="grid grid-cols-3 gap-4 border-t border-[var(--ak-border)] pt-3">
-                        <div class="concept-depot-metric">
-                            <b>{{ number_format($depot['cashBalance'], 0, ',', '.') }} {{ $depot['currency'] }}</b>
-                            <small>{{ __('Barbestand') }}</small>
+                    @if($depot)
+                        <div class="grid grid-cols-3 gap-4 border-t border-[var(--ak-border)] pt-3">
+                            <div class="concept-metric">
+                                <b>{{ number_format($depot['cashBalance'], 0, ',', '.') }} {{ $depot['currency'] }}</b>
+                                <small>{{ __('Barbestand') }}</small>
+                            </div>
+                            <div class="concept-metric">
+                                <b>{{ number_format($depot['positionsValue'], 0, ',', '.') }} {{ $depot['currency'] }}</b>
+                                <small>{{ __('Positionswert') }}</small>
+                            </div>
+                            <div class="concept-metric">
+                                <b>{{ $depot['positionCount'] }}</b>
+                                <small>{{ __('Positionen') }}</small>
+                            </div>
                         </div>
-                        <div class="concept-depot-metric">
-                            <b>{{ number_format($depot['positionsValue'], 0, ',', '.') }} {{ $depot['currency'] }}</b>
-                            <small>{{ __('Positionswert') }}</small>
+                        <a href="{{ route('paper-depots.index') }}" class="concept-open-link text-emerald-500 hover:text-emerald-400">{{ __('Musterdepot öffnen') }} →</a>
+                    @else
+                        <div class="concept-empty">
+                            {{ __('Noch kein Musterdepot angelegt.') }}
+                            <a href="{{ route('paper-depots.index') }}" class="mt-2 block text-cyan-500 hover:text-cyan-400">{{ __('Jetzt anlegen') }} →</a>
                         </div>
-                        <div class="concept-depot-metric">
-                            <b>{{ $depot['positionCount'] }}</b>
-                            <small>{{ __('Positionen') }}</small>
+                    @endif
+                </section>
+
+                @foreach($sections as $section)
+                    <section class="concept-card concept-main-card" x-show="active === '{{ $section['id'] }}'" x-cloak>
+                        <div class="concept-main-header">
+                            <span class="concept-icon-badge border-cyan-400/25 bg-cyan-400/10 text-cyan-400"><x-dynamic-component :component="$section['icon']" class="h-5 w-5" /></span>
+                            <span>
+                                <small class="text-cyan-500">{{ __('Kurzübersicht') }}</small>
+                                <b>{{ $section['label'] }}</b>
+                            </span>
                         </div>
-                    </div>
-                    <a href="{{ route('paper-depots.index') }}" class="mt-4 inline-flex items-center gap-1 text-[11px] font-black text-emerald-500 hover:text-emerald-400">{{ __('Musterdepot öffnen') }} →</a>
-                @else
-                    <div class="concept-empty">
-                        {{ __('Noch kein Musterdepot angelegt.') }}
-                        <a href="{{ route('paper-depots.index') }}" class="mt-2 block text-cyan-500 hover:text-cyan-400">{{ __('Jetzt anlegen') }} →</a>
-                    </div>
-                @endif
-            </section>
+
+                        @if($section['kind'] === 'list')
+                            @if(count($section['items']))
+                                <div class="grid gap-1.5 sm:grid-cols-2">
+                                    @foreach($section['items'] as $name)
+                                        <div class="concept-list-item">{{ $name }}</div>
+                                    @endforeach
+                                </div>
+                                @if($section['total'] > count($section['items']))
+                                    <p class="mt-2 text-[11px] font-black text-[var(--ak-muted)]">{{ __('Insgesamt :count', ['count' => $section['total']]) }}</p>
+                                @endif
+                            @else
+                                <div class="concept-empty">{{ $section['emptyText'] }}</div>
+                            @endif
+                        @elseif($section['kind'] === 'market')
+                            @if($section['available'] && $section['assessment'])
+                                <p class="text-sm font-bold text-[var(--ak-text)]">{{ $section['assessment']['status'] }} · {{ number_format($section['assessment']['score'], 0) }}/100</p>
+                                <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ $section['assessment']['summary'] }}</p>
+                                @if(count($section['metrics']))
+                                    <div class="mt-3 grid grid-cols-2 gap-3 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-4">
+                                        @foreach($section['metrics'] as $metric)
+                                            <div class="concept-metric">
+                                                <b class="text-base">{{ $metric['value'] }}</b>
+                                                <small>{{ $metric['label'] }}</small>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            @else
+                                <div class="concept-empty">{{ __('Marktdaten aktuell nicht verfügbar.') }}</div>
+                            @endif
+                        @else
+                            <p class="text-xs text-[var(--ak-muted)]">{{ $section['description'] }}</p>
+                        @endif
+
+                        <a href="{{ $section['url'] }}" class="concept-open-link text-cyan-500 hover:text-cyan-400">{{ __('Vollständige Ansicht öffnen') }} →</a>
+                    </section>
+                @endforeach
+            </div>
         </div>
     </div>
 </x-app-layout>

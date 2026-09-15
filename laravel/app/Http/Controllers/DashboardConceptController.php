@@ -3,21 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Models\Portfolio;
+use App\Models\SmartSelectionLabel;
+use App\Services\ServingMarketSnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * A small, standalone layout concept for the "Persönlicher Bereich" -
- * left: a single-column stack of 8 navigation icons, middle: the user's
- * paper portfolio (Musterdepot) shown as a real summary card instead of
- * one more icon+count tile among many.
+ * A small, standalone layout concept for the "Persönlicher Bereich" - the
+ * left column keeps its fixed 1x8 icon grid, but clicking an icon now swaps
+ * the main area's content instead of navigating away: each icon gets a
+ * short overview of its own section, and the page defaults to a Musterdepot
+ * summary when nothing is selected.
  */
 final class DashboardConceptController extends Controller
 {
     /**
      * The 8 core navigation destinations for the left column. Musterdepot
-     * is deliberately excluded here - it gets its own, richer card instead
-     * of being reduced to an icon.
+     * is deliberately excluded here - it's the page's default view instead
+     * of being reduced to an icon among the other 8.
      */
     private const LEFT_COLUMN_ICONS = [
         ['watchlists', 'Watchlists', 'heroicon-o-star'],
@@ -40,6 +43,40 @@ final class DashboardConceptController extends Controller
             'icon' => $item[2],
             'url' => $this->urlFor($item[0]),
         ]);
+
+        $sections = collect([
+            $this->listSection(
+                'watchlists',
+                $user->watchlists()->orderByDesc('is_default')->orderBy('name')->limit(5)->pluck('name'),
+                $user->watchlists()->count(),
+                __('Noch keine Watchlist angelegt.'),
+            ),
+            $this->listSection(
+                'strategies',
+                $user->savedPredictionFilters()->orderByDesc('id')->limit(5)->pluck('name'),
+                $user->savedPredictionFilters()->count(),
+                __('Noch keine Strategie gespeichert.'),
+            ),
+            $this->listSection(
+                'labels',
+                SmartSelectionLabel::query()->where('user_id', $user->id)->orderByDesc('id')->limit(5)->pluck('name'),
+                SmartSelectionLabel::query()->where('user_id', $user->id)->count(),
+                __('Noch kein Label angelegt.'),
+            ),
+            $this->ctaSection('chartview', __('Chartmuster und Signale in der interaktiven Chartansicht erkunden.')),
+            $this->ctaSection('watchlist-screener', __('Die eigene Watchlist mit den Screener-Filtern kombinieren.')),
+            $this->ctaSection('predictions', __('Alle aktuellen KI-Prognosen in der vollständigen Tabelle ansehen.')),
+            $this->ctaSection('smart-screener', __('Aktien nach eigenen Kriterien filtern und sortieren.')),
+            $this->marketSection('market-report'),
+        ])->map(function (array $section) use ($leftIcons): array {
+            $meta = $leftIcons->firstWhere('id', $section['id']);
+
+            return array_merge($section, [
+                'label' => $meta['label'],
+                'icon' => $meta['icon'],
+                'url' => $meta['url'],
+            ]);
+        })->keyBy('id');
 
         $portfolio = $user->portfolios()
             ->where('type', 'paper')
@@ -64,8 +101,47 @@ final class DashboardConceptController extends Controller
 
         return view('dashboard-concept', [
             'leftIcons' => $leftIcons,
+            'sections' => $sections,
             'depot' => $depot,
         ]);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, string>  $items
+     */
+    private function listSection(string $id, $items, int $total, string $emptyText): array
+    {
+        return [
+            'id' => $id,
+            'kind' => 'list',
+            'items' => $items->values()->all(),
+            'total' => $total,
+            'emptyText' => $emptyText,
+        ];
+    }
+
+    private function ctaSection(string $id, string $description): array
+    {
+        return [
+            'id' => $id,
+            'kind' => 'cta',
+            'description' => $description,
+        ];
+    }
+
+    private function marketSection(string $id): array
+    {
+        $snapshot = app(ServingMarketSnapshotService::class)->snapshot();
+        $assessment = $snapshot['assessment'] ?? null;
+        $metrics = $snapshot['analysis']['metrics'] ?? [];
+
+        return [
+            'id' => $id,
+            'kind' => 'market',
+            'available' => (bool) ($snapshot['available'] ?? false),
+            'assessment' => $assessment,
+            'metrics' => array_slice($metrics, 0, 4),
+        ];
     }
 
     private function urlFor(string $tileId): string
