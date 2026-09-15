@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\TwelveDataFundamentalImporter;
+use App\Services\YahooFundamentalService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -13,7 +14,7 @@ class ImportTwelveDataFundamentals extends Command
 
     protected $description = 'One-time import of Twelve Data fundamentals for active stocks';
 
-    public function handle(TwelveDataFundamentalImporter $importer): int
+    public function handle(TwelveDataFundamentalImporter $importer, YahooFundamentalService $yahoo): int
     {
         $query = DB::table('instruments')->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at')->orderBy('id');
         if ($this->option('missing-only') && ! $this->option('analysis-only')) {
@@ -32,7 +33,7 @@ class ImportTwelveDataFundamentals extends Command
         $stocks = $query->get(['id', 'symbol', 'provider_symbol']);
         $bar = $this->output->createProgressBar($stocks->count());
         $bar->start();
-        $success = $failed = $skipped = 0;
+        $success = $failed = $skipped = $sectorFallback = 0;
 
         foreach ($stocks as $stock) {
             $imported = false;
@@ -62,6 +63,25 @@ class ImportTwelveDataFundamentals extends Command
 
                         continue;
                     }
+                    // Twelve Data has no data for this symbol at all - not
+                    // just foreign cross-listings, plainly German companies
+                    // (e.g. Stabilus SE) hit this too, and it's roughly a
+                    // quarter of the active universe. Yahoo's own listing
+                    // symbol (usually identical to ours, e.g. "STM.DE") often
+                    // still has at least a sector/industry, even without a
+                    // full financial-statement history.
+                    if (! $this->option('analysis-only')) {
+                        $fallback = $yahoo->assetProfile($stock->symbol);
+                        if ($fallback !== null) {
+                            DB::table('instruments')->where('id', $stock->id)->update(array_filter([
+                                'sector' => $fallback['sector'], 'industry' => $fallback['industry'], 'updated_at' => now(),
+                            ], fn ($value) => $value !== null));
+                            $sectorFallback++;
+                            $imported = true;
+
+                            continue;
+                        }
+                    }
                     $failed++;
                     $this->newLine();
                     $this->warn($stock->symbol.': '.$exception->getMessage());
@@ -73,7 +93,7 @@ class ImportTwelveDataFundamentals extends Command
 
         $bar->finish();
         $this->newLine(2);
-        $this->info("Import abgeschlossen: {$success} erfolgreich, {$skipped} tarifbedingt übersprungen, {$failed} fehlgeschlagen.");
+        $this->info("Import abgeschlossen: {$success} erfolgreich, {$sectorFallback} nur Sektor via Yahoo-Fallback, {$skipped} tarifbedingt übersprungen, {$failed} fehlgeschlagen.");
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
