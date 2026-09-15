@@ -349,7 +349,7 @@
         </button>
 
         <div class="ml-auto flex h-full shrink-0 items-center justify-end gap-3 [&>*]:self-center">
-            <x-preference-controls class="hidden sm:flex" />
+            <x-preference-controls :show-theme="true" class="hidden sm:flex" />
             @auth
                 @php
                     $topbarUser = auth()->user();

@@ -21,6 +21,7 @@ final class DashboardConceptController extends Controller
 {
     /** The core navigation destinations for the left column. */
     private const LEFT_COLUMN_ICONS = [
+        ['classic-dashboard', 'Klassisches Dashboard', 'heroicon-o-squares-2x2'],
         ['watchlists', 'Watchlists', 'heroicon-o-star'],
         ['strategies', 'Strategien', 'heroicon-o-adjustments-horizontal'],
         ['labels', 'Labels', 'heroicon-o-tag'],
@@ -31,7 +32,6 @@ final class DashboardConceptController extends Controller
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
         ['upcoming-news', 'Anstehende News', 'heroicon-o-calendar-days'],
         ['earnings-drift', 'Quartalszahlen-Historie', 'heroicon-o-chart-bar'],
-        ['classic-dashboard', 'Klassisches Dashboard', 'heroicon-o-squares-2x2'],
     ];
 
     public function __invoke(Request $request): View
