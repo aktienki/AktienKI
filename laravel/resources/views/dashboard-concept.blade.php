@@ -144,6 +144,23 @@
         #dashboard-concept-page .concept-classic-dashboard-col .dashboard-right-column {
             display: flex !important;
             flex-direction: column;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+        }
+        /* Without an explicit width, this column's grid-item default
+           min-width:auto lets its cards' intrinsic content (KPI tiles etc.)
+           push it past the 22rem track - the real dashboard never hits this
+           because .dashboard-right-column is display:none at this
+           breakpoint there, so its content never has to fit a narrow
+           column. Clamp every card (and anything inside them) back down. */
+        #dashboard-concept-page .concept-classic-dashboard-col .dashboard-right-column,
+        #dashboard-concept-page .concept-classic-dashboard-col .dashboard-right-column > * {
+            min-width: 0 !important;
+            max-width: 100% !important;
+        }
+        #dashboard-concept-page .concept-classic-dashboard-col .dashboard-right-column * {
+            overflow-wrap: break-word;
         }
     </style>
 

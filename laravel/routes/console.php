@@ -166,6 +166,17 @@ Schedule::command('etfs:sync-holdings')
     ->onOneServer()
     ->runInBackground();
 
+// Twelve Data fundamentals refresh weekly per stock (with a Yahoo Finance
+// fallback for sector/industry when Twelve Data has nothing for a symbol);
+// new listings without any snapshot yet are always included via
+// --missing-only regardless of the daily snapshot check.
+Schedule::command('fundamentals:import-twelve-data --missing-only')
+    ->weeklyOn(2, '02:00')
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping(240)
+    ->onOneServer()
+    ->runInBackground();
+
 // Der automatische Zertifikate-Import ist vorerst deaktiviert. Der manuelle
 // Befehl bleibt für einen späteren kontrollierten Neustart verfügbar.
 

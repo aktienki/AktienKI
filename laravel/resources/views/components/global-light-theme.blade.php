@@ -50,9 +50,9 @@
         --ak-overview-shadow:0 10px 24px rgba(51,65,85,.08),inset 2px 0 0 #cbd5e1 !important;
         --ak-overview-shadow-hover:0 13px 28px rgba(71,85,105,.10),inset 2px 0 0 #94a3b8 !important;
         --ak-focus-ring:0 0 0 3px rgba(82,82,91,.14) !important;
-        --ak-shadow:0 8px 24px rgba(24,24,27,.07) !important;
+        --ak-shadow:0 10px 30px rgba(24,24,27,.14) !important;
         --ak-shadow-topbar:0 6px 20px rgba(24,24,27,.06) !important;
-        --ak-shadow-hover:0 12px 30px rgba(24,24,27,.11) !important;
+        --ak-shadow-hover:0 16px 40px rgba(24,24,27,.18) !important;
         --ak-shadow-menu:0 16px 38px rgba(24,24,27,.12) !important;
         --ak-table-head-shadow:0 1px 0 var(--ak-border-hover),0 7px 16px rgba(24,24,27,.09) !important;
         --ak-positive:#047857 !important;

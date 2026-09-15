@@ -3677,7 +3677,7 @@ main:has(#stock-matrix) form select option {
     --ak-workspace-accent-bright: #007c87;
     --ak-workspace-accent-soft: rgba(0, 101, 111, .12);
     --ak-workspace-accent-border: rgba(0, 101, 111, .28);
-    --ak-workspace-shadow: 0 8px 22px rgba(35, 72, 67, .065);
+    --ak-workspace-shadow: 0 12px 32px rgba(35, 72, 67, .16);
 }
 
 :root:not([data-theme="light"]) {
