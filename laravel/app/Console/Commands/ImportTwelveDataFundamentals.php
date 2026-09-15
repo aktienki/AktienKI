@@ -30,7 +30,7 @@ class ImportTwelveDataFundamentals extends Command
         if ($limit) {
             $query->limit($limit);
         }
-        $stocks = $query->get(['id', 'symbol', 'provider_symbol']);
+        $stocks = $query->get(['id', 'symbol', 'provider_symbol', 'isin']);
         $bar = $this->output->createProgressBar($stocks->count());
         $bar->start();
         $success = $failed = $skipped = $sectorFallback = 0;
@@ -69,9 +69,15 @@ class ImportTwelveDataFundamentals extends Command
                     // quarter of the active universe. Yahoo's own listing
                     // symbol (usually identical to ours, e.g. "STM.DE") often
                     // still has at least a sector/industry, even without a
-                    // full financial-statement history.
+                    // full financial-statement history. For a foreign-market
+                    // cross-listing Yahoo doesn't know under that German
+                    // ticker either (most Japanese/Hong Kong/Chinese names),
+                    // its listing-independent ISIN still resolves via
+                    // Yahoo's search to the home-market symbol and usually
+                    // its sector/industry directly.
                     if (! $this->option('analysis-only')) {
-                        $fallback = $yahoo->assetProfile($stock->symbol);
+                        $fallback = $yahoo->assetProfile($stock->symbol)
+                            ?? $yahoo->assetProfileByIsin((string) $stock->isin);
                         if ($fallback !== null) {
                             DB::table('instruments')->where('id', $stock->id)->update(array_filter([
                                 'sector' => $fallback['sector'], 'industry' => $fallback['industry'], 'updated_at' => now(),

@@ -60,6 +60,45 @@ class YahooFundamentalService
     }
 
     /**
+     * For a foreign-market cross-listing (e.g. a Japanese or Hong Kong
+     * company only ever queried here under its German ".DE" ticker),
+     * assetProfile() above has nothing - Yahoo doesn't recognize that
+     * ticker at all. The ISIN is listing-independent, and Yahoo's search
+     * endpoint resolves it straight to the home-market symbol, often
+     * already including sector/industry in the same response - no session
+     * cookie/crumb needed for this endpoint.
+     *
+     * @return array{sector: ?string, industry: ?string}|null
+     */
+    public function assetProfileByIsin(string $isin): ?array
+    {
+        $isin = trim($isin);
+        if ($isin === '') {
+            return null;
+        }
+
+        $response = Http::withHeaders(['Accept' => 'application/json', 'User-Agent' => self::USER_AGENT])
+            ->timeout(15)
+            ->get('https://query1.finance.yahoo.com/v1/finance/search', ['q' => $isin]);
+        $quote = $response->successful() ? data_get($response->json(), 'quotes.0') : null;
+        if (! is_array($quote)) {
+            return null;
+        }
+
+        $sector = trim((string) ($quote['sector'] ?? ''));
+        $industry = trim((string) ($quote['industry'] ?? ''));
+        if ($sector !== '' || $industry !== '') {
+            return ['sector' => $sector !== '' ? $sector : null, 'industry' => $industry !== '' ? $industry : null];
+        }
+
+        // The search hit didn't carry sector/industry itself - fall back to
+        // a full profile lookup under the resolved home-market symbol.
+        $homeSymbol = trim((string) ($quote['symbol'] ?? ''));
+
+        return $homeSymbol !== '' ? $this->assetProfile($homeSymbol) : null;
+    }
+
+    /**
      * @return array{cookies: array<string, string>, crumb: string}|null
      */
     private function session(): ?array
