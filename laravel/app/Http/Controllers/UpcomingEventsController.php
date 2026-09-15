@@ -40,7 +40,7 @@ final class UpcomingEventsController extends Controller
     }
 
     /**
-     * @return Collection<int, array{date: string, time: ?string, symbol: string, name: string, country: ?string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, isWatched: bool, url: string}>
+     * @return Collection<int, array{date: string, time: ?string, instrumentId: int, symbol: string, name: string, country: ?string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, isWatched: bool, url: string}>
      */
     public function upcomingEvents(Request $request, int $lookaheadDays = self::LOOKAHEAD_DAYS, int $limit = 200): Collection
     {
@@ -56,7 +56,7 @@ final class UpcomingEventsController extends Controller
      * Already-reported earnings within the look-back window (real EPS
      * actual/surprise, not just the estimate) - newest first.
      *
-     * @return Collection<int, array{date: string, time: ?string, symbol: string, name: string, country: ?string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, isWatched: bool, url: string}>
+     * @return Collection<int, array{date: string, time: ?string, instrumentId: int, symbol: string, name: string, country: ?string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, isWatched: bool, url: string}>
      */
     public function recentEvents(Request $request, int $daysBack = self::LOOKBACK_DAYS, int $limit = 100): Collection
     {
@@ -70,7 +70,7 @@ final class UpcomingEventsController extends Controller
 
     /**
      * @param  callable(Builder): Builder  $scope
-     * @return Collection<int, array{date: string, time: ?string, symbol: string, name: string, country: ?string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, isWatched: bool, url: string}>
+     * @return Collection<int, array{date: string, time: ?string, instrumentId: int, symbol: string, name: string, country: ?string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, isWatched: bool, url: string}>
      */
     private function events(Request $request, callable $scope, int $limit): Collection
     {
@@ -96,6 +96,7 @@ final class UpcomingEventsController extends Controller
             ->map(fn (CorporateEvent $event): array => [
                 'date' => Carbon::parse($event->event_date)->toDateString(),
                 'time' => $event->event_time,
+                'instrumentId' => $event->instrument_id,
                 'symbol' => $event->instrument->symbol,
                 'name' => $event->instrument->name ?: $event->instrument->symbol,
                 'country' => $event->instrument->country,

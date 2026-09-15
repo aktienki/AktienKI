@@ -20,7 +20,7 @@
         #dashboard-concept-page .concept-icon-grid {
             display: grid;
             grid-template-columns: 1fr;
-            grid-template-rows: repeat(9, 1fr);
+            grid-template-rows: repeat(10, 1fr);
             gap: .5rem;
             padding: .75rem;
             background: none;
@@ -203,6 +203,32 @@
                                         <a href="{{ $event['url'] }}" class="concept-list-item">
                                             <span class="min-w-0 flex-1 truncate">{{ $event['name'] }} ({{ $event['symbol'] }})</span>
                                             <span class="shrink-0 text-[10px] font-black text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($event['date'])->format('d.m.') }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="concept-empty">{{ $section['emptyText'] }}</div>
+                            @endif
+                        @elseif($section['kind'] === 'earnings-drift')
+                            @if(count($section['rows']))
+                                <div class="concept-opp-stack">
+                                    @foreach($section['rows'] as $row)
+                                        <a href="{{ $row['url'] }}" class="concept-opp-card">
+                                            <div class="concept-opp-head">
+                                                <span class="min-w-0">
+                                                    <b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $row['name'] }}</b>
+                                                    <small class="mt-0.5 block text-[10px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $row['symbol'] }} · {{ __('nächste Zahlen') }} {{ \Illuminate\Support\Carbon::parse($row['nextDate'])->format('d.m.Y') }}</small>
+                                                </span>
+                                                <span class="concept-opp-badge">{{ $row['tendency'] }}</span>
+                                            </div>
+                                            <p class="text-xs text-[var(--ak-muted)]">
+                                                n={{ $row['n'] }} ·
+                                                {{ __('Ø Kurs +3T bei Beat') }}:
+                                                <span class="font-black {{ ($row['post3dBeat'] ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $row['post3dBeat'] === null ? '—' : (($row['post3dBeat'] >= 0 ? '+' : '').number_format($row['post3dBeat'], 2, ',', '.').' %') }}</span>
+                                                ·
+                                                {{ __('bei Miss') }}:
+                                                <span class="font-black {{ ($row['post3dMiss'] ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $row['post3dMiss'] === null ? '—' : (($row['post3dMiss'] >= 0 ? '+' : '').number_format($row['post3dMiss'], 2, ',', '.').' %') }}</span>
+                                            </p>
                                         </a>
                                     @endforeach
                                 </div>

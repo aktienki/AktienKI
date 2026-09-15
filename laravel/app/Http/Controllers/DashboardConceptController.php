@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SmartSelectionLabel;
+use App\Services\EarningsDriftStatsService;
 use App\Services\ServingMarketSnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -27,6 +28,7 @@ final class DashboardConceptController extends Controller
         ['smart-screener', 'Smart Screener', 'heroicon-o-magnifying-glass'],
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
         ['upcoming-news', 'Anstehende News', 'heroicon-o-calendar-days'],
+        ['earnings-drift', 'Quartalszahlen-Historie', 'heroicon-o-chart-bar'],
     ];
 
     public function __invoke(Request $request): View
@@ -66,6 +68,7 @@ final class DashboardConceptController extends Controller
             $this->ctaSection('smart-screener', __('Aktien nach eigenen Kriterien filtern und sortieren.')),
             $this->marketSection('market-report', $snapshot),
             $this->eventsSection('upcoming-news', $request),
+            $this->earningsDriftSection('earnings-drift', $request),
         ])->map(function (array $section) use ($leftIcons): array {
             $meta = $leftIcons->firstWhere('id', $section['id']);
 
@@ -216,6 +219,43 @@ final class DashboardConceptController extends Controller
         ];
     }
 
+    /**
+     * For every stock with an upcoming earnings date, its own historical
+     * post-earnings reaction (earnings:drift-report-by-stock's numbers) -
+     * "for stocks with upcoming quarterly results, what has this specific
+     * stock historically done 3 trading days after a beat vs. a miss".
+     * Sorted by the soonest upcoming date first.
+     */
+    private function earningsDriftSection(string $id, Request $request): array
+    {
+        $upcoming = app(UpcomingEventsController::class)
+            ->upcomingEvents($request, lookaheadDays: 90, limit: 100);
+
+        $instrumentIds = $upcoming->pluck('instrumentId')->unique()->values()->all();
+        $stats = app(EarningsDriftStatsService::class)->forInstruments($instrumentIds);
+
+        $rows = $upcoming
+            ->unique('instrumentId')
+            ->map(function (array $event) use ($stats): ?array {
+                $stat = $stats->get($event['instrumentId']);
+                if ($stat === null) {
+                    return null;
+                }
+
+                return [...$stat, 'nextDate' => $event['date'], 'url' => $event['url']];
+            })
+            ->filter()
+            ->take(8)
+            ->values();
+
+        return [
+            'id' => $id,
+            'kind' => 'earnings-drift',
+            'rows' => $rows->all(),
+            'emptyText' => __('Für keine Aktie mit bevorstehenden Quartalszahlen liegt bereits eigene Historie vor.'),
+        ];
+    }
+
     private function urlFor(string $tileId): string
     {
         return match ($tileId) {
@@ -228,6 +268,7 @@ final class DashboardConceptController extends Controller
             'smart-screener' => route('screener.index'),
             'market-report' => route('daily-market-analysis'),
             'upcoming-news' => route('upcoming-events.index'),
+            'earnings-drift' => route('upcoming-events.index'),
             default => route('dashboard'),
         };
     }
