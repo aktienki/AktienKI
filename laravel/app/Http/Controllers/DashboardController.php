@@ -99,6 +99,16 @@ class DashboardController extends Controller
 
     public function __invoke(Request $request): View
     {
+        return view('dashboard', $this->buildViewData($request));
+    }
+
+    /**
+     * All of __invoke()'s view data, extracted so other pages (the concept
+     * dashboard's "Klassisches Dashboard" tab) can reuse the exact same
+     * middle/right-column data instead of recomputing it differently.
+     */
+    public function buildViewData(Request $request): array
+    {
         $user = $request->user();
         $planAccess = app(PlanAccessService::class);
         $canUsePlus = $planAccess->allowsTariff($user, PlanLevel::Plus);
@@ -339,7 +349,7 @@ class DashboardController extends Controller
         // News remain empty until a canonical serving-news source exists.
         $newsCenterItems = collect();
 
-        return view('dashboard', compact(
+        return compact(
             'riskProfile', 'strategyPortfolio', 'overview', 'marketSituation', 'continentPredictions',
             'marketFactorSnapshot',
             'externalConfirmedBuys',
@@ -365,7 +375,7 @@ class DashboardController extends Controller
             'topIndicatorStock',
             'bestNewStock',
             'newsCenterItems',
-        ));
+        );
     }
 
     /**

@@ -6,11 +6,29 @@ use PHPUnit\Framework\TestCase;
 
 final class DashboardExternalBuySignalsTest extends TestCase
 {
+    /**
+     * dashboard.blade.php's big <style> block and its middle/right column
+     * markup now live in resources/views/partials/ (shared with the
+     * concept dashboard's "Klassisches Dashboard" tab) - concatenate all
+     * of them so string assertions against "the view" still see content
+     * that moved into one of those partials.
+     */
+    private function dashboardView(string $root): string
+    {
+        $view = (string) file_get_contents($root.'/resources/views/dashboard.blade.php');
+        foreach (['dashboard-styles', 'dashboard-middle-column', 'dashboard-right-column'] as $partial) {
+            $view .= (string) file_get_contents($root."/resources/views/partials/{$partial}.blade.php");
+        }
+
+        return $view;
+    }
+
+
     public function test_signal_card_only_renders_exact_batch_external_buy_confirmations(): void
     {
         $root = dirname(__DIR__, 2);
         $controller = (string) file_get_contents($root.'/app/Http/Controllers/DashboardController.php');
-        $view = (string) file_get_contents($root.'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView($root);
 
         $this->assertStringContainsString("->where('verdict', 'NO_OBJECTION')", $controller);
         $this->assertStringContainsString("\$stock->instrument_id.'|'.\$stock->serving_batch_id", $controller);
@@ -25,7 +43,7 @@ final class DashboardExternalBuySignalsTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $controller = (string) file_get_contents($root.'/app/Http/Controllers/DashboardController.php');
-        $view = (string) file_get_contents($root.'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView($root);
 
         // Champion and its two ranked alternatives are ranked in the SAME
         // pool (every externally GPT-confirmed BUY signal) by the same
@@ -48,7 +66,7 @@ final class DashboardExternalBuySignalsTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $controller = (string) file_get_contents($root.'/app/Http/Controllers/DashboardController.php');
-        $view = (string) file_get_contents($root.'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView($root);
 
         $this->assertStringContainsString('$externalConfirmedRanked', $controller);
         $this->assertStringContainsString('->take(2)', $controller);
@@ -83,7 +101,7 @@ final class DashboardExternalBuySignalsTest extends TestCase
 
     public function test_all_help_buttons_share_the_personal_card_design(): void
     {
-        $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView(dirname(__DIR__, 2));
 
         $this->assertStringContainsString('width: 2.25rem; height: 2.25rem;', $view);
         $this->assertStringContainsString('border-radius: .5rem;', $view);
@@ -93,7 +111,7 @@ final class DashboardExternalBuySignalsTest extends TestCase
 
     public function test_desktop_champion_and_signal_cockpit_share_one_card_shell(): void
     {
-        $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView(dirname(__DIR__, 2));
 
         $this->assertStringContainsString('id="dashboard-center-combined-card"', $view);
         $this->assertStringContainsString('.dashboard-center-combined-card > #dashboard-newscenter-card,', $view);

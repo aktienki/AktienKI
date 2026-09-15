@@ -97,6 +97,14 @@
         #dashboard-concept-page .concept-panel-score { margin-top: .6rem; display: grid; gap: .3rem; border-top: 1px solid var(--ak-border); padding-top: .6rem; }
         #dashboard-concept-page .concept-panel-score-label { font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--ak-muted); }
         #dashboard-concept-page .concept-panel-score-corr { margin-top: .15rem; font-size: .64rem; font-weight: 700; color: var(--ak-muted); }
+        /* "Klassisches Dashboard" tab: the real dashboard cards, laid out in
+           a simple two-column grid here instead of the real page's
+           drag/resize-customizable bento grid. */
+        #dashboard-concept-page .concept-classic-dashboard-grid { display: grid; gap: 1rem; grid-template-columns: 1fr; align-items: start; }
+        @media (min-width: 900px) {
+            #dashboard-concept-page .concept-classic-dashboard-grid { grid-template-columns: 1fr 1fr; }
+        }
+        #dashboard-concept-page .concept-classic-dashboard-col { display: grid; gap: 1rem; min-width: 0; }
     </style>
 
     <div id="dashboard-concept-page" x-data="{ active: null }">
@@ -278,6 +286,17 @@
                             @else
                                 <div class="concept-empty">{{ $section['emptyText'] }}</div>
                             @endif
+                        @elseif($section['kind'] === 'classic-dashboard')
+                            @php extract($section['viewData']); @endphp
+                            @include('partials.dashboard-styles')
+                            <div class="concept-classic-dashboard-grid">
+                                <div class="concept-classic-dashboard-col">
+                                    @include('partials.dashboard-middle-column')
+                                </div>
+                                <div class="concept-classic-dashboard-col">
+                                    @include('partials.dashboard-market-overview-column')
+                                </div>
+                            </div>
                         @else
                             <p class="text-xs text-[var(--ak-muted)]">{{ $section['description'] }}</p>
                         @endif

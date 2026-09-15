@@ -7,6 +7,7 @@ use App\Services\EarningsDriftStatsService;
 use App\Services\PanelScoreDriftStatsService;
 use App\Services\ServingMarketSnapshotService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 /**
@@ -30,6 +31,7 @@ final class DashboardConceptController extends Controller
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
         ['upcoming-news', 'Anstehende News', 'heroicon-o-calendar-days'],
         ['earnings-drift', 'Quartalszahlen-Historie', 'heroicon-o-chart-bar'],
+        ['classic-dashboard', 'Klassisches Dashboard', 'heroicon-o-squares-2x2'],
     ];
 
     public function __invoke(Request $request): View
@@ -70,6 +72,7 @@ final class DashboardConceptController extends Controller
             $this->marketSection('market-report', $snapshot),
             $this->eventsSection('upcoming-news', $request),
             $this->earningsDriftSection('earnings-drift', $request),
+            $this->classicDashboardSection('classic-dashboard', $request),
         ])->map(function (array $section) use ($leftIcons): array {
             $meta = $leftIcons->firstWhere('id', $section['id']);
 
@@ -166,7 +169,7 @@ final class DashboardConceptController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, string>  $items
+     * @param  Collection<int, string>  $items
      */
     private function listSection(string $id, $items, int $total, string $emptyText): array
     {
@@ -285,7 +288,39 @@ final class DashboardConceptController extends Controller
             'market-report' => route('daily-market-analysis'),
             'upcoming-news' => route('upcoming-events.index'),
             'earnings-drift' => route('upcoming-events.index'),
+            'classic-dashboard' => route('dashboard'),
             default => route('dashboard'),
         };
+    }
+
+    /**
+     * Reuses DashboardController::buildViewData() - the exact same data the
+     * real /dashboard page computes - instead of recomputing any of it
+     * differently here. Only the small layout-helper closures/values that
+     * dashboard.blade.php itself defines inline (card order/visibility/size,
+     * the country-flag lookup) are not part of that data and are rebuilt
+     * here in a simplified, always-visible form: this concept preview does
+     * not support the real dashboard's per-user card drag/resize
+     * customization, it just shows every card in its default place.
+     */
+    private function classicDashboardSection(string $id, Request $request): array
+    {
+        $data = app(DashboardController::class)->buildViewData($request);
+
+        return [
+            'id' => $id,
+            'kind' => 'classic-dashboard',
+            'viewData' => array_merge($data, [
+                'dashboardCardSize' => fn (string $cardId): string => '2',
+                'dashboardCardOrder' => fn (string $cardId): int => 0,
+                'dashboardCardVisible' => fn (string $cardId): bool => true,
+                'dashboardMarketVisible' => true,
+                'dashboardCountryFlags' => [
+                    'DE' => '🇩🇪', 'US' => '🇺🇸', 'AT' => '🇦🇹', 'CH' => '🇨🇭', 'GB' => '🇬🇧', 'FR' => '🇫🇷',
+                    'NL' => '🇳🇱', 'DK' => '🇩🇰', 'SE' => '🇸🇪', 'NO' => '🇳🇴', 'FI' => '🇫🇮', 'IT' => '🇮🇹',
+                    'ES' => '🇪🇸', 'JP' => '🇯🇵', 'CN' => '🇨🇳', 'HK' => '🇭🇰', 'CA' => '🇨🇦', 'AU' => '🇦🇺',
+                ],
+            ]),
+        ];
     }
 }

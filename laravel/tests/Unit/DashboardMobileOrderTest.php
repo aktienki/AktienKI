@@ -6,9 +6,27 @@ use PHPUnit\Framework\TestCase;
 
 final class DashboardMobileOrderTest extends TestCase
 {
+    /**
+     * dashboard.blade.php's big <style> block and its middle/right column
+     * markup now live in resources/views/partials/ (shared with the
+     * concept dashboard's "Klassisches Dashboard" tab) - concatenate all
+     * of them so string assertions against "the view" still see content
+     * that moved into one of those partials.
+     */
+    private function dashboardView(): string
+    {
+        $root = dirname(__DIR__, 2);
+        $view = (string) file_get_contents($root.'/resources/views/dashboard.blade.php');
+        foreach (['dashboard-styles', 'dashboard-middle-column', 'dashboard-right-column'] as $partial) {
+            $view .= (string) file_get_contents($root."/resources/views/partials/{$partial}.blade.php");
+        }
+
+        return $view;
+    }
+
     public function test_mobile_dashboard_uses_the_fixed_priority_order(): void
     {
-        $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView();
         $mobileStart = strrpos($view, '@media (max-width: 767px)');
         $mobileEnd = strpos($view, '@media (min-width: 768px)', $mobileStart ?: 0);
         $mobileCss = substr($view, $mobileStart ?: 0, ($mobileEnd ?: strlen($view)) - ($mobileStart ?: 0));
@@ -38,7 +56,7 @@ final class DashboardMobileOrderTest extends TestCase
 
     public function test_mobile_dashboard_contains_a_compact_community_card(): void
     {
-        $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView();
 
         $this->assertStringContainsString('data-dashboard-card="community"', $view);
         $this->assertStringContainsString('dashboard-mobile-community', $view);
@@ -49,7 +67,7 @@ final class DashboardMobileOrderTest extends TestCase
 
     public function test_mobile_card_selection_is_not_overridden_and_hides_the_layout_cog(): void
     {
-        $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView();
 
         $this->assertStringContainsString(
             "array_unique([...\$dashboardMobileCards, 'mobile-view'])",
@@ -83,7 +101,7 @@ final class DashboardMobileOrderTest extends TestCase
             "'champion', 'market', 'market-summary', 'schedule', 'strategy', 'signal-cockpit',\n        'personal', 'community', 'mobile-view'",
             $controller,
         );
-        $this->assertStringContainsString('data-mobile-dashboard-card="champion"', (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php'));
+        $this->assertStringContainsString('data-mobile-dashboard-card="champion"', $this->dashboardView());
     }
 
     public function test_new_mobile_texts_have_english_translations(): void
@@ -105,7 +123,7 @@ final class DashboardMobileOrderTest extends TestCase
 
     public function test_signal_cockpit_uses_the_new_quality_and_risk_ratings(): void
     {
-        $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView();
 
         $this->assertStringContainsString(
             'QualityGrade::fromPercent(\\App\\Support\\AiScore::toPercent($cockpitAverageScore))',
@@ -119,7 +137,7 @@ final class DashboardMobileOrderTest extends TestCase
 
     public function test_mobile_signal_cockpit_keeps_its_full_title_readable(): void
     {
-        $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView();
 
         $this->assertStringContainsString('truncate text-sm font-black text-[var(--ak-text)] sm:text-base', $view);
         $this->assertStringContainsString('border-cyan-400/20 px-1 py-0.5 sm:hidden', $view);
@@ -128,7 +146,7 @@ final class DashboardMobileOrderTest extends TestCase
 
     public function test_activity_feed_replaces_the_trading_opportunity_card(): void
     {
-        $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView();
 
         $this->assertStringContainsString("__('Aktivitäten')", $view);
         $this->assertStringContainsString('collect($dashboardActivities)->take(5)', $view);
@@ -139,7 +157,7 @@ final class DashboardMobileOrderTest extends TestCase
 
     public function test_three_factor_champion_reason_is_expandable(): void
     {
-        $view = (string) file_get_contents(dirname(__DIR__, 2).'/resources/views/dashboard.blade.php');
+        $view = $this->dashboardView();
         $controller = (string) file_get_contents(dirname(__DIR__, 2).'/app/Http/Controllers/DashboardController.php');
 
         $this->assertStringContainsString('dashboard-champion-reason group', $view);
