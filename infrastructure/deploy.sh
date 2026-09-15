@@ -22,7 +22,13 @@ HEALTH_URL=https://aktienki.com/
 TARGET="${1:-origin/$BRANCH}"
 ts() { date -Is; }
 log() { printf '\n\033[1;36m>>> %s\033[0m\n' "$*"; }
-as_app() { sudo -u "$APP_USER" env -C "$1" "${@:2}"; }
+# umask 002 matters here: without it, files this creates (view:cache,
+# config:cache, composer/npm artifacts) get mode 755/mask r-x for the
+# www-data group instead of 775/rwx, and php-fpm (running as www-data)
+# then fails with "touch(): Utime failed: Operation not permitted" the
+# first time it needs to recompile one of them live - a real, recurring
+# production error, not just a permissions nicety.
+as_app() { sudo -u "$APP_USER" env -C "$1" bash -c 'umask 002; exec "$@"' bash "${@:2}"; }
 
 [ "$(id -u)" -eq 0 ] || { echo "run as root"; exit 1; }
 
