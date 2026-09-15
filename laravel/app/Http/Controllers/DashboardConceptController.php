@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SmartSelectionLabel;
+use App\Models\User;
 use App\Services\EarningsDriftStatsService;
 use App\Services\PanelScoreDriftStatsService;
 use App\Services\ServingMarketSnapshotService;
@@ -69,7 +70,7 @@ final class DashboardConceptController extends Controller
             $this->ctaSection('watchlist-screener', __('Die eigene Watchlist mit den Screener-Filtern kombinieren.')),
             $this->ctaSection('predictions', __('Alle aktuellen KI-Prognosen in der vollständigen Tabelle ansehen.')),
             $this->ctaSection('smart-screener', __('Aktien nach eigenen Kriterien filtern und sortieren.')),
-            $this->marketSection('market-report', $snapshot),
+            $this->marketSection('market-report', $snapshot, $user),
             $this->eventsSection('upcoming-news', $request),
             $this->earningsDriftSection('earnings-drift', $request),
             $this->classicDashboardSection('classic-dashboard', $request),
@@ -191,7 +192,14 @@ final class DashboardConceptController extends Controller
         ];
     }
 
-    private function marketSection(string $id, array $snapshot): array
+    /**
+     * Also folds in the Screener/dashboard's "Aktuelle Remote-Aktien" stock
+     * count + signal-distribution card (DashboardController::
+     * profileUniverseStats(), the same data the real dashboard and the
+     * classic-dashboard tab show) - not just the market-wide score/summary
+     * text this section used to show alone.
+     */
+    private function marketSection(string $id, array $snapshot, User $user): array
     {
         $assessment = $snapshot['assessment'] ?? null;
         $metrics = $snapshot['analysis']['metrics'] ?? [];
@@ -202,6 +210,7 @@ final class DashboardConceptController extends Controller
             'available' => (bool) ($snapshot['available'] ?? false),
             'assessment' => $assessment,
             'metrics' => array_slice($metrics, 0, 4),
+            'profileUniverseStats' => app(DashboardController::class)->profileUniverseStats($user),
         ];
     }
 

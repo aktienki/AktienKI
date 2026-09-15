@@ -821,7 +821,8 @@ class DashboardController extends Controller
         });
     }
 
-    private function profileUniverseStats(User $user): array
+    /** Public so DashboardConceptController can reuse the exact same universe stats for its "Aktuelle Marktlage" preview. */
+    public function profileUniverseStats(User $user): array
     {
         $level = app(StockRiskClassificationService::class)->userLevel($user);
         $snapshot = app(ServingMarketSnapshotService::class)->snapshot();

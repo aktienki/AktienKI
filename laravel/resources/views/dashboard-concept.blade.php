@@ -97,6 +97,8 @@
         #dashboard-concept-page .concept-panel-score { margin-top: .6rem; display: grid; gap: .3rem; border-top: 1px solid var(--ak-border); padding-top: .6rem; }
         #dashboard-concept-page .concept-panel-score-label { font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--ak-muted); }
         #dashboard-concept-page .concept-panel-score-corr { margin-top: .15rem; font-size: .64rem; font-weight: 700; color: var(--ak-muted); }
+        #dashboard-concept-page .concept-market-overview-card { margin-top: 1rem; }
+        #dashboard-concept-page .concept-market-overview-card #dashboard-market-overview-card { height: auto !important; min-height: 0 !important; }
         /* "Klassisches Dashboard" tab: the real dashboard's middle column
            (Champion+Alternativen, Remote-Aktien-Übersicht, Zusätzliche
            Kandidaten) and right column (Bestätigte POSITIV-Signale,
@@ -254,6 +256,15 @@
                             @else
                                 <div class="concept-empty">{{ __('Marktdaten aktuell nicht verfügbar.') }}</div>
                             @endif
+
+                            {{-- The Screener/dashboard's "Aktuelle Remote-Aktien"
+                                 stock count + signal-distribution card - same
+                                 partial the classic-dashboard tab uses. --}}
+                            @php $profileUniverseStats = $section['profileUniverseStats']; @endphp
+                            @include('partials.dashboard-styles')
+                            <div class="concept-market-overview-card">
+                                @include('partials.dashboard-market-overview-card')
+                            </div>
                         @elseif($section['kind'] === 'events')
                             @if(count($section['events']))
                                 <div class="grid gap-1.5">
