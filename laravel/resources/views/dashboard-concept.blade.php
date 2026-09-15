@@ -116,7 +116,10 @@
         #dashboard-concept-page .concept-classic-dashboard-stack [class*="dashboard-bento-"],
         #dashboard-concept-page .concept-classic-dashboard-stack #dashboard-middle-column,
         #dashboard-concept-page .concept-classic-dashboard-stack #dashboard-center-combined-card,
-        #dashboard-concept-page .concept-classic-dashboard-stack .dashboard-center-combined-card {
+        #dashboard-concept-page .concept-classic-dashboard-stack .dashboard-center-combined-card,
+        #dashboard-concept-page .concept-classic-dashboard-stack #dashboard-market-overview-card,
+        #dashboard-concept-page .concept-classic-dashboard-stack #dashboard-daily-tips-card,
+        #dashboard-concept-page .concept-classic-dashboard-stack .dashboard-daily-tips {
             grid-column: auto !important;
             grid-row: auto !important;
             align-self: auto !important;
