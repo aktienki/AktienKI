@@ -36,6 +36,7 @@ final class DashboardConceptController extends Controller
     public function __invoke(Request $request): View
     {
         $user = $request->user();
+        $snapshot = app(ServingMarketSnapshotService::class)->snapshot();
 
         $leftIcons = collect(self::LEFT_COLUMN_ICONS)->map(fn (array $item): array => [
             'id' => $item[0],
@@ -67,7 +68,7 @@ final class DashboardConceptController extends Controller
             $this->ctaSection('watchlist-screener', __('Die eigene Watchlist mit den Screener-Filtern kombinieren.')),
             $this->ctaSection('predictions', __('Alle aktuellen KI-Prognosen in der vollständigen Tabelle ansehen.')),
             $this->ctaSection('smart-screener', __('Aktien nach eigenen Kriterien filtern und sortieren.')),
-            $this->marketSection('market-report'),
+            $this->marketSection('market-report', $snapshot),
         ])->map(function (array $section) use ($leftIcons): array {
             $meta = $leftIcons->firstWhere('id', $section['id']);
 
@@ -103,24 +104,40 @@ final class DashboardConceptController extends Controller
             'leftIcons' => $leftIcons,
             'sections' => $sections,
             'depot' => $depot,
-            'opportunities' => $this->opportunities($request),
+            'opportunities' => $this->opportunities($request, $snapshot),
         ]);
     }
 
     /**
      * The first thing shown on the page (before Musterdepot): the same
      * three-factor champion and recent signal changes the main dashboard's
-     * cards use - a condensed "current trading opportunities" overview.
+     * cards use, plus the broader market-snapshot "opportunities" list -
+     * unlike the champion, that list does not require external confirmation
+     * and panel coverage at once, so it stays populated even when the
+     * strict champion pool is empty.
      */
-    private function opportunities(Request $request): array
+    private function opportunities(Request $request, array $snapshot): array
     {
         $dashboard = app(DashboardController::class);
         $champion = $dashboard->championSummary($request);
         $signalChanges = collect($dashboard->signalCockpit()['signalChanges'] ?? [])->take(5)->values();
 
+        $marketOpportunities = collect($snapshot['analysis']['opportunities'] ?? [])
+            ->take(5)
+            ->map(function (string $line): array {
+                // Lines are always "Name (SYMBOL): ...", produced by
+                // ServingMarketSnapshotService::stockLine() - parse the
+                // symbol back out so each one can link to its stock page.
+                preg_match('/\(([^)]+)\):/', $line, $match);
+
+                return ['text' => $line, 'symbol' => $match[1] ?? null];
+            })
+            ->values();
+
         return [
             'champion' => $champion,
             'signalChanges' => $signalChanges->all(),
+            'marketOpportunities' => $marketOpportunities->all(),
         ];
     }
 
@@ -147,9 +164,8 @@ final class DashboardConceptController extends Controller
         ];
     }
 
-    private function marketSection(string $id): array
+    private function marketSection(string $id, array $snapshot): array
     {
-        $snapshot = app(ServingMarketSnapshotService::class)->snapshot();
         $assessment = $snapshot['assessment'] ?? null;
         $metrics = $snapshot['analysis']['metrics'] ?? [];
 

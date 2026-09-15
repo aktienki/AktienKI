@@ -120,6 +120,25 @@
                             <div class="concept-empty">{{ __('Kein Champion aktuell verfügbar.') }}</div>
                         @endif
 
+                        <p class="mb-2 mt-4 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Chancen laut Marktlage') }}</p>
+                        @if(count($opportunities['marketOpportunities']))
+                            <div class="grid gap-1.5">
+                                @foreach($opportunities['marketOpportunities'] as $opportunity)
+                                    @if($opportunity['symbol'])
+                                        <a href="{{ route('stocks.show', ['symbol' => $opportunity['symbol'], 'return_to' => '/dashboard/concept']) }}" class="concept-list-item concept-opportunity-row">
+                                            <span class="min-w-0 flex-1">{{ $opportunity['text'] }}</span>
+                                        </a>
+                                    @else
+                                        <div class="concept-list-item concept-opportunity-row">
+                                            <span class="min-w-0 flex-1">{{ $opportunity['text'] }}</span>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="concept-empty">{{ __('Aktuell keine Marktchancen verfügbar.') }}</div>
+                        @endif
+
                         <p class="mb-2 mt-4 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Signalwechsel') }}</p>
                         @if(count($opportunities['signalChanges']))
                             <div class="grid gap-1.5">
