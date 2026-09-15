@@ -104,7 +104,27 @@
         @media (min-width: 900px) {
             #dashboard-concept-page .concept-classic-dashboard-grid { grid-template-columns: 1fr 1fr; }
         }
-        #dashboard-concept-page .concept-classic-dashboard-col { display: grid; gap: 1rem; min-width: 0; }
+        #dashboard-concept-page .concept-classic-dashboard-col { display: grid; gap: 1rem; min-width: 0; align-content: start; }
+        /* The real dashboard's own <style> block (dashboard-styles.blade.php,
+           included above) pins these same card classes into an explicit
+           12-column/N-row bento grid ("grid-column: 5 / span 4; grid-row:
+           1 / -1; height: 100%", etc.) - rules that keep matching here even
+           though this preview's grid has neither those columns nor rows,
+           producing empty stretched space and cards escaping their card
+           border. Force every such card back to normal block flow inside
+           this preview's own two-column grid instead. */
+        #dashboard-concept-page .concept-classic-dashboard-col [class*="dashboard-bento-"],
+        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-middle-column,
+        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-center-combined-card,
+        #dashboard-concept-page .concept-classic-dashboard-col .dashboard-center-combined-card {
+            grid-column: auto !important;
+            grid-row: auto !important;
+            align-self: auto !important;
+            position: static !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+        }
     </style>
 
     <div id="dashboard-concept-page" x-data="{ active: null }">
