@@ -62,10 +62,13 @@
             display: grid; place-items: center; min-height: 8rem; padding: 1rem; border: 1px dashed var(--ak-border); border-radius: .8rem; text-align: center; font-size: .78rem; font-weight: 700; color: var(--ak-muted);
         }
         #dashboard-concept-page .concept-list-item {
-            display: flex; align-items: center; gap: .5rem; border-radius: .6rem; padding: .5rem .6rem;
+            display: flex; align-items: center; justify-content: space-between; gap: .5rem; border-radius: .6rem; padding: .5rem .6rem;
             border: 1px solid var(--ak-border); font-size: .78rem; font-weight: 700; color: var(--ak-text);
+            text-decoration: none; transition: border-color .15s ease;
         }
+        #dashboard-concept-page a.concept-list-item:hover { border-color: color-mix(in srgb, #22d3ee 45%, transparent); }
         #dashboard-concept-page .concept-open-link { margin-top: 1rem; display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 800; }
+        #dashboard-concept-page .concept-stack { display: grid; gap: 1rem; }
     </style>
 
     <div id="dashboard-concept-page" x-data="{ active: null }">
@@ -93,40 +96,78 @@
                 @endforeach
             </nav>
 
-            {{-- Right: Musterdepot by default, swaps to the active section's short overview --}}
+            {{-- Right: Handelsmöglichkeiten + Musterdepot by default, swaps to the active section's short overview --}}
             <div>
-                <section class="concept-card concept-main-card" x-show="active === null" x-cloak>
-                    <div class="concept-main-header">
-                        <span class="concept-icon-badge border-emerald-400/25 bg-emerald-400/10 text-emerald-400"><x-heroicon-o-beaker class="h-5 w-5" /></span>
-                        <span>
-                            <small class="text-emerald-500">{{ __('Musterdepot') }}</small>
-                            <b>{{ $depot['name'] ?? __('Kein Musterdepot vorhanden') }}</b>
-                        </span>
-                    </div>
+                <div class="concept-stack" x-show="active === null" x-cloak>
+                    {{-- First sub-page: current trading opportunities (champion + signal changes) --}}
+                    <section class="concept-card concept-main-card">
+                        <div class="concept-main-header">
+                            <span class="concept-icon-badge border-amber-400/25 bg-amber-400/10 text-amber-400"><x-heroicon-o-bolt class="h-5 w-5" /></span>
+                            <span>
+                                <small class="text-amber-500">{{ __('Kurzübersicht') }}</small>
+                                <b>{{ __('Aktuelle Handelsmöglichkeiten') }}</b>
+                            </span>
+                        </div>
 
-                    @if($depot)
-                        <div class="grid grid-cols-3 gap-4 border-t border-[var(--ak-border)] pt-3">
-                            <div class="concept-metric">
-                                <b>{{ number_format($depot['cashBalance'], 0, ',', '.') }} {{ $depot['currency'] }}</b>
-                                <small>{{ __('Barbestand') }}</small>
+                        <p class="mb-2 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Drei-Faktoren-Champion') }}</p>
+                        @if($opportunities['champion'])
+                            @php($champion = $opportunities['champion'])
+                            <a href="{{ route('stocks.show', ['symbol' => $champion->symbol, 'return_to' => '/dashboard/concept']) }}" class="concept-list-item concept-champion-row">
+                                <span class="min-w-0 flex-1 truncate">{{ $champion->name }} ({{ $champion->symbol }})</span>
+                                <span class="shrink-0 tabular-nums text-amber-400">{{ number_format((float) ($champion->three_factor_score ?? 0), 1) }}</span>
+                            </a>
+                        @else
+                            <div class="concept-empty">{{ __('Kein Champion aktuell verfügbar.') }}</div>
+                        @endif
+
+                        <p class="mb-2 mt-4 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Signalwechsel') }}</p>
+                        @if(count($opportunities['signalChanges']))
+                            <div class="grid gap-1.5">
+                                @foreach($opportunities['signalChanges'] as $change)
+                                    <a href="{{ route('stocks.show', ['symbol' => $change['symbol'], 'prediction' => $change['prediction_id'], 'return_to' => '/dashboard/concept']) }}" class="concept-list-item concept-signal-row">
+                                        <span class="min-w-0 flex-1 truncate">{{ $change['name'] ?: $change['symbol'] }}</span>
+                                        <span class="shrink-0 text-[10px] font-black text-[var(--ak-muted)]">{{ $change['from'] }} → {{ $change['to'] }}</span>
+                                    </a>
+                                @endforeach
                             </div>
-                            <div class="concept-metric">
-                                <b>{{ number_format($depot['positionsValue'], 0, ',', '.') }} {{ $depot['currency'] }}</b>
-                                <small>{{ __('Positionswert') }}</small>
-                            </div>
-                            <div class="concept-metric">
-                                <b>{{ $depot['positionCount'] }}</b>
-                                <small>{{ __('Positionen') }}</small>
-                            </div>
+                        @else
+                            <div class="concept-empty">{{ __('Keine aktuellen Signalwechsel.') }}</div>
+                        @endif
+                    </section>
+
+                    <section class="concept-card concept-main-card">
+                        <div class="concept-main-header">
+                            <span class="concept-icon-badge border-emerald-400/25 bg-emerald-400/10 text-emerald-400"><x-heroicon-o-beaker class="h-5 w-5" /></span>
+                            <span>
+                                <small class="text-emerald-500">{{ __('Musterdepot') }}</small>
+                                <b>{{ $depot['name'] ?? __('Kein Musterdepot vorhanden') }}</b>
+                            </span>
                         </div>
-                        <a href="{{ route('paper-depots.index') }}" class="concept-open-link text-emerald-500 hover:text-emerald-400">{{ __('Musterdepot öffnen') }} →</a>
-                    @else
-                        <div class="concept-empty">
-                            {{ __('Noch kein Musterdepot angelegt.') }}
-                            <a href="{{ route('paper-depots.index') }}" class="mt-2 block text-cyan-500 hover:text-cyan-400">{{ __('Jetzt anlegen') }} →</a>
-                        </div>
-                    @endif
-                </section>
+
+                        @if($depot)
+                            <div class="grid grid-cols-3 gap-4 border-t border-[var(--ak-border)] pt-3">
+                                <div class="concept-metric">
+                                    <b>{{ number_format($depot['cashBalance'], 0, ',', '.') }} {{ $depot['currency'] }}</b>
+                                    <small>{{ __('Barbestand') }}</small>
+                                </div>
+                                <div class="concept-metric">
+                                    <b>{{ number_format($depot['positionsValue'], 0, ',', '.') }} {{ $depot['currency'] }}</b>
+                                    <small>{{ __('Positionswert') }}</small>
+                                </div>
+                                <div class="concept-metric">
+                                    <b>{{ $depot['positionCount'] }}</b>
+                                    <small>{{ __('Positionen') }}</small>
+                                </div>
+                            </div>
+                            <a href="{{ route('paper-depots.index') }}" class="concept-open-link text-emerald-500 hover:text-emerald-400">{{ __('Musterdepot öffnen') }} →</a>
+                        @else
+                            <div class="concept-empty">
+                                {{ __('Noch kein Musterdepot angelegt.') }}
+                                <a href="{{ route('paper-depots.index') }}" class="mt-2 block text-cyan-500 hover:text-cyan-400">{{ __('Jetzt anlegen') }} →</a>
+                            </div>
+                        @endif
+                    </section>
+                </div>
 
                 @foreach($sections as $section)
                     <section class="concept-card concept-main-card" x-show="active === '{{ $section['id'] }}'" x-cloak>

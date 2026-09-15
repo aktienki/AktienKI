@@ -732,6 +732,39 @@ class DashboardController extends Controller
         }
     }
 
+    /**
+     * The single #1 three-factor champion (externally GPT-confirmed BUY +
+     * panel coverage, same composite score/ranking the screener and the main
+     * dashboard card use) - exposed as its own public method so other pages
+     * (the concept dashboard's "Handelsmöglichkeiten" overview) can reuse
+     * the exact same pick instead of recomputing it differently.
+     */
+    public function championSummary(Request $request): ?object
+    {
+        $user = $request->user();
+        $remoteDashboardRequest = Request::create('/screener', 'GET', ['limit' => 'all']);
+        $remoteDashboardRequest->setUserResolver(fn () => $user);
+        $remoteDashboardStocks = collect(app(ServingScreenerService::class)->data($remoteDashboardRequest)['stocks'])
+            ->each(function (object $stock): void {
+                $stock->prediction_id = null;
+                $stock->ai_score = $stock->ranking_score;
+                $stock->prediction_score = $stock->score_10;
+                $stock->dashboard_ranking_score = $stock->ranking_score;
+                $stock->confidence = $stock->confidence_percent;
+                $stock->display_price = $stock->current_price;
+                $stock->display_price_time = $stock->prediction_time;
+                $stock->display_price_live = false;
+                $stock->daily_change_percent = $stock->price_change_percent;
+                $stock->horizon_fusion_consensus_return = $stock->expected_return_20d;
+                $stock->market_return_20d = $stock->expected_return_20d;
+            });
+
+        $externalConfirmedBuys = $this->externalConfirmedBuys($remoteDashboardStocks);
+        $externalConfirmedRanked = $this->threeFactorRanking($externalConfirmedBuys);
+
+        return $externalConfirmedRanked->first();
+    }
+
     public function signalCockpit(): array
     {
         return Cache::remember('dashboard.personal.signal-cockpit-serving-v1', now()->addMinutes(2), function (): array {

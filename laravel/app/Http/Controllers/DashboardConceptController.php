@@ -103,7 +103,25 @@ final class DashboardConceptController extends Controller
             'leftIcons' => $leftIcons,
             'sections' => $sections,
             'depot' => $depot,
+            'opportunities' => $this->opportunities($request),
         ]);
+    }
+
+    /**
+     * The first thing shown on the page (before Musterdepot): the same
+     * three-factor champion and recent signal changes the main dashboard's
+     * cards use - a condensed "current trading opportunities" overview.
+     */
+    private function opportunities(Request $request): array
+    {
+        $dashboard = app(DashboardController::class);
+        $champion = $dashboard->championSummary($request);
+        $signalChanges = collect($dashboard->signalCockpit()['signalChanges'] ?? [])->take(5)->values();
+
+        return [
+            'champion' => $champion,
+            'signalChanges' => $signalChanges->all(),
+        ];
     }
 
     /**
