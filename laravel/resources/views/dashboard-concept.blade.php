@@ -94,6 +94,9 @@
         #dashboard-concept-page .concept-drift-event-row {
             display: flex; align-items: center; gap: .6rem; font-size: .68rem; font-weight: 700; color: var(--ak-text);
         }
+        #dashboard-concept-page .concept-panel-score { margin-top: .6rem; display: grid; gap: .3rem; border-top: 1px solid var(--ak-border); padding-top: .6rem; }
+        #dashboard-concept-page .concept-panel-score-label { font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--ak-muted); }
+        #dashboard-concept-page .concept-panel-score-corr { margin-top: .15rem; font-size: .64rem; font-weight: 700; color: var(--ak-muted); }
     </style>
 
     <div id="dashboard-concept-page" x-data="{ active: null }">
@@ -253,6 +256,22 @@
                                                     </div>
                                                 @endforeach
                                             </div>
+
+                                            @if(count($row['panelDeciles']))
+                                                <div class="concept-panel-score">
+                                                    <p class="concept-panel-score-label">{{ __('Panel-Score (Extremdezile)') }}</p>
+                                                    @foreach($row['panelDeciles'] as $decile)
+                                                        <div class="concept-drift-event-row">
+                                                            <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ __('Dezil') }} {{ $decile['decile'] }}</span>
+                                                            <span class="min-w-0 flex-1 truncate">n={{ $decile['n'] }}</span>
+                                                            <span class="shrink-0 tabular-nums {{ $decile['avgForwardReturn'] >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">Ø 20T {{ $decile['avgForwardReturn'] >= 0 ? '+' : '' }}{{ number_format($decile['avgForwardReturn'] * 100, 2, ',', '.') }} %</span>
+                                                        </div>
+                                                    @endforeach
+                                                    @if($row['panelCorrelation'])
+                                                        <p class="concept-panel-score-corr">r = {{ $row['panelCorrelation']['corrPercentile'] === null ? '—' : number_format($row['panelCorrelation']['corrPercentile'], 3, ',', '.') }} ({{ __('Perzentil') }}, n={{ $row['panelCorrelation']['n'] }})</p>
+                                                    @endif
+                                                </div>
+                                            @endif
                                         </div>
                                     @endforeach
                                 </div>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SmartSelectionLabel;
 use App\Services\EarningsDriftStatsService;
+use App\Services\PanelScoreDriftStatsService;
 use App\Services\ServingMarketSnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -233,16 +234,31 @@ final class DashboardConceptController extends Controller
 
         $instrumentIds = $upcoming->pluck('instrumentId')->unique()->values()->all();
         $stats = app(EarningsDriftStatsService::class)->forInstruments($instrumentIds);
+        $panelStats = app(PanelScoreDriftStatsService::class);
 
         $rows = $upcoming
             ->unique('instrumentId')
-            ->map(function (array $event) use ($stats): ?array {
+            ->map(function (array $event) use ($stats, $panelStats): ?array {
                 $stat = $stats->get($event['instrumentId']);
                 if ($stat === null) {
                     return null;
                 }
 
-                return [...$stat, 'nextDate' => $event['date'], 'url' => $event['url']];
+                // Same stock's panel-score-vs-forward-return picture right
+                // next to its earnings reaction - only the two extreme
+                // deciles (where the panel-wide signal actually concentrates,
+                // see panel:score-drift-report) to keep this compact.
+                $decileRows = $panelStats->decileBreakdown($event['instrumentId']);
+                $panelDeciles = $decileRows->whereIn('decile', [1, 10])->values();
+                $panelCorrelation = $panelStats->correlation($event['instrumentId']);
+
+                return [
+                    ...$stat,
+                    'nextDate' => $event['date'],
+                    'url' => $event['url'],
+                    'panelDeciles' => $panelDeciles->all(),
+                    'panelCorrelation' => $panelCorrelation,
+                ];
             })
             ->filter()
             ->take(8)
