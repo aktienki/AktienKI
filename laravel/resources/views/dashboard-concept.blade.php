@@ -107,6 +107,7 @@
            grid, which these cards' own CSS classes are tightly coupled to
            (see below) and which only really resolves correctly with every
            other dashboard card also present. */
+        #dashboard-concept-page .concept-classic-dashboard-top { width: 100%; min-width: 0; margin-bottom: 1rem; }
         #dashboard-concept-page .concept-classic-dashboard-grid { display: grid; gap: 1rem; width: 100%; min-width: 0; grid-template-columns: 1fr; align-items: start; }
         @media (min-width: 1100px) {
             #dashboard-concept-page .concept-classic-dashboard-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); }
@@ -119,14 +120,17 @@
            matching here too even though this preview's grid has none of
            those columns/rows, producing empty stretched space and cards
            escaping their card border. Force every such card back to normal
-           block flow, full width of its own grid column, natural height. */
-        #dashboard-concept-page .concept-classic-dashboard-col [class*="dashboard-bento-"],
-        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-middle-column,
-        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-center-combined-card,
-        #dashboard-concept-page .concept-classic-dashboard-col .dashboard-center-combined-card,
-        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-market-overview-card,
-        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-daily-tips-card,
-        #dashboard-concept-page .concept-classic-dashboard-col .dashboard-daily-tips {
+           block flow, full width of its own grid column, natural height.
+           Scoped to the whole concept page (not just the two columns) so
+           it also covers the full-width "Aktuelle Remote-Aktien" row above
+           them. */
+        #dashboard-concept-page [class*="dashboard-bento-"],
+        #dashboard-concept-page #dashboard-middle-column,
+        #dashboard-concept-page #dashboard-center-combined-card,
+        #dashboard-concept-page .dashboard-center-combined-card,
+        #dashboard-concept-page #dashboard-market-overview-card,
+        #dashboard-concept-page #dashboard-daily-tips-card,
+        #dashboard-concept-page .dashboard-daily-tips {
             grid-column: auto !important;
             grid-row: auto !important;
             align-self: auto !important;
@@ -355,10 +359,12 @@
                         @elseif($section['kind'] === 'classic-dashboard')
                             @php extract($section['viewData']); @endphp
                             @include('partials.dashboard-styles')
+                            <div class="concept-classic-dashboard-top">
+                                @include('partials.dashboard-market-overview-card')
+                            </div>
                             <div class="concept-classic-dashboard-grid">
                                 <div class="concept-classic-dashboard-col">
                                     @include('partials.dashboard-middle-column')
-                                    @include('partials.dashboard-market-overview-card')
                                     @include('partials.dashboard-daily-tips-card')
                                 </div>
                                 <div class="concept-classic-dashboard-col">

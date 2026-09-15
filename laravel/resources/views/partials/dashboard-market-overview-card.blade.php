@@ -2,7 +2,7 @@
                         <div class="aki-profile-universe-grid grid gap-3">
                             <div class="flex min-w-0 items-start justify-between gap-3">
                                 <div class="min-w-0">
-                                    <p id="profile-universe-title" class="text-[10px] font-black uppercase tracking-[.12em] text-cyan-400">{{ __('Aktuelle Remote-Aktien') }}</p>
+                                    <p id="profile-universe-title" class="text-[10px] font-black uppercase tracking-[.12em] text-cyan-400">{{ __('Aktuelles Portfolio') }}</p>
                                     <div class="mt-1 flex items-end gap-1.5"><strong class="text-2xl font-black leading-none tabular-nums text-[var(--ak-text)]">{{ number_format((int) ($profileUniverseStats['active_count'] ?? 0), 0, ',', '.') }}</strong><span class="pb-0.5 text-[10px] font-bold text-[var(--ak-muted)]">{{ __('Aktien') }}</span></div>
                                     <p class="mt-1 text-[8px] font-black uppercase tracking-wide text-cyan-400">{{ __('Remote-Serving') }} · {{ number_format((int) ($profileUniverseStats['current_signal_count'] ?? 0), 0, ',', '.') }} {{ __('mit aktueller Prediction') }} · {{ number_format((int) ($profileUniverseStats['open_count'] ?? 0), 0, ',', '.') }} {{ __('ausstehend') }}</p>
                                 </div>
