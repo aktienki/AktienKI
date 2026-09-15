@@ -87,6 +87,16 @@ Schedule::command('indices:sync-germany-top500')
     ->dailyAt('06:20')->timezone('Europe/Berlin')
     ->withoutOverlapping(10)->onOneServer()->runInBackground();
 
+// Newly discovered instruments start with is_german_tradeable=null - and
+// the automated-portfolio candidate query requires it to be true, so an
+// unchecked instrument can never be bought automatically no matter how
+// good its signal is. Without --force this only checks instruments that
+// have never been checked, so it stays cheap (no external API call for
+// an already-primarily-German listing) even as the universe grows.
+Schedule::command('stocks:sync-german-listings')
+    ->dailyAt('06:30')->timezone('Europe/Berlin')
+    ->withoutOverlapping(20)->onOneServer()->runInBackground();
+
 Schedule::command('markets:generate-index-infos')
     ->dailyAt('06:35')->timezone('Europe/Berlin')
     ->withoutOverlapping(20)
