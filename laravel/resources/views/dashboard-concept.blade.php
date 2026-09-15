@@ -110,7 +110,7 @@
         #dashboard-concept-page .concept-classic-dashboard-top { width: 100%; min-width: 0; margin-bottom: 1rem; }
         #dashboard-concept-page .concept-classic-dashboard-grid { display: grid; gap: 1rem; width: 100%; min-width: 0; grid-template-columns: 1fr; align-items: start; }
         @media (min-width: 1100px) {
-            #dashboard-concept-page .concept-classic-dashboard-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); }
+            #dashboard-concept-page .concept-classic-dashboard-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
         }
         #dashboard-concept-page .concept-classic-dashboard-col { display: grid; gap: 1rem; min-width: 0; align-content: start; }
         /* The real dashboard's own <style> block (dashboard-styles.blade.php,
