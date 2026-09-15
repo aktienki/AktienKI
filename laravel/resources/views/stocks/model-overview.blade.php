@@ -316,11 +316,20 @@
 
                                     <details class="model-artifacts mt-3 rounded-xl border border-[var(--ak-border)] p-3"><summary class="cursor-pointer text-[9px] font-black text-[var(--ak-text)]">{{ __('Modellartefakte') }} ({{ count($variant['artifacts']) }})</summary><div class="mt-2 space-y-2">@forelse($variant['artifacts'] as $artifact)<div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2 text-[8px]"><span class="min-w-0"><b class="block truncate text-[var(--ak-text)]">{{ $artifact['name'] }}</b><small class="text-[var(--ak-muted)]">{{ $artifact['kind'] }} · {{ $artifact['format'] ?: '—' }} · SHA {{ $artifact['sha256'] !== '' ? substr($artifact['sha256'], 0, 12) : '—' }}</small></span><b class="text-[var(--ak-muted)]">{{ $artifact['size'] ?? '—' }}</b></div>@empty<p class="text-[8px] text-[var(--ak-muted)]">{{ __('Kein Artefakt im Manifest.') }}</p>@endforelse</div></details>
 
+                                    @if(! ($variant['local_feasible'] ?? true))
+                                        <div class="model-local-feasibility mt-3 rounded-xl border border-rose-400/30 bg-rose-400/[.06] p-3">
+                                            <p class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wide text-rose-400"><x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5" />{{ __('Automatisierung kann diese Konfiguration nie ausführen') }}</p>
+                                            <p class="mt-1 text-[8px] leading-4 text-[var(--ak-muted)]">{{ $variant['local_feasibility_message'] }}</p>
+                                        </div>
+                                    @endif
+
                                     <div class="model-strategy-action mt-3 rounded-xl border border-teal-300/25 bg-teal-400/[.055] p-3">
                                         <p class="text-[9px] font-black text-[var(--ak-text)]">{{ __('Du möchtest diese Konfiguration deiner persönlichen Strategie hinzufügen?') }}</p>
                                         <p class="mt-1 text-[8px] leading-4 text-[var(--ak-muted)]">{{ $horizon['days'] }}T · {{ $variant['label'] }} · {{ $variant['model_name'] }}</p>
                                         @if($configurationSaved)
                                             <a href="{{ route('setup.saved-filters.index') }}" class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-400/35 bg-emerald-400/[.08] px-3 py-2.5 text-[9px] font-black text-emerald-400 transition hover:bg-emerald-400/[.13]"><x-heroicon-o-check-circle class="h-4 w-4" />{{ __('In persönlicher Strategie gespeichert') }}</a>
+                                        @elseif(! ($variant['local_feasible'] ?? true))
+                                            <p class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-400/25 px-3 py-2.5 text-[9px] font-black text-[var(--ak-muted)]"><x-heroicon-o-no-symbol class="h-4 w-4" />{{ __('Nicht hinzufügbar - siehe Warnung oben') }}</p>
                                         @else
                                             <form method="POST" action="{{ route('stocks.models.strategy.store', ['symbol' => $instrument->symbol]) }}" class="mt-3">
                                                 @csrf

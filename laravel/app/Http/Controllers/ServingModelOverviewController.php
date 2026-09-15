@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\LocalModelFeasibilityService;
 use App\Services\SavedFilterLimitService;
 use App\Services\ServingModelOverviewService;
 use Illuminate\Http\RedirectResponse;
@@ -11,9 +12,25 @@ use Illuminate\View\View;
 
 final class ServingModelOverviewController extends Controller
 {
-    public function __invoke(Request $request, string $symbol, ServingModelOverviewService $models): View
+    public function __invoke(Request $request, string $symbol, ServingModelOverviewService $models, LocalModelFeasibilityService $feasibility): View
     {
         $data = $models->data($symbol);
+        // The picker above reads the external serving database - it says
+        // nothing about whether AutomatedPortfolioService could ever match
+        // this configuration against the local, server-scheduled prediction
+        // pipeline. Without this, a strategy can be saved that never fires,
+        // with no indication why. See LocalModelFeasibilityService.
+        $data['horizons'] = $data['horizons']->map(function (array $horizon) use ($feasibility, $symbol): array {
+            foreach ($horizon['variants'] as $variantKey => $variant) {
+                $check = $feasibility->check($symbol, (int) $horizon['days'], (string) $variantKey, (string) ($variant['model_name'] ?? ''));
+                $horizon['variants'][$variantKey]['local_feasible'] = $check['feasible'];
+                $horizon['variants'][$variantKey]['local_feasibility_message'] = $check['reason'] === null
+                    ? null
+                    : $feasibility->explain($check['reason'], $symbol, (int) $horizon['days'], (string) ($variant['model_name'] ?? ''), $check['local_model_name']);
+            }
+
+            return $horizon;
+        });
         $requestedHorizon = $request->integer('horizon');
         if (in_array($requestedHorizon, [10, 20, 40], true)
             && $data['horizons']->contains(fn (array $horizon): bool => (int) $horizon['days'] === $requestedHorizon)) {
@@ -40,6 +57,7 @@ final class ServingModelOverviewController extends Controller
         string $symbol,
         ServingModelOverviewService $models,
         SavedFilterLimitService $limits,
+        LocalModelFeasibilityService $feasibility,
     ): RedirectResponse {
         $validated = $request->validate([
             'release_id' => ['required', 'uuid'],
@@ -55,6 +73,19 @@ final class ServingModelOverviewController extends Controller
         $horizon = $data['horizons']->firstWhere('days', (int) $validated['horizon']);
         $variant = $horizon['variants'][(string) $validated['variant']] ?? null;
         abort_unless($horizon && $variant, 404);
+
+        // The picker only validates against the external serving database.
+        // Refuse here rather than silently saving a strategy that
+        // AutomatedPortfolioService can never match - see
+        // LocalModelFeasibilityService for why this differs from what the
+        // page above just displayed as available.
+        $check = $feasibility->check($symbol, (int) $horizon['days'], (string) $validated['variant'], (string) ($variant['model_name'] ?? ''));
+        if (! $check['feasible']) {
+            return redirect()->route('stocks.models', ['symbol' => $symbol])
+                ->withErrors(['model_configuration' => $feasibility->explain(
+                    (string) $check['reason'], $symbol, (int) $horizon['days'], (string) ($variant['model_name'] ?? ''), $check['local_model_name'],
+                )]);
+        }
 
         $configurationKey = $this->configurationKey(
             (string) $data['release']['id'],

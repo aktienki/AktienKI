@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\ServingModelOverviewController;
 use App\Http\Controllers\ServingPredictionTableController;
 use App\Http\Controllers\ServingStockController;
+use App\Services\ServingReadService;
 use Illuminate\Http\Request;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
@@ -49,6 +50,40 @@ final class ServingStockRouteTest extends TestCase
         $this->assertContains('plan:pro', $route->gatherMiddleware());
     }
 
+    /**
+     * The Strategietester picker validates only against the external serving
+     * database - AutomatedPortfolioService reads a completely separate,
+     * local pipeline. Without this guard, a strategy could be saved that
+     * never fires, with no indication why (this was the actual root cause
+     * behind saved_prediction_filters #83 and #102 never producing a real
+     * buy). See LocalModelFeasibilityService.
+     */
+    public function test_store_strategy_rejects_a_locally_infeasible_configuration_before_saving(): void
+    {
+        $controller = (string) file_get_contents(app_path('Http/Controllers/ServingModelOverviewController.php'));
+
+        $this->assertStringContainsString('LocalModelFeasibilityService $feasibility', $controller);
+        $this->assertStringContainsString("if (! \$check['feasible'])", $controller);
+        // The rejection happens before the strategy is ever persisted.
+        $rejectPosition = strpos($controller, "if (! \$check['feasible'])");
+        $persistPosition = strpos($controller, 'DB::transaction(function ()');
+        $this->assertNotFalse($rejectPosition);
+        $this->assertNotFalse($persistPosition);
+        $this->assertLessThan($persistPosition, $rejectPosition);
+    }
+
+    /**
+     * The picker page itself must also surface why a configuration is dead,
+     * not just refuse it silently on submit.
+     */
+    public function test_model_overview_view_warns_about_infeasible_configurations(): void
+    {
+        $view = (string) file_get_contents(resource_path('views/stocks/model-overview.blade.php'));
+
+        $this->assertStringContainsString("! (\$variant['local_feasible'] ?? true)", $view);
+        $this->assertStringContainsString('Automatisierung kann diese Konfiguration nie ausführen', $view);
+    }
+
     public function test_an_individually_checked_model_is_kept_in_the_strategy_selection(): void
     {
         $sourceToken = str_repeat('A', 40);
@@ -77,7 +112,7 @@ final class ServingStockRouteTest extends TestCase
 
         $response = app(ServingPredictionTableController::class)->storeStrategySelection(
             $request,
-            app(\App\Services\ServingReadService::class),
+            app(ServingReadService::class),
         );
 
         parse_str((string) parse_url($response->getTargetUrl(), PHP_URL_QUERY), $query);
@@ -107,7 +142,7 @@ final class ServingStockRouteTest extends TestCase
 
         $response = app(ServingPredictionTableController::class)->storeStrategySelection(
             $request,
-            app(\App\Services\ServingReadService::class),
+            app(ServingReadService::class),
         );
 
         parse_str((string) parse_url($response->getTargetUrl(), PHP_URL_QUERY), $query);
