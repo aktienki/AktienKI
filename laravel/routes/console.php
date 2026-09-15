@@ -142,6 +142,10 @@ Schedule::command('events:sync-twelve-data --days-back=7 --days-forward=60')
     ->dailyAt('03:00')
     ->withoutOverlapping(30)
     ->runInBackground();
+Schedule::command('earnings:compute-price-reactions')
+    ->dailyAt('03:20')
+    ->withoutOverlapping(30)
+    ->runInBackground();
 
 // ETF issuers usually refresh portfolio files daily. A weekly snapshot keeps
 // the reverse stock-to-ETF lookup current without unnecessary provider load.

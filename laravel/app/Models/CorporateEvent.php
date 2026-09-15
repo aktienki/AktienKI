@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class CorporateEvent extends Model
 {
@@ -26,5 +27,10 @@ class CorporateEvent extends Model
     public function import(): BelongsTo
     {
         return $this->belongsTo(CorporateEventImport::class, 'import_id');
+    }
+
+    public function reaction(): HasOne
+    {
+        return $this->hasOne(EarningsPriceReaction::class);
     }
 }
