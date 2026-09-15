@@ -10,7 +10,6 @@ use App\Http\Controllers\CommodityScreenerController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DailyMarketAnalysisController;
-use App\Http\Controllers\DashboardConceptController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepotController;
 use App\Http\Controllers\EasyAccessController;
@@ -273,7 +272,6 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::post('/aki/chat', AkiChatController::class)->middleware('throttle:10,1')->name('aki.chat');
     Route::post('/live-prices/subscribe', LivePriceSubscriptionController::class)->name('live-prices.subscribe');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
-    Route::get('/dashboard/concept', DashboardConceptController::class)->name('dashboard.concept');
     Route::get('/tabellen/performance-transparenz', PerformanceTransparencyController::class)
         ->middleware('plan:pro')
         ->name('predictions.performance-transparency');

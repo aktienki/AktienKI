@@ -253,7 +253,6 @@
                     <p class="dashboard-mobile-risk-label hidden items-center gap-1.5 font-black uppercase"><x-heroicon-o-shield-check class="h-4 w-4 {{ $riskProfile === 'risk' ? 'text-rose-600' : 'text-cyan-600' }}" /><span class="dashboard-profile-badge rounded-md border px-2 py-1 text-[8px] tracking-[.1em]" data-profile="{{ $riskProfile }}">{{ $riskLabels[$riskProfile] ?? ucfirst($riskProfile) }}</span><span class="dashboard-plan-tier-badge rounded-md border px-2.5 py-1 text-[9px] tracking-[.12em]" data-plan="{{ strtolower($dashboardPlanLabel) }}">{{ $dashboardPlanLabel }}</span></p>
                     <p class="dashboard-personal-eyebrow text-[10px] font-black uppercase tracking-[.2em] text-orange-400">{{ __('Persönliche Übersicht') }}</p>
                     <h1 class="dashboard-page-title mt-1 text-2xl font-black text-[var(--ak-text)] sm:text-3xl">{{ __('Mein Dashboard') }}</h1>
-                    <a href="{{ route('dashboard.concept') }}" class="mt-1 inline-flex items-center gap-1 text-[10px] font-black text-cyan-500 hover:text-cyan-400">{{ __('Konzept ansehen: kompaktes Alternativ-Dashboard') }} →</a>
                 </div>
                 <div class="dashboard-header-actions flex flex-wrap items-center justify-end gap-2">
                     <div class="dashboard-theme-switch flex items-center gap-2 rounded-xl border border-cyan-400/25 bg-[var(--ak-card)] px-2 py-1.5 shadow-[var(--ak-shadow)]" aria-label="{{ __('Darstellung') }}">
