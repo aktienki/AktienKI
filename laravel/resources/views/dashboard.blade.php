@@ -842,13 +842,14 @@
                                     $alternativePanelTone = $alternativeDecile === null ? 'border-slate-400/25 text-[var(--ak-muted)]' : ($alternativeDecile >= 6 ? 'border-emerald-400/35 bg-emerald-400/[.08] text-emerald-500' : ($alternativeDecile >= 4 ? 'border-amber-400/35 bg-amber-400/[.08] text-amber-500' : 'border-rose-400/35 bg-rose-400/[.08] text-rose-500'));
                                     $alternativeCategory = (string) ($alternative->alternative_category ?? 'score');
                                     // 'alternative' (the "maybe interesting soon" pick, which never
-                                    // went through the ranked pool) intentionally shares the same
-                                    // "Ranking · Platz :rank" label as the ranked ones - it's shown
-                                    // as just another candidate, not called out as special.
+                                    // went through the ranked pool) sits in the exact same card grid,
+                                    // same size/structure as the ranked ones - only its label differs,
+                                    // as a small hint it's not from the ranked pool itself.
                                     $alternativeCategoryLabel = match($alternativeCategory) {
                                         'panel' => __('Panel-Bewertung'),
                                         'external' => __('Externe Bewertung'),
-                                        'alternative', 'rank' => __('Ranking · Platz :rank', ['rank' => (int) ($alternative->alternative_rank ?? 0)]),
+                                        'alternative' => __('Evtl. bald interessant'),
+                                        'rank' => __('Ranking · Platz :rank', ['rank' => (int) ($alternative->alternative_rank ?? 0)]),
                                         default => __('KI-Bewertung'),
                                     };
                                     $alternativeReturn20 = is_numeric($alternative->expected_return_20d ?? null) ? (float) $alternative->expected_return_20d : null;
