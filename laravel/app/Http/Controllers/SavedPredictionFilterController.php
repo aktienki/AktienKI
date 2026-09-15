@@ -31,9 +31,18 @@ final class SavedPredictionFilterController extends Controller
         'q' => '', 'country' => '', 'exchange' => '', 'sector' => '', 'ai_type' => '',
         'model' => '', 'quality_tier' => '', 'service_quality_gate' => '',
         'quality_horizons_present' => 1, 'quality_horizons' => [10, 20, 40], 'signal' => '',
+        // Empty means unrestricted, matching every other filter here -
+        // set explicitly (e.g. 'EUR') when the linked portfolio settles in
+        // one currency and must never hold a USD/HKD/... position it can't
+        // actually clear.
+        'currency' => '',
+        // Empty list means unrestricted. Set to pin quotes to specific
+        // venues (e.g. ['XETR', 'FSX']) even for stocks that also have a
+        // EUR-denominated listing elsewhere (Paris, Amsterdam, ...).
+        'exchange_mics' => [],
         'score_min' => 0, 'confidence_min' => 0, 'drawdown_max' => 50, 'risk_max' => 100,
         'profit_per_trade_min' => 0, 'median_return_min' => null, 'volatility_max' => 100, 'minimum_trades' => 0, 'sector_score_min' => -1,
-        'predicted_return_min' => 0.5, 'noise_score_min' => 0, 'profit_factor_min' => 0, 'signal_quality_min' => 0, 'model_quality_min' => 0, 'heatmap_selection' => '',
+        'predicted_return_min' => 0.5, 'predicted_return_horizon' => 20, 'noise_score_min' => 0, 'profit_factor_min' => 0, 'signal_quality_min' => 0, 'model_quality_min' => 0, 'heatmap_selection' => '',
         'pe_max' => 100, 'dividend_yield_min' => 0, 'dividend_yield_operator' => 'gte', 'market_cap_min' => 0, 'market_cap_group' => 'all',
         'revenue_growth_min' => -50, 'hit_rate_min' => 0,
         'gate_mode' => 'system',
@@ -137,6 +146,10 @@ final class SavedPredictionFilterController extends Controller
             'return_to_models' => ['nullable', 'boolean'],
             'models_return_token' => ['nullable', 'string', 'size:40', 'regex:/^[A-Za-z0-9]+$/'],
             'heatmap_selection' => ['nullable', 'string', 'max:4000'],
+            'currency' => ['nullable', 'string', 'size:3'],
+            'exchange_mics' => ['nullable', 'array', 'max:10'],
+            'exchange_mics.*' => ['string', 'max:10'],
+            'predicted_return_horizon' => ['nullable', 'integer', 'in:5,10,15,20'],
             'score_min' => ['nullable', 'numeric', 'between:0,10'],
             'confidence_min' => ['nullable', 'numeric', 'between:0,100'],
             'drawdown_max' => ['nullable', 'numeric', 'between:0,100'],

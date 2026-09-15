@@ -230,7 +230,14 @@ final class AutomatedPortfolioService
         $scoreSql = '(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END)';
         $confidenceSql = '(CASE WHEN prediction.confidence <= 1 THEN prediction.confidence * 100 ELSE prediction.confidence END)';
         $riskSql = '(CASE WHEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) <= 1 THEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) * 100 ELSE COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) END)';
-        $predictedReturnSql = '((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100';
+        // Configurable so a strategy can pin predicted_return_min to whichever
+        // horizon a walk-forward scan (thresholds:scan) found strongest for it,
+        // instead of always the 20-day forecast. Falls back to 20d for every
+        // strategy created before this existed.
+        $predictedReturnHorizon = in_array((int) ($filters['predicted_return_horizon'] ?? 20), [5, 10, 15, 20], true)
+            ? (int) $filters['predicted_return_horizon']
+            : 20;
+        $predictedReturnSql = "((prediction.predicted_price_{$predictedReturnHorizon}d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100";
         $fundamentalNumber = static fn (string $key): string => match ($key) {
             'trailingPE' => "COALESCE(fundamental.trailing_pe, CASE WHEN NULLIF(fundamental.data::jsonb->>'trailingPE', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'trailingPE')::numeric END)",
             'dividendYield' => "COALESCE(fundamental.dividend_yield, CASE WHEN NULLIF(fundamental.data::jsonb->>'dividendYield', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'dividendYield')::numeric END)",
@@ -274,6 +281,22 @@ final class AutomatedPortfolioService
             ->where('instrument.is_active', true)
             ->where('instrument.is_german_tradeable', true)
             ->whereNull('instrument.deleted_at')
+            // is_german_tradeable only means a EUR cross-listing EXISTS
+            // somewhere - it does not mean this specific instrument row
+            // trades in EUR itself (ADI/1024.HK/2318.HK all have it true
+            // while instrument.currency is USD/HKD). A strategy whose
+            // portfolio settles in EUR needs the row actually bought to be
+            // EUR-denominated, so this is a separate, explicit filter.
+            ->when((string) ($filters['currency'] ?? '') !== '', fn ($query) => $query
+                ->whereRaw('UPPER(instrument.currency) = ?', [strtoupper((string) $filters['currency'])]))
+            // Quotes must come from a specific venue (e.g. Xetra/Frankfurt
+            // only, not Paris/Amsterdam, even though those also settle in
+            // EUR) - a list of allowed exchange MICs, same empty-means-
+            // unrestricted convention as every other filter here.
+            ->when(collect((array) ($filters['exchange_mics'] ?? []))->filter()->isNotEmpty(), function ($query) use ($filters): void {
+                $mics = collect((array) $filters['exchange_mics'])->filter()->map(fn ($mic) => strtoupper((string) $mic))->values()->all();
+                $query->whereRaw('UPPER(exchange.mic) IN ('.implode(',', array_fill(0, count($mics), '?')).')', $mics);
+            })
             // A strategy created from the model overview is tied to the exact
             // stock/horizon/model variant selected there. It must never fall
             // back to another model of the same stock.
