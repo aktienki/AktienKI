@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CorporateEvent;
 use App\Models\Watchlist;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -16,20 +17,25 @@ use Illuminate\View\View;
  * corporate_events table. That table already holds real, matched data -
  * this page is the first place in the app that actually shows it, grouped
  * by date, with a small badge for entries on the user's own watchlists.
- * upcomingEvents() is public so the concept dashboard's own "Anstehende
- * News" tab can reuse the exact same list for its short overview.
+ * upcomingEvents()/recentEvents() are public so the concept dashboard's
+ * own "Anstehende News" tab can reuse the exact same lists.
  */
 final class UpcomingEventsController extends Controller
 {
     public const LOOKAHEAD_DAYS = 60;
 
+    public const LOOKBACK_DAYS = 30;
+
     public function __invoke(Request $request): View
     {
-        $events = $this->upcomingEvents($request, self::LOOKAHEAD_DAYS, 200);
+        $upcoming = $this->upcomingEvents($request, self::LOOKAHEAD_DAYS, 200);
+        $recent = $this->recentEvents($request, self::LOOKBACK_DAYS, 100);
 
         return view('upcoming-events', [
-            'groupedByDate' => $events->groupBy('date'),
+            'groupedByDate' => $upcoming->groupBy('date'),
+            'recentGroupedByDate' => $recent->groupBy('date'),
             'lookaheadDays' => self::LOOKAHEAD_DAYS,
+            'lookbackDays' => self::LOOKBACK_DAYS,
         ]);
     }
 
@@ -37,6 +43,36 @@ final class UpcomingEventsController extends Controller
      * @return Collection<int, array{date: string, time: ?string, symbol: string, name: string, country: ?string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, isWatched: bool, url: string}>
      */
     public function upcomingEvents(Request $request, int $lookaheadDays = self::LOOKAHEAD_DAYS, int $limit = 200): Collection
+    {
+        return $this->events(
+            $request,
+            fn (Builder $query) => $query->whereBetween('event_date', [now()->toDateString(), now()->addDays($lookaheadDays)->toDateString()])
+                ->orderBy('event_date')->orderBy('event_time'),
+            $limit,
+        );
+    }
+
+    /**
+     * Already-reported earnings within the look-back window (real EPS
+     * actual/surprise, not just the estimate) - newest first.
+     *
+     * @return Collection<int, array{date: string, time: ?string, symbol: string, name: string, country: ?string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, isWatched: bool, url: string}>
+     */
+    public function recentEvents(Request $request, int $daysBack = self::LOOKBACK_DAYS, int $limit = 100): Collection
+    {
+        return $this->events(
+            $request,
+            fn (Builder $query) => $query->whereBetween('event_date', [now()->subDays($daysBack)->toDateString(), now()->subDay()->toDateString()])
+                ->orderByDesc('event_date')->orderBy('event_time'),
+            $limit,
+        );
+    }
+
+    /**
+     * @param  callable(Builder): Builder  $scope
+     * @return Collection<int, array{date: string, time: ?string, symbol: string, name: string, country: ?string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, isWatched: bool, url: string}>
+     */
+    private function events(Request $request, callable $scope, int $limit): Collection
     {
         $user = $request->user();
 
@@ -48,13 +84,12 @@ final class UpcomingEventsController extends Controller
             ->unique()
             ->all();
 
-        return CorporateEvent::query()
+        $query = CorporateEvent::query()
             ->with('instrument:id,symbol,name,country')
             ->where('event_type', 'earnings')
-            ->whereBetween('event_date', [now()->toDateString(), now()->addDays($lookaheadDays)->toDateString()])
-            ->whereHas('instrument')
-            ->orderBy('event_date')
-            ->orderBy('event_time')
+            ->whereHas('instrument');
+
+        return $scope($query)
             ->limit($limit)
             ->get()
             ->filter(fn (CorporateEvent $event): bool => $event->instrument !== null)
