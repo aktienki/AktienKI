@@ -18,6 +18,18 @@ class EarningsPriceReactionCalculator
     public const WINDOW_DAYS = 3;
 
     /**
+     * How many calendar days the anchor bar is allowed to fall after the
+     * event date. Without this cap, an event older than the instrument's
+     * price_bars coverage would silently anchor to the earliest bar
+     * available - every such event then gets the exact same close_at_event
+     * and return_post_3d, which is wrong, not just imprecise (this is
+     * exactly what happened for JPM: its bars only start 2023-08-25, so
+     * every 2021-2023 event anchored to that one bar and produced
+     * identical numbers).
+     */
+    private const MAX_ANCHOR_GAP_DAYS = 10;
+
+    /**
      * @param  Collection<int, object{bar_time: string, close: string|float}>  $bars  Sorted ascending by bar_time.
      * @return array{close_at_event: float, return_pre_3d: ?float, return_post_3d: ?float, is_complete: bool}|null
      */
@@ -33,6 +45,18 @@ class EarningsPriceReactionCalculator
 
         if ($anchorIndex === false) {
             // No trading day on or after the event yet - too fresh to react to.
+            return null;
+        }
+
+        // diffInDays() with one argument returns a *signed* difference here
+        // (negative when $eventDate is before $anchorDate) - explicitly
+        // pass absolute=true, otherwise every past-dated gap silently
+        // slips past this guard undetected.
+        $anchorDate = CarbonImmutable::parse($bars[$anchorIndex]->bar_time)->startOfDay();
+        if ($anchorDate->diffInDays($eventDate->startOfDay(), absolute: true) > self::MAX_ANCHOR_GAP_DAYS) {
+            // The nearest bar on/after the event is suspiciously far away -
+            // this instrument's price history doesn't actually reach back
+            // (or forward) to this event. No real anchor exists; don't fake one.
             return null;
         }
 
