@@ -31,7 +31,7 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3rem;
             aspect-ratio: 1 / 1;
             border-radius: .9rem;
-            border: 1px solid var(--ak-border);
+            border: 1.5px solid var(--ak-border-strong);
             background: none;
             color: var(--ak-text);
             text-decoration: none;
