@@ -1172,22 +1172,51 @@ final class ServingScreenerService
 
     private function percentiles(Collection $stocks, callable $metric): Collection
     {
-        $values = $stocks->map($metric)->filter(fn ($value): bool => is_numeric($value))->map(fn ($value): float => (float) $value)->sort()->values();
-        if ($values->isEmpty()) {
+        // Was O(n^2): every stock re-scanned the entire sorted value list with
+        // two Collection::filter() closures to count "below" and "equal"
+        // candidates. At ~770 screener stocks x ~7 metrics x 3 groupings
+        // (global/index/sector) that is tens of millions of closure calls,
+        // which started tipping the request over the 30s execution limit as
+        // the remote universe grew. $values is already sorted, so both
+        // counts are a binary-search lower-bound lookup instead - O(n log n)
+        // for the whole metric rather than O(n^2).
+        $values = $stocks->map($metric)->filter(fn ($value): bool => is_numeric($value))->map(fn ($value): float => (float) $value)->sort()->values()->all();
+        $count = count($values);
+        if ($count === 0) {
             return collect();
         }
 
-        return $stocks->mapWithKeys(function (object $stock) use ($metric, $values): array {
+        return $stocks->mapWithKeys(function (object $stock) use ($metric, $values, $count): array {
             $value = $metric($stock);
             if (! is_numeric($value)) {
                 return [$stock->instrument_id => null];
             }
             $value = (float) $value;
-            $below = $values->filter(fn (float $candidate): bool => $candidate < $value)->count();
-            $equal = $values->filter(fn (float $candidate): bool => abs($candidate - $value) < 0.0000001)->count();
+            $below = $this->lowerBound($values, $value);
+            $equal = $this->lowerBound($values, $value + 0.0000001) - $this->lowerBound($values, $value - 0.0000001);
 
-            return [$stock->instrument_id => round((($below + (($equal + 1) / 2)) / $values->count()) * 100, 1)];
+            return [$stock->instrument_id => round((($below + (($equal + 1) / 2)) / $count) * 100, 1)];
         });
+    }
+
+    /**
+     * Index of the first element in the ascending-sorted $values that is
+     * >= $target (i.e. the count of elements strictly less than $target).
+     */
+    private function lowerBound(array $values, float $target): int
+    {
+        $low = 0;
+        $high = count($values);
+        while ($low < $high) {
+            $mid = intdiv($low + $high, 2);
+            if ($values[$mid] < $target) {
+                $low = $mid + 1;
+            } else {
+                $high = $mid;
+            }
+        }
+
+        return $low;
     }
 
     private function groupedPercentiles(Collection $stocks, string $group, callable $metric): Collection
