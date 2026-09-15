@@ -2399,25 +2399,6 @@
         #personal-dashboard .dashboard-center-combined-card > [data-dashboard-card="signal-cockpit"] {
             grid-row: 2 !important;
         }
-        /* Side by side once there is room for it - stacked (above) stays the
-           mobile/tablet default. Matches the bento grid's own xl breakpoint
-           (1280px) where it switches from 2 to 12 columns. */
-        @media (min-width: 1280px) {
-            #personal-dashboard .dashboard-center-combined-card {
-                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-                grid-template-rows: auto !important;
-            }
-            #personal-dashboard .dashboard-center-combined-card > #dashboard-newscenter-card {
-                grid-column: 1 !important;
-                grid-row: 1 !important;
-                border-bottom: 0 !important;
-                border-right: 1px solid var(--ak-border) !important;
-            }
-            #personal-dashboard .dashboard-center-combined-card > [data-dashboard-card="signal-cockpit"] {
-                grid-column: 2 !important;
-                grid-row: 1 !important;
-            }
-        }
         #personal-dashboard .dashboard-center-combined-card > article > .dashboard-card-help-btn {
             display: none !important;
         }
