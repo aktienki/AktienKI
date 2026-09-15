@@ -85,6 +85,15 @@
         #dashboard-concept-page .concept-horizon-bar .bar-track { position: relative; height: .35rem; border-radius: .3rem; background: color-mix(in srgb, var(--ak-border) 70%, transparent); overflow: hidden; }
         #dashboard-concept-page .concept-horizon-bar .bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: .3rem; }
         #dashboard-concept-page .concept-opp-footer { margin-top: .8rem; padding-top: .65rem; border-top: 1px solid var(--ak-border); font-size: .72rem; line-height: 1.4; }
+        #dashboard-concept-page .concept-drift-toggle {
+            margin-top: .6rem; border: 0; background: none; padding: 0; cursor: pointer;
+            font-size: .68rem; font-weight: 800; color: #22d3ee;
+        }
+        #dashboard-concept-page .concept-drift-toggle:hover { color: #67e8f9; }
+        #dashboard-concept-page .concept-drift-events { margin-top: .6rem; display: grid; gap: .35rem; border-top: 1px solid var(--ak-border); padding-top: .6rem; }
+        #dashboard-concept-page .concept-drift-event-row {
+            display: flex; align-items: center; gap: .6rem; font-size: .68rem; font-weight: 700; color: var(--ak-text);
+        }
     </style>
 
     <div id="dashboard-concept-page" x-data="{ active: null }">
@@ -213,12 +222,12 @@
                             @if(count($section['rows']))
                                 <div class="concept-opp-stack">
                                     @foreach($section['rows'] as $row)
-                                        <a href="{{ $row['url'] }}" class="concept-opp-card">
+                                        <div class="concept-opp-card" x-data="{ expanded: false }">
                                             <div class="concept-opp-head">
-                                                <span class="min-w-0">
+                                                <a href="{{ $row['url'] }}" class="min-w-0 no-underline">
                                                     <b class="block truncate text-sm font-black text-[var(--ak-text)]">{{ $row['name'] }}</b>
                                                     <small class="mt-0.5 block text-[10px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $row['symbol'] }} · {{ __('nächste Zahlen') }} {{ \Illuminate\Support\Carbon::parse($row['nextDate'])->format('d.m.Y') }}</small>
-                                                </span>
+                                                </a>
                                                 <span class="concept-opp-badge">{{ $row['tendency'] }}</span>
                                             </div>
                                             <p class="text-xs text-[var(--ak-muted)]">
@@ -229,7 +238,22 @@
                                                 {{ __('bei Miss') }}:
                                                 <span class="font-black {{ ($row['post3dMiss'] ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ $row['post3dMiss'] === null ? '—' : (($row['post3dMiss'] >= 0 ? '+' : '').number_format($row['post3dMiss'], 2, ',', '.').' %') }}</span>
                                             </p>
-                                        </a>
+
+                                            <button type="button" class="concept-drift-toggle" @click="expanded = !expanded">
+                                                <span x-show="!expanded">{{ __('Einzelereignisse anzeigen') }} ({{ count($row['events']) }}) ↓</span>
+                                                <span x-show="expanded" x-cloak>{{ __('Einzelereignisse ausblenden') }} ↑</span>
+                                            </button>
+
+                                            <div x-show="expanded" x-cloak class="concept-drift-events">
+                                                @foreach($row['events'] as $event)
+                                                    <div class="concept-drift-event-row">
+                                                        <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($event['date'])->format('d.m.Y') }}</span>
+                                                        <span class="min-w-0 flex-1 truncate">{{ __('Schätzung') }} {{ $event['epsEstimate'] === null ? '—' : number_format($event['epsEstimate'], 2, ',', '.') }} / {{ __('Ist') }} {{ $event['epsActual'] === null ? '—' : number_format($event['epsActual'], 2, ',', '.') }} ({{ $event['surprisePercent'] === null ? '—' : (($event['surprisePercent'] >= 0 ? '+' : '').number_format($event['surprisePercent'], 1, ',', '.').' %') }})</span>
+                                                        <span class="shrink-0 tabular-nums {{ ($event['post3d'] ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">-3T {{ $event['pre3d'] === null ? '—' : number_format($event['pre3d'], 1, ',', '.').'%' }} · +3T {{ $event['post3d'] === null ? '—' : number_format($event['post3d'], 1, ',', '.').'%' }}</span>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
                                     @endforeach
                                 </div>
                             @else

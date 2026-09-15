@@ -16,7 +16,7 @@ class EarningsDriftStatsService
 {
     /**
      * @param  list<int>  $instrumentIds
-     * @return Collection<int, array{instrumentId: int, symbol: string, name: string, n: int, pre3d: ?float, post3d: ?float, post3dBeat: ?float, post3dMiss: ?float, beatCount: int, missCount: int, tendency: string}> Keyed by instrument_id.
+     * @return Collection<int, array{instrumentId: int, symbol: string, name: string, n: int, pre3d: ?float, post3d: ?float, post3dBeat: ?float, post3dMiss: ?float, beatCount: int, missCount: int, tendency: string, events: list<array{date: string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, pre3d: ?float, post3d: ?float}>}> Keyed by instrument_id.
      */
     public function forInstruments(array $instrumentIds): Collection
     {
@@ -33,7 +33,7 @@ class EarningsDriftStatsService
 
     /**
      * @param  int  $minSample  Minimum number of past events a stock needs to be included at all.
-     * @return Collection<int, array{instrumentId: int, symbol: string, name: string, n: int, pre3d: ?float, post3d: ?float, post3dBeat: ?float, post3dMiss: ?float, beatCount: int, missCount: int, tendency: string}> Keyed by instrument_id.
+     * @return Collection<int, array{instrumentId: int, symbol: string, name: string, n: int, pre3d: ?float, post3d: ?float, post3dBeat: ?float, post3dMiss: ?float, beatCount: int, missCount: int, tendency: string, events: list<array{date: string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, pre3d: ?float, post3d: ?float}>}> Keyed by instrument_id.
      */
     public function forAllStocks(int $minSample = 1, ?string $symbol = null): Collection
     {
@@ -58,7 +58,7 @@ class EarningsDriftStatsService
     }
 
     /**
-     * @return array{instrumentId: int, symbol: string, name: string, n: int, pre3d: ?float, post3d: ?float, post3dBeat: ?float, post3dMiss: ?float, beatCount: int, missCount: int, tendency: string}
+     * @return array{instrumentId: int, symbol: string, name: string, n: int, pre3d: ?float, post3d: ?float, post3dBeat: ?float, post3dMiss: ?float, beatCount: int, missCount: int, tendency: string, events: list<array{date: string, epsEstimate: ?float, epsActual: ?float, surprisePercent: ?float, pre3d: ?float, post3d: ?float}>}
      */
     private function statsFor(Collection $group): array
     {
@@ -81,6 +81,16 @@ class EarningsDriftStatsService
             'beatCount' => $beats->count(),
             'missCount' => $misses->count(),
             'tendency' => $this->tendency($avgPost3dBeat, $avgPost3dMiss, $beats->count(), $misses->count()),
+            // The individual events behind the averages above - every past
+            // report this stock's stats were computed from, newest first.
+            'events' => $group->sortByDesc('event_date')->map(fn (EarningsPriceReaction $r): array => [
+                'date' => $r->event_date->toDateString(),
+                'epsEstimate' => $r->eps_estimate,
+                'epsActual' => $r->eps_actual,
+                'surprisePercent' => $r->surprise_percent,
+                'pre3d' => $r->return_pre_3d,
+                'post3d' => $r->return_post_3d,
+            ])->values()->all(),
         ];
     }
 
