@@ -61,6 +61,34 @@ final class LocalModelFeasibilityServiceTest extends TestCase
         $this->assertSame('catboost_regressor future_return_20', $result['local_model_name']);
     }
 
+    public function test_a_model_name_that_is_a_prefix_of_a_different_algorithm_does_not_match(): void
+    {
+        // "GradientBoostingRegressor" (the picker's PascalCase name) must
+        // not match "hist_gradient_boosting_regressor" just because it is a
+        // literal substring of it - these are two distinct sklearn model
+        // classes, not the same one under different naming.
+        [$symbol] = $this->seedLocalPrediction(horizonDays: 20, modelName: 'hist_gradient_boosting_regressor future_return_20', publicAlias: 'Horizon Nova');
+
+        $result = app(LocalModelFeasibilityService::class)->check($symbol, 20, 'standard', 'GradientBoostingRegressor');
+
+        $this->assertFalse($result['feasible']);
+        $this->assertSame('local_model_changed', $result['reason']);
+    }
+
+    public function test_pascal_case_model_names_from_the_picker_match_the_snake_case_local_name(): void
+    {
+        // The real-world case that motivated normalizing both sides at all:
+        // the serving picker's model_name is PascalCase
+        // ("GradientBoostingRegressor"), the local model_definitions.name is
+        // snake_case with a "future_return_N" suffix.
+        [$symbol] = $this->seedLocalPrediction(horizonDays: 10, modelName: 'gradient_boosting_regressor future_return_10', publicAlias: 'Horizon Atlas');
+
+        $result = app(LocalModelFeasibilityService::class)->check($symbol, 10, 'standard', 'GradientBoostingRegressor');
+
+        $this->assertTrue($result['feasible']);
+        $this->assertNull($result['reason']);
+    }
+
     public function test_pure_tcn_requires_a_local_model_with_tcn_in_its_name(): void
     {
         [$symbol] = $this->seedLocalPrediction(horizonDays: 10, modelName: 'gradient_boosting_regressor future_return_10', publicAlias: 'Horizon Atlas');

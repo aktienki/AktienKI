@@ -306,9 +306,18 @@ final class AutomatedPortfolioService
                         $symbol = strtoupper(trim((string) $configuration['symbol']));
                         $horizonMinutes = (int) $configuration['horizon_days'] * 1440;
                         $variant = (string) $configuration['variant'];
-                        $modelName = mb_strtolower(trim((string) ($configuration['model_name'] ?? '')));
+                        // The serving picker's model_name arrives as PascalCase
+                        // ("GradientBoostingRegressor"); the local
+                        // model_definitions.name is snake_case with a
+                        // "future_return_N" suffix
+                        // ("gradient_boosting_regressor future_return_20").
+                        // Comparing the raw, differently-formatted strings
+                        // never matched - stripped to bare alphanumerics both
+                        // become "gradientboostingregressor...", which is what
+                        // LocalModelFeasibilityService checks too.
+                        $modelNameNormalized = preg_replace('/[^a-z0-9]/', '', mb_strtolower(trim((string) ($configuration['model_name'] ?? '')))) ?? '';
 
-                        $configurations->orWhere(function ($candidate) use ($symbol, $horizonMinutes, $variant, $modelName): void {
+                        $configurations->orWhere(function ($candidate) use ($symbol, $horizonMinutes, $variant, $modelNameNormalized): void {
                             $candidate->whereRaw('UPPER(instrument.symbol) = ?', [$symbol])
                                 ->where('prediction.prediction_horizon_minutes', $horizonMinutes);
 
@@ -317,11 +326,16 @@ final class AutomatedPortfolioService
                                     $model->whereRaw("LOWER(COALESCE(model_definition.public_alias, '')) LIKE '%tcn%'")
                                         ->orWhereRaw("LOWER(COALESCE(model_definition.name, '')) LIKE '%tcn%'");
                                 });
-                            } elseif ($modelName !== '') {
-                                $candidate->where(function ($model) use ($modelName): void {
-                                    $model->whereRaw('LOWER(COALESCE(model_definition.public_alias, model_definition.name, ?)) = ?', [$modelName, $modelName])
-                                        ->orWhereRaw('LOWER(COALESCE(model_definition.public_alias, ?)) LIKE ?', ['', '%'.$modelName.'%'])
-                                        ->orWhereRaw('LOWER(COALESCE(model_definition.name, ?)) LIKE ?', ['', '%'.$modelName.'%']);
+                            } elseif ($modelNameNormalized !== '') {
+                                // EXACT equality after stripping the
+                                // " future_return_N" suffix and normalizing -
+                                // a LIKE/substring match would wrongly treat
+                                // "GradientBoostingRegressor" as matching
+                                // "HistGradientBoostingRegressor", a
+                                // different algorithm entirely.
+                                $candidate->where(function ($model) use ($modelNameNormalized): void {
+                                    $model->whereRaw("REGEXP_REPLACE(LOWER(COALESCE(model_definition.public_alias, '')), '[^a-z0-9]', '', 'g') = ?", [$modelNameNormalized])
+                                        ->orWhereRaw("REGEXP_REPLACE(REGEXP_REPLACE(LOWER(COALESCE(model_definition.name, '')), '\\s*future_return_\\d+\\s*$', ''), '[^a-z0-9]', '', 'g') = ?", [$modelNameNormalized]);
                                 });
                             }
                         });

@@ -73,15 +73,40 @@ final class ServingStockRouteTest extends TestCase
     }
 
     /**
-     * The picker page itself must also surface why a configuration is dead,
-     * not just refuse it silently on submit.
+     * The picker must not just warn about a dead configuration - it must not
+     * offer it at all, so only what could genuinely be added to a strategy
+     * ever appears (a stock/horizon/variant combination that
+     * AutomatedPortfolioService could actually match locally).
      */
-    public function test_model_overview_view_warns_about_infeasible_configurations(): void
+    public function test_model_overview_controller_filters_out_locally_infeasible_variants(): void
+    {
+        $controller = (string) file_get_contents(app_path('Http/Controllers/ServingModelOverviewController.php'));
+
+        $this->assertStringContainsString('->filter(fn (array $variant, string $variantKey): bool => $feasibility', $controller);
+        $this->assertStringContainsString("->filter(fn (array \$horizon): bool => \$horizon['variants'] !== [])", $controller);
+        $this->assertStringContainsString("\$data['noLocalCoverage']", $controller);
+    }
+
+    public function test_model_overview_view_shows_an_empty_state_when_nothing_is_locally_executable(): void
     {
         $view = (string) file_get_contents(resource_path('views/stocks/model-overview.blade.php'));
 
-        $this->assertStringContainsString("! (\$variant['local_feasible'] ?? true)", $view);
-        $this->assertStringContainsString('Automatisierung kann diese Konfiguration nie ausführen', $view);
+        $this->assertStringContainsString('$noLocalCoverage ?? false', $view);
+        $this->assertStringContainsString('Keine automatisierbare Konfiguration für diese Aktie', $view);
+    }
+
+    /**
+     * A LIKE/substring match here would wrongly treat "GradientBoostingRegressor"
+     * as matching "HistGradientBoostingRegressor" - a different algorithm
+     * entirely. This must be an exact match after normalizing, matching
+     * LocalModelFeasibilityService's own rule.
+     */
+    public function test_automated_portfolio_service_uses_exact_model_name_matching_not_substring(): void
+    {
+        $service = (string) file_get_contents(app_path('Services/AutomatedPortfolioService.php'));
+
+        $this->assertStringContainsString("', '', 'g') = ?\", [\$modelNameNormalized])", $service);
+        $this->assertStringNotContainsString("'%'.\$modelNameNormalized.'%'", $service);
     }
 
     public function test_an_individually_checked_model_is_kept_in_the_strategy_selection(): void

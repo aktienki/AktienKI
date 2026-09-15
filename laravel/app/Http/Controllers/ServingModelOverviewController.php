@@ -18,26 +18,38 @@ final class ServingModelOverviewController extends Controller
         // The picker above reads the external serving database - it says
         // nothing about whether AutomatedPortfolioService could ever match
         // this configuration against the local, server-scheduled prediction
-        // pipeline. Without this, a strategy can be saved that never fires,
-        // with no indication why. See LocalModelFeasibilityService.
-        $data['horizons'] = $data['horizons']->map(function (array $horizon) use ($feasibility, $symbol): array {
-            foreach ($horizon['variants'] as $variantKey => $variant) {
-                $check = $feasibility->check($symbol, (int) $horizon['days'], (string) $variantKey, (string) ($variant['model_name'] ?? ''));
-                $horizon['variants'][$variantKey]['local_feasible'] = $check['feasible'];
-                $horizon['variants'][$variantKey]['local_feasibility_message'] = $check['reason'] === null
-                    ? null
-                    : $feasibility->explain($check['reason'], $symbol, (int) $horizon['days'], (string) ($variant['model_name'] ?? ''), $check['local_model_name']);
-            }
+        // pipeline. Showing a configuration that can never actually run
+        // (and could previously still be saved as a dead strategy) is more
+        // confusing than useful, so only locally executable variants - and
+        // only horizons that have at least one - are kept at all. See
+        // LocalModelFeasibilityService.
+        $data['horizons'] = $data['horizons']
+            ->map(function (array $horizon) use ($feasibility, $symbol): array {
+                $horizon['variants'] = collect($horizon['variants'])
+                    ->filter(fn (array $variant, string $variantKey): bool => $feasibility
+                        ->check($symbol, (int) $horizon['days'], $variantKey, (string) ($variant['model_name'] ?? ''))['feasible'])
+                    ->all();
 
-            return $horizon;
-        });
+                return $horizon;
+            })
+            ->filter(fn (array $horizon): bool => $horizon['variants'] !== [])
+            ->values();
+        $data['noLocalCoverage'] = $data['horizons']->isEmpty();
+
         $requestedHorizon = $request->integer('horizon');
         if (in_array($requestedHorizon, [10, 20, 40], true)
             && $data['horizons']->contains(fn (array $horizon): bool => (int) $horizon['days'] === $requestedHorizon)) {
             $data['initialHorizon'] = $requestedHorizon;
+        } elseif (! $data['horizons']->contains(fn (array $horizon): bool => (int) $horizon['days'] === (int) $data['initialHorizon'])) {
+            // The service's own pick (e.g. the externally preferred/active
+            // horizon) may have been filtered out entirely - fall back to
+            // whichever remaining horizon comes first instead of pointing
+            // Alpine's initial state at a horizon that no longer renders.
+            $data['initialHorizon'] = (int) ($data['horizons']->first()['days'] ?? 0);
         }
         $requestedVariant = (string) $request->query('variant', '');
         $data['initialVariant'] = in_array($requestedVariant, ['standard', 'pure_tcn'], true)
+                && collect($data['horizons']->firstWhere('days', $data['initialHorizon'])['variants'] ?? [])->has($requestedVariant)
             ? $requestedVariant
             : null;
         $data['personalModelConfigurationKeys'] = $request->user()->savedPredictionFilters()

@@ -59,17 +59,29 @@ class LocalModelFeasibilityService
             return $this->result($isTcn, $isTcn ? null : 'no_local_tcn_variant', $localName ?: $localAlias);
         }
 
-        $needle = mb_strtolower(trim((string) $modelName));
+        $needle = $this->normalize((string) $modelName);
         if ($needle === '') {
             return $this->result(true, null, $localName ?: $localAlias);
         }
 
-        $matches = mb_strtolower($localAlias) === $needle
-            || mb_strtolower($localName) === $needle
-            || str_contains(mb_strtolower($localAlias), $needle)
-            || str_contains(mb_strtolower($localName), $needle);
+        // The serving picker's model_name arrives as PascalCase
+        // ("GradientBoostingRegressor"); the local model_definitions.name is
+        // snake_case with a "future_return_N" suffix
+        // ("gradient_boosting_regressor future_return_20"). Strip that
+        // suffix, then normalize both to bare alphanumerics and require
+        // EXACT equality, not substring containment - "GradientBoosting..."
+        // is otherwise wrongly seen inside "HistGradientBoosting...", a
+        // genuinely different algorithm.
+        $localAlgorithmNormalized = $this->normalize(preg_replace('/\s*future_return_\d+\s*$/i', '', $localName) ?? $localName);
+        $localAliasNormalized = $this->normalize($localAlias);
+        $matches = $localAlgorithmNormalized === $needle || $localAliasNormalized === $needle;
 
         return $this->result($matches, $matches ? null : 'local_model_changed', $localName ?: $localAlias);
+    }
+
+    private function normalize(string $value): string
+    {
+        return preg_replace('/[^a-z0-9]/', '', mb_strtolower($value)) ?? '';
     }
 
     /**
