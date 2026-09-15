@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\SignalTransitionRecorder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -47,6 +48,7 @@ class ApplyHorizonFusion extends Command
                 'predictions.id', 'predictions.instrument_id', 'predictions.prediction_horizon_minutes',
                 'predictions.prediction_time', 'predictions.direction', 'predictions.market_return_5d',
                 'predictions.market_return_10d', 'predictions.market_return_15d', 'predictions.market_return_20d',
+                'predictions.ai_score', 'predictions.risk_score',
             ])
             ->orderByDesc('predictions.prediction_time')->get()->groupBy('instrument_id');
         $updated = 0;
@@ -284,6 +286,17 @@ class ApplyHorizonFusion extends Command
                         ]);
                     }
                 });
+                // Independent of the external "serving" system's
+                // serving_signal_transitions (no scheduled job on this
+                // server ever writes to it) - this is the one place a
+                // single, final daily signal per instrument exists, so it
+                // is the only reliable place to detect a real change.
+                app(SignalTransitionRecorder::class)->record(
+                    (int) $instrumentRows->first()->instrument_id,
+                    $finalSignal,
+                    is_numeric($primary20?->ai_score) ? (float) $primary20->ai_score : null,
+                    is_numeric($primary20?->risk_score) ? (float) $primary20->risk_score : null,
+                );
             }
             $updated++;
         }
