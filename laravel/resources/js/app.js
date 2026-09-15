@@ -4,9 +4,15 @@ import './bootstrap';
 import './preferences';
 import './market-map';
 
-import Alpine from 'alpinejs';
-
-window.Alpine = Alpine;
+// Livewire (via @livewireScripts in the layout) already bundles and starts
+// its own Alpine instance and exposes it as window.Alpine - importing and
+// starting a second one here made every page run two Alpine instances at
+// once ("Detected multiple instances of Alpine running" in the console),
+// which silently broke reactivity for x-data state driven by whichever
+// instance lost the race (e.g. the concept dashboard's icon-click-to-switch
+// stopped updating). No plugin/directive/data is registered on our own
+// instance anywhere in this codebase, so there is nothing to migrate to an
+// alpine:init listener - just stop creating the second instance.
 
 // Remember the last distinct in-app location so page-level back links retain
 // the real origin, including filters and query parameters. A reload does not
@@ -160,8 +166,6 @@ if (document.querySelector(chartTargetSelector)) {
 if (document.querySelector('meta[name="authenticated-user"]') && document.querySelector('[data-live-symbol]')) {
     await import('./live-prices');
 }
-
-Alpine.start();
 
 // Give native and custom dialogs one shared surface hook. This keeps modal
 // contrast consistent even when individual views still use legacy utility
