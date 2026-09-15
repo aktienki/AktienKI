@@ -64,6 +64,8 @@ class EarningsPriceReactionService
                         'instrument_id' => $event->instrument_id,
                         'event_date' => $event->event_date,
                         'surprise_percent' => $event->surprise_percent,
+                        'eps_estimate' => $event->eps_estimate,
+                        'eps_actual' => $event->eps_actual,
                         ...$result,
                         'computed_at' => now(),
                     ],

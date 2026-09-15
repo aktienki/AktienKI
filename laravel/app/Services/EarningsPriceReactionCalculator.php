@@ -7,22 +7,19 @@ use Illuminate\Support\Collection;
 
 /**
  * Pure computation: given an instrument's daily closing prices (already
- * fetched and sorted by bar_time) and an earnings event date, finds the
- * trading-day-indexed close at/after the event and the pre/post returns
- * around it. Trading-day indexed, not calendar-day - price_bars only has
- * trading days, so "+20 days" here means 20 trading sessions, matching
- * how the panel model's own return horizons are defined elsewhere.
+ * fetched and sorted by bar_time) and an earnings event date, computes the
+ * price move 3 trading days before publication and 3 trading days after -
+ * trading-day indexed, not calendar-day, since price_bars only has
+ * trading sessions and weekends/holidays would otherwise skew a fixed
+ * 3-day calendar window.
  */
 class EarningsPriceReactionCalculator
 {
-    /** @var list<int> */
-    public const FORWARD_HORIZONS = [1, 5, 10, 20, 40];
-
-    public const PRE_WINDOW = 5;
+    public const WINDOW_DAYS = 3;
 
     /**
      * @param  Collection<int, object{bar_time: string, close: string|float}>  $bars  Sorted ascending by bar_time.
-     * @return array{close_at_event: float, return_pre_5d: ?float, return_1d: ?float, return_5d: ?float, return_10d: ?float, return_20d: ?float, return_40d: ?float, is_complete: bool}|null
+     * @return array{close_at_event: float, return_pre_3d: ?float, return_post_3d: ?float, is_complete: bool}|null
      */
     public function compute(Collection $bars, CarbonImmutable $eventDate): ?array
     {
@@ -40,29 +37,18 @@ class EarningsPriceReactionCalculator
         }
 
         $closeAtEvent = (float) $bars[$anchorIndex]->close;
-        $preIndex = $anchorIndex - self::PRE_WINDOW;
 
-        $returns = [];
-        $isComplete = true;
-        foreach (self::FORWARD_HORIZONS as $horizon) {
-            $index = $anchorIndex + $horizon;
-            if ($index < $bars->count()) {
-                $returns[$horizon] = $this->percentChange($closeAtEvent, (float) $bars[$index]->close);
-            } else {
-                $returns[$horizon] = null;
-                $isComplete = false;
-            }
-        }
+        $preIndex = $anchorIndex - self::WINDOW_DAYS;
+        $postIndex = $anchorIndex + self::WINDOW_DAYS;
+
+        $returnPre3d = $preIndex >= 0 ? $this->percentChange((float) $bars[$preIndex]->close, $closeAtEvent) : null;
+        $returnPost3d = $postIndex < $bars->count() ? $this->percentChange($closeAtEvent, (float) $bars[$postIndex]->close) : null;
 
         return [
             'close_at_event' => $closeAtEvent,
-            'return_pre_5d' => $preIndex >= 0 ? $this->percentChange((float) $bars[$preIndex]->close, $closeAtEvent) : null,
-            'return_1d' => $returns[1],
-            'return_5d' => $returns[5],
-            'return_10d' => $returns[10],
-            'return_20d' => $returns[20],
-            'return_40d' => $returns[40],
-            'is_complete' => $isComplete,
+            'return_pre_3d' => $returnPre3d,
+            'return_post_3d' => $returnPost3d,
+            'is_complete' => $returnPre3d !== null && $returnPost3d !== null,
         ];
     }
 
