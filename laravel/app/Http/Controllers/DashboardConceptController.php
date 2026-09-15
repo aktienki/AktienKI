@@ -320,6 +320,12 @@ final class DashboardConceptController extends Controller
                     'NL' => '🇳🇱', 'DK' => '🇩🇰', 'SE' => '🇸🇪', 'NO' => '🇳🇴', 'FI' => '🇫🇮', 'IT' => '🇮🇹',
                     'ES' => '🇪🇸', 'JP' => '🇯🇵', 'CN' => '🇨🇳', 'HK' => '🇭🇰', 'CA' => '🇨🇦', 'AU' => '🇦🇺',
                 ],
+                // dashboard.blade.php derives these inline from $marketSituation
+                // rather than returning them from buildViewData() - the
+                // right-column partial's market-outlook card needs the same
+                // two booleans.
+                'marketOutlookIsNeutral' => mb_strtolower(trim((string) ($data['marketSituation']?->market_outlook ?? ''))) === 'neutral',
+                'marketRiskIsHigh' => mb_strtolower(trim((string) ($data['marketSituation']?->risk_level ?? ''))) === 'high',
             ]),
         ];
     }

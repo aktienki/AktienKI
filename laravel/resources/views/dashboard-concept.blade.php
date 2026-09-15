@@ -97,14 +97,19 @@
         #dashboard-concept-page .concept-panel-score { margin-top: .6rem; display: grid; gap: .3rem; border-top: 1px solid var(--ak-border); padding-top: .6rem; }
         #dashboard-concept-page .concept-panel-score-label { font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--ak-muted); }
         #dashboard-concept-page .concept-panel-score-corr { margin-top: .15rem; font-size: .64rem; font-weight: 700; color: var(--ak-muted); }
-        /* "Klassisches Dashboard" tab: the real dashboard cards, stacked
-           full-width, one below the other - not the real page's
-           drag/resize-customizable multi-column bento grid, which these
-           cards' own CSS classes are tightly coupled to (see below). A
-           single column guarantees every card just takes its own natural
-           height and never fights another card over column width/height,
-           which a 2-column attempt here kept getting wrong. */
-        #dashboard-concept-page .concept-classic-dashboard-stack { display: grid; gap: 1rem; width: 100%; min-width: 0; }
+        /* "Klassisches Dashboard" tab: the real dashboard's middle column
+           (Champion+Alternativen, Remote-Aktien-Übersicht, Zusätzliche
+           Kandidaten) and right column (Bestätigte POSITIV-Signale,
+           Earnings, Marktausblick) as two columns, matching the real page's
+           layout - not its full drag/resize-customizable 12-column bento
+           grid, which these cards' own CSS classes are tightly coupled to
+           (see below) and which only really resolves correctly with every
+           other dashboard card also present. */
+        #dashboard-concept-page .concept-classic-dashboard-grid { display: grid; gap: 1rem; width: 100%; min-width: 0; grid-template-columns: 1fr; align-items: start; }
+        @media (min-width: 1100px) {
+            #dashboard-concept-page .concept-classic-dashboard-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); }
+        }
+        #dashboard-concept-page .concept-classic-dashboard-col { display: grid; gap: 1rem; min-width: 0; align-content: start; }
         /* The real dashboard's own <style> block (dashboard-styles.blade.php,
            included above) pins these same card classes into an explicit
            12-column/N-row bento grid ("grid-column: 5 / span 4; grid-row:
@@ -112,14 +117,14 @@
            matching here too even though this preview's grid has none of
            those columns/rows, producing empty stretched space and cards
            escaping their card border. Force every such card back to normal
-           block flow, full width, natural height.  */
-        #dashboard-concept-page .concept-classic-dashboard-stack [class*="dashboard-bento-"],
-        #dashboard-concept-page .concept-classic-dashboard-stack #dashboard-middle-column,
-        #dashboard-concept-page .concept-classic-dashboard-stack #dashboard-center-combined-card,
-        #dashboard-concept-page .concept-classic-dashboard-stack .dashboard-center-combined-card,
-        #dashboard-concept-page .concept-classic-dashboard-stack #dashboard-market-overview-card,
-        #dashboard-concept-page .concept-classic-dashboard-stack #dashboard-daily-tips-card,
-        #dashboard-concept-page .concept-classic-dashboard-stack .dashboard-daily-tips {
+           block flow, full width of its own grid column, natural height. */
+        #dashboard-concept-page .concept-classic-dashboard-col [class*="dashboard-bento-"],
+        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-middle-column,
+        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-center-combined-card,
+        #dashboard-concept-page .concept-classic-dashboard-col .dashboard-center-combined-card,
+        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-market-overview-card,
+        #dashboard-concept-page .concept-classic-dashboard-col #dashboard-daily-tips-card,
+        #dashboard-concept-page .concept-classic-dashboard-col .dashboard-daily-tips {
             grid-column: auto !important;
             grid-row: auto !important;
             align-self: auto !important;
@@ -128,6 +133,15 @@
             height: auto !important;
             min-height: 0 !important;
             max-height: none !important;
+        }
+        /* A desktop-only breakpoint in dashboard-styles.blade.php sets a bare
+           ".dashboard-right-column { display: none }" that only the real
+           page's #personal-dashboard ancestor overrides back to visible -
+           this preview has no such ancestor, so the right column would
+           silently vanish above 1280px without this. */
+        #dashboard-concept-page .concept-classic-dashboard-col .dashboard-right-column {
+            display: flex !important;
+            flex-direction: column;
         }
     </style>
 
@@ -313,9 +327,15 @@
                         @elseif($section['kind'] === 'classic-dashboard')
                             @php extract($section['viewData']); @endphp
                             @include('partials.dashboard-styles')
-                            <div class="concept-classic-dashboard-stack">
-                                @include('partials.dashboard-middle-column')
-                                @include('partials.dashboard-market-overview-column')
+                            <div class="concept-classic-dashboard-grid">
+                                <div class="concept-classic-dashboard-col">
+                                    @include('partials.dashboard-middle-column')
+                                    @include('partials.dashboard-market-overview-card')
+                                    @include('partials.dashboard-daily-tips-card')
+                                </div>
+                                <div class="concept-classic-dashboard-col">
+                                    @include('partials.dashboard-right-column')
+                                </div>
                             </div>
                         @else
                             <p class="text-xs text-[var(--ak-muted)]">{{ $section['description'] }}</p>
