@@ -246,10 +246,29 @@ if (config('aktienki.python_engine.server_predictions_enabled', false)) {
     }
 }
 
-// Analyze today's highlights with The Grid after predictions are finalized
+// Sync serving_predictions to main DB after Americas predictions finalize
+Schedule::command('predictions:sync-serving --since=1')
+    ->weekdays()
+    ->at('23:02') // After Americas predictions finalize
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->runInBackground();
+
+// Refresh materialized view after sync completes
+Schedule::command('highlights:refresh-view')
+    ->weekdays()
+    ->at('23:05')
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->runInBackground();
+
+// Analyze highlights with The Grid
 Schedule::command('highlights:analyze-today')
     ->weekdays()
-    ->at('23:00'); // After Americas predictions finalize (~20:23 UTC)
+    ->at('23:10') // After view refresh
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->runInBackground();
 
 // Freeze guard: alert when the serving snapshot the dashboard/screener reads
 // has not advanced. Independent of the publish topology.

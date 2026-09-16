@@ -338,29 +338,24 @@ final class DashboardConceptController extends Controller
      */
     private function todayFocusSection(string $id): array
     {
-        $today = now()->toDateString();
-        $yesterday = now()->subDay()->toDateString();
-
         $topSignal = null;
         $swingStock = null;
         $surpriseSignal = null;
         $trendSwitch = null;
 
-        // 1. Top-Signal: Best BUY today by expected return (40T)
-        $topBuy = \DB::connection('serving')->table('serving_predictions')
-            ->where('signal', 'BUY')
-            ->whereDate('created_at', $today)
+        // 1. Top-Signal: Best BUY today by expected return (from materialized view)
+        $topBuy = \DB::table('today_highlights_mv')
+            ->where('serving_signal', 'BUY')
             ->orderByDesc('expected_return')
-            ->select('instrument_id', 'expected_return', 'calibrated_score')
+            ->select('instrument_id', 'expected_return', 'symbol', 'name')
             ->first();
 
         if ($topBuy) {
-            $instrument = \DB::table('instruments')->where('id', $topBuy->instrument_id)->select('symbol', 'name')->first();
             $topSignal = [
-                'symbol' => $instrument->symbol ?? '?',
-                'name' => $instrument->name ?? $instrument->symbol ?? '?',
+                'symbol' => $topBuy->symbol,
+                'name' => $topBuy->name,
                 'return' => (float)($topBuy->expected_return ?? 0) * 100,
-                'url' => route('stocks.show', ['symbol' => $instrument->symbol, 'return_to' => '/dashboard/concept']),
+                'url' => route('stocks.show', ['symbol' => $topBuy->symbol, 'return_to' => '/dashboard/concept']),
             ];
         }
 
@@ -388,53 +383,34 @@ final class DashboardConceptController extends Controller
         }
 
         // 3. Überraschung: BUY signal when yesterday was SELL/HOLD
-        $yesterdaySignals = \DB::table('predictions')
-            ->whereDate('created_at', $yesterday)
-            ->select('instrument_id', 'signal')
-            ->get()
-            ->keyBy('instrument_id');
-
-        $surprise = \DB::connection('serving')->table('serving_predictions')
-            ->where('signal', 'BUY')
-            ->whereDate('created_at', $today)
-            ->select('instrument_id', 'expected_return')
+        $surprise = \DB::table('today_highlights_mv')
+            ->where('serving_signal', 'BUY')
+            ->whereIn('predictions_signal', ['SELL', 'HOLD'])
             ->orderByDesc('expected_return')
-            ->get()
-            ->first(function ($p) use ($yesterdaySignals) {
-                $old = $yesterdaySignals->get($p->instrument_id);
-                return $old && in_array($old->signal, ['SELL', 'HOLD']);
-            });
+            ->select('instrument_id', 'expected_return', 'symbol', 'name')
+            ->first();
 
         if ($surprise) {
-            $instr = \DB::table('instruments')->where('id', $surprise->instrument_id)->select('symbol', 'name')->first();
             $surpriseSignal = [
-                'symbol' => $instr->symbol ?? '?',
-                'name' => $instr->name ?? $instr->symbol ?? '?',
+                'symbol' => $surprise->symbol,
+                'name' => $surprise->name,
                 'return' => (float)($surprise->expected_return ?? 0) * 100,
-                'url' => route('stocks.show', ['symbol' => $instr->symbol, 'return_to' => '/dashboard/concept']),
+                'url' => route('stocks.show', ['symbol' => $surprise->symbol, 'return_to' => '/dashboard/concept']),
             ];
         }
 
-        // 4. Trendwechsel: SELL yesterday → BUY today (both from predictions table)
-        $sellYesterday = \DB::table('predictions as p1')
-            ->where('p1.signal', 'SELL')
-            ->whereDate('p1.created_at', $yesterday)
-            ->pluck('instrument_id')
-            ->all();
-
-        $trendSwitches = \DB::table('predictions as p2')
-            ->join('instruments as i', 'i.id', '=', 'p2.instrument_id')
-            ->where('p2.signal', 'BUY')
-            ->whereDate('p2.created_at', $today)
-            ->whereIn('p2.instrument_id', $sellYesterday)
-            ->select('i.symbol', 'i.name')
+        // 4. Trendwechsel: SELL yesterday → BUY today (from materialized view)
+        $trendSwitch_row = \DB::table('today_highlights_mv')
+            ->where('predictions_signal', 'SELL')
+            ->where('serving_signal', 'BUY')
+            ->select('symbol', 'name')
             ->first();
 
-        if ($trendSwitches) {
+        if ($trendSwitch_row) {
             $trendSwitch = [
-                'symbol' => $trendSwitches->symbol,
-                'name' => $trendSwitches->name,
-                'url' => route('stocks.show', ['symbol' => $trendSwitches->symbol, 'return_to' => '/dashboard/concept']),
+                'symbol' => $trendSwitch_row->symbol,
+                'name' => $trendSwitch_row->name,
+                'url' => route('stocks.show', ['symbol' => $trendSwitch_row->symbol, 'return_to' => '/dashboard/concept']),
             ];
         }
 
