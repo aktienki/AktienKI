@@ -501,57 +501,55 @@
                                         </article>
                                     @endif
                             </div>
-                            @if ($strategyCompositionByCountry !== [] || $strategyCompositionBySector !== [])
-                                @php $compositionPalette = ['#06b6d4', '#f97316', '#10b981', '#8b5cf6', '#f43f5e', '#eab308']; @endphp
-                                <div class="concept-classic-dashboard-top">
-                                    <article class="concept-card p-4">
-                                        <div class="flex items-center gap-2">
-                                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-chart-pie class="h-4 w-4" /></span>
-                                            <span class="min-w-0">
-                                                <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Depot-Zusammensetzung') }}</span>
-                                                <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gehaltene Positionen · aktive Strategiedepots') }}</span>
-                                            </span>
-                                        </div>
-                                        <div class="mt-4 grid gap-6 sm:grid-cols-2">
-                                            @foreach ([['label' => __('Nach Land'), 'rows' => $strategyCompositionByCountry], ['label' => __('Nach Sektor'), 'rows' => $strategyCompositionBySector]] as $chart)
-                                                <div>
-                                                    <small class="block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $chart['label'] }}</small>
-                                                    @if ($chart['rows'] === [])
-                                                        <div class="concept-empty mt-2">{{ __('Keine offenen Positionen.') }}</div>
-                                                    @else
-                                                        @php $cumulative = 0.0; @endphp
-                                                        <div class="mt-2 flex items-center gap-4">
-                                                            <svg viewBox="0 0 120 120" class="h-24 w-24 shrink-0 -rotate-90" aria-hidden="true">
-                                                                <circle cx="60" cy="60" r="48" fill="none" stroke="var(--ak-border)" stroke-width="16" />
-                                                                @foreach ($chart['rows'] as $index => $row)
-                                                                    <circle
-                                                                        cx="60" cy="60" r="48" fill="none" stroke-width="16" pathLength="100"
-                                                                        stroke="{{ $row['label'] === __('Sonstige') ? '#94a3b8' : $compositionPalette[$index % count($compositionPalette)] }}"
-                                                                        stroke-dasharray="{{ max(0.3, $row['pct']) }} {{ 100 - max(0.3, $row['pct']) }}"
-                                                                        stroke-dashoffset="{{ -$cumulative }}"
-                                                                    />
-                                                                    @php $cumulative += $row['pct']; @endphp
-                                                                @endforeach
-                                                            </svg>
-                                                            <ul class="min-w-0 flex-1 space-y-1">
-                                                                @foreach ($chart['rows'] as $index => $row)
-                                                                    <li class="flex items-center gap-1.5 text-[10px]">
-                                                                        <i class="h-2 w-2 shrink-0 rounded-full" style="background: {{ $row['label'] === __('Sonstige') ? '#94a3b8' : $compositionPalette[$index % count($compositionPalette)] }}"></i>
-                                                                        <span class="min-w-0 flex-1 truncate font-bold text-[var(--ak-text)]">{{ $row['label'] }}</span>
-                                                                        <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ number_format($row['pct'], 0, ',', '.') }} %</span>
-                                                                    </li>
-                                                                @endforeach
-                                                            </ul>
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    </article>
-                                </div>
-                            @endif
                             <div class="concept-classic-dashboard-grid">
                                 <div class="concept-classic-dashboard-col">
+                                    @if ($strategyCompositionByCountry !== [] || $strategyCompositionBySector !== [])
+                                        @php $compositionPalette = ['#06b6d4', '#f97316', '#10b981', '#8b5cf6', '#f43f5e', '#eab308']; @endphp
+                                        <article class="concept-card p-4">
+                                            <div class="flex items-center gap-2">
+                                                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-chart-pie class="h-4 w-4" /></span>
+                                                <span class="min-w-0">
+                                                    <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Depot-Zusammensetzung') }}</span>
+                                                    <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gehaltene Positionen · aktive Strategiedepots') }}</span>
+                                                </span>
+                                            </div>
+                                            <div class="mt-4 space-y-5">
+                                                @foreach ([['label' => __('Nach Land'), 'rows' => $strategyCompositionByCountry], ['label' => __('Nach Sektor'), 'rows' => $strategyCompositionBySector]] as $chart)
+                                                    <div>
+                                                        <small class="block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $chart['label'] }}</small>
+                                                        @if ($chart['rows'] === [])
+                                                            <div class="concept-empty mt-2">{{ __('Keine offenen Positionen.') }}</div>
+                                                        @else
+                                                            @php $cumulative = 0.0; @endphp
+                                                            <div class="mt-2 flex items-center gap-4">
+                                                                <svg viewBox="0 0 120 120" class="h-24 w-24 shrink-0 -rotate-90" aria-hidden="true">
+                                                                    <circle cx="60" cy="60" r="48" fill="none" stroke="var(--ak-border)" stroke-width="16" />
+                                                                    @foreach ($chart['rows'] as $index => $row)
+                                                                        <circle
+                                                                            cx="60" cy="60" r="48" fill="none" stroke-width="16" pathLength="100"
+                                                                            stroke="{{ $row['label'] === __('Sonstige') ? '#94a3b8' : $compositionPalette[$index % count($compositionPalette)] }}"
+                                                                            stroke-dasharray="{{ max(0.3, $row['pct']) }} {{ 100 - max(0.3, $row['pct']) }}"
+                                                                            stroke-dashoffset="{{ -$cumulative }}"
+                                                                        />
+                                                                        @php $cumulative += $row['pct']; @endphp
+                                                                    @endforeach
+                                                                </svg>
+                                                                <ul class="min-w-0 flex-1 space-y-1">
+                                                                    @foreach ($chart['rows'] as $index => $row)
+                                                                        <li class="flex items-center gap-1.5 text-[10px]">
+                                                                            <i class="h-2 w-2 shrink-0 rounded-full" style="background: {{ $row['label'] === __('Sonstige') ? '#94a3b8' : $compositionPalette[$index % count($compositionPalette)] }}"></i>
+                                                                            <span class="min-w-0 flex-1 truncate font-bold text-[var(--ak-text)]">{{ $row['label'] }}</span>
+                                                                            <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ number_format($row['pct'], 0, ',', '.') }} %</span>
+                                                                        </li>
+                                                                    @endforeach
+                                                                </ul>
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </article>
+                                    @endif
                                     @include('partials.dashboard-middle-column')
                                     @include('partials.dashboard-daily-tips-card')
                                 </div>
