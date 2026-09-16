@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\PlanLevel;
 use App\Models\CommunityPost;
+use App\Models\CorporateEvent;
 use App\Models\Portfolio;
 use App\Models\SmartSelectionLabel;
 use App\Models\User;
@@ -117,7 +118,18 @@ class DashboardController extends Controller
         $companyNewsEnabled = (bool) data_get($user->preferences, 'dashboard_company_news_enabled', true);
         $scheduleEmailsEnabled = (bool) data_get($user->preferences, 'dashboard_schedule_emails_enabled', true);
         $riskProfile = (string) data_get($user->meta, 'risk_profile.level', data_get($user->risk_profile, 'level', 'normal'));
-        $strategyPortfolio = $this->strategyPortfolio((int) $user->id);
+        // $strategyPortfolios (plural, every live-automated depot) backs the
+        // concept page's "Klassisches Dashboard" tab only, for now -
+        // dashboard.blade.php (the real dashboard) still reads the
+        // single-portfolio $strategyPortfolio below, unchanged.
+        $strategyPortfolios = $this->strategyPortfolios((int) $user->id);
+        $strategyPortfolioTotals = $this->strategyPortfolioTotals($strategyPortfolios);
+        $recentBuysCount = $strategyPortfolios->isEmpty() ? 0 : DB::table('portfolio_transactions')
+            ->whereIn('portfolio_id', $strategyPortfolios->pluck('id'))
+            ->where('type', 'buy')
+            ->where('transaction_date', '>=', now()->subDays(7)->toDateString())
+            ->count();
+        $strategyPortfolio = $strategyPortfolios->first();
         $overview = [
             'paper_depots' => $user->portfolios()
                 ->where('type', 'paper')
@@ -333,7 +345,13 @@ class DashboardController extends Controller
             )
             ->sortBy(fn (array $reminder): string => $reminder['symbol'].'-'.$reminder['label'])
             ->values();
+        // Kept empty here deliberately - dashboard.blade.php's own "Termine &
+        // Erinnerungen" card reads $dashboardScheduleItems (built from this),
+        // and the real dashboard isn't meant to change yet. The concept
+        // page's classic-dashboard tab gets the same underlying events
+        // through the separate $strategyPositionEvents below instead.
         $corporateScheduleItems = collect();
+        $strategyPositionEvents = $this->upcomingPositionEvents($strategyPortfolios);
         $allScheduleItems = $messageReminders
             ->concat($corporateScheduleItems)
             ->sortBy(fn (array $item): string => ($item['sort_at'] === '0000-00-00' ? '9999-12-31' : $item['sort_at']).'-'.$item['symbol'])
@@ -350,7 +368,7 @@ class DashboardController extends Controller
         $newsCenterItems = collect();
 
         return compact(
-            'riskProfile', 'strategyPortfolio', 'overview', 'marketSituation', 'continentPredictions',
+            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'overview', 'marketSituation', 'continentPredictions',
             'marketFactorSnapshot',
             'externalConfirmedBuys',
             'threeFactorAlternatives',
@@ -549,36 +567,142 @@ class DashboardController extends Controller
         return $stock;
     }
 
-    private function strategyPortfolio(int $userId): mixed
+    /**
+     * Every live-automated strategy depot, each annotated with its own
+     * value/performance - not just the first one. A user can now run
+     * several strategies in parallel (one depot per strategy), so the
+     * dashboard's "Strategiedepots" card needs all of them, not a single
+     * arbitrarily-picked portfolio.
+     *
+     * @return Collection<int, Portfolio>
+     */
+    private function strategyPortfolios(int $userId): Collection
     {
-        $portfolios = Portfolio::query()
+        return Portfolio::query()
             ->where('user_id', $userId)
             ->where('type', 'paper')
             ->where('active', true)
             ->whereHas('strategies')
             ->with(['cashAccount', 'strategies:id,name', 'positions.instrument:id,symbol,name,country'])
-            ->get();
+            ->get()
+            ->map(function (Portfolio $portfolio): Portfolio {
+                $positionsValue = $portfolio->positions->sum(fn ($position): float => (float) $position->quantity * (float) ($position->current_price ?? $position->average_buy_price));
+                $cash = (float) ($portfolio->cashAccount?->balance ?? 0);
+                $initialCapital = max(0.0, (float) data_get($portfolio->meta, 'automation.initial_capital', 0));
+                $totalValue = $positionsValue + $cash;
 
-        $portfolio = $portfolios->first(fn ($candidate): bool => (bool) data_get($candidate->meta, 'automation.live_enabled', false))
-            ?? $portfolios->first();
+                $portfolio->setAttribute('dashboard_positions_value', $positionsValue);
+                $portfolio->setAttribute('dashboard_cash', $cash);
+                $portfolio->setAttribute('dashboard_total_value', $totalValue);
+                $portfolio->setAttribute('dashboard_initial_capital', $initialCapital);
+                $portfolio->setAttribute('dashboard_performance', $initialCapital > 0
+                    ? (($totalValue - $initialCapital) / $initialCapital) * 100
+                    : 0.0);
+                $portfolio->setAttribute('dashboard_live_enabled', (bool) data_get($portfolio->meta, 'automation.live_enabled', false));
 
-        if (! $portfolio) {
-            return null;
+                return $portfolio;
+            })
+            ->sortByDesc(fn (Portfolio $portfolio): int => (int) $portfolio->dashboard_live_enabled)
+            ->values();
+    }
+
+    /**
+     * Sums by currency instead of across currencies - there is no FX
+     * conversion anywhere in this app (buying a non-EUR instrument into a
+     * EUR depot already silently misrecords its price as EUR, a bug fixed
+     * elsewhere this session), so a single blended total would be just as
+     * wrong here.
+     *
+     * @return Collection<string, array{total_value: float, performance: float, count: int}>
+     */
+    private function strategyPortfolioTotals(Collection $portfolios): Collection
+    {
+        return $portfolios
+            ->groupBy(fn (Portfolio $portfolio): string => strtoupper((string) $portfolio->currency))
+            ->map(function (Collection $group): array {
+                $totalValue = (float) $group->sum('dashboard_total_value');
+                $totalInitial = (float) $group->sum('dashboard_initial_capital');
+
+                return [
+                    'total_value' => $totalValue,
+                    'performance' => $totalInitial > 0 ? (($totalValue - $totalInitial) / $totalInitial) * 100 : 0.0,
+                    'count' => $group->count(),
+                ];
+            });
+    }
+
+    /**
+     * Two things a strategy-depot holder needs to see coming, across every
+     * depot at once: the next earnings date for anything currently held,
+     * and the next scheduled exit (VariableExitStrategyService stores each
+     * position's own holding-period on open, so "opened_at + holding days"
+     * is the same date the automation itself will act on).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function upcomingPositionEvents(Collection $portfolios): Collection
+    {
+        $positions = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions
+            ->map(fn ($position) => ['position' => $position, 'portfolio' => $portfolio]));
+
+        if ($positions->isEmpty()) {
+            return collect();
         }
 
-        $positionsValue = $portfolio->positions->sum(fn ($position): float => (float) $position->quantity * (float) ($position->current_price ?? $position->average_buy_price));
-        $cash = (float) ($portfolio->cashAccount?->balance ?? 0);
-        $initialCapital = max(0.0, (float) data_get($portfolio->meta, 'automation.initial_capital', 0));
-        $totalValue = $positionsValue + $cash;
+        $instrumentIds = $positions->map(fn (array $row) => $row['position']->instrument_id)->unique()->values()->all();
 
-        $portfolio->setAttribute('dashboard_positions_value', $positionsValue);
-        $portfolio->setAttribute('dashboard_cash', $cash);
-        $portfolio->setAttribute('dashboard_total_value', $totalValue);
-        $portfolio->setAttribute('dashboard_performance', $initialCapital > 0
-            ? (($totalValue - $initialCapital) / $initialCapital) * 100
-            : 0.0);
+        $earnings = CorporateEvent::query()
+            ->with('instrument:id,symbol,name')
+            ->where('event_type', 'earnings')
+            ->whereIn('instrument_id', $instrumentIds)
+            ->whereBetween('event_date', [now()->toDateString(), now()->addDays(21)->toDateString()])
+            ->orderBy('event_date')
+            ->get()
+            ->filter(fn (CorporateEvent $event): bool => $event->instrument !== null)
+            ->map(fn (CorporateEvent $event): array => [
+                'id' => 'earnings-'.$event->id,
+                'type' => 'earnings',
+                'symbol' => $event->instrument->symbol,
+                'name' => $event->instrument->name ?: $event->instrument->symbol,
+                'label' => __('Quartalszahlen'),
+                'schedule' => __('Termin').' · '.Carbon::parse($event->event_date)->format('d.m.Y'),
+                'date' => Carbon::parse($event->event_date)->format('Y-m-d'),
+                'sort_at' => Carbon::parse($event->event_date)->format('Y-m-d'),
+                'status' => null,
+                'active' => true,
+                'expired' => false,
+            ]);
 
-        return $portfolio;
+        $exits = $positions
+            ->map(function (array $row): ?array {
+                $position = $row['position'];
+                $holdingDays = data_get($position->meta, 'automation.exit_holding_days');
+                if (! is_numeric($holdingDays) || ! $position->opened_at_date) {
+                    return null;
+                }
+                $exitDate = Carbon::parse($position->opened_at_date)->addDays((int) $holdingDays)->startOfDay();
+                if ($exitDate->isBefore(today()) || $exitDate->isAfter(today()->addDays(21))) {
+                    return null;
+                }
+
+                return [
+                    'id' => 'exit-'.$position->id,
+                    'type' => 'sell',
+                    'symbol' => $position->instrument?->symbol ?? '—',
+                    'name' => $position->instrument?->name ?: ($position->instrument?->symbol ?? '—'),
+                    'label' => __('Geplanter Verkauf'),
+                    'schedule' => $row['portfolio']->name.' · '.$exitDate->format('d.m.Y'),
+                    'date' => $exitDate->format('Y-m-d'),
+                    'sort_at' => $exitDate->format('Y-m-d'),
+                    'status' => null,
+                    'active' => true,
+                    'expired' => false,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        return $earnings->concat($exits)->sortBy('sort_at')->values();
     }
 
     private function continentPredictions(): array

@@ -370,10 +370,81 @@
                             </div>
                             <div class="concept-classic-dashboard-grid">
                                 <div class="concept-classic-dashboard-col">
+                                    @if ($strategyPortfolios->isNotEmpty())
+                                        <article class="concept-card p-4">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <div class="flex min-w-0 items-center gap-2">
+                                                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-bolt class="h-4 w-4" /></span>
+                                                    <span class="min-w-0">
+                                                        <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Strategiedepots') }}</span>
+                                                        <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                            {{ trans_choice(':count Depot|:count Depots', $strategyPortfolios->count(), ['count' => $strategyPortfolios->count()]) }}
+                                                            @if ($recentBuysCount > 0)
+                                                                · <span class="text-emerald-500">{{ trans_choice(':count neuer Kauf (7T)|:count neue Käufe (7T)', $recentBuysCount, ['count' => $recentBuysCount]) }}</span>
+                                                            @endif
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div class="mt-3 flex flex-wrap items-end gap-x-4 gap-y-1 border-t border-[var(--ak-border)] pt-3">
+                                                @foreach ($strategyPortfolioTotals as $currency => $totals)
+                                                    <span class="min-w-0">
+                                                        <small class="block text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gesamt') }} ({{ $currency }})</small>
+                                                        <span class="mt-0.5 flex items-baseline gap-1.5">
+                                                            <b class="truncate text-lg font-black tabular-nums text-[var(--ak-text)]">{{ number_format($totals['total_value'], 0, ',', '.') }} {{ $currency === 'EUR' ? '€' : $currency }}</b>
+                                                            <small class="text-[9px] font-black tabular-nums {{ $totals['performance'] >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $totals['performance'] >= 0 ? '+' : '' }}{{ number_format($totals['performance'], 1, ',', '.') }} %</small>
+                                                        </span>
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                            <div class="mt-2 space-y-1">
+                                                @foreach ($strategyPortfolios as $portfolio)
+                                                    <a href="{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => request()->getRequestUri()]) }}" class="flex items-center justify-between gap-2 rounded-lg border border-[var(--ak-border)] px-2 py-1.5 transition hover:border-orange-300/50">
+                                                        <span class="flex min-w-0 items-center gap-1.5">
+                                                            <i class="h-1.5 w-1.5 shrink-0 rounded-full {{ $portfolio->dashboard_live_enabled ? 'bg-emerald-500' : 'bg-slate-400' }}"></i>
+                                                            <span class="truncate text-[10px] font-bold text-[var(--ak-text)]">{{ $portfolio->name }}</span>
+                                                        </span>
+                                                        <span class="flex shrink-0 items-baseline gap-1">
+                                                            <b class="text-[10px] font-black tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_total_value, 0, ',', '.') }} {{ strtoupper((string) $portfolio->currency) === 'EUR' ? '€' : $portfolio->currency }}</b>
+                                                            <small class="text-[8px] font-black tabular-nums {{ $portfolio->dashboard_performance >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $portfolio->dashboard_performance >= 0 ? '+' : '' }}{{ number_format($portfolio->dashboard_performance, 1, ',', '.') }} %</small>
+                                                        </span>
+                                                    </a>
+                                                @endforeach
+                                            </div>
+                                        </article>
+                                    @endif
                                     @include('partials.dashboard-middle-column')
                                     @include('partials.dashboard-daily-tips-card')
                                 </div>
                                 <div class="concept-classic-dashboard-col">
+                                    <article class="concept-card p-4">
+                                        <div class="flex items-center gap-2">
+                                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-500"><x-heroicon-o-calendar-days class="h-4 w-4" /></span>
+                                            <span class="min-w-0">
+                                                <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Anstehende Termine') }}</span>
+                                                <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Quartalszahlen & geplante Verkäufe · nächste 21 Tage') }}</span>
+                                            </span>
+                                        </div>
+                                        <div class="mt-3 space-y-1.5">
+                                            @forelse ($strategyPositionEvents->take(6) as $event)
+                                                <div class="flex items-center gap-2 rounded-lg border border-[var(--ak-border)] px-2.5 py-2">
+                                                    <span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-cyan-400/10 text-cyan-500">
+                                                        @if ($event['type'] === 'earnings')
+                                                            <x-heroicon-o-chart-bar class="h-3.5 w-3.5" />
+                                                        @else
+                                                            <x-heroicon-o-banknotes class="h-3.5 w-3.5" />
+                                                        @endif
+                                                    </span>
+                                                    <span class="min-w-0 flex-1">
+                                                        <b class="block truncate text-[10px] text-[var(--ak-text)]">{{ $event['symbol'] }} · {{ $event['label'] }}</b>
+                                                        <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $event['schedule'] }}</small>
+                                                    </span>
+                                                </div>
+                                            @empty
+                                                <div class="concept-empty">{{ __('Keine Termine in den nächsten 21 Tagen.') }}</div>
+                                            @endforelse
+                                        </div>
+                                    </article>
                                     @include('partials.dashboard-right-column')
                                 </div>
                             </div>
