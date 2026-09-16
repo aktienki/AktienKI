@@ -344,27 +344,18 @@ final class DashboardConceptController extends Controller
             ];
         }
 
-        // 2. Grösster Swing: Best/worst held position performance today
+        // 2. Grösster Swing: Best/worst held position by performance
         $holdingSwings = \DB::table('portfolio_positions as pp')
-            ->join('portfolio_transactions as pt', function ($j) {
-                $j->on('pp.id', '=', 'pt.portfolio_position_id')
-                  ->where('pt.type', '=', 'buy');
-            })
             ->join('instruments as i', 'i.id', '=', 'pp.instrument_id')
             ->select([
                 'i.symbol',
                 'i.name',
                 'pp.current_price',
-                \DB::raw('COALESCE(pt.average_buy_price, 0) as avg_buy_price'),
-                \DB::raw('(pp.current_price - COALESCE(pt.average_buy_price, 0)) / NULLIF(COALESCE(pt.average_buy_price, 1), 0) * 100 as perf_pct'),
+                'pp.average_buy_price',
+                \DB::raw('(pp.current_price - pp.average_buy_price) / NULLIF(pp.average_buy_price, 0) * 100 as perf_pct'),
             ])
-            ->whereExists(function ($q) {
-                $q->select(\DB::raw(1))
-                  ->from('portfolio_transactions as pt2')
-                  ->whereColumn('pt2.portfolio_position_id', 'pp.id')
-                  ->where('pt2.type', 'buy');
-            })
-            ->orderByDesc(\DB::raw('ABS((pp.current_price - COALESCE(pt.average_buy_price, 0)) / NULLIF(COALESCE(pt.average_buy_price, 1), 0) * 100)'))
+            ->where('pp.quantity', '>', 0)
+            ->orderByDesc(\DB::raw('ABS((pp.current_price - pp.average_buy_price) / NULLIF(pp.average_buy_price, 0) * 100)'))
             ->first();
 
         if ($holdingSwings) {
