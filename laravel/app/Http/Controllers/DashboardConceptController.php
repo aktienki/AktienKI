@@ -316,26 +316,51 @@ final class DashboardConceptController extends Controller
      */
     private function stockOfTheDaySection(string $id, Request $request): array
     {
-        $stock = \DB::connection('serving')->table('serving_predictions as sp')
-            ->join('instruments as i', 'i.id', '=', 'sp.instrument_id')
-            ->select([
-                'i.id',
-                'i.symbol',
-                'i.name',
-                'i.country',
-                'sp.current_price',
-                'sp.composite_score',
-                'sp.risk_score',
-                'sp.expected_return_10d',
-                'sp.expected_return_20d',
-                'sp.expected_return_40d',
-            ])
-            ->orderByRaw('GREATEST(sp.expected_return_10d, sp.expected_return_20d, sp.expected_return_40d) DESC')
-            ->whereNotNull('sp.expected_return_40d')
-            ->whereDate('sp.created_at', now()->toDateString())
-            ->first();
+        $today = now()->toDateString();
 
-        if (!$stock) {
+        $predictions = \DB::connection('serving')->table('serving_predictions as sp')
+            ->select([
+                'sp.instrument_id',
+                'sp.horizon',
+                'sp.expected_return',
+                'sp.calibrated_score',
+                'sp.risk_score',
+            ])
+            ->whereDate('sp.created_at', $today)
+            ->get();
+
+        if ($predictions->isEmpty()) {
+            return [
+                'id' => $id,
+                'kind' => 'stock-of-day',
+                'available' => false,
+            ];
+        }
+
+        $byInstrument = $predictions->groupBy('instrument_id')->map(function ($group) {
+            $maxReturn = $group->max(fn ($p) => (float) ($p->expected_return ?? 0));
+            $score = $group->first()->calibrated_score ?? null;
+            $risk = $group->first()->risk_score ?? null;
+            return [
+                'max_return' => $maxReturn,
+                'score' => $score,
+                'risk' => $risk,
+                'horizons' => $group->keyBy('horizon')->mapWithKeys(fn ($p, $h) => [(int)$h.'T' => (float)($p->expected_return ?? 0) * 100]),
+            ];
+        })->sortByDesc('max_return')->first();
+
+        if (!$byInstrument) {
+            return [
+                'id' => $id,
+                'kind' => 'stock-of-day',
+                'available' => false,
+            ];
+        }
+
+        $instrumentId = $predictions->groupBy('instrument_id')->sortByDesc(fn ($g) => $g->max(fn ($p) => (float) ($p->expected_return ?? 0)))->keys()->first();
+        $instrument = \DB::table('instruments')->where('id', $instrumentId)->select(['symbol', 'name', 'country'])->first();
+
+        if (!$instrument) {
             return [
                 'id' => $id,
                 'kind' => 'stock-of-day',
@@ -347,17 +372,16 @@ final class DashboardConceptController extends Controller
             'id' => $id,
             'kind' => 'stock-of-day',
             'available' => true,
-            'symbol' => $stock->symbol,
-            'name' => $stock->name ?: $stock->symbol,
-            'country' => $stock->country,
-            'url' => route('stocks.show', ['symbol' => $stock->symbol, 'return_to' => '/dashboard/concept']),
-            'currentPrice' => is_numeric($stock->current_price) ? (float) $stock->current_price : null,
-            'compositeScore' => is_numeric($stock->composite_score) ? (float) $stock->composite_score : null,
-            'riskScore' => is_numeric($stock->risk_score) ? (float) $stock->risk_score : null,
+            'symbol' => $instrument->symbol,
+            'name' => $instrument->name ?: $instrument->symbol,
+            'country' => $instrument->country,
+            'url' => route('stocks.show', ['symbol' => $instrument->symbol, 'return_to' => '/dashboard/concept']),
+            'compositeScore' => is_numeric($byInstrument['score']) ? (float) $byInstrument['score'] : null,
+            'riskScore' => is_numeric($byInstrument['risk']) ? (float) $byInstrument['risk'] : null,
             'horizons' => [
-                '10T' => is_numeric($stock->expected_return_10d) ? (float) $stock->expected_return_10d : null,
-                '20T' => is_numeric($stock->expected_return_20d) ? (float) $stock->expected_return_20d : null,
-                '40T' => is_numeric($stock->expected_return_40d) ? (float) $stock->expected_return_40d : null,
+                '10T' => $byInstrument['horizons']['10T'] ?? null,
+                '20T' => $byInstrument['horizons']['20T'] ?? null,
+                '40T' => $byInstrument['horizons']['40T'] ?? null,
             ],
         ];
     }
