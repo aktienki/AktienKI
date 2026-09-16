@@ -630,7 +630,7 @@
                 </button>
 
                 <template x-teleport="body">
-                <div x-show="saveOpen" x-cloak class="fixed inset-0 z-[9999] flex items-center justify-center p-4" style="background: rgb(7, 17, 31) !important; opacity: 1 !important;" @keydown.escape.window="saveOpen = false">
+                <div id="save-strategy-modal" x-show="saveOpen" x-cloak class="fixed inset-0 z-[9999] flex items-center justify-center p-4" style="background: rgb(7, 17, 31) !important; opacity: 1 !important;" @keydown.escape.window="saveOpen = false">
                     <form method="POST" action="{{ $qualitySetupMode ? route('setup.quality.labels.store') : route('setup.filter.saved.store') }}" class="relative isolate max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-teal-300/20 p-5 shadow-2xl" style="background: rgba(21, 36, 58, 0.90) !important; background-image: none !important; backdrop-filter: none !important;" @click.outside="saveOpen = false">
                         @csrf
                         @if (request('backtest_run'))<input type="hidden" name="backtest_run" value="{{ request('backtest_run') }}">@endif
@@ -1294,6 +1294,14 @@
                                 if (response.ok) {
                                     const result = await response.json();
                                     if (result.finished) {
+                                        // Reloading while the "Strategie speichern" modal is
+                                        // open would discard whatever the user is typing. Defer
+                                        // the reload - the next poll retries once it's closed.
+                                        const saveModal = document.getElementById('save-strategy-modal');
+                                        if (saveModal && getComputedStyle(saveModal).display !== 'none') {
+                                            window.setTimeout(poll, 2500);
+                                            return;
+                                        }
                                         window.location.reload();
                                         return;
                                     }
