@@ -415,24 +415,25 @@ final class DashboardConceptController extends Controller
             ];
         }
 
-        // 4. Trendwechsel: SELL yesterday → BUY today
-        $trendSwitches = \DB::table('predictions as p1')
+        // 4. Trendwechsel: SELL yesterday → BUY today (both from predictions table)
+        $sellYesterday = \DB::table('predictions as p1')
             ->where('p1.signal', 'SELL')
             ->whereDate('p1.created_at', $yesterday)
-            ->join('serving_predictions as sp', function ($j) {
-                $j->on('sp.instrument_id', '=', 'p1.instrument_id')
-                  ->where('sp.signal', '=', 'BUY')
-                  ->whereDate('sp.created_at', now()->toDateString());
-            })
-            ->join('instruments as i', 'i.id', '=', 'p1.instrument_id')
-            ->select('i.symbol', 'i.name', 'sp.expected_return')
+            ->pluck('instrument_id')
+            ->all();
+
+        $trendSwitches = \DB::table('predictions as p2')
+            ->join('instruments as i', 'i.id', '=', 'p2.instrument_id')
+            ->where('p2.signal', 'BUY')
+            ->whereDate('p2.created_at', $today)
+            ->whereIn('p2.instrument_id', $sellYesterday)
+            ->select('i.symbol', 'i.name')
             ->first();
 
         if ($trendSwitches) {
             $trendSwitch = [
                 'symbol' => $trendSwitches->symbol,
                 'name' => $trendSwitches->name,
-                'return' => (float)($trendSwitches->expected_return ?? 0) * 100,
                 'url' => route('stocks.show', ['symbol' => $trendSwitches->symbol, 'return_to' => '/dashboard/concept']),
             ];
         }
