@@ -339,7 +339,7 @@ final class DashboardConceptController extends Controller
                 [
                     'label' => __('Überraschung'),
                     'subtitle' => __('Signal gegen den Trend'),
-                    'icon' => 'heroicon-o-lightning-bolt',
+                    'icon' => 'heroicon-o-bolt',
                     'color' => 'yellow',
                     'data' => null,
                 ],
