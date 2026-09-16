@@ -452,7 +452,8 @@ final class DashboardConceptController extends Controller
             ],
         ];
 
-        $insights = app(\App\Services\TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
+        $insights = \Illuminate\Support\Facades\Cache::get('today_highlights_insights')
+            ?? app(\App\Services\TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
 
         return [
             'id' => $id,
