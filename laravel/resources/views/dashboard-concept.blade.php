@@ -365,9 +365,6 @@
                         @elseif($section['kind'] === 'classic-dashboard')
                             @php extract($section['viewData']); @endphp
                             @include('partials.dashboard-styles')
-                            <div class="concept-classic-dashboard-top">
-                                @include('partials.dashboard-market-overview-card')
-                            </div>
                             <div class="concept-classic-dashboard-grid">
                                 <div class="concept-classic-dashboard-col">
                                     @if ($strategyPortfolios->isNotEmpty())
@@ -394,6 +391,9 @@
                                                             <b class="truncate text-lg font-black tabular-nums text-[var(--ak-text)]">{{ number_format($totals['total_value'], 0, ',', '.') }} {{ $currency === 'EUR' ? '€' : $currency }}</b>
                                                             <small class="text-[9px] font-black tabular-nums {{ $totals['performance'] >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $totals['performance'] >= 0 ? '+' : '' }}{{ number_format($totals['performance'], 1, ',', '.') }} %</small>
                                                         </span>
+                                                        @if ($totals['total_value_eur'] !== null)
+                                                            <small class="mt-0.5 block text-[9px] font-bold text-[var(--ak-muted)]">≈ {{ number_format($totals['total_value_eur'], 0, ',', '.') }} €</small>
+                                                        @endif
                                                     </span>
                                                 @endforeach
                                             </div>

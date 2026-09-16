@@ -22,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -619,16 +620,45 @@ class DashboardController extends Controller
     {
         return $portfolios
             ->groupBy(fn (Portfolio $portfolio): string => strtoupper((string) $portfolio->currency))
-            ->map(function (Collection $group): array {
+            ->map(function (Collection $group, string $currency): array {
                 $totalValue = (float) $group->sum('dashboard_total_value');
                 $totalInitial = (float) $group->sum('dashboard_initial_capital');
+                $eurRate = $currency !== 'EUR' ? $this->eurConversionRate($currency) : null;
 
                 return [
                     'total_value' => $totalValue,
+                    'total_value_eur' => $eurRate !== null ? $totalValue * $eurRate : null,
                     'performance' => $totalInitial > 0 ? (($totalValue - $totalInitial) / $totalInitial) * 100 : 0.0,
                     'count' => $group->count(),
                 ];
             });
+    }
+
+    /**
+     * How many EUR one unit of $currency is worth right now - display-only
+     * (e.g. "≈ 8,660 €" next to a USD total), never used to convert an
+     * actual position/transaction. Yahoo's FX quote endpoint needs no
+     * crumb/session (unlike quoteSummary - see YahooFundamentalService).
+     */
+    private function eurConversionRate(string $currency): ?float
+    {
+        $currency = strtoupper($currency);
+        if ($currency === 'EUR') {
+            return 1.0;
+        }
+
+        return Cache::remember("dashboard.eur_rate.{$currency}", now()->addMinutes(15), function () use ($currency): ?float {
+            try {
+                $response = Http::withHeaders(['Accept' => 'application/json', 'User-Agent' => 'Mozilla/5.0 (compatible; AktienKI/1.0)'])
+                    ->timeout(8)
+                    ->get("https://query1.finance.yahoo.com/v8/finance/chart/EUR{$currency}=X", ['interval' => '1m', 'range' => '1d']);
+                $price = $response->successful() ? $response->json('chart.result.0.meta.regularMarketPrice') : null;
+
+                return is_numeric($price) && (float) $price > 0 ? 1 / (float) $price : null;
+            } catch (\Throwable) {
+                return null;
+            }
+        });
     }
 
     /**
