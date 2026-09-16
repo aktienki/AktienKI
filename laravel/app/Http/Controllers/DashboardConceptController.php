@@ -31,6 +31,7 @@ final class DashboardConceptController extends Controller
         ['predictions', 'Prognosetabelle', 'heroicon-o-table-cells'],
         ['smart-screener', 'Smart Screener', 'heroicon-o-magnifying-glass'],
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
+        ['stock-of-day', 'Aktie des Tages', 'heroicon-o-sparkles'],
         ['upcoming-news', 'Anstehende News', 'heroicon-o-calendar-days'],
         ['earnings-drift', 'Quartalszahlen-Historie', 'heroicon-o-chart-bar'],
     ];
@@ -71,6 +72,7 @@ final class DashboardConceptController extends Controller
             $this->ctaSection('predictions', __('Alle aktuellen KI-Prognosen in der vollständigen Tabelle ansehen.')),
             $this->ctaSection('smart-screener', __('Aktien nach eigenen Kriterien filtern und sortieren.')),
             $this->marketSection('market-report', $snapshot, $user),
+            $this->stockOfTheDaySection('stock-of-day', $request),
             $this->eventsSection('upcoming-news', $request),
             $this->earningsDriftSection('earnings-drift', $request),
             $this->classicDashboardSection('classic-dashboard', $request),
@@ -312,6 +314,54 @@ final class DashboardConceptController extends Controller
      * not support the real dashboard's per-user card drag/resize
      * customization, it just shows every card in its default place.
      */
+    private function stockOfTheDaySection(string $id, Request $request): array
+    {
+        $stock = \DB::connection('serving')->table('serving_predictions as sp')
+            ->join('instruments as i', 'i.id', '=', 'sp.instrument_id')
+            ->select([
+                'i.id',
+                'i.symbol',
+                'i.name',
+                'i.country',
+                'sp.current_price',
+                'sp.composite_score',
+                'sp.risk_score',
+                'sp.expected_return_10d',
+                'sp.expected_return_20d',
+                'sp.expected_return_40d',
+            ])
+            ->orderByRaw('GREATEST(sp.expected_return_10d, sp.expected_return_20d, sp.expected_return_40d) DESC')
+            ->whereNotNull('sp.expected_return_40d')
+            ->whereDate('sp.created_at', now()->toDateString())
+            ->first();
+
+        if (!$stock) {
+            return [
+                'id' => $id,
+                'kind' => 'stock-of-day',
+                'available' => false,
+            ];
+        }
+
+        return [
+            'id' => $id,
+            'kind' => 'stock-of-day',
+            'available' => true,
+            'symbol' => $stock->symbol,
+            'name' => $stock->name ?: $stock->symbol,
+            'country' => $stock->country,
+            'url' => route('stocks.show', ['symbol' => $stock->symbol, 'return_to' => '/dashboard/concept']),
+            'currentPrice' => is_numeric($stock->current_price) ? (float) $stock->current_price : null,
+            'compositeScore' => is_numeric($stock->composite_score) ? (float) $stock->composite_score : null,
+            'riskScore' => is_numeric($stock->risk_score) ? (float) $stock->risk_score : null,
+            'horizons' => [
+                '10T' => is_numeric($stock->expected_return_10d) ? (float) $stock->expected_return_10d : null,
+                '20T' => is_numeric($stock->expected_return_20d) ? (float) $stock->expected_return_20d : null,
+                '40T' => is_numeric($stock->expected_return_40d) ? (float) $stock->expected_return_40d : null,
+            ],
+        ];
+    }
+
     private function classicDashboardSection(string $id, Request $request): array
     {
         $data = app(DashboardController::class)->buildViewData($request);

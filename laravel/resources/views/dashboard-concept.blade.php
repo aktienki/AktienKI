@@ -383,6 +383,57 @@
                             @else
                                 <div class="concept-empty">{{ $section['emptyText'] }}</div>
                             @endif
+                        @elseif($section['kind'] === 'stock-of-day')
+                            @if($section['available'])
+                                <a href="{{ $section['url'] }}" class="block text-decoration-none">
+                                    <div class="concept-opp-card">
+                                        <div class="concept-opp-head">
+                                            <span class="min-w-0">
+                                                <span class="flex min-w-0 items-center gap-1.5">
+                                                    <span class="shrink-0">{{ $transactionCountryFlags[strtoupper((string) $section['country'])] ?? '🌐' }}</span>
+                                                    <b class="min-w-0 truncate font-bold text-[var(--ak-text)]">{{ $section['name'] }}</b>
+                                                </span>
+                                                <small class="mt-0.5 block truncate text-[10px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $section['symbol'] }}</small>
+                                            </span>
+                                            <span class="concept-opp-badge">{{ __('Beste Prognose') }}</span>
+                                        </div>
+                                        @if($section['currentPrice'] !== null)
+                                            <p class="text-xs text-[var(--ak-muted)]">
+                                                {{ __('Aktueller Kurs') }}: <span class="font-black text-[var(--ak-text)]">{{ number_format($section['currentPrice'], 2, ',', '.') }} €</span>
+                                            </p>
+                                        @endif
+                                        @if($section['compositeScore'] !== null || $section['riskScore'] !== null)
+                                            <div class="mt-2 flex items-center gap-3 border-t border-[var(--ak-border)] pt-2">
+                                                @if($section['compositeScore'] !== null)
+                                                    <div class="flex items-center gap-1">
+                                                        <span class="text-[9px] font-black uppercase text-[var(--ak-muted)]">{{ __('Score') }}</span>
+                                                        <span class="text-[11px] font-black text-[var(--ak-text)]">{{ number_format($section['compositeScore'], 0, ',', '.') }}</span>
+                                                    </div>
+                                                @endif
+                                                @if($section['riskScore'] !== null)
+                                                    <div class="flex items-center gap-1">
+                                                        <span class="text-[9px] font-black uppercase text-[var(--ak-muted)]">{{ __('Risiko') }}</span>
+                                                        <span class="text-[11px] font-black text-[var(--ak-text)]">{{ number_format($section['riskScore'] / 10, 1, ',', '.') }}/10</span>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endif
+                                        <div class="concept-horizon-row mt-3 border-t border-[var(--ak-border)] pt-3">
+                                            @foreach(['10T', '20T', '40T'] as $horizon)
+                                                @php $return = $section['horizons'][$horizon]; @endphp
+                                                <div class="flex flex-col items-center gap-1">
+                                                    <small class="text-[9px] font-black uppercase text-[var(--ak-muted)]">{{ $horizon }}</small>
+                                                    <span class="text-[13px] font-black {{ $return === null ? 'text-[var(--ak-muted)]' : ($return >= 0 ? 'text-emerald-500' : 'text-rose-500') }}">
+                                                        {{ $return === null ? '—' : (($return >= 0 ? '+' : '').number_format($return, 1, ',', '.').' %') }}
+                                                    </span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </a>
+                            @else
+                                <div class="concept-empty">{{ __('Keine Prognosen für heute verfügbar.') }}</div>
+                            @endif
                         @elseif($section['kind'] === 'classic-dashboard')
                             @php
                                 extract($section['viewData']);
