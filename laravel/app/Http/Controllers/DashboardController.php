@@ -358,7 +358,8 @@ class DashboardController extends Controller
         $strategyCompositionBySector = $this->positionComposition($strategyPortfolios, 'sector');
         $strategyAverageMetrics = $this->positionAverageMetrics($strategyPortfolios);
         $strategyHorizonReturns = $this->positionHorizonReturns($strategyPortfolios);
-        $strategyModelHorizonReturns = $this->positionModelHorizonReturns($strategyPortfolios);
+        $strategyPositionHoldings = $this->positionHoldings($strategyPortfolios);
+        $strategyModelHorizonReturns = $this->positionModelHorizonMatrix($strategyPositionHoldings);
         $allScheduleItems = $messageReminders
             ->concat($corporateScheduleItems)
             ->sortBy(fn (array $item): string => ($item['sort_at'] === '0000-00-00' ? '9999-12-31' : $item['sort_at']).'-'.$item['symbol'])
@@ -375,7 +376,7 @@ class DashboardController extends Controller
         $newsCenterItems = collect();
 
         return compact(
-            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'strategyCompositionByCountry', 'strategyCompositionBySector', 'strategyAverageMetrics', 'strategyHorizonReturns', 'strategyModelHorizonReturns', 'overview', 'marketSituation', 'continentPredictions',
+            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'strategyCompositionByCountry', 'strategyCompositionBySector', 'strategyAverageMetrics', 'strategyHorizonReturns', 'strategyModelHorizonReturns', 'strategyPositionHoldings', 'overview', 'marketSituation', 'continentPredictions',
             'marketFactorSnapshot',
             'externalConfirmedBuys',
             'threeFactorAlternatives',
@@ -590,7 +591,7 @@ class DashboardController extends Controller
             ->where('type', 'paper')
             ->where('active', true)
             ->whereHas('strategies')
-            ->with(['cashAccount', 'strategies:id,name', 'positions.instrument:id,symbol,name,country,sector'])
+            ->with(['cashAccount', 'strategies:id,name', 'positions.instrument:id,symbol,name,country,sector,currency'])
             ->get()
             ->map(function (Portfolio $portfolio): Portfolio {
                 $positionsValue = $portfolio->positions->sum(fn ($position): float => (float) $position->quantity * (float) ($position->current_price ?? $position->average_buy_price));
@@ -926,58 +927,97 @@ class DashboardController extends Controller
     }
 
     /**
-     * Model-variant vs. horizon return matrix for a heatmap. Unlike
-     * positionHorizonReturns() (built on ServingReadService::latestPredictions(),
-     * which collapses each instrument/horizon down to a single row), this reads
-     * serving_predictions directly so both model variants stay visible.
+     * Model-variant vs. horizon investment-volume matrix for the heatmap.
+     * Built directly from positionHoldings()'s already-resolved per-position
+     * model/horizon (each held position counts toward exactly one cell - its
+     * own resolved model+horizon), not from "does a serving_predictions row
+     * exist for this instrument at this horizon/variant", which would put a
+     * 1 in nearly every cell since serving predicts every horizon/variant
+     * for every instrument regardless of what's actually held.
+     *
+     * @param  array<int, array{model: ?string, horizon: ?int, current_value: float}>  $holdings
      */
-    private function positionModelHorizonReturns(Collection $portfolios): array
+    private function positionModelHorizonMatrix(array $holdings): array
     {
-        // Weighted per held depot position - see positionAverageMetrics().
-        $positionInstrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->values();
-        if ($positionInstrumentIds->isEmpty()) {
+        return collect(['standard', 'pure_tcn'])->map(function (string $variant) use ($holdings): array {
+            $variantLabel = $variant === 'pure_tcn' ? 'Pure TCN' : 'Standard';
+            $cells = collect([10, 20, 40])->map(function (int $horizon) use ($holdings, $variantLabel): array {
+                $matching = collect($holdings)->filter(fn (array $holding): bool => $holding['model'] === $variantLabel && $holding['horizon'] === $horizon);
+
+                return [
+                    'horizon' => $horizon,
+                    'count' => $matching->count(),
+                    'volume' => (float) $matching->sum('current_value'),
+                ];
+            })->all();
+
+            return [
+                'variant' => $variant,
+                'label' => $variantLabel,
+                'cells' => $cells,
+            ];
+        })->all();
+    }
+
+    /**
+     * One row per held depot position - the model/horizon columns are a best-
+     * effort lookup, not a persisted fact: positions don't record which
+     * serving variant triggered them, only the exit horizon (meta.automation.
+     * exit_holding_days). So "Modell" shows whichever variant currently has
+     * the most recent serving_predictions row for that instrument/horizon -
+     * the live model tracking this position now, not necessarily the one
+     * that triggered the original buy.
+     */
+    private function positionHoldings(Collection $portfolios): array
+    {
+        $pairs = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions
+            ->map(fn ($position) => ['portfolio' => $portfolio, 'position' => $position]));
+        if ($pairs->isEmpty()) {
             return [];
         }
-        $uniqueInstrumentIds = $positionInstrumentIds->unique()->values();
 
-        $rows = DB::connection('serving')->table('serving_predictions as prediction')
+        $instrumentIds = $pairs->pluck('position.instrument_id')->unique()->values();
+        $ranked = DB::connection('serving')->table('serving_predictions as prediction')
             ->join('serving_prediction_scopes as scope', function ($join): void {
                 $join->on('scope.instrument_id', '=', 'prediction.instrument_id')
                     ->on('scope.release_id', '=', 'prediction.release_id')
                     ->on('scope.horizon', '=', 'prediction.horizon')
                     ->on('scope.variant', '=', 'prediction.variant');
             })
-            ->whereIn('prediction.instrument_id', $uniqueInstrumentIds->all())
-            ->whereIn('prediction.horizon', [10, 20, 40])
-            ->select(['prediction.instrument_id', 'prediction.horizon', 'prediction.variant', 'prediction.expected_return'])
-            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY prediction.instrument_id, prediction.horizon, prediction.variant ORDER BY prediction.as_of DESC, prediction.id DESC) AS scope_rank');
+            ->whereIn('prediction.instrument_id', $instrumentIds->all())
+            ->select(['prediction.instrument_id', 'prediction.horizon', 'prediction.variant'])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY prediction.instrument_id, prediction.horizon ORDER BY prediction.as_of DESC, prediction.id DESC) AS scope_rank');
+        $latestByInstrumentHorizon = DB::connection('serving')->query()->fromSub($ranked, 'ranked')->where('scope_rank', 1)->get()
+            ->keyBy(fn (object $row): string => $row->instrument_id.'-'.$row->horizon);
 
-        $latestByKey = DB::connection('serving')->query()->fromSub($rows, 'ranked')->where('scope_rank', 1)->get()
-            ->keyBy(fn (object $row): string => $row->instrument_id.'-'.$row->horizon.'-'.$row->variant);
+        return $pairs->map(function (array $pair) use ($latestByInstrumentHorizon): array {
+            $portfolio = $pair['portfolio'];
+            $position = $pair['position'];
+            $quantity = (float) $position->quantity;
+            $buyPrice = (float) $position->average_buy_price;
+            $currentPrice = (float) ($position->current_price ?? $buyPrice);
+            $buyValue = $quantity * $buyPrice;
+            $currentValue = $quantity * $currentPrice;
+            $performanceEur = $currentValue - $buyValue;
 
-        return collect(['standard', 'pure_tcn'])->map(function (string $variant) use ($latestByKey, $positionInstrumentIds): array {
-            $cells = collect([10, 20, 40])->map(function (int $horizon) use ($latestByKey, $variant, $positionInstrumentIds): array {
-                $values = collect();
-                foreach ($positionInstrumentIds as $instrumentId) {
-                    $row = $latestByKey->get($instrumentId.'-'.$horizon.'-'.$variant);
-                    if ($row !== null && is_numeric($row->expected_return ?? null)) {
-                        $values->push((float) $row->expected_return * 100.0);
-                    }
-                }
-
-                return [
-                    'horizon' => $horizon,
-                    'avg_return' => $values->isNotEmpty() ? (float) $values->avg() : null,
-                    'count' => $values->count(),
-                ];
-            })->all();
+            $exitHoldingDays = (int) data_get($position->meta, 'automation.exit_holding_days', 0);
+            $horizon = in_array($exitHoldingDays, [10, 20, 40], true) ? $exitHoldingDays : null;
+            $modelRow = $horizon !== null ? $latestByInstrumentHorizon->get($position->instrument_id.'-'.$horizon) : null;
 
             return [
-                'variant' => $variant,
-                'label' => $variant === 'pure_tcn' ? 'Pure TCN' : 'Standard',
-                'cells' => $cells,
+                'name' => $position->instrument?->name ?? $position->instrument?->symbol ?? __('Unbekannt'),
+                'symbol' => $position->instrument?->symbol,
+                'portfolio_name' => $portfolio->name,
+                'model' => $modelRow !== null ? ((string) $modelRow->variant === 'pure_tcn' ? 'Pure TCN' : 'Standard') : null,
+                'horizon' => $horizon,
+                'quantity' => $quantity,
+                'currency' => strtoupper((string) ($position->instrument?->currency ?? 'EUR')),
+                'buy_value' => $buyValue,
+                'current_value' => $currentValue,
+                'performance_eur' => $performanceEur,
+                'performance_pct' => $buyValue > 0 ? ($performanceEur / $buyValue) * 100 : 0.0,
             ];
-        })->all();
+        })->sortByDesc('current_value')->values()->all();
     }
 
     private function continentPredictions(): array

@@ -571,8 +571,8 @@
                                                     </div>
                                                 </div>
                                             @endif
-                                            @if (collect($strategyModelHorizonReturns)->flatMap(fn ($v) => $v['cells'])->contains(fn ($c) => $c['count'] > 0))
-                                                @php $heatmapMax = max(1, collect($strategyModelHorizonReturns)->flatMap(fn ($v) => $v['cells'])->max(fn ($c) => (int) $c['count'])); @endphp
+                                            @if (collect($strategyModelHorizonReturns)->flatMap(fn ($v) => $v['cells'])->contains(fn ($c) => $c['volume'] > 0))
+                                                @php $heatmapMax = max(1, collect($strategyModelHorizonReturns)->flatMap(fn ($v) => $v['cells'])->max(fn ($c) => (float) $c['volume'])); @endphp
                                                 <div class="mt-5 border-t border-[var(--ak-border)] pt-4">
                                                     <small class="block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Modell vs. Horizont') }}</small>
                                                     <div class="mt-2 grid grid-cols-4 gap-1 text-[9px]">
@@ -584,13 +584,13 @@
                                                             <span class="flex min-w-0 items-center truncate font-black text-[var(--ak-text)]">{{ $variantRow['label'] }}</span>
                                                             @foreach ($variantRow['cells'] as $cell)
                                                                 @php
-                                                                    $intensity = $cell['count'] > 0 ? min(1, $cell['count'] / $heatmapMax) : 0;
-                                                                    $heatmapBg = $cell['count'] > 0
+                                                                    $intensity = $cell['volume'] > 0 ? min(1, $cell['volume'] / $heatmapMax) : 0;
+                                                                    $heatmapBg = $cell['volume'] > 0
                                                                         ? 'color-mix(in srgb, #06b6d4 '.number_format($intensity * 70, 0).'%, transparent)'
                                                                         : 'transparent';
                                                                 @endphp
-                                                                <span class="grid place-items-center rounded py-1.5 font-black tabular-nums {{ $cell['count'] === 0 ? 'text-[var(--ak-muted)]' : 'text-[var(--ak-text)]' }}" style="background: {{ $heatmapBg }}">
-                                                                    {{ $cell['count'] }}
+                                                                <span class="grid place-items-center rounded py-1.5 font-black tabular-nums {{ $cell['volume'] <= 0 ? 'text-[var(--ak-muted)]' : 'text-[var(--ak-text)]' }}" style="background: {{ $heatmapBg }}" title="{{ trans_choice(':count Position|:count Positionen', $cell['count'], ['count' => $cell['count']]) }}">
+                                                                    {{ $cell['volume'] > 0 ? number_format($cell['volume'], 0, ',', '.').' €' : '—' }}
                                                                 </span>
                                                             @endforeach
                                                         @endforeach
@@ -600,7 +600,86 @@
                                         </article>
                                     @endif
                             </div>
+                            @if ($strategyPositionHoldings !== [])
+                                <article class="concept-card mb-4 p-4">
+                                    <div class="flex items-center gap-2">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-briefcase class="h-4 w-4" /></span>
+                                        <span class="min-w-0">
+                                            <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Depotpositionen') }}</span>
+                                            <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Alle gehaltenen Positionen · aktive Strategiedepots') }}</span>
+                                        </span>
+                                    </div>
+                                    <div class="mt-3 overflow-x-auto">
+                                        <table class="w-full border-collapse text-[10px]">
+                                            <thead>
+                                                <tr class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                    <th class="border-0 pb-1.5 pr-2 text-left font-black">{{ __('Name') }}</th>
+                                                    <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Depot') }}</th>
+                                                    <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Modell') }}</th>
+                                                    <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Horizont') }}</th>
+                                                    <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Anzahl') }}</th>
+                                                    <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Kaufwert') }}</th>
+                                                    <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Aktueller Wert') }}</th>
+                                                    <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Performance (€)') }}</th>
+                                                    <th class="border-0 pb-1.5 pl-2 text-right font-black">{{ __('Performance (%)') }}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($strategyPositionHoldings as $holding)
+                                                    @php $holdingCurrencySuffix = $holding['currency'] === 'EUR' ? '€' : $holding['currency']; @endphp
+                                                    <tr>
+                                                        <td class="border-0 py-1.5 pr-2">
+                                                            <span class="flex min-w-0 items-center gap-1.5">
+                                                                <span class="shrink-0">{{ $transactionCountryFlags[strtoupper((string) $holding['symbol'])] ?? '🌐' }}</span>
+                                                                <b class="min-w-0 truncate font-bold text-[var(--ak-text)]">{{ $holding['name'] }}</b>
+                                                            </span>
+                                                        </td>
+                                                        <td class="border-0 px-2 py-1.5 truncate text-[var(--ak-muted)]">{{ $holding['portfolio_name'] }}</td>
+                                                        <td class="border-0 px-2 py-1.5 text-[var(--ak-muted)]">{{ $holding['model'] ?? '—' }}</td>
+                                                        <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-muted)]">{{ $holding['horizon'] !== null ? $holding['horizon'].'T' : '—' }}</td>
+                                                        <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($holding['quantity'], 0, ',', '.') }}</td>
+                                                        <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($holding['buy_value'], 0, ',', '.') }} {{ $holdingCurrencySuffix }}</td>
+                                                        <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($holding['current_value'], 0, ',', '.') }} {{ $holdingCurrencySuffix }}</td>
+                                                        <td class="border-0 px-2 py-1.5 text-right tabular-nums font-black {{ $holding['performance_eur'] >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $holding['performance_eur'] >= 0 ? '+' : '' }}{{ number_format($holding['performance_eur'], 0, ',', '.') }} {{ $holdingCurrencySuffix }}</td>
+                                                        <td class="border-0 py-1.5 pl-2 text-right tabular-nums font-black {{ $holding['performance_pct'] >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $holding['performance_pct'] >= 0 ? '+' : '' }}{{ number_format($holding['performance_pct'], 1, ',', '.') }} %</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </article>
+                            @endif
                             <div class="concept-classic-dashboard-grid">
+                                <div class="concept-classic-dashboard-col">
+                                    <article class="concept-card p-4">
+                                        <div class="flex items-center gap-2">
+                                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-500"><x-heroicon-o-calendar-days class="h-4 w-4" /></span>
+                                            <span class="min-w-0">
+                                                <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Anstehende Termine') }}</span>
+                                                <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Quartalszahlen & geplante Verkäufe · nächste 21 Tage') }}</span>
+                                            </span>
+                                        </div>
+                                        <div class="mt-3 space-y-1.5">
+                                            @forelse ($strategyPositionEvents->take(6) as $event)
+                                                <div class="flex items-center gap-2 rounded-lg border border-[var(--ak-border)] px-2.5 py-2">
+                                                    <span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-cyan-400/10 text-cyan-500">
+                                                        @if ($event['type'] === 'earnings')
+                                                            <x-heroicon-o-chart-bar class="h-3.5 w-3.5" />
+                                                        @else
+                                                            <x-heroicon-o-banknotes class="h-3.5 w-3.5" />
+                                                        @endif
+                                                    </span>
+                                                    <span class="min-w-0 flex-1">
+                                                        <b class="block truncate text-[10px] text-[var(--ak-text)]">{{ $event['symbol'] }} · {{ $event['label'] }}</b>
+                                                        <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $event['schedule'] }}</small>
+                                                    </span>
+                                                </div>
+                                            @empty
+                                                <div class="concept-empty">{{ __('Keine Termine in den nächsten 21 Tagen.') }}</div>
+                                            @endforelse
+                                        </div>
+                                    </article>
+                                </div>
                                 <div class="concept-classic-dashboard-col">
                                     @if ($strategyRecentTransactions->isNotEmpty())
                                         <article class="concept-card p-4">
@@ -652,34 +731,6 @@
                                             </div>
                                         </article>
                                     @endif
-                                </div>
-                                <div class="concept-classic-dashboard-col">
-                                    <article class="concept-card p-4">
-                                        <div class="flex items-center gap-2">
-                                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-500"><x-heroicon-o-calendar-days class="h-4 w-4" /></span>
-                                            <span class="min-w-0">
-                                                <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Anstehende Termine') }}</span>
-                                                <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Quartalszahlen & geplante Verkäufe · nächste 21 Tage') }}</span>
-                                            </span>
-                                        </div>
-                                        <div class="mt-3 space-y-1.5">
-                                            @forelse ($strategyPositionEvents->take(6) as $event)
-                                                <div class="flex items-center gap-2 rounded-lg border border-[var(--ak-border)] px-2.5 py-2">
-                                                    <span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-cyan-400/10 text-cyan-500">
-                                                        @if ($event['type'] === 'earnings')
-                                                            <x-heroicon-o-chart-bar class="h-3.5 w-3.5" />
-                                                        @else
-                                                            <x-heroicon-o-banknotes class="h-3.5 w-3.5" />
-                                                        @endif
-                                                    </span>
-                                                    <span class="min-w-0 flex-1">
-                                                        <b class="block truncate text-[10px] text-[var(--ak-text)]">{{ $event['symbol'] }} · {{ $event['label'] }}</b>
-                                                        <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $event['schedule'] }}</small>
-                                                    </span>
-                                                </div>
-                                            @empty
-                                                <div class="concept-empty">{{ __('Keine Termine in den nächsten 21 Tagen.') }}</div>
-                                            @endforelse
                                         </div>
                                     </article>
                                 </div>
