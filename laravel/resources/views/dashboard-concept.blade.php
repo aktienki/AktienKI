@@ -274,7 +274,40 @@
                             </span>
                         </div>
 
-                        @if($section['kind'] === 'list')
+                        @if($section['kind'] === 'today-focus')
+                            <div class="grid gap-2 sm:grid-cols-2">
+                                @foreach($section['highlights'] as $highlight)
+                                    <div class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="grid h-6 w-6 shrink-0 place-items-center rounded text-{{ $highlight['color'] }}-500">
+                                                <x-dynamic-component :component="$highlight['icon']" class="h-4 w-4" />
+                                            </span>
+                                            <div class="min-w-0">
+                                                <b class="block text-[11px] font-black text-[var(--ak-text)]">{{ $highlight['label'] }}</b>
+                                                <small class="block text-[8px] text-[var(--ak-muted)]">{{ $highlight['subtitle'] }}</small>
+                                            </div>
+                                        </div>
+                                        @if($highlight['data'])
+                                            <div class="text-[10px] font-bold text-{{ $highlight['color'] }}-500">{{ $highlight['data'] }}</div>
+                                        @else
+                                            <div class="text-[9px] text-[var(--ak-muted)] italic">{{ __('Wird aktualisiert…') }}</div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                            @if(count($section['analogs']) > 0)
+                                <div class="mt-4 border-t border-[var(--ak-border)] pt-4">
+                                    <p class="mb-2 text-[10px] font-black uppercase text-[var(--ak-muted)]">{{ __('Historische Analoga') }}</p>
+                                    <div class="space-y-1.5">
+                                        @foreach($section['analogs'] as $analog)
+                                            <a href="{{ $analog['url'] }}" class="concept-list-item">
+                                                <span class="min-w-0 flex-1 truncate">{{ $analog['symbol'] }} — {{ $analog['analog_symbol'] }} ({{ __('damals') }} +{{ number_format($analog['outcome_pct'], 1, ',', '.') }}%)</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        @elseif($section['kind'] === 'list')
                             @if(count($section['items']))
                                 <div class="grid gap-1.5 sm:grid-cols-2">
                                     @foreach($section['items'] as $name)

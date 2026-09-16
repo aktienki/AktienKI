@@ -22,6 +22,7 @@ final class DashboardConceptController extends Controller
 {
     /** The core navigation destinations for the left column. */
     private const LEFT_COLUMN_ICONS = [
+        ['today-focus', 'Heute im Fokus', 'heroicon-o-fire'],
         ['classic-dashboard', 'Dashboard', 'heroicon-o-squares-2x2'],
         ['watchlists', 'Watchlists', 'heroicon-o-star'],
         ['strategies', 'Strategien', 'heroicon-o-adjustments-horizontal'],
@@ -49,6 +50,7 @@ final class DashboardConceptController extends Controller
         ]);
 
         $sections = collect([
+            $this->todayFocusSection('today-focus'),
             $this->listSection(
                 'watchlists',
                 $user->watchlists()->orderByDesc('is_default')->orderBy('name')->limit(5)->pluck('name'),
@@ -314,6 +316,45 @@ final class DashboardConceptController extends Controller
      * not support the real dashboard's per-user card drag/resize
      * customization, it just shows every card in its default place.
      */
+    private function todayFocusSection(string $id): array
+    {
+        return [
+            'id' => $id,
+            'kind' => 'today-focus',
+            'highlights' => [
+                [
+                    'label' => __('Top-Signal'),
+                    'subtitle' => __('Beste neue BUY-Empfehlung'),
+                    'icon' => 'heroicon-o-arrow-trending-up',
+                    'color' => 'emerald',
+                    'data' => null,
+                ],
+                [
+                    'label' => __('Grösster Swing'),
+                    'subtitle' => __('Positionäre Performance heute'),
+                    'icon' => 'heroicon-o-chart-bar',
+                    'color' => 'orange',
+                    'data' => null,
+                ],
+                [
+                    'label' => __('Überraschung'),
+                    'subtitle' => __('Signal gegen den Trend'),
+                    'icon' => 'heroicon-o-lightning-bolt',
+                    'color' => 'yellow',
+                    'data' => null,
+                ],
+                [
+                    'label' => __('Trendwechsel'),
+                    'subtitle' => __('Von SELL zu BUY geflipped'),
+                    'icon' => 'heroicon-o-arrow-path',
+                    'color' => 'cyan',
+                    'data' => null,
+                ],
+            ],
+            'analogs' => [],
+        ];
+    }
+
     private function stockOfTheDaySection(string $id, Request $request): array
     {
         $today = now()->toDateString();
