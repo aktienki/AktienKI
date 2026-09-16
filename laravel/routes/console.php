@@ -249,7 +249,7 @@ if (config('aktienki.python_engine.server_predictions_enabled', false)) {
 // Analyze today's highlights with The Grid after predictions are finalized
 Schedule::command('highlights:analyze-today')
     ->weekdays()
-    ->at('16:30'); // After Europe predictions finalize (~16:23 UTC)
+    ->at('23:00'); // After Americas predictions finalize (~20:23 UTC)
 
 // Freeze guard: alert when the serving snapshot the dashboard/screener reads
 // has not advanced. Independent of the publish topology.
