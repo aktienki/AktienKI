@@ -22,7 +22,7 @@ final class DashboardConceptController extends Controller
 {
     /** The core navigation destinations for the left column. */
     private const LEFT_COLUMN_ICONS = [
-        ['classic-dashboard', 'Klassisches Dashboard', 'heroicon-o-squares-2x2'],
+        ['classic-dashboard', 'Dashboard', 'heroicon-o-squares-2x2'],
         ['watchlists', 'Watchlists', 'heroicon-o-star'],
         ['strategies', 'Strategien', 'heroicon-o-adjustments-horizontal'],
         ['labels', 'Labels', 'heroicon-o-tag'],

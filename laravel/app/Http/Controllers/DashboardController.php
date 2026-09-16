@@ -358,6 +358,7 @@ class DashboardController extends Controller
         $strategyCompositionBySector = $this->positionComposition($strategyPortfolios, 'sector');
         $strategyAverageMetrics = $this->positionAverageMetrics($strategyPortfolios);
         $strategyHorizonReturns = $this->positionHorizonReturns($strategyPortfolios);
+        $strategyModelHorizonReturns = $this->positionModelHorizonReturns($strategyPortfolios);
         $allScheduleItems = $messageReminders
             ->concat($corporateScheduleItems)
             ->sortBy(fn (array $item): string => ($item['sort_at'] === '0000-00-00' ? '9999-12-31' : $item['sort_at']).'-'.$item['symbol'])
@@ -374,7 +375,7 @@ class DashboardController extends Controller
         $newsCenterItems = collect();
 
         return compact(
-            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'strategyCompositionByCountry', 'strategyCompositionBySector', 'strategyAverageMetrics', 'strategyHorizonReturns', 'overview', 'marketSituation', 'continentPredictions',
+            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'strategyCompositionByCountry', 'strategyCompositionBySector', 'strategyAverageMetrics', 'strategyHorizonReturns', 'strategyModelHorizonReturns', 'overview', 'marketSituation', 'continentPredictions',
             'marketFactorSnapshot',
             'externalConfirmedBuys',
             'threeFactorAlternatives',
@@ -897,6 +898,57 @@ class DashboardController extends Controller
                 'horizon' => $horizon,
                 'avg_return' => $rows->isNotEmpty() ? (float) $rows->avg() : null,
                 'count' => $rows->count(),
+            ];
+        })->all();
+    }
+
+    /**
+     * Model-variant vs. horizon return matrix for a heatmap. Unlike
+     * positionHorizonReturns() (built on ServingReadService::latestPredictions(),
+     * which collapses each instrument/horizon down to a single row), this reads
+     * serving_predictions directly so both model variants stay visible.
+     */
+    private function positionModelHorizonReturns(Collection $portfolios): array
+    {
+        $instrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->unique()->values();
+        if ($instrumentIds->isEmpty()) {
+            return [];
+        }
+
+        $rows = DB::connection('serving')->table('serving_predictions as prediction')
+            ->join('serving_prediction_scopes as scope', function ($join): void {
+                $join->on('scope.instrument_id', '=', 'prediction.instrument_id')
+                    ->on('scope.release_id', '=', 'prediction.release_id')
+                    ->on('scope.horizon', '=', 'prediction.horizon')
+                    ->on('scope.variant', '=', 'prediction.variant');
+            })
+            ->whereIn('prediction.instrument_id', $instrumentIds->all())
+            ->whereIn('prediction.horizon', [10, 20, 40])
+            ->select(['prediction.instrument_id', 'prediction.horizon', 'prediction.variant', 'prediction.expected_return'])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY prediction.instrument_id, prediction.horizon, prediction.variant ORDER BY prediction.as_of DESC, prediction.id DESC) AS scope_rank');
+
+        $latest = DB::connection('serving')->query()->fromSub($rows, 'ranked')->where('scope_rank', 1)->get();
+
+        return collect(['standard', 'pure_tcn'])->map(function (string $variant) use ($latest): array {
+            $cells = collect([10, 20, 40])->map(function (int $horizon) use ($latest, $variant): array {
+                $values = $latest
+                    ->where('variant', $variant)
+                    ->where('horizon', $horizon)
+                    ->pluck('expected_return')
+                    ->filter(fn ($value) => is_numeric($value))
+                    ->map(fn ($value) => (float) $value * 100.0);
+
+                return [
+                    'horizon' => $horizon,
+                    'avg_return' => $values->isNotEmpty() ? (float) $values->avg() : null,
+                    'count' => $values->count(),
+                ];
+            })->all();
+
+            return [
+                'variant' => $variant,
+                'label' => $variant === 'pure_tcn' ? 'Pure TCN' : 'Standard',
+                'cells' => $cells,
             ];
         })->all();
     }

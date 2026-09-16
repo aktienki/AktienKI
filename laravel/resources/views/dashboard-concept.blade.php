@@ -571,6 +571,34 @@
                                                     </div>
                                                 </div>
                                             @endif
+                                            @if (collect($strategyModelHorizonReturns)->flatMap(fn ($v) => $v['cells'])->contains(fn ($c) => $c['avg_return'] !== null))
+                                                @php $heatmapMax = max(0.01, collect($strategyModelHorizonReturns)->flatMap(fn ($v) => $v['cells'])->max(fn ($c) => abs((float) ($c['avg_return'] ?? 0)))); @endphp
+                                                <div class="mt-5 border-t border-[var(--ak-border)] pt-4">
+                                                    <small class="block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Modell vs. Horizont') }}</small>
+                                                    <div class="mt-2 grid grid-cols-4 gap-1 text-[9px]">
+                                                        <span></span>
+                                                        @foreach ([10, 20, 40] as $horizon)
+                                                            <span class="text-center font-black text-[var(--ak-muted)]">{{ $horizon }}T</span>
+                                                        @endforeach
+                                                        @foreach ($strategyModelHorizonReturns as $variantRow)
+                                                            <span class="flex min-w-0 items-center truncate font-black text-[var(--ak-text)]">{{ $variantRow['label'] }}</span>
+                                                            @foreach ($variantRow['cells'] as $cell)
+                                                                @php
+                                                                    $intensity = $cell['avg_return'] !== null ? min(1, abs($cell['avg_return']) / $heatmapMax) : 0;
+                                                                    $heatmapBg = $cell['avg_return'] === null
+                                                                        ? 'transparent'
+                                                                        : ($cell['avg_return'] >= 0
+                                                                            ? 'color-mix(in srgb, #22c55e '.number_format($intensity * 70, 0).'%, transparent)'
+                                                                            : 'color-mix(in srgb, #f43f5e '.number_format($intensity * 70, 0).'%, transparent)');
+                                                                @endphp
+                                                                <span class="grid place-items-center rounded py-1.5 font-black tabular-nums {{ $cell['avg_return'] === null ? 'text-[var(--ak-muted)]' : 'text-[var(--ak-text)]' }}" style="background: {{ $heatmapBg }}">
+                                                                    {{ $cell['avg_return'] === null ? '—' : ($cell['avg_return'] >= 0 ? '+' : '').number_format($cell['avg_return'], 1, ',', '.') }}
+                                                                </span>
+                                                            @endforeach
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
                                         </article>
                                     @endif
                             </div>
