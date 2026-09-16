@@ -384,7 +384,14 @@
                                 <div class="concept-empty">{{ $section['emptyText'] }}</div>
                             @endif
                         @elseif($section['kind'] === 'classic-dashboard')
-                            @php extract($section['viewData']); @endphp
+                            @php
+                                extract($section['viewData']);
+                                // Defined once here rather than relying on
+                                // $dashboardCountryFlags from dashboard-middle-column/
+                                // daily-tips-card - those partials are included further
+                                // below and wouldn't be in scope for the cards above them.
+                                $transactionCountryFlags = ['DE' => '🇩🇪', 'US' => '🇺🇸', 'AT' => '🇦🇹', 'CH' => '🇨🇭', 'GB' => '🇬🇧', 'FR' => '🇫🇷', 'NL' => '🇳🇱', 'DK' => '🇩🇰', 'SE' => '🇸🇪', 'NO' => '🇳🇴', 'FI' => '🇫🇮', 'IT' => '🇮🇹', 'ES' => '🇪🇸', 'JP' => '🇯🇵', 'CN' => '🇨🇳', 'HK' => '🇭🇰', 'CA' => '🇨🇦', 'AU' => '🇦🇺'];
+                            @endphp
                             @include('partials.dashboard-styles')
                             <div class="concept-classic-dashboard-row">
                                 @if ($strategyPortfolios->isNotEmpty())
@@ -463,10 +470,24 @@
                                                     <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gehaltene Positionen · aktive Strategiedepots') }}</span>
                                                 </span>
                                             </div>
+                                            <svg width="0" height="0" class="absolute" aria-hidden="true">
+                                                <defs>
+                                                    <linearGradient id="concept-gauge-chance" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                        <stop offset="0%" stop-color="#ef4444" />
+                                                        <stop offset="50%" stop-color="#f59e0b" />
+                                                        <stop offset="100%" stop-color="#22c55e" />
+                                                    </linearGradient>
+                                                    <linearGradient id="concept-gauge-risk" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                        <stop offset="0%" stop-color="#22c55e" />
+                                                        <stop offset="50%" stop-color="#f59e0b" />
+                                                        <stop offset="100%" stop-color="#ef4444" />
+                                                    </linearGradient>
+                                                </defs>
+                                            </svg>
                                             <div class="mt-4 grid grid-cols-4 gap-2">
                                                 @foreach ([
-                                                    ['kind' => 'pie', 'label' => __('Nach Land'), 'rows' => $strategyCompositionByCountry],
-                                                    ['kind' => 'pie', 'label' => __('Nach Sektor'), 'rows' => $strategyCompositionBySector],
+                                                    ['kind' => 'pie', 'label' => __('Nach Land'), 'rows' => $strategyCompositionByCountry, 'flags' => true],
+                                                    ['kind' => 'pie', 'label' => __('Nach Sektor'), 'rows' => $strategyCompositionBySector, 'flags' => false],
                                                     ['kind' => 'gauge', 'label' => __('Ø Score'), 'value' => $strategyAverageMetrics['score'], 'type' => 'chance'],
                                                     ['kind' => 'gauge', 'label' => __('Ø Risiko'), 'value' => $strategyAverageMetrics['risk'], 'type' => 'risk'],
                                                 ] as $chart)
@@ -477,7 +498,18 @@
                                                                 @if ($chart['value'] === null)
                                                                     <div class="concept-empty w-full">—</div>
                                                                 @else
-                                                                    <x-segmented-score-donut :score="$chart['value']" :type="$chart['type']" :label="$chart['label']" />
+                                                                    @php $gaugePct = max(0, min(100, (float) $chart['value'])); @endphp
+                                                                    <div class="relative grid h-16 w-16 place-items-center">
+                                                                        <svg viewBox="0 0 120 120" class="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true">
+                                                                            <circle cx="60" cy="60" r="48" fill="none" stroke="var(--ak-border)" stroke-width="16" />
+                                                                            <circle
+                                                                                cx="60" cy="60" r="48" fill="none" stroke-width="16" pathLength="100" stroke-linecap="round"
+                                                                                stroke="url(#concept-gauge-{{ $chart['type'] }})"
+                                                                                stroke-dasharray="{{ max(0.3, $gaugePct) }} {{ 100 - max(0.3, $gaugePct) }}"
+                                                                            />
+                                                                        </svg>
+                                                                        <b class="relative text-base font-black text-[var(--ak-text)]">{{ number_format($gaugePct, 0, ',', '.') }}</b>
+                                                                    </div>
                                                                 @endif
                                                             </div>
                                                         @elseif ($chart['rows'] === [])
@@ -501,6 +533,9 @@
                                                                     @foreach ($chart['rows'] as $index => $row)
                                                                         <li class="flex items-center gap-1 text-[8px]">
                                                                             <i class="h-1.5 w-1.5 shrink-0 rounded-full" style="background: {{ $row['label'] === __('Sonstige') ? '#94a3b8' : $compositionPalette[$index % count($compositionPalette)] }}"></i>
+                                                                            @if ($chart['flags'] ?? false)
+                                                                                <span class="shrink-0">{{ $transactionCountryFlags[$row['label']] ?? '🌐' }}</span>
+                                                                            @endif
                                                                             <span class="min-w-0 flex-1 truncate font-bold text-[var(--ak-text)]">{{ $row['label'] }}</span>
                                                                             <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ number_format($row['pct'], 0, ',', '.') }} %</span>
                                                                         </li>
@@ -559,13 +594,6 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        @php
-                                                            // Defined locally rather than relying on
-                                                            // $dashboardCountryFlags from dashboard-middle-column/
-                                                            // daily-tips-card - those partials are included further
-                                                            // below in the page and wouldn't be in scope yet here.
-                                                            $transactionCountryFlags = ['DE' => '🇩🇪', 'US' => '🇺🇸', 'AT' => '🇦🇹', 'CH' => '🇨🇭', 'GB' => '🇬🇧', 'FR' => '🇫🇷', 'NL' => '🇳🇱', 'DK' => '🇩🇰', 'SE' => '🇸🇪', 'NO' => '🇳🇴', 'FI' => '🇫🇮', 'IT' => '🇮🇹', 'ES' => '🇪🇸', 'JP' => '🇯🇵', 'CN' => '🇨🇳', 'HK' => '🇭🇰', 'CA' => '🇨🇦', 'AU' => '🇦🇺'];
-                                                        @endphp
                                                         @foreach ($strategyRecentTransactions as $transaction)
                                                             @php $currencySuffix = strtoupper($transaction['currency']) === 'EUR' ? '€' : $transaction['currency']; @endphp
                                                             <tr>
