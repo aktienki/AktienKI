@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 final class SyncServingPredictions extends Command
 {
-    protected $signature = 'predictions:sync-serving --since=1';
+    protected $signature = 'predictions:sync-serving {--since=1}';
     protected $description = 'Sync serving_predictions from serving DB to main DB';
 
     public function handle(): int
@@ -25,9 +25,8 @@ final class SyncServingPredictions extends Command
             DB::connection('pgsql')->table('serving_predictions_copy')->truncate();
 
             foreach ($data->chunk(1000) as $chunk) {
-                DB::connection('pgsql')->table('serving_predictions_copy')->insertOrIgnore(
-                    $chunk->toArray()
-                );
+                $rows = $chunk->map(fn ($row) => (array)$row)->all();
+                DB::connection('pgsql')->table('serving_predictions_copy')->insertOrIgnore($rows);
             }
 
             $this->info('✓ Synced '.count($data).' serving predictions');

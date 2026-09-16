@@ -13,7 +13,7 @@ final class RefreshTodayHighlightsView extends Command
     public function handle(): int
     {
         try {
-            DB::connection('pgsql')->statement('REFRESH MATERIALIZED VIEW CONCURRENTLY today_highlights_mv');
+            DB::connection('pgsql')->statement('REFRESH MATERIALIZED VIEW today_highlights_mv');
             $this->info('✓ Materialized view refreshed');
             return 0;
         } catch (\Exception $e) {
