@@ -356,6 +356,7 @@ class DashboardController extends Controller
         $strategyRecentTransactions = $this->recentStrategyTransactions($strategyPortfolios);
         $strategyCompositionByCountry = $this->positionComposition($strategyPortfolios, 'country');
         $strategyCompositionBySector = $this->positionComposition($strategyPortfolios, 'sector');
+        $strategyAverageMetrics = $this->positionAverageMetrics($strategyPortfolios);
         $allScheduleItems = $messageReminders
             ->concat($corporateScheduleItems)
             ->sortBy(fn (array $item): string => ($item['sort_at'] === '0000-00-00' ? '9999-12-31' : $item['sort_at']).'-'.$item['symbol'])
@@ -372,7 +373,7 @@ class DashboardController extends Controller
         $newsCenterItems = collect();
 
         return compact(
-            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'strategyCompositionByCountry', 'strategyCompositionBySector', 'overview', 'marketSituation', 'continentPredictions',
+            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'strategyCompositionByCountry', 'strategyCompositionBySector', 'strategyAverageMetrics', 'overview', 'marketSituation', 'continentPredictions',
             'marketFactorSnapshot',
             'externalConfirmedBuys',
             'threeFactorAlternatives',
@@ -830,6 +831,49 @@ class DashboardController extends Controller
         }
 
         return $rows;
+    }
+
+    /**
+     * Average AI score and average risk across every currently held
+     * position's latest prediction - same normalization AiScore::toPercent()
+     * and AutomatedPortfolioService's riskSql already use elsewhere, so
+     * this reads on the same 0-100 scale as the rest of the app.
+     *
+     * @return array{score: ?float, risk: ?float, count: int}
+     */
+    private function positionAverageMetrics(Collection $portfolios): array
+    {
+        $instrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->unique()->values();
+        if ($instrumentIds->isEmpty()) {
+            return ['score' => null, 'risk' => null, 'count' => 0];
+        }
+
+        $latestPredictionIds = DB::table('predictions')
+            ->whereIn('instrument_id', $instrumentIds)
+            ->selectRaw('instrument_id, MAX(id) AS prediction_id')
+            ->groupBy('instrument_id')
+            ->pluck('prediction_id');
+
+        $predictions = DB::table('predictions')
+            ->whereIn('id', $latestPredictionIds)
+            ->get(['ai_score', 'prediction_score', 'risk_score', 'drawdown_risk_factor']);
+
+        $scores = $predictions
+            ->map(fn (object $row) => AiScore::toPercent(is_numeric($row->ai_score) ? $row->ai_score : $row->prediction_score))
+            ->filter(fn ($value) => $value !== null);
+        $risks = $predictions
+            ->map(function (object $row) {
+                $risk = is_numeric($row->risk_score) ? $row->risk_score : $row->drawdown_risk_factor;
+
+                return is_numeric($risk) ? ((float) $risk <= 1 ? (float) $risk * 100 : (float) $risk) : null;
+            })
+            ->filter(fn ($value) => $value !== null);
+
+        return [
+            'score' => $scores->isNotEmpty() ? (float) $scores->avg() : null,
+            'risk' => $risks->isNotEmpty() ? (float) $risks->avg() : null,
+            'count' => $instrumentIds->count(),
+        ];
     }
 
     private function continentPredictions(): array
