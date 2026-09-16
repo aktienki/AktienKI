@@ -513,16 +513,16 @@
                                                     <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gehaltene Positionen · aktive Strategiedepots') }}</span>
                                                 </span>
                                             </div>
-                                            <div class="mt-4 space-y-5">
+                                            <div class="mt-4 grid grid-cols-2 gap-3">
                                                 @foreach ([['label' => __('Nach Land'), 'rows' => $strategyCompositionByCountry], ['label' => __('Nach Sektor'), 'rows' => $strategyCompositionBySector]] as $chart)
-                                                    <div>
+                                                    <div class="min-w-0">
                                                         <small class="block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $chart['label'] }}</small>
                                                         @if ($chart['rows'] === [])
                                                             <div class="concept-empty mt-2">{{ __('Keine offenen Positionen.') }}</div>
                                                         @else
                                                             @php $cumulative = 0.0; @endphp
-                                                            <div class="mt-2 flex items-center gap-4">
-                                                                <svg viewBox="0 0 120 120" class="h-24 w-24 shrink-0 -rotate-90" aria-hidden="true">
+                                                            <div class="mt-2 flex flex-col items-center gap-2">
+                                                                <svg viewBox="0 0 120 120" class="h-20 w-20 shrink-0 -rotate-90" aria-hidden="true">
                                                                     <circle cx="60" cy="60" r="48" fill="none" stroke="var(--ak-border)" stroke-width="16" />
                                                                     @foreach ($chart['rows'] as $index => $row)
                                                                         <circle
@@ -534,10 +534,10 @@
                                                                         @php $cumulative += $row['pct']; @endphp
                                                                     @endforeach
                                                                 </svg>
-                                                                <ul class="min-w-0 flex-1 space-y-1">
+                                                                <ul class="w-full min-w-0 space-y-1">
                                                                     @foreach ($chart['rows'] as $index => $row)
-                                                                        <li class="flex items-center gap-1.5 text-[10px]">
-                                                                            <i class="h-2 w-2 shrink-0 rounded-full" style="background: {{ $row['label'] === __('Sonstige') ? '#94a3b8' : $compositionPalette[$index % count($compositionPalette)] }}"></i>
+                                                                        <li class="flex items-center gap-1 text-[9px]">
+                                                                            <i class="h-1.5 w-1.5 shrink-0 rounded-full" style="background: {{ $row['label'] === __('Sonstige') ? '#94a3b8' : $compositionPalette[$index % count($compositionPalette)] }}"></i>
                                                                             <span class="min-w-0 flex-1 truncate font-bold text-[var(--ak-text)]">{{ $row['label'] }}</span>
                                                                             <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ number_format($row['pct'], 0, ',', '.') }} %</span>
                                                                         </li>
