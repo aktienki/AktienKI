@@ -134,7 +134,7 @@
            uses it defines its own sizing/ring styling locally, so this
            page needs the same base rules (fill:none is the important one -
            without it the ring's <circle> elements render solid black). */
-        #dashboard-concept-page .segmented-score { position: relative; display: grid; width: 5rem; height: 5rem; place-items: center; }
+        #dashboard-concept-page .segmented-score { position: relative; display: grid; width: 4rem; height: 4rem; place-items: center; }
         #dashboard-concept-page .segmented-score-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
         #dashboard-concept-page .segmented-score-sector { fill: none; stroke-width: 8; stroke-linecap: butt; opacity: .72; }
         #dashboard-concept-page .segmented-score-sector.is-active { opacity: 1; }
@@ -453,7 +453,7 @@
                                             </div>
                                         </article>
                                     @endif
-                                @if ($strategyCompositionByCountry !== [] || $strategyCompositionBySector !== [])
+                                @if ($strategyCompositionByCountry !== [] || $strategyCompositionBySector !== [] || $strategyAverageMetrics['count'] > 0)
                                         @php $compositionPalette = ['#06b6d4', '#f97316', '#10b981', '#8b5cf6', '#f43f5e', '#eab308']; @endphp
                                         <article class="concept-card p-4">
                                             <div class="flex items-center gap-2">
@@ -463,16 +463,29 @@
                                                     <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gehaltene Positionen · aktive Strategiedepots') }}</span>
                                                 </span>
                                             </div>
-                                            <div class="mt-4 grid grid-cols-2 gap-3">
-                                                @foreach ([['label' => __('Nach Land'), 'rows' => $strategyCompositionByCountry], ['label' => __('Nach Sektor'), 'rows' => $strategyCompositionBySector]] as $chart)
+                                            <div class="mt-4 grid grid-cols-4 gap-2">
+                                                @foreach ([
+                                                    ['kind' => 'pie', 'label' => __('Nach Land'), 'rows' => $strategyCompositionByCountry],
+                                                    ['kind' => 'pie', 'label' => __('Nach Sektor'), 'rows' => $strategyCompositionBySector],
+                                                    ['kind' => 'gauge', 'label' => __('Ø Score'), 'value' => $strategyAverageMetrics['score'], 'type' => 'chance'],
+                                                    ['kind' => 'gauge', 'label' => __('Ø Risiko'), 'value' => $strategyAverageMetrics['risk'], 'type' => 'risk'],
+                                                ] as $chart)
                                                     <div class="min-w-0">
-                                                        <small class="block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $chart['label'] }}</small>
-                                                        @if ($chart['rows'] === [])
-                                                            <div class="concept-empty mt-2">{{ __('Keine offenen Positionen.') }}</div>
+                                                        <small class="block truncate text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $chart['label'] }}</small>
+                                                        @if ($chart['kind'] === 'gauge')
+                                                            <div class="mt-2 flex flex-col items-center gap-1">
+                                                                @if ($chart['value'] === null)
+                                                                    <div class="concept-empty w-full">—</div>
+                                                                @else
+                                                                    <x-segmented-score-donut :score="$chart['value']" :type="$chart['type']" :label="$chart['label']" />
+                                                                @endif
+                                                            </div>
+                                                        @elseif ($chart['rows'] === [])
+                                                            <div class="concept-empty mt-2">{{ __('Keine Positionen.') }}</div>
                                                         @else
                                                             @php $cumulative = 0.0; @endphp
                                                             <div class="mt-2 flex flex-col items-center gap-2">
-                                                                <svg viewBox="0 0 120 120" class="h-20 w-20 shrink-0 -rotate-90" aria-hidden="true">
+                                                                <svg viewBox="0 0 120 120" class="h-16 w-16 shrink-0 -rotate-90" aria-hidden="true">
                                                                     <circle cx="60" cy="60" r="48" fill="none" stroke="var(--ak-border)" stroke-width="16" />
                                                                     @foreach ($chart['rows'] as $index => $row)
                                                                         <circle
@@ -486,7 +499,7 @@
                                                                 </svg>
                                                                 <ul class="w-full min-w-0 space-y-1">
                                                                     @foreach ($chart['rows'] as $index => $row)
-                                                                        <li class="flex items-center gap-1 text-[9px]">
+                                                                        <li class="flex items-center gap-1 text-[8px]">
                                                                             <i class="h-1.5 w-1.5 shrink-0 rounded-full" style="background: {{ $row['label'] === __('Sonstige') ? '#94a3b8' : $compositionPalette[$index % count($compositionPalette)] }}"></i>
                                                                             <span class="min-w-0 flex-1 truncate font-bold text-[var(--ak-text)]">{{ $row['label'] }}</span>
                                                                             <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ number_format($row['pct'], 0, ',', '.') }} %</span>
@@ -498,21 +511,24 @@
                                                     </div>
                                                 @endforeach
                                             </div>
-                                            @if ($strategyAverageMetrics['count'] > 0)
-                                                <div class="mt-5 grid grid-cols-2 gap-3 border-t border-[var(--ak-border)] pt-4">
-                                                    @foreach ([
-                                                        ['label' => __('Ø Score'), 'value' => $strategyAverageMetrics['score'], 'type' => 'chance'],
-                                                        ['label' => __('Ø Risiko'), 'value' => $strategyAverageMetrics['risk'], 'type' => 'risk'],
-                                                    ] as $gauge)
-                                                        <div class="flex flex-col items-center gap-1">
-                                                            <small class="block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $gauge['label'] }}</small>
-                                                            @if ($gauge['value'] === null)
-                                                                <div class="concept-empty mt-1 w-full">—</div>
-                                                            @else
-                                                                <x-segmented-score-donut :score="$gauge['value']" :type="$gauge['type']" :label="$gauge['label']" />
-                                                            @endif
-                                                        </div>
-                                                    @endforeach
+                                            @if (collect($strategyHorizonReturns)->contains(fn ($h) => $h['avg_return'] !== null))
+                                                @php $maxAbsReturn = max(0.01, collect($strategyHorizonReturns)->max(fn ($h) => abs((float) ($h['avg_return'] ?? 0)))); @endphp
+                                                <div class="mt-5 border-t border-[var(--ak-border)] pt-4">
+                                                    <small class="block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Ø Prognose je Horizont') }}</small>
+                                                    <div class="mt-2 space-y-2">
+                                                        @foreach ($strategyHorizonReturns as $horizonRow)
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="w-7 shrink-0 text-[9px] font-black text-[var(--ak-muted)]">{{ $horizonRow['horizon'] }}T</span>
+                                                                <span class="relative h-3 min-w-0 flex-1 rounded-full bg-[var(--ak-border)]">
+                                                                    @if ($horizonRow['avg_return'] !== null)
+                                                                        <span class="absolute inset-y-0 rounded-full {{ $horizonRow['avg_return'] >= 0 ? 'left-1/2 bg-emerald-500' : 'right-1/2 bg-rose-500' }}" style="width: {{ number_format(abs($horizonRow['avg_return']) / $maxAbsReturn * 50, 1) }}%"></span>
+                                                                    @endif
+                                                                    <span class="absolute inset-y-0 left-1/2 w-px bg-[var(--ak-muted)]"></span>
+                                                                </span>
+                                                                <span class="w-14 shrink-0 text-right text-[9px] font-black tabular-nums {{ $horizonRow['avg_return'] === null ? 'text-[var(--ak-muted)]' : ($horizonRow['avg_return'] >= 0 ? 'text-emerald-500' : 'text-rose-500') }}">{{ $horizonRow['avg_return'] === null ? '—' : ($horizonRow['avg_return'] >= 0 ? '+' : '').number_format($horizonRow['avg_return'], 1, ',', '.').' %' }}</span>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
                                                 </div>
                                             @endif
                                         </article>

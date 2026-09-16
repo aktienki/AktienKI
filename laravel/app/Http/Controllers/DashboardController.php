@@ -357,6 +357,7 @@ class DashboardController extends Controller
         $strategyCompositionByCountry = $this->positionComposition($strategyPortfolios, 'country');
         $strategyCompositionBySector = $this->positionComposition($strategyPortfolios, 'sector');
         $strategyAverageMetrics = $this->positionAverageMetrics($strategyPortfolios);
+        $strategyHorizonReturns = $this->positionHorizonReturns($strategyPortfolios);
         $allScheduleItems = $messageReminders
             ->concat($corporateScheduleItems)
             ->sortBy(fn (array $item): string => ($item['sort_at'] === '0000-00-00' ? '9999-12-31' : $item['sort_at']).'-'.$item['symbol'])
@@ -373,7 +374,7 @@ class DashboardController extends Controller
         $newsCenterItems = collect();
 
         return compact(
-            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'strategyCompositionByCountry', 'strategyCompositionBySector', 'strategyAverageMetrics', 'overview', 'marketSituation', 'continentPredictions',
+            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'strategyCompositionByCountry', 'strategyCompositionBySector', 'strategyAverageMetrics', 'strategyHorizonReturns', 'overview', 'marketSituation', 'continentPredictions',
             'marketFactorSnapshot',
             'externalConfirmedBuys',
             'threeFactorAlternatives',
@@ -874,6 +875,37 @@ class DashboardController extends Controller
             'risk' => $risks->isNotEmpty() ? (float) $risks->avg() : null,
             'count' => $instrumentIds->count(),
         ];
+    }
+
+    /**
+     * Average expected return per horizon across every held position -
+     * from the current serving system (serving_predictions, horizons
+     * 10/20/40), not the older predictions table (5/10/15/20d columns),
+     * which is on its way out.
+     *
+     * @return array<int, array{horizon: int, avg_return: ?float, count: int}>
+     */
+    private function positionHorizonReturns(Collection $portfolios): array
+    {
+        $instrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->unique()->values();
+        if ($instrumentIds->isEmpty()) {
+            return [];
+        }
+
+        $predictions = app(ServingReadService::class)->latestPredictions()
+            ->filter(fn (object $row): bool => in_array((int) $row->instrument_id, $instrumentIds->all(), true));
+
+        return collect([10, 20, 40])->map(function (int $horizon) use ($predictions): array {
+            $rows = $predictions->filter(fn (object $row): bool => (int) $row->horizon === $horizon)
+                ->pluck('expected_return_percent')
+                ->filter(fn ($value) => is_numeric($value));
+
+            return [
+                'horizon' => $horizon,
+                'avg_return' => $rows->isNotEmpty() ? (float) $rows->avg() : null,
+                'count' => $rows->count(),
+            ];
+        })->all();
     }
 
     private function continentPredictions(): array
