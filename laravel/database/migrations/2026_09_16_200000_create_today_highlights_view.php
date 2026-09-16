@@ -19,7 +19,7 @@ return new class extends Migration
             )
         SQL);
 
-        // Materialized view combining predictions + serving predictions
+        // Materialized view combining predictions + serving predictions (last 2 days for testing)
         DB::connection('pgsql')->statement(<<<'SQL'
             CREATE MATERIALIZED VIEW today_highlights_mv AS
             SELECT
@@ -35,7 +35,7 @@ return new class extends Migration
                 ON sp.instrument_id = p.instrument_id
                 AND sp.created_at::date = p.created_at::date
             LEFT JOIN instruments i ON i.id = COALESCE(p.instrument_id, sp.instrument_id)
-            WHERE (p.created_at::date = CURRENT_DATE OR sp.created_at::date = CURRENT_DATE)
+            WHERE (p.created_at::date >= CURRENT_DATE - INTERVAL '1 day' OR sp.created_at::date >= CURRENT_DATE - INTERVAL '1 day')
         SQL);
 
         DB::connection('pgsql')->statement('CREATE INDEX idx_today_highlights_mv_instrument ON today_highlights_mv(instrument_id)');

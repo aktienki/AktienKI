@@ -338,14 +338,16 @@ final class DashboardConceptController extends Controller
      */
     private function todayFocusSection(string $id): array
     {
+        $date = now()->subDay()->toDateString(); // Use yesterday for testing
         $topSignal = null;
         $swingStock = null;
         $surpriseSignal = null;
         $trendSwitch = null;
 
-        // 1. Top-Signal: Best BUY today by expected return (from materialized view)
+        // 1. Top-Signal: Best BUY by expected return (from materialized view)
         $topBuy = \DB::table('today_highlights_mv')
             ->where('serving_signal', 'BUY')
+            ->whereDate('prediction_date', $date)
             ->orderByDesc('expected_return')
             ->select('instrument_id', 'expected_return', 'symbol', 'name')
             ->first();
@@ -386,6 +388,7 @@ final class DashboardConceptController extends Controller
         $surprise = \DB::table('today_highlights_mv')
             ->where('serving_signal', 'BUY')
             ->whereIn('predictions_signal', ['SELL', 'HOLD'])
+            ->whereDate('prediction_date', $date)
             ->orderByDesc('expected_return')
             ->select('instrument_id', 'expected_return', 'symbol', 'name')
             ->first();
@@ -399,10 +402,11 @@ final class DashboardConceptController extends Controller
             ];
         }
 
-        // 4. Trendwechsel: SELL yesterday → BUY today (from materialized view)
+        // 4. Trendwechsel: SELL → BUY (from materialized view)
         $trendSwitch_row = \DB::table('today_highlights_mv')
             ->where('predictions_signal', 'SELL')
             ->where('serving_signal', 'BUY')
+            ->whereDate('prediction_date', $date)
             ->select('symbol', 'name')
             ->first();
 
