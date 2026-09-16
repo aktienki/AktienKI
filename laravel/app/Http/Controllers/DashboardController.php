@@ -763,7 +763,7 @@ class DashboardController extends Controller
             ->orderByDesc('t.transaction_date')
             ->orderByDesc('t.id')
             ->limit($limit)
-            ->get(['t.id', 't.type', 't.portfolio_id', 't.transaction_date', 't.quantity', 't.price', 't.currency', 'i.symbol', 'i.name', 'p.name as portfolio_name'])
+            ->get(['t.id', 't.type', 't.portfolio_id', 't.transaction_date', 't.quantity', 't.price', 't.currency', 'i.symbol', 'i.name', 'i.country', 'p.name as portfolio_name'])
             ->map(function (object $row) use ($totalValueByPortfolio): array {
                 $value = (float) $row->quantity * (float) $row->price;
                 $portfolioTotal = (float) ($totalValueByPortfolio->get($row->portfolio_id) ?? 0);
@@ -774,6 +774,7 @@ class DashboardController extends Controller
                     'date' => Carbon::parse($row->transaction_date)->format('d.m.Y'),
                     'symbol' => $row->symbol,
                     'name' => $row->name,
+                    'country' => strtoupper((string) $row->country),
                     'portfolio_name' => $row->portfolio_name,
                     'quantity' => (float) $row->quantity,
                     'price' => (float) $row->price,

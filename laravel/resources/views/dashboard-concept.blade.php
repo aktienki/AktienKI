@@ -466,6 +466,13 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
+                                                        @php
+                                                            // Defined locally rather than relying on
+                                                            // $dashboardCountryFlags from dashboard-middle-column/
+                                                            // daily-tips-card - those partials are included further
+                                                            // below in the page and wouldn't be in scope yet here.
+                                                            $transactionCountryFlags = ['DE' => '🇩🇪', 'US' => '🇺🇸', 'AT' => '🇦🇹', 'CH' => '🇨🇭', 'GB' => '🇬🇧', 'FR' => '🇫🇷', 'NL' => '🇳🇱', 'DK' => '🇩🇰', 'SE' => '🇸🇪', 'NO' => '🇳🇴', 'FI' => '🇫🇮', 'IT' => '🇮🇹', 'ES' => '🇪🇸', 'JP' => '🇯🇵', 'CN' => '🇨🇳', 'HK' => '🇭🇰', 'CA' => '🇨🇦', 'AU' => '🇦🇺'];
+                                                        @endphp
                                                         @foreach ($strategyRecentTransactions as $transaction)
                                                             @php $currencySuffix = strtoupper($transaction['currency']) === 'EUR' ? '€' : $transaction['currency']; @endphp
                                                             <tr>
@@ -474,9 +481,12 @@
                                                                     <span class="inline-flex rounded border px-1.5 py-0.5 text-[8px] font-black uppercase {{ $transaction['type'] === 'buy' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-500' : 'border-rose-400/30 bg-rose-400/10 text-rose-500' }}">{{ $transaction['type'] === 'buy' ? __('Kauf') : __('Verkauf') }}</span>
                                                                 </td>
                                                                 <td class="border-0 px-2 py-1.5">
-                                                                    <span class="min-w-0">
-                                                                        <b class="block truncate font-bold text-[var(--ak-text)]">{{ $transaction['name'] }}</b>
-                                                                        <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $transaction['portfolio_name'] }}</small>
+                                                                    <span class="flex min-w-0 items-center gap-1.5">
+                                                                        <span class="shrink-0">{{ $transactionCountryFlags[$transaction['country']] ?? '🌐' }}</span>
+                                                                        <span class="min-w-0">
+                                                                            <b class="block truncate font-bold text-[var(--ak-text)]">{{ $transaction['name'] }}</b>
+                                                                            <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $transaction['portfolio_name'] }}</small>
+                                                                        </span>
                                                                     </span>
                                                                 </td>
                                                                 <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($transaction['quantity'], 0, ',', '.') }}</td>
