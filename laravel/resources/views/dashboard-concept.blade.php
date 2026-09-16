@@ -383,19 +383,12 @@
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div class="mt-3 flex flex-wrap items-end gap-x-4 gap-y-1 border-t border-[var(--ak-border)] pt-3">
-                                                @foreach ($strategyPortfolioTotals as $currency => $totals)
-                                                    <span class="min-w-0">
-                                                        <small class="block text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gesamt') }} ({{ $currency }})</small>
-                                                        <span class="mt-0.5 flex items-baseline gap-1.5">
-                                                            <b class="truncate text-lg font-black tabular-nums text-[var(--ak-text)]">{{ number_format($totals['total_value'], 0, ',', '.') }} {{ $currency === 'EUR' ? '€' : $currency }}</b>
-                                                            <small class="text-[9px] font-black tabular-nums {{ $totals['performance'] >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $totals['performance'] >= 0 ? '+' : '' }}{{ number_format($totals['performance'], 1, ',', '.') }} %</small>
-                                                        </span>
-                                                        @if ($totals['total_value_eur'] !== null)
-                                                            <small class="mt-0.5 block text-[9px] font-bold text-[var(--ak-muted)]">≈ {{ number_format($totals['total_value_eur'], 0, ',', '.') }} €</small>
-                                                        @endif
-                                                    </span>
-                                                @endforeach
+                                            <div class="mt-3 border-t border-[var(--ak-border)] pt-3">
+                                                <small class="block text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gesamt') }} (EUR)</small>
+                                                <span class="mt-0.5 flex items-baseline gap-1.5">
+                                                    <b class="truncate text-lg font-black tabular-nums text-[var(--ak-text)]">{{ number_format($strategyPortfolioTotals['total_value_eur'], 0, ',', '.') }} €</b>
+                                                    <small class="text-[9px] font-black tabular-nums {{ $strategyPortfolioTotals['performance'] >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $strategyPortfolioTotals['performance'] >= 0 ? '+' : '' }}{{ number_format($strategyPortfolioTotals['performance'], 1, ',', '.') }} %</small>
+                                                </span>
                                             </div>
                                             <div class="mt-2 overflow-x-auto">
                                                 <table class="w-full border-collapse text-[10px]">
@@ -411,7 +404,6 @@
                                                     </thead>
                                                     <tbody>
                                                         @foreach ($strategyPortfolios as $portfolio)
-                                                            @php $currencySuffix = strtoupper((string) $portfolio->currency) === 'EUR' ? '€' : $portfolio->currency; @endphp
                                                             <tr class="group cursor-pointer" onclick="window.location='{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => request()->getRequestUri()]) }}'">
                                                                 <td class="border-0 py-1.5 pr-2 group-hover:text-orange-500">
                                                                     <span class="flex min-w-0 items-center gap-1.5">
@@ -420,8 +412,8 @@
                                                                     </span>
                                                                 </td>
                                                                 <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-muted)]">{{ $portfolio->dashboard_position_count }}</td>
-                                                                <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_cash, 0, ',', '.') }} {{ $currencySuffix }}</td>
-                                                                <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_positions_value, 0, ',', '.') }} {{ $currencySuffix }}</td>
+                                                                <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_cash_eur, 0, ',', '.') }} €</td>
+                                                                <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_positions_value_eur, 0, ',', '.') }} €</td>
                                                                 <td class="border-0 px-2 py-1.5">
                                                                     <span class="flex items-center gap-1.5">
                                                                         <span class="h-1.5 w-10 shrink-0 overflow-hidden rounded-full bg-[var(--ak-border)]"><span class="block h-full rounded-full bg-orange-400" style="width: {{ number_format(min(100, (float) $portfolio->dashboard_capital_bound_pct), 1) }}%"></span></span>
@@ -430,7 +422,7 @@
                                                                 </td>
                                                                 <td class="border-0 py-1.5 pl-2 text-right">
                                                                     <span class="flex items-baseline justify-end gap-1">
-                                                                        <b class="tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_total_value, 0, ',', '.') }} {{ $currencySuffix }}</b>
+                                                                        <b class="tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_total_value_eur, 0, ',', '.') }} €</b>
                                                                         <small class="text-[8px] font-black tabular-nums {{ $portfolio->dashboard_performance >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $portfolio->dashboard_performance >= 0 ? '+' : '' }}{{ number_format($portfolio->dashboard_performance, 1, ',', '.') }} %</small>
                                                                     </span>
                                                                 </td>
@@ -445,6 +437,48 @@
                                     @include('partials.dashboard-daily-tips-card')
                                 </div>
                                 <div class="concept-classic-dashboard-col">
+                                    @if ($strategyRecentTransactions->isNotEmpty())
+                                        <article class="concept-card p-4">
+                                            <div class="flex items-center gap-2">
+                                                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
+                                                <span class="min-w-0">
+                                                    <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Letzte Transaktionen') }}</span>
+                                                    <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Über alle Strategiedepots') }}</span>
+                                                </span>
+                                            </div>
+                                            <div class="mt-3 overflow-x-auto">
+                                                <table class="w-full border-collapse text-[10px]">
+                                                    <thead>
+                                                        <tr class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                            <th class="border-0 pb-1.5 pr-2 text-left font-black">{{ __('Datum') }}</th>
+                                                            <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Typ') }}</th>
+                                                            <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Aktie') }}</th>
+                                                            <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Menge') }}</th>
+                                                            <th class="border-0 pb-1.5 pl-2 text-right font-black">{{ __('Preis') }}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($strategyRecentTransactions as $transaction)
+                                                            <tr>
+                                                                <td class="border-0 py-1.5 pr-2 whitespace-nowrap tabular-nums text-[var(--ak-muted)]">{{ $transaction['date'] }}</td>
+                                                                <td class="border-0 px-2 py-1.5">
+                                                                    <span class="inline-flex rounded border px-1.5 py-0.5 text-[8px] font-black uppercase {{ $transaction['type'] === 'buy' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-500' : 'border-rose-400/30 bg-rose-400/10 text-rose-500' }}">{{ $transaction['type'] === 'buy' ? __('Kauf') : __('Verkauf') }}</span>
+                                                                </td>
+                                                                <td class="border-0 px-2 py-1.5">
+                                                                    <span class="min-w-0">
+                                                                        <b class="block truncate font-bold text-[var(--ak-text)]">{{ $transaction['symbol'] }}</b>
+                                                                        <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $transaction['portfolio_name'] }}</small>
+                                                                    </span>
+                                                                </td>
+                                                                <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($transaction['quantity'], 0, ',', '.') }}</td>
+                                                                <td class="border-0 py-1.5 pl-2 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($transaction['price'], 2, ',', '.') }} {{ strtoupper($transaction['currency']) === 'EUR' ? '€' : $transaction['currency'] }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </article>
+                                    @endif
                                     <article class="concept-card p-4">
                                         <div class="flex items-center gap-2">
                                             <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-500"><x-heroicon-o-calendar-days class="h-4 w-4" /></span>

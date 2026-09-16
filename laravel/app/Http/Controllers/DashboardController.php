@@ -353,6 +353,7 @@ class DashboardController extends Controller
         // through the separate $strategyPositionEvents below instead.
         $corporateScheduleItems = collect();
         $strategyPositionEvents = $this->upcomingPositionEvents($strategyPortfolios);
+        $strategyRecentTransactions = $this->recentStrategyTransactions($strategyPortfolios);
         $allScheduleItems = $messageReminders
             ->concat($corporateScheduleItems)
             ->sortBy(fn (array $item): string => ($item['sort_at'] === '0000-00-00' ? '9999-12-31' : $item['sort_at']).'-'.$item['symbol'])
@@ -369,7 +370,7 @@ class DashboardController extends Controller
         $newsCenterItems = collect();
 
         return compact(
-            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'overview', 'marketSituation', 'continentPredictions',
+            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'overview', 'marketSituation', 'continentPredictions',
             'marketFactorSnapshot',
             'externalConfirmedBuys',
             'threeFactorAlternatives',
@@ -591,6 +592,7 @@ class DashboardController extends Controller
                 $cash = (float) ($portfolio->cashAccount?->balance ?? 0);
                 $initialCapital = max(0.0, (float) data_get($portfolio->meta, 'automation.initial_capital', 0));
                 $totalValue = $positionsValue + $cash;
+                $eurRate = $this->eurConversionRate((string) $portfolio->currency) ?? 1.0;
 
                 $portfolio->setAttribute('dashboard_positions_value', $positionsValue);
                 $portfolio->setAttribute('dashboard_cash', $cash);
@@ -602,6 +604,13 @@ class DashboardController extends Controller
                     ? (($totalValue - $initialCapital) / $initialCapital) * 100
                     : 0.0);
                 $portfolio->setAttribute('dashboard_live_enabled', (bool) data_get($portfolio->meta, 'automation.live_enabled', false));
+                // Display-only EUR equivalents (see eurConversionRate) so a
+                // mixed-currency depot list can show one consistent column
+                // instead of a separate USD block.
+                $portfolio->setAttribute('dashboard_positions_value_eur', $positionsValue * $eurRate);
+                $portfolio->setAttribute('dashboard_cash_eur', $cash * $eurRate);
+                $portfolio->setAttribute('dashboard_total_value_eur', $totalValue * $eurRate);
+                $portfolio->setAttribute('dashboard_initial_capital_eur', $initialCapital * $eurRate);
 
                 return $portfolio;
             })
@@ -610,30 +619,24 @@ class DashboardController extends Controller
     }
 
     /**
-     * Sums by currency instead of across currencies - there is no FX
-     * conversion anywhere in this app (buying a non-EUR instrument into a
-     * EUR depot already silently misrecords its price as EUR, a bug fixed
-     * elsewhere this session), so a single blended total would be just as
-     * wrong here.
+     * One blended EUR total across every depot regardless of its own
+     * currency - each portfolio's own dashboard_total_value_eur (see
+     * strategyPortfolios()) is already a live-rate EUR conversion for
+     * display, so summing those is safe here even though no actual
+     * position/transaction ever gets converted.
      *
-     * @return Collection<string, array{total_value: float, performance: float, count: int}>
+     * @return array{total_value_eur: float, performance: float, count: int}
      */
-    private function strategyPortfolioTotals(Collection $portfolios): Collection
+    private function strategyPortfolioTotals(Collection $portfolios): array
     {
-        return $portfolios
-            ->groupBy(fn (Portfolio $portfolio): string => strtoupper((string) $portfolio->currency))
-            ->map(function (Collection $group, string $currency): array {
-                $totalValue = (float) $group->sum('dashboard_total_value');
-                $totalInitial = (float) $group->sum('dashboard_initial_capital');
-                $eurRate = $currency !== 'EUR' ? $this->eurConversionRate($currency) : null;
+        $totalValueEur = (float) $portfolios->sum('dashboard_total_value_eur');
+        $totalInitialEur = (float) $portfolios->sum('dashboard_initial_capital_eur');
 
-                return [
-                    'total_value' => $totalValue,
-                    'total_value_eur' => $eurRate !== null ? $totalValue * $eurRate : null,
-                    'performance' => $totalInitial > 0 ? (($totalValue - $totalInitial) / $totalInitial) * 100 : 0.0,
-                    'count' => $group->count(),
-                ];
-            });
+        return [
+            'total_value_eur' => $totalValueEur,
+            'performance' => $totalInitialEur > 0 ? (($totalValueEur - $totalInitialEur) / $totalInitialEur) * 100 : 0.0,
+            'count' => $portfolios->count(),
+        ];
     }
 
     /**
@@ -735,6 +738,41 @@ class DashboardController extends Controller
             ->values();
 
         return $earnings->concat($exits)->sortBy('sort_at')->values();
+    }
+
+    /**
+     * The last few buys/sells across every strategy depot at once, newest
+     * first - each row's own price/currency as actually booked (the
+     * German-listing EUR price for a non-EUR instrument, see
+     * AutomatedPortfolioService::resolvePurchasePrice()), not re-derived.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function recentStrategyTransactions(Collection $portfolios, int $limit = 5): Collection
+    {
+        if ($portfolios->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('portfolio_transactions as t')
+            ->join('instruments as i', 'i.id', '=', 't.instrument_id')
+            ->join('portfolios as p', 'p.id', '=', 't.portfolio_id')
+            ->whereIn('t.portfolio_id', $portfolios->pluck('id'))
+            ->orderByDesc('t.transaction_date')
+            ->orderByDesc('t.id')
+            ->limit($limit)
+            ->get(['t.id', 't.type', 't.transaction_date', 't.quantity', 't.price', 't.currency', 'i.symbol', 'i.name', 'p.name as portfolio_name'])
+            ->map(fn (object $row): array => [
+                'id' => $row->id,
+                'type' => $row->type,
+                'date' => Carbon::parse($row->transaction_date)->format('d.m.Y'),
+                'symbol' => $row->symbol,
+                'name' => $row->name,
+                'portfolio_name' => $row->portfolio_name,
+                'quantity' => (float) $row->quantity,
+                'price' => (float) $row->price,
+                'currency' => (string) $row->currency,
+            ]);
     }
 
     private function continentPredictions(): array
