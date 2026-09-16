@@ -484,7 +484,12 @@ final class AutomatedPortfolioService
      */
     private function resolvePurchasePrice(object $candidate, Portfolio $portfolio): ?array
     {
-        $nativePrice = (float) ($candidate->quote_price ?: $candidate->current_price);
+        // For instruments in the portfolio's native currency, always use the
+        // price at the time the prediction was generated (candidate->current_price),
+        // not a later quote. For FX-requiring conversions, the listing quote
+        // (candidate->quote_price) is fetched fresh since we need the current
+        // EUR rate to execute the cross-listing trade.
+        $nativePrice = (float) $candidate->current_price;
         if ($nativePrice <= 0) {
             return null;
         }
