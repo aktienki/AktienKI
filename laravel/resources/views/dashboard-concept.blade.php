@@ -508,7 +508,12 @@
                                                                                 stroke-dasharray="{{ max(0.3, $gaugePct) }} {{ 100 - max(0.3, $gaugePct) }}"
                                                                             />
                                                                         </svg>
-                                                                        <b class="relative text-base font-black text-[var(--ak-text)]">{{ number_format($gaugePct, 0, ',', '.') }}</b>
+                                                                        <b class="relative text-base font-black text-[var(--ak-text)]">
+                                                                            {{ $chart['type'] === 'risk' ? number_format($gaugePct / 10, 1, ',', '.') : number_format($gaugePct, 0, ',', '.') }}
+                                                                            @if ($chart['type'] === 'risk')
+                                                                                <small class="text-[8px] font-black text-[var(--ak-muted)]">/10</small>
+                                                                            @endif
+                                                                        </b>
                                                                     </div>
                                                                 @endif
                                                             </div>
