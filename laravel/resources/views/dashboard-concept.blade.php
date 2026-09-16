@@ -418,9 +418,9 @@
                                                 </span>
                                             </div>
                                             <div class="mt-2 overflow-x-auto">
-                                                <table class="w-full border-collapse text-[10px]">
+                                                <table class="w-full border-collapse text-[12px]">
                                                     <thead>
-                                                        <tr class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                        <tr class="text-[10px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                                                             <th class="border-0 pb-1.5 pr-2 text-left font-black">{{ __('Depot') }}</th>
                                                             <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Pos.') }}</th>
                                                             <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Frei') }}</th>
@@ -643,7 +643,7 @@
                                                         <td class="border-0 px-2 py-1.5">
                                                             @if ($holding['holding_remaining_pct'] !== null)
                                                                 <span class="flex items-center gap-1.5">
-                                                                    <span class="h-2.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--ak-border)]"><span class="block h-full rounded-full bg-cyan-500" style="width: {{ number_format($holding['holding_remaining_pct'], 1) }}%"></span></span>
+                                                                    <span class="h-2.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--ak-border)]"><span class="block h-full rounded-full" style="background: #06b6d4; width: {{ number_format($holding['holding_remaining_pct'], 1) }}%"></span></span>
                                                                     <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ $holding['holding_remaining_days'] }}{{ __('T') }} · {{ number_format($holding['holding_remaining_pct'], 0, ',', '.') }} %</span>
                                                                 </span>
                                                             @else
@@ -704,9 +704,9 @@
                                                 </span>
                                             </div>
                                             <div class="mt-3 overflow-x-auto">
-                                                <table class="w-full border-collapse text-[10px]">
+                                                <table class="w-full border-collapse text-[12px]">
                                                     <thead>
-                                                        <tr class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                        <tr class="text-[10px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                                                             <th class="border-0 pb-1.5 pr-2 text-left font-black">{{ __('Datum') }}</th>
                                                             <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Typ') }}</th>
                                                             <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Aktie') }}</th>
