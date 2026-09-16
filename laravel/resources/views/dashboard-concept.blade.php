@@ -114,6 +114,17 @@
            (see below) and which only really resolves correctly with every
            other dashboard card also present. */
         #dashboard-concept-page .concept-classic-dashboard-top { width: 100%; min-width: 0; margin-bottom: 1rem; }
+        /* Strategiedepots and Letzte Transaktionen live in their own row,
+           separate from the two free-flowing columns below, so this one can
+           use align-items: stretch to force both cards to the same height -
+           doing that on the whole grid would also force every other card
+           pair (Champion vs. Anstehende Termine, etc.) to match, which
+           don't share a natural height relationship. */
+        #dashboard-concept-page .concept-classic-dashboard-row { display: grid; gap: 1rem; width: 100%; min-width: 0; grid-template-columns: 1fr; align-items: stretch; margin-bottom: 1rem; }
+        #dashboard-concept-page .concept-classic-dashboard-row > article { display: flex; flex-direction: column; }
+        @media (min-width: 1100px) {
+            #dashboard-concept-page .concept-classic-dashboard-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+        }
         #dashboard-concept-page .concept-classic-dashboard-grid { display: grid; gap: 1rem; width: 100%; min-width: 0; grid-template-columns: 1fr; align-items: start; }
         @media (min-width: 1100px) {
             #dashboard-concept-page .concept-classic-dashboard-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -365,9 +376,8 @@
                         @elseif($section['kind'] === 'classic-dashboard')
                             @php extract($section['viewData']); @endphp
                             @include('partials.dashboard-styles')
-                            <div class="concept-classic-dashboard-grid">
-                                <div class="concept-classic-dashboard-col">
-                                    @if ($strategyPortfolios->isNotEmpty())
+                            <div class="concept-classic-dashboard-row">
+                                @if ($strategyPortfolios->isNotEmpty())
                                         <article class="concept-card p-4">
                                             <div class="flex items-center justify-between gap-2">
                                                 <div class="flex min-w-0 items-center gap-2">
@@ -433,11 +443,7 @@
                                             </div>
                                         </article>
                                     @endif
-                                    @include('partials.dashboard-middle-column')
-                                    @include('partials.dashboard-daily-tips-card')
-                                </div>
-                                <div class="concept-classic-dashboard-col">
-                                    @if ($strategyRecentTransactions->isNotEmpty())
+                                @if ($strategyRecentTransactions->isNotEmpty())
                                         <article class="concept-card p-4">
                                             <div class="flex items-center gap-2">
                                                 <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
@@ -479,6 +485,13 @@
                                             </div>
                                         </article>
                                     @endif
+                            </div>
+                            <div class="concept-classic-dashboard-grid">
+                                <div class="concept-classic-dashboard-col">
+                                    @include('partials.dashboard-middle-column')
+                                    @include('partials.dashboard-daily-tips-card')
+                                </div>
+                                <div class="concept-classic-dashboard-col">
                                     <article class="concept-card p-4">
                                         <div class="flex items-center gap-2">
                                             <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-500"><x-heroicon-o-calendar-days class="h-4 w-4" /></span>
