@@ -6,6 +6,12 @@
             background: var(--ak-card);
             border-radius: 1.25rem;
             box-shadow: var(--ak-shadow);
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+        #dashboard-concept-page .concept-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--ak-border-strong);
+            box-shadow: var(--ak-shadow-hover);
         }
         #dashboard-concept-page .concept-layout {
             display: grid;
