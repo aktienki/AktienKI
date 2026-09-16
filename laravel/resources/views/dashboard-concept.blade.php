@@ -501,9 +501,9 @@
                                                                     @php $gaugePct = max(0, min(100, (float) $chart['value'])); @endphp
                                                                     <div class="relative grid h-16 w-16 place-items-center">
                                                                         <svg viewBox="0 0 120 120" class="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true">
-                                                                            <circle cx="60" cy="60" r="48" fill="none" stroke="var(--ak-border)" stroke-width="16" />
+                                                                            <circle cx="60" cy="60" r="48" fill="none" stroke="var(--ak-border)" stroke-width="12" />
                                                                             <circle
-                                                                                cx="60" cy="60" r="48" fill="none" stroke-width="16" pathLength="100" stroke-linecap="round"
+                                                                                cx="60" cy="60" r="48" fill="none" stroke-width="12" pathLength="100" stroke-linecap="round"
                                                                                 stroke="url(#concept-gauge-{{ $chart['type'] }})"
                                                                                 stroke-dasharray="{{ max(0.3, $gaugePct) }} {{ 100 - max(0.3, $gaugePct) }}"
                                                                             />
