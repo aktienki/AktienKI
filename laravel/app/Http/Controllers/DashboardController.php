@@ -596,6 +596,8 @@ class DashboardController extends Controller
                 $portfolio->setAttribute('dashboard_cash', $cash);
                 $portfolio->setAttribute('dashboard_total_value', $totalValue);
                 $portfolio->setAttribute('dashboard_initial_capital', $initialCapital);
+                $portfolio->setAttribute('dashboard_position_count', $portfolio->positions->count());
+                $portfolio->setAttribute('dashboard_capital_bound_pct', $totalValue > 0 ? ($positionsValue / $totalValue) * 100 : 0.0);
                 $portfolio->setAttribute('dashboard_performance', $initialCapital > 0
                     ? (($totalValue - $initialCapital) / $initialCapital) * 100
                     : 0.0);

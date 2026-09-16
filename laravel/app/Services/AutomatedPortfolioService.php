@@ -19,6 +19,7 @@ final class AutomatedPortfolioService
         private readonly PersonalizedSignalService $signals,
         private readonly VariableExitStrategyService $exitStrategies,
         private readonly TechnicalPriceLevelService $priceLevels,
+        private readonly TwelveDataService $marketData,
     ) {}
 
     public function scan(): array
@@ -468,6 +469,71 @@ final class AutomatedPortfolioService
         })->unique('instrument_id')->values();
     }
 
+    /**
+     * A EUR depot buying a non-EUR instrument (e.g. the USA-Strategie
+     * targeting USD stocks) must not record the raw native-currency quote
+     * as if it were EUR - that silently misprices the trade (the bug
+     * behind ADI/1024.HK/2318.HK needing manual cleanup earlier). Instead,
+     * mirror DepotController::addInstrument()'s manual-add path: resolve
+     * the instrument's German Xetra/Frankfurt cross-listing and buy at
+     * its real EUR quote. Returns null - the candidate must be skipped -
+     * when the depot's own currency doesn't match and no EUR listing
+     * quote is available.
+     *
+     * @return array{price: float, currency: string, listing: ?array, primary_currency: string}|null
+     */
+    private function resolvePurchasePrice(object $candidate, Portfolio $portfolio): ?array
+    {
+        $nativePrice = (float) ($candidate->quote_price ?: $candidate->current_price);
+        if ($nativePrice <= 0) {
+            return null;
+        }
+
+        $instrument = DB::table('instruments')->where('id', $candidate->instrument_id)
+            ->first(['currency', 'isin', 'name', 'symbol', 'german_listing_symbol', 'german_listing_exchange', 'german_listing_mic', 'german_listing_currency']);
+        if (! $instrument) {
+            return null;
+        }
+
+        $instrumentCurrency = strtoupper((string) $instrument->currency);
+        $portfolioCurrency = strtoupper((string) $portfolio->currency);
+        if ($instrumentCurrency === $portfolioCurrency) {
+            return ['price' => $nativePrice, 'currency' => $portfolioCurrency, 'listing' => null, 'primary_currency' => $instrumentCurrency];
+        }
+
+        // No FX conversion path exists for any depot currency other than
+        // EUR - same restriction DepotController::addInstrument() enforces.
+        if ($portfolioCurrency !== 'EUR') {
+            return null;
+        }
+
+        $listing = $instrument->german_listing_symbol ? [
+            'symbol' => $instrument->german_listing_symbol,
+            'exchange' => $instrument->german_listing_exchange,
+            'mic_code' => $instrument->german_listing_mic,
+            'currency' => $instrument->german_listing_currency,
+        ] : $this->marketData->germanListing($instrument->isin, (string) $instrument->name, (string) $instrument->symbol);
+        if (! $listing || strtoupper((string) ($listing['currency'] ?? '')) !== 'EUR') {
+            return null;
+        }
+
+        if (! $instrument->german_listing_symbol) {
+            DB::table('instruments')->where('id', $candidate->instrument_id)->update([
+                'german_listing_symbol' => $listing['symbol'], 'german_listing_exchange' => $listing['exchange'] ?: null,
+                'german_listing_mic' => $listing['mic_code'] ?: null, 'german_listing_currency' => 'EUR',
+                'german_listing_verified_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $listingQuote = $this->marketData->listingQuote($listing['symbol'], $listing['exchange'] ?: null);
+        if (! is_numeric($listingQuote['price'] ?? null) || (float) $listingQuote['price'] <= 0
+            || strtoupper((string) ($listingQuote['currency'] ?? 'EUR')) !== 'EUR') {
+            return null;
+        }
+
+        return ['price' => (float) $listingQuote['price'], 'currency' => 'EUR', 'listing' => $listing, 'primary_currency' => $instrumentCurrency];
+    }
+
     private function buyCandidate(SavedPredictionFilter $strategy, Portfolio $assignedPortfolio, object $candidate, float $sectorAverage, ?float $indexAverage = null, bool $reservationReleased = false): bool
     {
         if (DB::table('portfolio_automation_executions')->where('saved_prediction_filter_id', $strategy->id)->where('prediction_id', $candidate->prediction_id)->exists()) {
@@ -536,10 +602,11 @@ final class AutomatedPortfolioService
             return false;
         }
 
-        $price = (float) ($candidate->quote_price ?: $candidate->current_price);
-        if ($price <= 0) {
+        $purchase = $this->resolvePurchasePrice($candidate, $portfolio);
+        if ($purchase === null) {
             return false;
         }
+        $price = $purchase['price'];
         $exitStrategy = (bool) data_get($strategy->filters, 'dynamic_horizon_exit_enabled', false)
             ? $this->exitStrategies->resolveForPrediction((int) $candidate->instrument_id, $candidate)
             : $this->exitStrategies->resolve((int) $candidate->instrument_id);
@@ -603,7 +670,7 @@ final class AutomatedPortfolioService
             'quantity' => $quantity,
             'price' => $price,
             'fees' => $tradeCost,
-            'currency' => $candidate->currency ?: $portfolio->currency,
+            'currency' => $purchase['currency'],
             'meta' => [
                 'source' => 'strategy_automation', 'strategy_id' => $strategy->id,
                 'prediction_id' => $candidate->prediction_id, 'sector' => $candidate->sector,
@@ -616,6 +683,9 @@ final class AutomatedPortfolioService
                 'exit_holding_days' => $exitStrategy['holding_days'],
                 'exit_profile_id' => $exitStrategy['profile_id'],
                 'exit_profile_source' => $exitStrategy['source'],
+                'pricing_source' => $purchase['listing'] !== null ? 'german_listing' : 'primary_listing',
+                'pricing_listing' => $purchase['listing'],
+                'primary_currency' => $purchase['primary_currency'],
             ],
         ]);
         DB::afterCommit(fn () => app(PublicPortfolioFollowerNotifier::class)->send((int) $transaction->id));

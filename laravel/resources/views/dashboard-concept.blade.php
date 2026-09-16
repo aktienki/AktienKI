@@ -397,19 +397,47 @@
                                                     </span>
                                                 @endforeach
                                             </div>
-                                            <div class="mt-2 space-y-1">
-                                                @foreach ($strategyPortfolios as $portfolio)
-                                                    <a href="{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => request()->getRequestUri()]) }}" class="flex items-center justify-between gap-2 rounded-lg border border-[var(--ak-border)] px-2 py-1.5 transition hover:border-orange-300/50">
-                                                        <span class="flex min-w-0 items-center gap-1.5">
-                                                            <i class="h-1.5 w-1.5 shrink-0 rounded-full {{ $portfolio->dashboard_live_enabled ? 'bg-emerald-500' : 'bg-slate-400' }}"></i>
-                                                            <span class="truncate text-[10px] font-bold text-[var(--ak-text)]">{{ $portfolio->name }}</span>
-                                                        </span>
-                                                        <span class="flex shrink-0 items-baseline gap-1">
-                                                            <b class="text-[10px] font-black tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_total_value, 0, ',', '.') }} {{ strtoupper((string) $portfolio->currency) === 'EUR' ? '€' : $portfolio->currency }}</b>
-                                                            <small class="text-[8px] font-black tabular-nums {{ $portfolio->dashboard_performance >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $portfolio->dashboard_performance >= 0 ? '+' : '' }}{{ number_format($portfolio->dashboard_performance, 1, ',', '.') }} %</small>
-                                                        </span>
-                                                    </a>
-                                                @endforeach
+                                            <div class="mt-2 overflow-x-auto">
+                                                <table class="w-full border-collapse text-[10px]">
+                                                    <thead>
+                                                        <tr class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                            <th class="border-0 pb-1.5 pr-2 text-left font-black">{{ __('Depot') }}</th>
+                                                            <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Pos.') }}</th>
+                                                            <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Frei') }}</th>
+                                                            <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Gebunden') }}</th>
+                                                            <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Bindung') }}</th>
+                                                            <th class="border-0 pb-1.5 pl-2 text-right font-black">{{ __('Gesamt') }}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($strategyPortfolios as $portfolio)
+                                                            @php $currencySuffix = strtoupper((string) $portfolio->currency) === 'EUR' ? '€' : $portfolio->currency; @endphp
+                                                            <tr class="group cursor-pointer" onclick="window.location='{{ route('depots.show', ['portfolio' => $portfolio, 'return_to' => request()->getRequestUri()]) }}'">
+                                                                <td class="border-0 py-1.5 pr-2 group-hover:text-orange-500">
+                                                                    <span class="flex min-w-0 items-center gap-1.5">
+                                                                        <i class="h-1.5 w-1.5 shrink-0 rounded-full {{ $portfolio->dashboard_live_enabled ? 'bg-emerald-500' : 'bg-slate-400' }}"></i>
+                                                                        <span class="truncate font-bold text-[var(--ak-text)] group-hover:text-orange-500">{{ $portfolio->name }}</span>
+                                                                    </span>
+                                                                </td>
+                                                                <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-muted)]">{{ $portfolio->dashboard_position_count }}</td>
+                                                                <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_cash, 0, ',', '.') }} {{ $currencySuffix }}</td>
+                                                                <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_positions_value, 0, ',', '.') }} {{ $currencySuffix }}</td>
+                                                                <td class="border-0 px-2 py-1.5">
+                                                                    <span class="flex items-center gap-1.5">
+                                                                        <span class="h-1.5 w-10 shrink-0 overflow-hidden rounded-full bg-[var(--ak-border)]"><span class="block h-full rounded-full bg-orange-400" style="width: {{ number_format(min(100, (float) $portfolio->dashboard_capital_bound_pct), 1) }}%"></span></span>
+                                                                        <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ number_format((float) $portfolio->dashboard_capital_bound_pct, 0, ',', '.') }} %</span>
+                                                                    </span>
+                                                                </td>
+                                                                <td class="border-0 py-1.5 pl-2 text-right">
+                                                                    <span class="flex items-baseline justify-end gap-1">
+                                                                        <b class="tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_total_value, 0, ',', '.') }} {{ $currencySuffix }}</b>
+                                                                        <small class="text-[8px] font-black tabular-nums {{ $portfolio->dashboard_performance >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $portfolio->dashboard_performance >= 0 ? '+' : '' }}{{ number_format($portfolio->dashboard_performance, 1, ',', '.') }} %</small>
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         </article>
                                     @endif
