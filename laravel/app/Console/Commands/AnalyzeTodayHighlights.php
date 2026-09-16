@@ -7,12 +7,13 @@ use Illuminate\Console\Command;
 
 final class AnalyzeTodayHighlights extends Command
 {
-    protected $signature = 'highlights:analyze-today';
-    protected $description = 'Analyze today\'s trading highlights with The Grid and save to JSON';
+    protected $signature = 'highlights:analyze-today {--date=}';
+    protected $description = 'Analyze trading highlights with The Grid and save to JSON';
 
     public function handle(): int
     {
-        $this->info('Analyzing today\'s highlights...');
+        $dateStr = $this->option('date') ?? now()->toDateString();
+        $this->info("Analyzing highlights for $dateStr...");
 
         try {
             $dummyHighlights = [

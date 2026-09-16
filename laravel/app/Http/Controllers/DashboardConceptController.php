@@ -338,7 +338,7 @@ final class DashboardConceptController extends Controller
      */
     private function todayFocusSection(string $id): array
     {
-        $date = now()->subDay()->toDateString(); // Use yesterday for testing
+        $date = now()->toDateString();
         $topSignal = null;
         $swingStock = null;
         $surpriseSignal = null;
