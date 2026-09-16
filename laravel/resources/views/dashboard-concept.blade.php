@@ -508,10 +508,10 @@
                                                                                 stroke-dasharray="{{ max(0.3, $gaugePct) }} {{ 100 - max(0.3, $gaugePct) }}"
                                                                             />
                                                                         </svg>
-                                                                        <b class="relative text-base font-black text-[var(--ak-text)]">
+                                                                        <b class="relative text-[10px] font-black text-[var(--ak-text)]">
                                                                             {{ $chart['type'] === 'risk' ? number_format($gaugePct / 10, 1, ',', '.') : number_format($gaugePct, 0, ',', '.') }}
                                                                             @if ($chart['type'] === 'risk')
-                                                                                <small class="text-[8px] font-black text-[var(--ak-muted)]">/10</small>
+                                                                                <small class="text-[6px] font-black text-[var(--ak-muted)]">/10</small>
                                                                             @endif
                                                                         </b>
                                                                     </div>
@@ -571,8 +571,8 @@
                                                     </div>
                                                 </div>
                                             @endif
-                                            @if (collect($strategyModelHorizonReturns)->flatMap(fn ($v) => $v['cells'])->contains(fn ($c) => $c['avg_return'] !== null))
-                                                @php $heatmapMax = max(0.01, collect($strategyModelHorizonReturns)->flatMap(fn ($v) => $v['cells'])->max(fn ($c) => abs((float) ($c['avg_return'] ?? 0)))); @endphp
+                                            @if (collect($strategyModelHorizonReturns)->flatMap(fn ($v) => $v['cells'])->contains(fn ($c) => $c['count'] > 0))
+                                                @php $heatmapMax = max(1, collect($strategyModelHorizonReturns)->flatMap(fn ($v) => $v['cells'])->max(fn ($c) => (int) $c['count'])); @endphp
                                                 <div class="mt-5 border-t border-[var(--ak-border)] pt-4">
                                                     <small class="block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Modell vs. Horizont') }}</small>
                                                     <div class="mt-2 grid grid-cols-4 gap-1 text-[9px]">
@@ -584,15 +584,13 @@
                                                             <span class="flex min-w-0 items-center truncate font-black text-[var(--ak-text)]">{{ $variantRow['label'] }}</span>
                                                             @foreach ($variantRow['cells'] as $cell)
                                                                 @php
-                                                                    $intensity = $cell['avg_return'] !== null ? min(1, abs($cell['avg_return']) / $heatmapMax) : 0;
-                                                                    $heatmapBg = $cell['avg_return'] === null
-                                                                        ? 'transparent'
-                                                                        : ($cell['avg_return'] >= 0
-                                                                            ? 'color-mix(in srgb, #22c55e '.number_format($intensity * 70, 0).'%, transparent)'
-                                                                            : 'color-mix(in srgb, #f43f5e '.number_format($intensity * 70, 0).'%, transparent)');
+                                                                    $intensity = $cell['count'] > 0 ? min(1, $cell['count'] / $heatmapMax) : 0;
+                                                                    $heatmapBg = $cell['count'] > 0
+                                                                        ? 'color-mix(in srgb, #06b6d4 '.number_format($intensity * 70, 0).'%, transparent)'
+                                                                        : 'transparent';
                                                                 @endphp
-                                                                <span class="grid place-items-center rounded py-1.5 font-black tabular-nums {{ $cell['avg_return'] === null ? 'text-[var(--ak-muted)]' : 'text-[var(--ak-text)]' }}" style="background: {{ $heatmapBg }}">
-                                                                    {{ $cell['avg_return'] === null ? '—' : ($cell['avg_return'] >= 0 ? '+' : '').number_format($cell['avg_return'], 1, ',', '.') }}
+                                                                <span class="grid place-items-center rounded py-1.5 font-black tabular-nums {{ $cell['count'] === 0 ? 'text-[var(--ak-muted)]' : 'text-[var(--ak-text)]' }}" style="background: {{ $heatmapBg }}">
+                                                                    {{ $cell['count'] }}
                                                                 </span>
                                                             @endforeach
                                                         @endforeach

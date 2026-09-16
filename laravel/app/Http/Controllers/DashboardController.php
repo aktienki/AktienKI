@@ -853,21 +853,38 @@ class DashboardController extends Controller
      */
     private function positionAverageMetrics(Collection $portfolios): array
     {
-        $instrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->unique()->values();
-        if ($instrumentIds->isEmpty()) {
+        // One entry per actually held depot position, not deduplicated by
+        // instrument - a stock held in two strategy depots must weigh twice,
+        // since these figures describe the depots' current exposure, not
+        // "which distinct stocks are currently held anywhere."
+        $positionInstrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->values();
+        if ($positionInstrumentIds->isEmpty()) {
             return ['score' => null, 'risk' => null, 'count' => 0];
         }
 
-        $stocks = app(ServingScreenerService::class)->currentStocks()
-            ->filter(fn (object $stock): bool => in_array((int) $stock->instrument_id, $instrumentIds->all(), true));
+        $stocksById = app(ServingScreenerService::class)->currentStocks()
+            ->filter(fn (object $stock): bool => in_array((int) $stock->instrument_id, $positionInstrumentIds->unique()->all(), true))
+            ->keyBy(fn (object $stock): int => (int) $stock->instrument_id);
 
-        $scores = $stocks->pluck('composite_score')->filter(fn ($value) => is_numeric($value));
-        $risks = $stocks->pluck('risk_percent')->filter(fn ($value) => is_numeric($value));
+        $scores = collect();
+        $risks = collect();
+        foreach ($positionInstrumentIds as $instrumentId) {
+            $stock = $stocksById->get((int) $instrumentId);
+            if ($stock === null) {
+                continue;
+            }
+            if (is_numeric($stock->composite_score ?? null)) {
+                $scores->push((float) $stock->composite_score);
+            }
+            if (is_numeric($stock->risk_percent ?? null)) {
+                $risks->push((float) $stock->risk_percent);
+            }
+        }
 
         return [
             'score' => $scores->isNotEmpty() ? (float) $scores->avg() : null,
             'risk' => $risks->isNotEmpty() ? (float) $risks->avg() : null,
-            'count' => $instrumentIds->count(),
+            'count' => $positionInstrumentIds->count(),
         ];
     }
 
@@ -881,23 +898,29 @@ class DashboardController extends Controller
      */
     private function positionHorizonReturns(Collection $portfolios): array
     {
-        $instrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->unique()->values();
-        if ($instrumentIds->isEmpty()) {
+        // Weighted per held depot position - see positionAverageMetrics().
+        $positionInstrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->values();
+        if ($positionInstrumentIds->isEmpty()) {
             return [];
         }
 
-        $predictions = app(ServingReadService::class)->latestPredictions()
-            ->filter(fn (object $row): bool => in_array((int) $row->instrument_id, $instrumentIds->all(), true));
+        $predictionsByInstrument = app(ServingReadService::class)->latestPredictions()
+            ->filter(fn (object $row): bool => in_array((int) $row->instrument_id, $positionInstrumentIds->unique()->all(), true))
+            ->groupBy(fn (object $row): int => (int) $row->instrument_id);
 
-        return collect([10, 20, 40])->map(function (int $horizon) use ($predictions): array {
-            $rows = $predictions->filter(fn (object $row): bool => (int) $row->horizon === $horizon)
-                ->pluck('expected_return_percent')
-                ->filter(fn ($value) => is_numeric($value));
+        return collect([10, 20, 40])->map(function (int $horizon) use ($predictionsByInstrument, $positionInstrumentIds): array {
+            $values = collect();
+            foreach ($positionInstrumentIds as $instrumentId) {
+                $row = $predictionsByInstrument->get((int) $instrumentId)?->firstWhere('horizon', $horizon);
+                if ($row !== null && is_numeric($row->expected_return_percent ?? null)) {
+                    $values->push((float) $row->expected_return_percent);
+                }
+            }
 
             return [
                 'horizon' => $horizon,
-                'avg_return' => $rows->isNotEmpty() ? (float) $rows->avg() : null,
-                'count' => $rows->count(),
+                'avg_return' => $values->isNotEmpty() ? (float) $values->avg() : null,
+                'count' => $values->count(),
             ];
         })->all();
     }
@@ -910,10 +933,12 @@ class DashboardController extends Controller
      */
     private function positionModelHorizonReturns(Collection $portfolios): array
     {
-        $instrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->unique()->values();
-        if ($instrumentIds->isEmpty()) {
+        // Weighted per held depot position - see positionAverageMetrics().
+        $positionInstrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->values();
+        if ($positionInstrumentIds->isEmpty()) {
             return [];
         }
+        $uniqueInstrumentIds = $positionInstrumentIds->unique()->values();
 
         $rows = DB::connection('serving')->table('serving_predictions as prediction')
             ->join('serving_prediction_scopes as scope', function ($join): void {
@@ -922,21 +947,23 @@ class DashboardController extends Controller
                     ->on('scope.horizon', '=', 'prediction.horizon')
                     ->on('scope.variant', '=', 'prediction.variant');
             })
-            ->whereIn('prediction.instrument_id', $instrumentIds->all())
+            ->whereIn('prediction.instrument_id', $uniqueInstrumentIds->all())
             ->whereIn('prediction.horizon', [10, 20, 40])
             ->select(['prediction.instrument_id', 'prediction.horizon', 'prediction.variant', 'prediction.expected_return'])
             ->selectRaw('ROW_NUMBER() OVER (PARTITION BY prediction.instrument_id, prediction.horizon, prediction.variant ORDER BY prediction.as_of DESC, prediction.id DESC) AS scope_rank');
 
-        $latest = DB::connection('serving')->query()->fromSub($rows, 'ranked')->where('scope_rank', 1)->get();
+        $latestByKey = DB::connection('serving')->query()->fromSub($rows, 'ranked')->where('scope_rank', 1)->get()
+            ->keyBy(fn (object $row): string => $row->instrument_id.'-'.$row->horizon.'-'.$row->variant);
 
-        return collect(['standard', 'pure_tcn'])->map(function (string $variant) use ($latest): array {
-            $cells = collect([10, 20, 40])->map(function (int $horizon) use ($latest, $variant): array {
-                $values = $latest
-                    ->where('variant', $variant)
-                    ->where('horizon', $horizon)
-                    ->pluck('expected_return')
-                    ->filter(fn ($value) => is_numeric($value))
-                    ->map(fn ($value) => (float) $value * 100.0);
+        return collect(['standard', 'pure_tcn'])->map(function (string $variant) use ($latestByKey, $positionInstrumentIds): array {
+            $cells = collect([10, 20, 40])->map(function (int $horizon) use ($latestByKey, $variant, $positionInstrumentIds): array {
+                $values = collect();
+                foreach ($positionInstrumentIds as $instrumentId) {
+                    $row = $latestByKey->get($instrumentId.'-'.$horizon.'-'.$variant);
+                    if ($row !== null && is_numeric($row->expected_return ?? null)) {
+                        $values->push((float) $row->expected_return * 100.0);
+                    }
+                }
 
                 return [
                     'horizon' => $horizon,
