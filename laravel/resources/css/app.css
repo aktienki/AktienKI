@@ -1047,9 +1047,9 @@
 }
 
 :root:not([data-theme="light"]) body:not(.welcome-background) {
-    --ak-card: rgba(52, 65, 95, .98);
-    --ak-card-hover: rgba(57, 71, 102, .99);
-    --ak-card-strong: rgba(47, 59, 88, .99);
+    --ak-card: rgba(17, 24, 39, .68);
+    --ak-card-hover: rgba(24, 32, 50, .78);
+    --ak-card-strong: rgba(15, 23, 42, .82);
     --ak-border: rgba(251, 191, 36, .16);
     --ak-border-strong: rgba(251, 191, 36, .38);
     --ak-surface: #171d3a;
