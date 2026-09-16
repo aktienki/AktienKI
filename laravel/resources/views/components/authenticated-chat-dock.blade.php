@@ -31,7 +31,7 @@
             <span class="grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/25 bg-cyan-400/10 text-cyan-200"><x-heroicon-o-sparkles class="h-5 w-5" /></span>
             <div><p class="text-[9px] font-black uppercase tracking-[.16em] text-cyan-300">{{ __('Assistent') }}</p><h2 class="text-base font-black">{{ __('AKI fragen') }}</h2></div>
             <button type="button" data-aki-global-chat-clear class="ml-auto rounded-lg border border-amber-300/30 bg-amber-300/10 px-2.5 py-1.5 text-[9px] font-black text-amber-200 hover:bg-amber-300/20">{{ __('Verlauf löschen') }}</button>
-            <button type="button" data-aki-global-chat-close class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white" aria-label="{{ __('Chat schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
+            <button type="button" data-aki-global-chat-close class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 hover:bg-transparent hover:text-white" aria-label="{{ __('Chat schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
         </header>
         <div class="flex flex-wrap items-center gap-2 border-b border-cyan-300/15 px-4 py-2.5" style="background:#0b2235 !important">
             <span class="text-[9px] font-black uppercase tracking-[.12em] text-slate-400">{{ __('Antwortqualität') }}</span>
@@ -42,7 +42,7 @@
             </span>
         </div>
         <div data-aki-global-chat-messages class="min-h-56 flex-1 space-y-2 overflow-y-auto p-5" style="background:#0a2032 !important">
-            <p class="max-w-[88%] rounded-xl border border-cyan-300/15 bg-slate-700/60 px-3 py-2 text-xs leading-5">{{ __('Hallo! Wie kann ich dir auf dieser Seite helfen?') }}</p>
+            <p class="max-w-[88%] rounded-xl border border-cyan-300/15 bg-transparent px-3 py-2 text-xs leading-5">{{ __('Hallo! Wie kann ich dir auf dieser Seite helfen?') }}</p>
         </div>
         <form data-aki-global-chat-form class="flex gap-2 border-t border-cyan-300/20 p-3" style="background:#091827 !important">
             <input data-aki-global-chat-input type="text" class="min-w-0 flex-1 rounded-xl border border-cyan-300/25 bg-slate-950/55 px-3 py-2.5 text-xs text-white placeholder:text-slate-500 focus:border-cyan-300/55 focus:outline-none" placeholder="{{ __('Stelle AKI eine Frage …') }}" autocomplete="off">
@@ -64,7 +64,7 @@
 
     const addMessage = (content, role) => {
         const bubble = document.createElement('p');
-        bubble.className = `max-w-[88%] whitespace-pre-line rounded-xl border px-3 py-2 text-xs leading-5 ${role === 'user' ? 'ml-auto border-cyan-300/25 bg-cyan-500 text-slate-950' : 'border-cyan-300/15 bg-slate-700/60 text-slate-100'}`;
+        bubble.className = `max-w-[88%] whitespace-pre-line rounded-xl border px-3 py-2 text-xs leading-5 ${role === 'user' ? 'ml-auto border-cyan-300/25 bg-cyan-500 text-slate-950' : 'border-cyan-300/15 bg-transparent text-slate-100'}`;
         bubble.textContent = content;
         messages.appendChild(bubble);
         messages.scrollTop = messages.scrollHeight;

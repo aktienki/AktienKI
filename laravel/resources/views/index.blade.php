@@ -1700,7 +1700,7 @@
                     <h2 id="prediction-heatmap-title" class="mt-1 text-xl font-black text-white">{{ __('Historische Qualität nach KI-Score und Konfidenz') }}</h2>
                     <p class="mt-1 text-xs text-slate-400">{{ __('Trefferquote, Profitfaktor, Drawdown und Trades; alle aktuellen Filter werden berücksichtigt.') }}</p>
                 </div>
-                <button type="button" data-close-prediction-heatmap class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-white/5 hover:text-white" aria-label="{{ __('Schließen') }}">
+                <button type="button" data-close-prediction-heatmap class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-transparent hover:text-white" aria-label="{{ __('Schließen') }}">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>
@@ -1797,7 +1797,7 @@
                         <h2 id="prediction-watchlist-picker-title" class="mt-1 text-lg font-black text-white">{{ __('Watchlist auswählen') }}</h2>
                         <p id="prediction-watchlist-picker-name" class="mt-1 truncate text-xs text-slate-400"></p>
                     </div>
-                    <button type="button" data-close-watchlist-picker class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/5 hover:text-white" aria-label="{{ __('Schließen') }}">
+                    <button type="button" data-close-watchlist-picker class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-transparent hover:text-white" aria-label="{{ __('Schließen') }}">
                         <x-heroicon-o-x-mark class="h-5 w-5" />
                     </button>
                 </div>
@@ -2062,7 +2062,7 @@
                 <button type="button" data-aki-chat-clear class="ml-auto mr-1 rounded-lg border border-amber-300/80 bg-amber-500 px-2.5 py-1.5 text-[9px] font-black text-white shadow-sm hover:bg-amber-400">{{ __('Verlauf löschen') }}</button>
                 <button type="button" data-aki-chat-close class="rounded-lg p-2 text-[var(--ak-muted)] hover:bg-[var(--ak-surface-muted)]" aria-label="{{ __('Chat schließen') }}"><x-heroicon-o-x-mark class="h-5 w-5" /></button>
             </header>
-            <div id="aki-chat-messages" class="max-h-[72vh] space-y-2 overflow-y-auto p-5" style="background:rgba(9,28,45,.82) !important;"><p class="max-w-[92%] rounded-xl border border-teal-300/20 bg-slate-700/70 px-3 py-2 text-xs leading-5 text-slate-100">{{ __('Ich helfe dir bei der Auswahl und Erklärung deiner Prognosefilter.') }}</p></div>
+            <div id="aki-chat-messages" class="max-h-[72vh] space-y-2 overflow-y-auto p-5" style="background:rgba(9,28,45,.82) !important;"><p class="max-w-[92%] rounded-xl border border-teal-300/20 bg-transparent px-3 py-2 text-xs leading-5 text-slate-100">{{ __('Ich helfe dir bei der Auswahl und Erklärung deiner Prognosefilter.') }}</p></div>
             <form onsubmit="return window.akiAsk(event)" class="flex gap-2 border-t border-teal-300/20 p-3" style="background:rgba(10,30,47,.96) !important;">
                 <input id="aki-chat-input" type="text" class="min-w-0 flex-1 rounded-lg border border-teal-300/30 bg-slate-950/65 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-400" placeholder="{{ __('Wie setze ich den Profitfaktor?') }}" autocomplete="off">
                 <button type="submit" class="rounded-lg bg-teal-600 px-3 py-2 text-xs font-black text-white hover:bg-teal-500">{{ __('Senden') }}</button>
@@ -2076,9 +2076,9 @@
         const akiChatMessages = document.getElementById('aki-chat-messages');
         if (akiChatMessages && akiChatHistory.length) {
             akiChatMessages.innerHTML = '';
-            akiChatHistory.forEach((entry) => { const item = document.createElement('p'); item.className = `max-w-[88%] whitespace-pre-line rounded-xl border px-3 py-2 text-xs ${entry.role === 'user' ? 'ml-auto border-teal-300/30 bg-teal-600 text-white' : 'border-teal-300/15 bg-slate-700/70 text-slate-100'}`; item.textContent = entry.content; akiChatMessages.appendChild(item); });
+            akiChatHistory.forEach((entry) => { const item = document.createElement('p'); item.className = `max-w-[88%] whitespace-pre-line rounded-xl border px-3 py-2 text-xs ${entry.role === 'user' ? 'ml-auto border-teal-300/30 bg-teal-600 text-white' : 'border-teal-300/15 bg-transparent text-slate-100'}`; item.textContent = entry.content; akiChatMessages.appendChild(item); });
         }
-        document.querySelector('[data-aki-chat-clear]')?.addEventListener('click', () => { localStorage.removeItem(akiChatStorageKey); akiChatHistory.length = 0; if (akiChatMessages) akiChatMessages.innerHTML = '<p class="max-w-[88%] rounded-xl border border-teal-300/15 bg-slate-700/70 px-3 py-2 text-xs text-slate-100">{{ __('Der Chatverlauf wurde gelöscht.') }}</p>'; });
+        document.querySelector('[data-aki-chat-clear]')?.addEventListener('click', () => { localStorage.removeItem(akiChatStorageKey); akiChatHistory.length = 0; if (akiChatMessages) akiChatMessages.innerHTML = '<p class="max-w-[88%] rounded-xl border border-teal-300/15 bg-transparent px-3 py-2 text-xs text-slate-100">{{ __('Der Chatverlauf wurde gelöscht.') }}</p>'; });
         window.akiAsk = window.akiAsk || async function (event) {
             event.preventDefault();
             const input = document.getElementById('aki-chat-input');
@@ -2092,7 +2092,7 @@
             akiChatHistory.push({ role: 'user', content: question });
             const pending = document.createElement('p');
             pending.id = 'aki-chat-pending';
-            pending.className = 'flex max-w-[92%] items-center gap-2 rounded-xl border border-amber-300/20 bg-slate-700/70 px-3 py-2 text-xs text-amber-200';
+            pending.className = 'flex max-w-[92%] items-center gap-2 rounded-xl border border-amber-300/20 bg-transparent px-3 py-2 text-xs text-amber-200';
             pending.innerHTML = '<span>AKI denkt</span><span class="aki-thinking-dots" aria-hidden="true">•••</span>';
             messages.appendChild(pending);
             try {
@@ -2100,7 +2100,7 @@
                 const payload = await response.json();
                 pending.remove();
                 const answerText = response.ok ? (payload.answer || '{{ __('Keine Antwort erhalten.') }}') : (payload.message || '{{ __('Die KI ist gerade nicht erreichbar.') }}');
-                const answer = document.createElement('p'); answer.className = 'max-w-[88%] whitespace-pre-line rounded-xl border border-teal-300/15 bg-slate-700/70 px-3 py-2 text-xs text-slate-100'; answer.textContent = answerText; messages.appendChild(answer); akiChatHistory.push({ role: 'assistant', content: answerText }); localStorage.setItem(akiChatStorageKey, JSON.stringify(akiChatHistory.slice(-16)));
+                const answer = document.createElement('p'); answer.className = 'max-w-[88%] whitespace-pre-line rounded-xl border border-teal-300/15 bg-transparent px-3 py-2 text-xs text-slate-100'; answer.textContent = answerText; messages.appendChild(answer); akiChatHistory.push({ role: 'assistant', content: answerText }); localStorage.setItem(akiChatStorageKey, JSON.stringify(akiChatHistory.slice(-16)));
                 if (response.ok && payload.filter_suggestion && Object.keys(payload.filter_suggestion).length) {
                     const apply = document.createElement('button'); apply.type = 'button'; apply.className = 'mt-2 rounded-lg border border-teal-500/40 bg-teal-500/15 px-3 py-2 text-[10px] font-black text-teal-700 dark:text-teal-200'; apply.textContent = '{{ __('Filter anwenden') }}';
                     const applyFilters = () => { const loading = document.getElementById('prediction-page-loading'); if (loading) { loading.classList.remove('hidden'); loading.classList.add('flex'); loading.style.display = 'flex'; } const params = new URLSearchParams(); Object.entries(payload.filter_suggestion).forEach(([key, value]) => { if (Array.isArray(value)) value.forEach((item) => params.append(`${key}[]`, item)); else if (value !== null && value !== '') params.set(key, value); }); window.location.href = '{{ route('predictions.index') }}?' + params.toString(); };
