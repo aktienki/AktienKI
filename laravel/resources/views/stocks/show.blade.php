@@ -1323,6 +1323,24 @@
         $showAnalysisFirst = true;
     @endphp
 
+    @if (session('status'))
+        <div
+            x-data="{ show: true }"
+            x-init="setTimeout(() => show = false, 3500)"
+            x-show="show"
+            x-transition.opacity
+            x-cloak
+            class="fixed right-4 top-20 z-[100] rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-4 py-2.5 text-xs font-bold text-emerald-300 shadow-lg shadow-black/20 backdrop-blur"
+        >
+            {{ match (session('status')) {
+                'watchlist-item-added' => __('Aktie wurde zur Watchlist hinzugefügt.'),
+                'watchlist-item-removed' => __('Aktie wurde aus der Watchlist entfernt.'),
+                'paper-depot-item-added' => __('Aktie wurde ins Musterdepot gelegt.'),
+                default => session('status'),
+            } }}
+        </div>
+    @endif
+
     <div
         id="stock-detail-page"
         class="ak-market-overview-skin mx-auto flex h-[calc(100vh-73px)] min-h-0 w-full max-w-screen-2xl flex-col py-4 supports-[height:100dvh]:h-[calc(100dvh-73px)]"
