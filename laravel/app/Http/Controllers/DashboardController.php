@@ -754,6 +754,8 @@ class DashboardController extends Controller
             return collect();
         }
 
+        $totalValueByPortfolio = $portfolios->keyBy('id')->map(fn (Portfolio $p): float => (float) $p->dashboard_total_value);
+
         return DB::table('portfolio_transactions as t')
             ->join('instruments as i', 'i.id', '=', 't.instrument_id')
             ->join('portfolios as p', 'p.id', '=', 't.portfolio_id')
@@ -761,18 +763,29 @@ class DashboardController extends Controller
             ->orderByDesc('t.transaction_date')
             ->orderByDesc('t.id')
             ->limit($limit)
-            ->get(['t.id', 't.type', 't.transaction_date', 't.quantity', 't.price', 't.currency', 'i.symbol', 'i.name', 'p.name as portfolio_name'])
-            ->map(fn (object $row): array => [
-                'id' => $row->id,
-                'type' => $row->type,
-                'date' => Carbon::parse($row->transaction_date)->format('d.m.Y'),
-                'symbol' => $row->symbol,
-                'name' => $row->name,
-                'portfolio_name' => $row->portfolio_name,
-                'quantity' => (float) $row->quantity,
-                'price' => (float) $row->price,
-                'currency' => (string) $row->currency,
-            ]);
+            ->get(['t.id', 't.type', 't.portfolio_id', 't.transaction_date', 't.quantity', 't.price', 't.currency', 'i.symbol', 'i.name', 'p.name as portfolio_name'])
+            ->map(function (object $row) use ($totalValueByPortfolio): array {
+                $value = (float) $row->quantity * (float) $row->price;
+                $portfolioTotal = (float) ($totalValueByPortfolio->get($row->portfolio_id) ?? 0);
+
+                return [
+                    'id' => $row->id,
+                    'type' => $row->type,
+                    'date' => Carbon::parse($row->transaction_date)->format('d.m.Y'),
+                    'symbol' => $row->symbol,
+                    'name' => $row->name,
+                    'portfolio_name' => $row->portfolio_name,
+                    'quantity' => (float) $row->quantity,
+                    'price' => (float) $row->price,
+                    'currency' => (string) $row->currency,
+                    'value' => $value,
+                    // Share of that depot's current total value - not of
+                    // the original trade-time capital, so it drifts with
+                    // the position's own performance, same as the
+                    // Strategiedepots table's Bindung column.
+                    'share_pct' => $portfolioTotal > 0 ? ($value / $portfolioTotal) * 100 : null,
+                ];
+            });
     }
 
     private function continentPredictions(): array

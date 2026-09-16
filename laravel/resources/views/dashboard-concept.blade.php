@@ -460,11 +460,14 @@
                                                             <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Typ') }}</th>
                                                             <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Aktie') }}</th>
                                                             <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Menge') }}</th>
-                                                            <th class="border-0 pb-1.5 pl-2 text-right font-black">{{ __('Preis') }}</th>
+                                                            <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Preis') }}</th>
+                                                            <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Kaufwert') }}</th>
+                                                            <th class="border-0 pb-1.5 pl-2 text-right font-black">{{ __('Anteil') }}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         @foreach ($strategyRecentTransactions as $transaction)
+                                                            @php $currencySuffix = strtoupper($transaction['currency']) === 'EUR' ? '€' : $transaction['currency']; @endphp
                                                             <tr>
                                                                 <td class="border-0 py-1.5 pr-2 whitespace-nowrap tabular-nums text-[var(--ak-muted)]">{{ $transaction['date'] }}</td>
                                                                 <td class="border-0 px-2 py-1.5">
@@ -477,7 +480,9 @@
                                                                     </span>
                                                                 </td>
                                                                 <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($transaction['quantity'], 0, ',', '.') }}</td>
-                                                                <td class="border-0 py-1.5 pl-2 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($transaction['price'], 2, ',', '.') }} {{ strtoupper($transaction['currency']) === 'EUR' ? '€' : $transaction['currency'] }}</td>
+                                                                <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($transaction['price'], 2, ',', '.') }} {{ $currencySuffix }}</td>
+                                                                <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($transaction['value'], 0, ',', '.') }} {{ $currencySuffix }}</td>
+                                                                <td class="border-0 py-1.5 pl-2 text-right tabular-nums text-[var(--ak-muted)]">{{ $transaction['share_pct'] !== null ? number_format($transaction['share_pct'], 0, ',', '.').' %' : '—' }}</td>
                                                             </tr>
                                                         @endforeach
                                                     </tbody>
