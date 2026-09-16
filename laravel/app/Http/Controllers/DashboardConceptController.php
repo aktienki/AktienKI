@@ -376,6 +376,7 @@ final class DashboardConceptController extends Controller
             'name' => $instrument->name ?: $instrument->symbol,
             'country' => $instrument->country,
             'url' => route('stocks.show', ['symbol' => $instrument->symbol, 'return_to' => '/dashboard/concept']),
+            'currentPrice' => null,
             'compositeScore' => is_numeric($byInstrument['score']) ? (float) $byInstrument['score'] : null,
             'riskScore' => is_numeric($byInstrument['risk']) ? (float) $byInstrument['risk'] : null,
             'horizons' => [
