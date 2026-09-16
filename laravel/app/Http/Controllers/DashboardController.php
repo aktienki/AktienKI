@@ -842,6 +842,14 @@ class DashboardController extends Controller
      *
      * @return array{score: ?float, risk: ?float, count: int}
      */
+    /**
+     * Uses ServingScreenerService::currentStocks() - the exact same
+     * composite_score/risk_percent every screener view shows - rather than
+     * the older predictions table's ai_score/risk_score, which drifted
+     * from it enough to show a materially different number for the same
+     * stock (confirmed live: Allianz showed 75 here vs. 38 in the
+     * screener before this fix).
+     */
     private function positionAverageMetrics(Collection $portfolios): array
     {
         $instrumentIds = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions->pluck('instrument_id'))->unique()->values();
@@ -849,26 +857,11 @@ class DashboardController extends Controller
             return ['score' => null, 'risk' => null, 'count' => 0];
         }
 
-        $latestPredictionIds = DB::table('predictions')
-            ->whereIn('instrument_id', $instrumentIds)
-            ->selectRaw('instrument_id, MAX(id) AS prediction_id')
-            ->groupBy('instrument_id')
-            ->pluck('prediction_id');
+        $stocks = app(ServingScreenerService::class)->currentStocks()
+            ->filter(fn (object $stock): bool => in_array((int) $stock->instrument_id, $instrumentIds->all(), true));
 
-        $predictions = DB::table('predictions')
-            ->whereIn('id', $latestPredictionIds)
-            ->get(['ai_score', 'prediction_score', 'risk_score', 'drawdown_risk_factor']);
-
-        $scores = $predictions
-            ->map(fn (object $row) => AiScore::toPercent(is_numeric($row->ai_score) ? $row->ai_score : $row->prediction_score))
-            ->filter(fn ($value) => $value !== null);
-        $risks = $predictions
-            ->map(function (object $row) {
-                $risk = is_numeric($row->risk_score) ? $row->risk_score : $row->drawdown_risk_factor;
-
-                return is_numeric($risk) ? ((float) $risk <= 1 ? (float) $risk * 100 : (float) $risk) : null;
-            })
-            ->filter(fn ($value) => $value !== null);
+        $scores = $stocks->pluck('composite_score')->filter(fn ($value) => is_numeric($value));
+        $risks = $stocks->pluck('risk_percent')->filter(fn ($value) => is_numeric($value));
 
         return [
             'score' => $scores->isNotEmpty() ? (float) $scores->avg() : null,
