@@ -475,7 +475,7 @@
                                                                 </td>
                                                                 <td class="border-0 px-2 py-1.5">
                                                                     <span class="min-w-0">
-                                                                        <b class="block truncate font-bold text-[var(--ak-text)]">{{ $transaction['symbol'] }}</b>
+                                                                        <b class="block truncate font-bold text-[var(--ak-text)]">{{ $transaction['name'] }}</b>
                                                                         <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $transaction['portfolio_name'] }}</small>
                                                                     </span>
                                                                 </td>
