@@ -318,6 +318,114 @@ final class DashboardConceptController extends Controller
      */
     private function todayFocusSection(string $id): array
     {
+        $today = now()->toDateString();
+        $yesterday = now()->subDay()->toDateString();
+
+        $topSignal = null;
+        $swingStock = null;
+        $surpriseSignal = null;
+        $trendSwitch = null;
+
+        // 1. Top-Signal: Best BUY today by expected return (40T)
+        $topBuy = \DB::connection('serving')->table('serving_predictions')
+            ->where('signal', 'BUY')
+            ->whereDate('created_at', $today)
+            ->orderByDesc('expected_return')
+            ->select('instrument_id', 'expected_return', 'calibrated_score')
+            ->first();
+
+        if ($topBuy) {
+            $instrument = \DB::table('instruments')->where('id', $topBuy->instrument_id)->select('symbol', 'name')->first();
+            $topSignal = [
+                'symbol' => $instrument->symbol ?? '?',
+                'name' => $instrument->name ?? $instrument->symbol ?? '?',
+                'return' => (float)($topBuy->expected_return ?? 0) * 100,
+                'url' => route('stocks.show', ['symbol' => $instrument->symbol, 'return_to' => '/dashboard/concept']),
+            ];
+        }
+
+        // 2. Grösster Swing: Best/worst held position performance today
+        $holdingSwings = \DB::table('portfolio_positions as pp')
+            ->join('portfolio_transactions as pt', function ($j) {
+                $j->on('pp.id', '=', 'pt.portfolio_position_id')
+                  ->where('pt.type', '=', 'buy');
+            })
+            ->join('instruments as i', 'i.id', '=', 'pp.instrument_id')
+            ->select([
+                'i.symbol',
+                'i.name',
+                'pp.current_price',
+                \DB::raw('COALESCE(pt.average_buy_price, 0) as avg_buy_price'),
+                \DB::raw('(pp.current_price - COALESCE(pt.average_buy_price, 0)) / NULLIF(COALESCE(pt.average_buy_price, 1), 0) * 100 as perf_pct'),
+            ])
+            ->whereExists(function ($q) {
+                $q->select(\DB::raw(1))
+                  ->from('portfolio_transactions as pt2')
+                  ->whereColumn('pt2.portfolio_position_id', 'pp.id')
+                  ->where('pt2.type', 'buy');
+            })
+            ->orderByDesc(\DB::raw('ABS((pp.current_price - COALESCE(pt.average_buy_price, 0)) / NULLIF(COALESCE(pt.average_buy_price, 1), 0) * 100)'))
+            ->first();
+
+        if ($holdingSwings) {
+            $swingStock = [
+                'symbol' => $holdingSwings->symbol,
+                'name' => $holdingSwings->name,
+                'perf_pct' => (float)$holdingSwings->perf_pct,
+                'url' => route('stocks.show', ['symbol' => $holdingSwings->symbol, 'return_to' => '/dashboard/concept']),
+            ];
+        }
+
+        // 3. Überraschung: BUY signal when yesterday was SELL/HOLD
+        $yesterdaySignals = \DB::table('predictions')
+            ->whereDate('created_at', $yesterday)
+            ->select('instrument_id', 'signal')
+            ->get()
+            ->keyBy('instrument_id');
+
+        $surprise = \DB::connection('serving')->table('serving_predictions')
+            ->where('signal', 'BUY')
+            ->whereDate('created_at', $today)
+            ->select('instrument_id', 'expected_return')
+            ->orderByDesc('expected_return')
+            ->get()
+            ->first(function ($p) use ($yesterdaySignals) {
+                $old = $yesterdaySignals->get($p->instrument_id);
+                return $old && in_array($old->signal, ['SELL', 'HOLD']);
+            });
+
+        if ($surprise) {
+            $instr = \DB::table('instruments')->where('id', $surprise->instrument_id)->select('symbol', 'name')->first();
+            $surpriseSignal = [
+                'symbol' => $instr->symbol ?? '?',
+                'name' => $instr->name ?? $instr->symbol ?? '?',
+                'return' => (float)($surprise->expected_return ?? 0) * 100,
+                'url' => route('stocks.show', ['symbol' => $instr->symbol, 'return_to' => '/dashboard/concept']),
+            ];
+        }
+
+        // 4. Trendwechsel: SELL yesterday → BUY today
+        $trendSwitches = \DB::table('predictions as p1')
+            ->where('p1.signal', 'SELL')
+            ->whereDate('p1.created_at', $yesterday)
+            ->join('serving_predictions as sp', function ($j) {
+                $j->on('sp.instrument_id', '=', 'p1.instrument_id')
+                  ->where('sp.signal', '=', 'BUY')
+                  ->whereDate('sp.created_at', now()->toDateString());
+            })
+            ->join('instruments as i', 'i.id', '=', 'p1.instrument_id')
+            ->select('i.symbol', 'i.name', 'sp.expected_return')
+            ->first();
+
+        if ($trendSwitches) {
+            $trendSwitch = [
+                'symbol' => $trendSwitches->symbol,
+                'name' => $trendSwitches->name,
+                'return' => (float)($trendSwitches->expected_return ?? 0) * 100,
+                'url' => route('stocks.show', ['symbol' => $trendSwitches->symbol, 'return_to' => '/dashboard/concept']),
+            ];
+        }
+
         return [
             'id' => $id,
             'kind' => 'today-focus',
@@ -327,28 +435,32 @@ final class DashboardConceptController extends Controller
                     'subtitle' => __('Beste neue BUY-Empfehlung'),
                     'icon' => 'heroicon-o-arrow-trending-up',
                     'color' => 'emerald',
-                    'data' => null,
+                    'data' => $topSignal ? sprintf('%s +%.1f%%', $topSignal['symbol'], $topSignal['return']) : null,
+                    'url' => $topSignal['url'] ?? null,
                 ],
                 [
                     'label' => __('Grösster Swing'),
                     'subtitle' => __('Positionäre Performance heute'),
                     'icon' => 'heroicon-o-chart-bar',
                     'color' => 'orange',
-                    'data' => null,
+                    'data' => $swingStock ? sprintf('%s %+.1f%%', $swingStock['symbol'], $swingStock['perf_pct']) : null,
+                    'url' => $swingStock['url'] ?? null,
                 ],
                 [
                     'label' => __('Überraschung'),
                     'subtitle' => __('Signal gegen den Trend'),
                     'icon' => 'heroicon-o-bolt',
                     'color' => 'yellow',
-                    'data' => null,
+                    'data' => $surpriseSignal ? sprintf('%s (war HOLD)', $surpriseSignal['symbol']) : null,
+                    'url' => $surpriseSignal['url'] ?? null,
                 ],
                 [
                     'label' => __('Trendwechsel'),
                     'subtitle' => __('Von SELL zu BUY geflipped'),
                     'icon' => 'heroicon-o-arrow-path',
                     'color' => 'cyan',
-                    'data' => null,
+                    'data' => $trendSwitch ? $trendSwitch['symbol'] : null,
+                    'url' => $trendSwitch['url'] ?? null,
                 ],
             ],
             'analogs' => [],

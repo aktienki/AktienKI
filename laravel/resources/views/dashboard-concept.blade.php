@@ -277,7 +277,8 @@
                         @if($section['kind'] === 'today-focus')
                             <div class="grid gap-2 sm:grid-cols-2">
                                 @foreach($section['highlights'] as $highlight)
-                                    <div class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3">
+                                    @php $wrapper = $highlight['url'] ? 'a' : 'div'; @endphp
+                                    <{{ $wrapper }} @if($highlight['url']) href="{{ $highlight['url'] }}" @endif class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3 transition hover:border-{{ $highlight['color'] }}-400 hover:bg-[var(--ak-card)]">
                                         <div class="flex items-center gap-2 mb-2">
                                             <span class="grid h-6 w-6 shrink-0 place-items-center rounded text-{{ $highlight['color'] }}-500">
                                                 <x-dynamic-component :component="$highlight['icon']" class="h-4 w-4" />
@@ -290,9 +291,9 @@
                                         @if($highlight['data'])
                                             <div class="text-[10px] font-bold text-{{ $highlight['color'] }}-500">{{ $highlight['data'] }}</div>
                                         @else
-                                            <div class="text-[9px] text-[var(--ak-muted)] italic">{{ __('Wird aktualisiert…') }}</div>
+                                            <div class="text-[9px] text-[var(--ak-muted)] italic">{{ __('Keine Daten heute') }}</div>
                                         @endif
-                                    </div>
+                                    </{{ $wrapper }}>
                                 @endforeach
                             </div>
                             @if(count($section['analogs']) > 0)
