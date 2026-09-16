@@ -4,19 +4,17 @@ namespace App\Console\Commands;
 
 use App\Services\TodayHighlightsAnalysisService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 
 final class AnalyzeTodayHighlights extends Command
 {
     protected $signature = 'highlights:analyze-today';
-    protected $description = 'Analyze today\'s trading highlights with The Grid and cache for 24h';
+    protected $description = 'Analyze today\'s trading highlights with The Grid and save to JSON';
 
     public function handle(): int
     {
         $this->info('Analyzing today\'s highlights...');
 
         try {
-            // Minimal highlights array (will be enriched by service with full data)
             $dummyHighlights = [
                 ['data' => null],
                 ['data' => null],
@@ -27,10 +25,12 @@ final class AnalyzeTodayHighlights extends Command
             $service = app(TodayHighlightsAnalysisService::class);
             $insights = $service->analyzeHighlights($dummyHighlights);
 
-            // Cache for 24 hours
-            Cache::put('today_highlights_insights', $insights, 86400);
+            $filePath = storage_path('app/cache/today_highlights.json');
+            @mkdir(dirname($filePath), 0755, true);
 
-            $this->info('✓ Highlights analyzed and cached for 24h');
+            file_put_contents($filePath, json_encode($insights, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+            $this->info('✓ Highlights analyzed and saved to '.$filePath);
             return 0;
         } catch (\Exception $e) {
             $this->error('Analysis failed: '.$e->getMessage());

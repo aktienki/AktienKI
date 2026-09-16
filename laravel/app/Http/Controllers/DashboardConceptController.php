@@ -306,6 +306,26 @@ final class DashboardConceptController extends Controller
         };
     }
 
+    private function loadCachedInsights(): ?array
+    {
+        $filePath = storage_path('app/cache/today_highlights.json');
+        if (!file_exists($filePath)) {
+            return null;
+        }
+
+        try {
+            $mtime = filemtime($filePath);
+            if ($mtime < now()->startOfDay()->timestamp) {
+                return null;
+            }
+
+            $json = file_get_contents($filePath);
+            return json_decode($json, true) ?: null;
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
     /**
      * Reuses DashboardController::buildViewData() - the exact same data the
      * real /dashboard page computes - instead of recomputing any of it
@@ -452,7 +472,7 @@ final class DashboardConceptController extends Controller
             ],
         ];
 
-        $insights = \Illuminate\Support\Facades\Cache::get('today_highlights_insights')
+        $insights = $this->loadCachedInsights()
             ?? app(\App\Services\TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
 
         return [
