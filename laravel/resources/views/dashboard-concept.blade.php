@@ -617,6 +617,8 @@
                                                     <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Depot') }}</th>
                                                     <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Modell') }}</th>
                                                     <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Horizont') }}</th>
+                                                    <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Gekauft am') }}</th>
+                                                    <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Haltedauer') }}</th>
                                                     <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Anzahl') }}</th>
                                                     <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Kaufwert') }}</th>
                                                     <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Aktueller Wert') }}</th>
@@ -637,6 +639,17 @@
                                                         <td class="border-0 px-2 py-1.5 truncate text-[var(--ak-muted)]">{{ $holding['portfolio_name'] }}</td>
                                                         <td class="border-0 px-2 py-1.5 text-[var(--ak-muted)]">{{ $holding['model'] ?? '—' }}</td>
                                                         <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-muted)]">{{ $holding['horizon'] !== null ? $holding['horizon'].'T' : '—' }}</td>
+                                                        <td class="border-0 px-2 py-1.5 whitespace-nowrap tabular-nums text-[var(--ak-muted)]">{{ $holding['bought_at'] ?? '—' }}</td>
+                                                        <td class="border-0 px-2 py-1.5">
+                                                            @if ($holding['holding_remaining_pct'] !== null)
+                                                                <span class="flex items-center gap-1.5">
+                                                                    <span class="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-[var(--ak-border)]"><span class="block h-full rounded-full bg-orange-400" style="width: {{ number_format($holding['holding_remaining_pct'], 1) }}%"></span></span>
+                                                                    <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ $holding['holding_remaining_days'] }}{{ __('T') }} · {{ number_format($holding['holding_remaining_pct'], 0, ',', '.') }} %</span>
+                                                                </span>
+                                                            @else
+                                                                <span class="text-[var(--ak-muted)]">—</span>
+                                                            @endif
+                                                        </td>
                                                         <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($holding['quantity'], 0, ',', '.') }}</td>
                                                         <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($holding['buy_value'], 0, ',', '.') }} {{ $holdingCurrencySuffix }}</td>
                                                         <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format($holding['current_value'], 0, ',', '.') }} {{ $holdingCurrencySuffix }}</td>

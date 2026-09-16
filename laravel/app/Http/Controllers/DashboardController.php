@@ -1004,6 +1004,13 @@ class DashboardController extends Controller
             $horizon = in_array($exitHoldingDays, [10, 20, 40], true) ? $exitHoldingDays : null;
             $modelRow = $horizon !== null ? $latestByInstrumentHorizon->get($position->instrument_id.'-'.$horizon) : null;
 
+            $boughtAt = $position->opened_at_date ? Carbon::parse($position->opened_at_date) : null;
+            $holdingElapsedDays = $boughtAt !== null ? max(0, (int) floor($boughtAt->diffInDays(now()))) : null;
+            $holdingRemainingPct = ($horizon !== null && $holdingElapsedDays !== null && $horizon > 0)
+                ? max(0.0, min(100.0, (1 - ($holdingElapsedDays / $horizon)) * 100))
+                : null;
+            $holdingRemainingDays = $holdingRemainingPct !== null ? max(0, $horizon - $holdingElapsedDays) : null;
+
             return [
                 'name' => $position->instrument?->name ?? $position->instrument?->symbol ?? __('Unbekannt'),
                 'symbol' => $position->instrument?->symbol,
@@ -1016,6 +1023,9 @@ class DashboardController extends Controller
                 'current_value' => $currentValue,
                 'performance_eur' => $performanceEur,
                 'performance_pct' => $buyValue > 0 ? ($performanceEur / $buyValue) * 100 : 0.0,
+                'bought_at' => $boughtAt?->format('d.m.Y'),
+                'holding_remaining_pct' => $holdingRemainingPct,
+                'holding_remaining_days' => $holdingRemainingDays,
             ];
         })->sortByDesc('current_value')->values()->all();
     }
