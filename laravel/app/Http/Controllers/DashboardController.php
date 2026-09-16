@@ -354,6 +354,8 @@ class DashboardController extends Controller
         $corporateScheduleItems = collect();
         $strategyPositionEvents = $this->upcomingPositionEvents($strategyPortfolios);
         $strategyRecentTransactions = $this->recentStrategyTransactions($strategyPortfolios);
+        $strategyCompositionByCountry = $this->positionComposition($strategyPortfolios, 'country');
+        $strategyCompositionBySector = $this->positionComposition($strategyPortfolios, 'sector');
         $allScheduleItems = $messageReminders
             ->concat($corporateScheduleItems)
             ->sortBy(fn (array $item): string => ($item['sort_at'] === '0000-00-00' ? '9999-12-31' : $item['sort_at']).'-'.$item['symbol'])
@@ -370,7 +372,7 @@ class DashboardController extends Controller
         $newsCenterItems = collect();
 
         return compact(
-            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'overview', 'marketSituation', 'continentPredictions',
+            'riskProfile', 'strategyPortfolio', 'strategyPortfolios', 'strategyPortfolioTotals', 'recentBuysCount', 'strategyPositionEvents', 'strategyRecentTransactions', 'strategyCompositionByCountry', 'strategyCompositionBySector', 'overview', 'marketSituation', 'continentPredictions',
             'marketFactorSnapshot',
             'externalConfirmedBuys',
             'threeFactorAlternatives',
@@ -585,7 +587,7 @@ class DashboardController extends Controller
             ->where('type', 'paper')
             ->where('active', true)
             ->whereHas('strategies')
-            ->with(['cashAccount', 'strategies:id,name', 'positions.instrument:id,symbol,name,country'])
+            ->with(['cashAccount', 'strategies:id,name', 'positions.instrument:id,symbol,name,country,sector'])
             ->get()
             ->map(function (Portfolio $portfolio): Portfolio {
                 $positionsValue = $portfolio->positions->sum(fn ($position): float => (float) $position->quantity * (float) ($position->current_price ?? $position->average_buy_price));
@@ -787,6 +789,47 @@ class DashboardController extends Controller
                     'share_pct' => $portfolioTotal > 0 ? ($value / $portfolioTotal) * 100 : null,
                 ];
             });
+    }
+
+    /**
+     * Held positions' value share by country or sector, across every
+     * strategy depot combined. Every position's current_price is already
+     * in its own depot's settlement currency (EUR for every depot now -
+     * see resolvePurchasePrice()), so summing raw values across depots is
+     * safe without a separate FX step. Top 5 groups, the rest folded into
+     * "Sonstige" - a pie chart with a dozen slivers is unreadable.
+     *
+     * @return array<int, array{label: string, pct: float, value: float}>
+     */
+    private function positionComposition(Collection $portfolios, string $groupBy): array
+    {
+        $positions = $portfolios->flatMap(fn (Portfolio $portfolio) => $portfolio->positions);
+        $totalValue = (float) $positions->sum(fn ($position): float => (float) $position->quantity * (float) ($position->current_price ?? $position->average_buy_price));
+        if ($totalValue <= 0) {
+            return [];
+        }
+
+        $grouped = $positions
+            ->groupBy(fn ($position) => trim((string) ($position->instrument?->{$groupBy} ?? '')) !== ''
+                ? (string) $position->instrument->{$groupBy}
+                : __('Unbekannt'))
+            ->map(fn (Collection $group): float => (float) $group->sum(fn ($position): float => (float) $position->quantity * (float) ($position->current_price ?? $position->average_buy_price)))
+            ->sortDesc();
+
+        $top = $grouped->take(5);
+        $rest = (float) $grouped->slice(5)->sum();
+
+        $rows = $top->map(fn (float $value, string $label): array => [
+            'label' => $label,
+            'value' => $value,
+            'pct' => ($value / $totalValue) * 100,
+        ])->values()->all();
+
+        if ($rest > 0) {
+            $rows[] = ['label' => __('Sonstige'), 'value' => $rest, 'pct' => ($rest / $totalValue) * 100];
+        }
+
+        return $rows;
     }
 
     private function continentPredictions(): array
