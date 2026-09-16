@@ -621,8 +621,6 @@
                                             </div>
                                         </article>
                                     @endif
-                                    @include('partials.dashboard-middle-column')
-                                    @include('partials.dashboard-daily-tips-card')
                                 </div>
                                 <div class="concept-classic-dashboard-col">
                                     <article class="concept-card p-4">
@@ -653,7 +651,6 @@
                                             @endforelse
                                         </div>
                                     </article>
-                                    @include('partials.dashboard-right-column')
                                 </div>
                             </div>
                         @else
