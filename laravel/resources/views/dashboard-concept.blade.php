@@ -643,7 +643,7 @@
                                                         <td class="border-0 px-2 py-1.5">
                                                             @if ($holding['holding_remaining_pct'] !== null)
                                                                 <span class="flex items-center gap-1.5">
-                                                                    <span class="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-[var(--ak-border)]"><span class="block h-full rounded-full bg-cyan-400" style="width: {{ number_format($holding['holding_remaining_pct'], 1) }}%"></span></span>
+                                                                    <span class="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-[var(--ak-border)]"><span class="block h-full rounded-full bg-cyan-400" style="width: {{ number_format(100 - $holding['holding_remaining_pct'], 1) }}%"></span></span>
                                                                     <span class="shrink-0 tabular-nums text-[var(--ak-muted)]">{{ $holding['holding_remaining_days'] }}{{ __('T') }} · {{ number_format($holding['holding_remaining_pct'], 0, ',', '.') }} %</span>
                                                                 </span>
                                                             @else
