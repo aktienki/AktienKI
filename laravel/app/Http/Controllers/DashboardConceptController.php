@@ -417,43 +417,51 @@ final class DashboardConceptController extends Controller
             ];
         }
 
+        $highlights = [
+            [
+                'label' => __('Top-Signal'),
+                'subtitle' => __('Beste neue BUY-Empfehlung'),
+                'icon' => 'heroicon-o-arrow-trending-up',
+                'color' => 'emerald',
+                'data' => $topSignal ? sprintf('%s +%.1f%%', $topSignal['symbol'], $topSignal['return']) : null,
+                'url' => $topSignal['url'] ?? null,
+            ],
+            [
+                'label' => __('Grösster Swing'),
+                'subtitle' => __('Positionäre Performance heute'),
+                'icon' => 'heroicon-o-chart-bar',
+                'color' => 'orange',
+                'data' => $swingStock ? sprintf('%s %+.1f%%', $swingStock['symbol'], $swingStock['perf_pct']) : null,
+                'url' => $swingStock['url'] ?? null,
+            ],
+            [
+                'label' => __('Überraschung'),
+                'subtitle' => __('Signal gegen den Trend'),
+                'icon' => 'heroicon-o-bolt',
+                'color' => 'yellow',
+                'data' => $surpriseSignal ? sprintf('%s (war HOLD)', $surpriseSignal['symbol']) : null,
+                'url' => $surpriseSignal['url'] ?? null,
+            ],
+            [
+                'label' => __('Trendwechsel'),
+                'subtitle' => __('Von SELL zu BUY geflipped'),
+                'icon' => 'heroicon-o-arrow-path',
+                'color' => 'cyan',
+                'data' => $trendSwitch ? $trendSwitch['symbol'] : null,
+                'url' => $trendSwitch['url'] ?? null,
+            ],
+        ];
+
+        $insights = app(\App\Services\TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
+
         return [
             'id' => $id,
             'kind' => 'today-focus',
-            'highlights' => [
-                [
-                    'label' => __('Top-Signal'),
-                    'subtitle' => __('Beste neue BUY-Empfehlung'),
-                    'icon' => 'heroicon-o-arrow-trending-up',
-                    'color' => 'emerald',
-                    'data' => $topSignal ? sprintf('%s +%.1f%%', $topSignal['symbol'], $topSignal['return']) : null,
-                    'url' => $topSignal['url'] ?? null,
-                ],
-                [
-                    'label' => __('Grösster Swing'),
-                    'subtitle' => __('Positionäre Performance heute'),
-                    'icon' => 'heroicon-o-chart-bar',
-                    'color' => 'orange',
-                    'data' => $swingStock ? sprintf('%s %+.1f%%', $swingStock['symbol'], $swingStock['perf_pct']) : null,
-                    'url' => $swingStock['url'] ?? null,
-                ],
-                [
-                    'label' => __('Überraschung'),
-                    'subtitle' => __('Signal gegen den Trend'),
-                    'icon' => 'heroicon-o-bolt',
-                    'color' => 'yellow',
-                    'data' => $surpriseSignal ? sprintf('%s (war HOLD)', $surpriseSignal['symbol']) : null,
-                    'url' => $surpriseSignal['url'] ?? null,
-                ],
-                [
-                    'label' => __('Trendwechsel'),
-                    'subtitle' => __('Von SELL zu BUY geflipped'),
-                    'icon' => 'heroicon-o-arrow-path',
-                    'color' => 'cyan',
-                    'data' => $trendSwitch ? $trendSwitch['symbol'] : null,
-                    'url' => $trendSwitch['url'] ?? null,
-                ],
-            ],
+            'highlights' => array_map(function ($h, $idx) use ($insights) {
+                $keys = ['top_signal_insight', 'swing_insight', 'surprise_insight', 'trend_switch_insight'];
+                $h['insight'] = $insights[$keys[$idx]] ?? '';
+                return $h;
+            }, $highlights, array_keys($highlights)),
             'analogs' => [],
         ];
     }

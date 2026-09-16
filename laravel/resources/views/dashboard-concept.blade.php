@@ -290,6 +290,9 @@
                                         </div>
                                         @if($highlight['data'])
                                             <div class="text-[10px] font-bold text-{{ $highlight['color'] }}-500">{{ $highlight['data'] }}</div>
+                                            @if($highlight['insight'])
+                                                <div class="mt-1.5 text-[9px] text-[var(--ak-muted)]">{{ $highlight['insight'] }}</div>
+                                            @endif
                                         @else
                                             <div class="text-[9px] text-[var(--ak-muted)] italic">{{ __('Keine Daten heute') }}</div>
                                         @endif
