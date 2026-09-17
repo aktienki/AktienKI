@@ -2026,8 +2026,8 @@
             $activeRunSettings = json_decode((string) ($activeBacktestRun->settings ?? '{}'), true) ?: [];
             $automaticComparisonActive = (bool) data_get($activeRunSettings, 'selection_filters.automatic_strategy_comparison', false);
         @endphp
-        <div x-data="{ open: @js(request()->boolean('show_result')) }" x-show="open" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" @open-backtest-result.window="open = true" @automatic-strategy-selected.window="open = false" @keydown.escape.window="if (!@js($automaticComparisonActive)) window.location.assign(@js($backtestTuningUrl))">
-            <section class="ak-backtest-result-dialog w-full max-w-5xl rounded-2xl border border-teal-300/20 bg-[#15243a]/90 p-5 shadow-2xl" @click.outside="if (!@js($automaticComparisonActive)) window.location.assign(@js($backtestTuningUrl))">
+        <div x-data="{ open: @js(request()->boolean('show_result')), saveModalOpen() { const m = document.getElementById('save-strategy-modal'); return !!m && getComputedStyle(m).display !== 'none'; } }" x-show="open" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" @open-backtest-result.window="open = true" @automatic-strategy-selected.window="open = false" @keydown.escape.window="if (!@js($automaticComparisonActive) && !saveModalOpen()) window.location.assign(@js($backtestTuningUrl))">
+            <section class="ak-backtest-result-dialog w-full max-w-5xl rounded-2xl border border-teal-300/20 bg-[#15243a]/90 p-5 shadow-2xl" @click.outside="if (!@js($automaticComparisonActive) && !saveModalOpen()) window.location.assign(@js($backtestTuningUrl))">
                 <div id="filtered-backtest-result-loading" class="mb-4 flex items-center gap-3 rounded-xl border border-cyan-300/20 bg-cyan-400/[.06] px-4 py-3" role="status" aria-live="polite">
                     <span class="relative flex h-8 w-8 shrink-0 items-center justify-center">
                         <span class="absolute h-8 w-8 animate-ping rounded-full bg-cyan-300/15"></span>
