@@ -22,6 +22,22 @@ HEALTH_URL=https://aktienki.com/
 TARGET="${1:-origin/$BRANCH}"
 ts() { date -Is; }
 log() { printf '\n\033[1;36m>>> %s\033[0m\n' "$*"; }
+# Runs a noisy step (composer/npm/vite) silently and only prints its output
+# if it fails - success just gets a one-line "OK". Keeps deploy output short
+# without hiding anything when something actually goes wrong.
+run_quiet() {
+  local desc="$1"; shift
+  local out; out="$(mktemp)"
+  if "$@" >"$out" 2>&1; then
+    echo "  $desc: OK"
+    rm -f "$out"
+  else
+    echo "  $desc: FAILED"
+    cat "$out"
+    rm -f "$out"
+    exit 1
+  fi
+}
 # umask 002 matters here: without it, files this creates (view:cache,
 # config:cache, composer/npm artifacts) get mode 755/mask r-x for the
 # www-data group instead of 775/rwx, and php-fpm (running as www-data)
@@ -52,14 +68,14 @@ as_app "$REPO" git reset --hard "$TARGET"
 as_app "$REPO" git --no-pager log --oneline -1
 
 log "Composer (production)"
-as_app "$APP" composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+run_quiet "composer install" as_app "$APP" composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
 log "Database migrations"
 as_app "$APP" php artisan migrate --force
 
 log "Frontend build (vite)"
-as_app "$APP" npm ci --no-audit --no-fund
-as_app "$APP" npm run build
+run_quiet "npm ci" as_app "$APP" npm ci --no-audit --no-fund
+run_quiet "npm run build" as_app "$APP" npm run build
 
 log "Framework caches"
 as_app "$APP" php artisan optimize:clear
