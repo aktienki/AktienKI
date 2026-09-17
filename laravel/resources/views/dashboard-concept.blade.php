@@ -195,7 +195,7 @@
         }
     </style>
 
-    <div id="dashboard-concept-page" x-data="{ active: null }">
+    <div id="dashboard-concept-page" x-data="{ active: 'today-focus' }">
         <header class="mb-5">
             <p class="text-[10px] font-black uppercase tracking-[.16em] text-cyan-500">{{ __('Konzept') }}</p>
             <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)]">{{ __('Persönlicher Bereich') }}</h1>
@@ -212,7 +212,7 @@
                         type="button"
                         class="concept-icon-tile"
                         :class="{ 'is-active': active === '{{ $item['id'] }}' }"
-                        @click="active = (active === '{{ $item['id'] }}' ? null : '{{ $item['id'] }}')"
+                        @click="active = '{{ $item['id'] }}'"
                         title="{{ $item['label'] }}"
                     >
                         <x-dynamic-component :component="$item['icon']" />
@@ -221,49 +221,8 @@
                 @endforeach
             </nav>
 
-            {{-- Right: Handelsmöglichkeiten by default, swaps to the active section's short overview --}}
+            {{-- Right: defaults straight to Heute im Fokus, swaps to whichever section is active --}}
             <div>
-                <section class="concept-card concept-main-card" x-show="active === null" x-cloak>
-                    <div class="concept-main-header">
-                        <span class="concept-icon-badge border-amber-400/25 bg-amber-400/10 text-amber-400"><x-heroicon-o-bolt class="h-5 w-5" /></span>
-                        <span>
-                            <small class="text-amber-500">{{ __('Kurzübersicht') }}</small>
-                            <b>{{ __('Aktuelle Handelsmöglichkeiten') }}</b>
-                        </span>
-                    </div>
-
-                    <p class="mb-2 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Drei-Faktoren-Champion') }}</p>
-                    @if($opportunities['champion'])
-                        <div class="concept-opp-stack">
-                            <x-dashboard-concept.opportunity-card :card="$opportunities['champion']" />
-                        </div>
-                    @else
-                        <div class="concept-empty">{{ __('Kein Champion aktuell verfügbar.') }}</div>
-                    @endif
-
-                    <p class="mb-2 mt-4 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Weitere Kandidaten') }}</p>
-                    @if(count($opportunities['candidates']))
-                        <div class="concept-opp-stack">
-                            @foreach($opportunities['candidates'] as $card)
-                                <x-dashboard-concept.opportunity-card :card="$card" />
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="concept-empty">{{ __('Aktuell keine weiteren Kandidaten verfügbar.') }}</div>
-                    @endif
-
-                    <p class="mb-2 mt-4 text-[10px] font-black uppercase tracking-[.12em] text-[var(--ak-muted)]">{{ __('Signalwechsel') }}</p>
-                    @if(count($opportunities['signalChanges']))
-                        <div class="concept-opp-stack">
-                            @foreach($opportunities['signalChanges'] as $card)
-                                <x-dashboard-concept.opportunity-card :card="$card" />
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="concept-empty">{{ __('Keine aktuellen Signalwechsel.') }}</div>
-                    @endif
-                </section>
-
                 @foreach($sections as $section)
                     <section class="concept-card concept-main-card" x-show="active === '{{ $section['id'] }}'" x-cloak>
                         <div class="concept-main-header">
