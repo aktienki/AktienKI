@@ -198,6 +198,16 @@ Schedule::command('news:sync-press-releases --limit=2500 --analyze --analysis-li
     ->onOneServer()
     ->runInBackground();
 
+// Refreshes the "News" dashboard section's JSON snapshot after the press
+// release sync above has had time to complete.
+Schedule::command('news:export-recent-json --hours=48')
+    ->weekdays()
+    ->dailyAt('05:00')
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->runInBackground();
+
 // Predictions run on the application server so production remains available
 // even when the training workstation is offline. The workstation only trains
 // and validates models; released artifacts are synchronized separately.

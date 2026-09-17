@@ -33,6 +33,7 @@ final class DashboardConceptController extends Controller
         ['smart-screener', 'Smart Screener', 'heroicon-o-magnifying-glass'],
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
         ['stock-of-day', 'Aktie des Tages', 'heroicon-o-sparkles'],
+        ['news', 'News', 'heroicon-o-newspaper'],
         ['upcoming-news', 'Anstehende News', 'heroicon-o-calendar-days'],
         ['earnings-drift', 'Quartalszahlen-Historie', 'heroicon-o-chart-bar'],
     ];
@@ -75,6 +76,7 @@ final class DashboardConceptController extends Controller
             $this->ctaSection('smart-screener', __('Aktien nach eigenen Kriterien filtern und sortieren.')),
             $this->marketSection('market-report', $snapshot, $user),
             $this->stockOfTheDaySection('stock-of-day', $request),
+            $this->newsSection('news'),
             $this->eventsSection('upcoming-news', $request),
             $this->earningsDriftSection('earnings-drift', $request),
             $this->classicDashboardSection('classic-dashboard', $request),
@@ -304,6 +306,39 @@ final class DashboardConceptController extends Controller
             'classic-dashboard' => route('dashboard'),
             default => route('dashboard'),
         };
+    }
+
+    /**
+     * Reads the static JSON snapshot news:export-recent-json writes (via
+     * news:sync-press-releases -> Twelve Data press_releases). Kept as a
+     * plain file rather than a live query so the "News" tab stays fast and
+     * the exact exported snapshot is inspectable independent of the DB.
+     */
+    private function newsSection(string $id): array
+    {
+        $filePath = storage_path('app/cache/recent_news.json');
+        $items = [];
+        $generatedAt = null;
+
+        if (file_exists($filePath)) {
+            $payload = json_decode(file_get_contents($filePath), true);
+            if (is_array($payload)) {
+                $generatedAt = $payload['generated_at'] ?? null;
+                $items = collect($payload['items'] ?? [])->take(30)->map(fn (array $item): array => [
+                    ...$item,
+                    'url' => filled($item['symbol'] ?? null)
+                        ? route('stocks.show', ['symbol' => $item['symbol'], 'return_to' => '/dashboard/concept'])
+                        : null,
+                ])->all();
+            }
+        }
+
+        return [
+            'id' => $id,
+            'kind' => 'news',
+            'items' => $items,
+            'generated_at' => $generatedAt,
+        ];
     }
 
     private function loadCachedInsights(array $highlights): ?array

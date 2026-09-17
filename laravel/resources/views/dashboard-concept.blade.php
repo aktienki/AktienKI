@@ -545,6 +545,43 @@
                             @else
                                 <div class="concept-empty">{{ __('Keine Prognosen für heute verfügbar.') }}</div>
                             @endif
+                        @elseif($section['kind'] === 'news')
+                            @if($section['generated_at'])
+                                <p class="mb-3 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                    {{ __('Stand: :date · letzte 48h', ['date' => \Illuminate\Support\Carbon::parse($section['generated_at'])->format('d.m.Y H:i')]) }}
+                                </p>
+                            @endif
+                            @if(count($section['items']) > 0)
+                                <div class="space-y-2">
+                                    @foreach($section['items'] as $news)
+                                        @php
+                                            $sentimentClass = $news['sentiment'] === null ? 'text-[var(--ak-muted)]' : ($news['sentiment'] > 0.15 ? 'text-emerald-500' : ($news['sentiment'] < -0.15 ? 'text-rose-500' : 'text-[var(--ak-muted)]'));
+                                        @endphp
+                                        <a @if($news['url']) href="{{ $news['url'] }}" @endif class="concept-card block p-3">
+                                            <div class="flex items-start justify-between gap-2">
+                                                <div class="min-w-0">
+                                                    <div class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                        <span>{{ $news['symbol'] }}</span>
+                                                        @if($news['sector'])<span>· {{ $news['sector'] }}</span>@endif
+                                                        <span>· {{ \Illuminate\Support\Carbon::parse($news['published_at'])->diffForHumans() }}</span>
+                                                    </div>
+                                                    <b class="mt-1 block text-[12px] leading-4 text-[var(--ak-text)]">{{ $news['headline'] }}</b>
+                                                    @if($news['summary'])
+                                                        <p class="mt-1 text-[10px] leading-4 text-[var(--ak-muted)]">{{ \Illuminate\Support\Str::limit($news['summary'], 180) }}</p>
+                                                    @endif
+                                                </div>
+                                                @if($news['sentiment'] !== null)
+                                                    <span class="shrink-0 text-[9px] font-black {{ $sentimentClass }}">
+                                                        {{ $news['sentiment'] > 0 ? '+' : '' }}{{ number_format($news['sentiment'], 1, ',', '.') }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="concept-empty">{{ __('Keine aktuellen Meldungen der letzten 48 Stunden.') }}</div>
+                            @endif
                         @elseif($section['kind'] === 'classic-dashboard')
                             @php
                                 extract($section['viewData']);
