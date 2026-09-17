@@ -159,7 +159,11 @@ return [
         'grid_endpoint' => env('STOCK_AI_ASSESSMENT_GRID_ENDPOINT', 'https://api.thegrid.ai/v1/chat/completions'),
         // Instrument string: <task>-<tier>, e.g. text-standard/text-prime/text-max.
         'grid_model' => env('STOCK_AI_ASSESSMENT_GRID_MODEL', 'gpt-sol-latest'),
-        'max_output_tokens' => (int) env('STOCK_AI_ASSESSMENT_MAX_OUTPUT_TOKENS', 900),
+        // Kimi (and other reasoning models on The Grid) spend a large,
+        // variable share of this budget on an internal reasoning trace
+        // before writing the actual JSON answer - 900 silently truncated
+        // several fields to empty arrays under load.
+        'max_output_tokens' => (int) env('STOCK_AI_ASSESSMENT_MAX_OUTPUT_TOKENS', 3500),
     ],
     'instrument_descriptions' => [
         // Bilingual business descriptions for newly imported stocks - same

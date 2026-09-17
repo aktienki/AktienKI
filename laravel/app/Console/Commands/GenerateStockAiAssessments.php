@@ -23,8 +23,28 @@ final class GenerateStockAiAssessments extends Command
         }
 
         $today = now()->toDateString();
+        $yesterday = now()->subDay()->toDateString();
+
+        // Only genuinely new BUY signals get a (paid) AI assessment - a
+        // stock that was already BUY yesterday and still is today is not
+        // reassessed, even if today's assessment for it doesn't exist yet.
+        $wasBuyYesterday = DB::table('today_highlights_mv')
+            ->where('serving_signal', 'BUY')
+            ->whereDate('prediction_date', $yesterday)
+            ->pluck('instrument_id')
+            ->map(fn ($id): int => (int) $id)
+            ->flip();
+        $isBuyToday = DB::table('today_highlights_mv')
+            ->where('serving_signal', 'BUY')
+            ->whereDate('prediction_date', $today)
+            ->pluck('instrument_id')
+            ->map(fn ($id): int => (int) $id)
+            ->flip();
+        $newBuyInstrumentIds = $isBuyToday->diffKeys($wasBuyYesterday)->keys();
+
         $stocks = $screener->currentStocks()
             ->filter(fn (object $stock): bool => strtoupper((string) ($stock->personalized_signal ?? '')) === 'BUY')
+            ->filter(fn (object $stock): bool => $this->option('force') || $newBuyInstrumentIds->contains((int) $stock->instrument_id))
             ->values();
 
         if (! $this->option('force')) {
@@ -36,7 +56,7 @@ final class GenerateStockAiAssessments extends Command
             $stocks = $stocks->reject(fn (object $stock): bool => $existingInstrumentIds->has((int) $stock->instrument_id))->values();
         }
 
-        $this->info("POSITIV stocks: {$stocks->count()} to assess.");
+        $this->info("New BUY signals to assess: {$stocks->count()}.");
 
         $generated = 0;
         $failed = 0;

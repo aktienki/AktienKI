@@ -52,15 +52,20 @@ PROMPT;
         ];
 
         $endpoint = (string) config('aktienki.stock_ai_assessment.grid_endpoint', 'https://api.thegrid.ai/v1/chat/completions');
-        $response = Http::withToken($apiKey)
-            ->acceptJson()
-            ->asJson()
-            ->connectTimeout(15)
-            ->timeout(120)
-            ->post($endpoint, $payload);
-
-        if ($response->failed()) {
-            throw new RuntimeException($this->providerError($response));
+        // The Grid's backend load-balances across providers; roughly one in
+        // three requests using response_format/tools transiently 500s or
+        // 400s on a provider that doesn't support the requested feature.
+        // A short retry almost always lands on a working provider.
+        try {
+            $response = Http::withToken($apiKey)
+                ->acceptJson()
+                ->asJson()
+                ->connectTimeout(15)
+                ->timeout(120)
+                ->retry(3, 1500)
+                ->post($endpoint, $payload);
+        } catch (\Illuminate\Http\Client\RequestException $e) {
+            throw new RuntimeException($this->providerError($e->response));
         }
 
         $rawResponse = $response->json();
