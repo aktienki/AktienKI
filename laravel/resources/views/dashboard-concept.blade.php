@@ -327,7 +327,7 @@
                                             @if($highlight['analog'])
                                                 @php
                                                     $analog = $highlight['analog'];
-                                                    $daysAgo = \Illuminate\Support\Carbon::parse($analog['signal_date'])->diffInDays(now());
+                                                    $daysAgo = (int) round(\Illuminate\Support\Carbon::parse($analog['signal_date'])->diffInDays(now()));
                                                     $outcomeClass = $analog['outcome_pct'] >= 0 ? 'text-emerald-500' : 'text-rose-500';
                                                 @endphp
                                                 {{-- A <div>, not <a>: this sits inside the card's own link (nested
