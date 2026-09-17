@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class ChartPatternSignalService
 {
-    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v5';
+    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v6';
 
     /** Event types driven by a bounded (0-100) oscillator, shown as its own panel below the candles rather than overlaid on price. */
     private const INDICATOR_EVENT_KEYS = ['rsi_oversold', 'rsi_overbought'];
@@ -140,8 +140,40 @@ final class ChartPatternSignalService
                 ? $this->rsiPanel($bars)
                 : null;
 
+            $span = self::CANDLESTICK_PATTERN_SPANS[$event['event_key']] ?? null;
+            $event['pattern_range'] = $span !== null && count($event['candles']) >= $span
+                ? $this->patternRange($event['candles'], $span)
+                : null;
+
             return $event;
         });
+    }
+
+    /**
+     * The bounding candle span each candlestick pattern is actually defined
+     * over - an engulfing pattern is a relationship between two consecutive
+     * candles, a pin bar is a single candle's shape - marked in the chart as
+     * start/end guide lines instead of leaving the reader to guess which
+     * candle(s) the label refers to.
+     */
+    private const CANDLESTICK_PATTERN_SPANS = [
+        'pattern_bullish_engulfing' => 2,
+        'pattern_bearish_engulfing' => 2,
+        'pattern_bullish_pin_bar' => 1,
+        'pattern_bearish_pin_bar' => 1,
+    ];
+
+    /** @param list<array{x: float, width: float}> $candles */
+    private function patternRange(array $candles, int $span): array
+    {
+        $slice = array_slice($candles, -$span);
+        $first = $slice[0];
+        $last = end($slice);
+
+        return [
+            'start_x' => round($first['x'] - $first['width'] / 2, 2),
+            'end_x' => round($last['x'] + $last['width'] / 2, 2),
+        ];
     }
 
     /** @return list<array{x: float, width: float, high_y: float, low_y: float, body_y: float, body_height: float, bullish: bool}> */
@@ -282,7 +314,7 @@ final class ChartPatternSignalService
                 -- intermittently see zero rows depending on time of day.
                 SELECT DISTINCT bar_time FROM series ORDER BY bar_time DESC LIMIT 1
             )
-            SELECT s.instrument_id, i.symbol, i.name, s.bar_time, s.close, s.previous_close,
+            SELECT s.instrument_id, i.symbol, i.name, i.country, s.bar_time, s.close, s.previous_close,
                    event.event_key, event.label_de, event.tone
             FROM series s
             JOIN instruments i ON i.id = s.instrument_id
@@ -310,6 +342,7 @@ final class ChartPatternSignalService
             'instrument_id' => (int) $row->instrument_id,
             'symbol' => $row->symbol,
             'name' => $row->name,
+            'country' => strtoupper((string) $row->country),
             'time' => $row->bar_time,
             'event_key' => $row->event_key,
             'label' => $row->label_de,

@@ -1083,9 +1083,9 @@
                                                 <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-{{ $tone }}-500/10 text-{{ $tone }}-500">
                                                     <x-dynamic-component :component="$row['tone'] === 'negative' ? 'heroicon-o-arrow-trending-down' : 'heroicon-o-arrow-trending-up'" class="h-4.5 w-4.5" />
                                                 </span>
-                                                <div class="min-w-0">
-                                                    <b class="block truncate text-[12px] font-black text-[var(--ak-text)]">{{ $row['symbol'] }}</b>
-                                                    <small class="block truncate text-[9px] text-[var(--ak-muted)]">{{ $row['name'] }}</small>
+                                                <div class="flex min-w-0 items-center gap-1.5">
+                                                    <span class="text-base leading-none">{{ $row['country_flag'] }}</span>
+                                                    <b class="block truncate text-[12px] font-black text-[var(--ak-text)]">{{ $row['name'] }}</b>
                                                 </div>
                                             </div>
 
@@ -1094,26 +1094,31 @@
                                                 <div class="text-[13px] font-black text-{{ $tone }}-500">{{ $row['label'] }}</div>
                                             </div>
 
-                                            @if(count($row['candles']))
-                                                <div class="mb-2 rounded-lg bg-[var(--ak-surface-muted)] px-2 py-1.5">
-                                                    <div class="mb-1 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf (30T)') }}</div>
-                                                    <svg viewBox="0 0 100 32" class="h-8 w-full" preserveAspectRatio="none">
-                                                        @foreach($row['candles'] as $candle)
-                                                            <line x1="{{ $candle['x'] }}" x2="{{ $candle['x'] }}" y1="{{ $candle['high_y'] }}" y2="{{ $candle['low_y'] }}" stroke="currentColor" stroke-width="1" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
-                                                            <rect x="{{ $candle['x'] - $candle['width'] / 2 }}" y="{{ $candle['body_y'] }}" width="{{ $candle['width'] }}" height="{{ $candle['body_height'] }}" fill="currentColor" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
-                                                        @endforeach
-                                                    </svg>
-
-                                                    @if($row['indicator_series'])
-                                                        <div class="mb-1 mt-2 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $row['indicator_series']['label'] }}</div>
-                                                        <svg viewBox="0 0 100 20" class="h-5 w-full" preserveAspectRatio="none">
-                                                            <line x1="0" x2="100" y1="{{ $row['indicator_series']['overbought_y'] }}" y2="{{ $row['indicator_series']['overbought_y'] }}" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,2" class="text-rose-400/50" />
-                                                            <line x1="0" x2="100" y1="{{ $row['indicator_series']['oversold_y'] }}" y2="{{ $row['indicator_series']['oversold_y'] }}" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,2" class="text-emerald-400/50" />
-                                                            <polyline points="{{ $row['indicator_series']['points'] }}" fill="none" stroke="currentColor" stroke-width="2" class="text-{{ $tone }}-500" stroke-linecap="round" stroke-linejoin="round" />
-                                                        </svg>
+                                            {{-- Fixed-height chart block on every card, whether or not this
+                                                 event has an indicator sub-panel (only RSI events do), so cards
+                                                 line up evenly - the RSI panel's own size is the reference. --}}
+                                            <div class="mb-2 rounded-lg bg-[var(--ak-surface-muted)] px-2 py-1.5">
+                                                <div class="mb-1 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf (30T)') }}</div>
+                                                <svg viewBox="0 0 100 32" class="h-8 w-full" preserveAspectRatio="none">
+                                                    @foreach($row['candles'] as $candle)
+                                                        <line x1="{{ $candle['x'] }}" x2="{{ $candle['x'] }}" y1="{{ $candle['high_y'] }}" y2="{{ $candle['low_y'] }}" stroke="currentColor" stroke-width="1" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
+                                                        <rect x="{{ $candle['x'] - $candle['width'] / 2 }}" y="{{ $candle['body_y'] }}" width="{{ $candle['width'] }}" height="{{ $candle['body_height'] }}" fill="currentColor" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
+                                                    @endforeach
+                                                    @if($row['pattern_range'])
+                                                        <line x1="{{ $row['pattern_range']['start_x'] }}" x2="{{ $row['pattern_range']['start_x'] }}" y1="0" y2="32" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2,1.5" class="text-amber-400" />
+                                                        <line x1="{{ $row['pattern_range']['end_x'] }}" x2="{{ $row['pattern_range']['end_x'] }}" y1="0" y2="32" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2,1.5" class="text-amber-400" />
                                                     @endif
-                                                </div>
-                                            @endif
+                                                </svg>
+
+                                                <div class="mb-1 mt-2 text-[8px] uppercase tracking-wide text-[var(--ak-muted)] {{ $row['indicator_series'] ? '' : 'invisible' }}">{{ $row['indicator_series']['label'] ?? __('RSI (14)') }}</div>
+                                                <svg viewBox="0 0 100 20" class="h-5 w-full {{ $row['indicator_series'] ? '' : 'invisible' }}" preserveAspectRatio="none">
+                                                    @if($row['indicator_series'])
+                                                        <line x1="0" x2="100" y1="{{ $row['indicator_series']['overbought_y'] }}" y2="{{ $row['indicator_series']['overbought_y'] }}" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,2" class="text-rose-400/50" />
+                                                        <line x1="0" x2="100" y1="{{ $row['indicator_series']['oversold_y'] }}" y2="{{ $row['indicator_series']['oversold_y'] }}" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,2" class="text-emerald-400/50" />
+                                                        <polyline points="{{ $row['indicator_series']['points'] }}" fill="none" stroke="currentColor" stroke-width="2" class="text-{{ $tone }}-500" stroke-linecap="round" stroke-linejoin="round" />
+                                                    @endif
+                                                </svg>
+                                            </div>
 
                                             @php
                                                 $scopeLabel = match ($row['probability_scope']) {

@@ -27,6 +27,12 @@ use Illuminate\View\View;
  */
 final class DashboardConceptController extends Controller
 {
+    private const COUNTRY_FLAGS = [
+        'DE' => '🇩🇪', 'US' => '🇺🇸', 'AT' => '🇦🇹', 'CH' => '🇨🇭', 'GB' => '🇬🇧', 'FR' => '🇫🇷',
+        'NL' => '🇳🇱', 'DK' => '🇩🇰', 'SE' => '🇸🇪', 'NO' => '🇳🇴', 'FI' => '🇫🇮', 'IT' => '🇮🇹',
+        'ES' => '🇪🇸', 'JP' => '🇯🇵', 'CN' => '🇨🇳', 'HK' => '🇭🇰', 'CA' => '🇨🇦', 'AU' => '🇦🇺',
+    ];
+
     /** The core navigation destinations for the left column. */
     private const LEFT_COLUMN_ICONS = [
         ['today-focus', 'Heute im Fokus', 'heroicon-o-fire'],
@@ -335,11 +341,13 @@ final class DashboardConceptController extends Controller
                 'time' => $event['time'],
                 'symbol' => $event['symbol'],
                 'name' => $event['name'],
+                'country_flag' => self::COUNTRY_FLAGS[$event['country']] ?? '🌐',
                 'label' => $event['label'],
                 'tone' => $event['tone'],
                 'change_pct' => $event['change_pct'],
                 'candles' => $event['candles'],
                 'indicator_series' => $event['indicator_series'],
+                'pattern_range' => $event['pattern_range'],
                 'rise_probability_20d' => $event['rise_probability_20d'],
                 'average_return_20d' => $event['average_return_20d'],
                 'probability_sample_size' => $event['probability_sample_size'],
