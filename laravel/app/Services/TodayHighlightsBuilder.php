@@ -267,40 +267,98 @@ final class TodayHighlightsBuilder
     }
 
     /**
-     * Snapshot of the latest available technical indicators for an
-     * instrument. technical_indicators is only refreshed sporadically, so
-     * as_of is surfaced explicitly rather than implying it's today's value.
+     * Technical indicators computed live from price_bars (daily closes,
+     * reliably synced) rather than read from the technical_indicators
+     * table, which only refreshes sporadically and had drifted about three
+     * weeks stale - showing bearish/neutral readings next to a same-day
+     * BUY signal it no longer had anything to do with.
      *
      * @return array<string, mixed>|null
      */
     private function technicalIndicators(int $instrumentId): ?array
     {
-        $row = DB::table('technical_indicators')
+        $bars = DB::table('price_bars')
             ->where('instrument_id', $instrumentId)
             ->where('interval', '1d')
             ->orderByDesc('bar_time')
-            ->first();
+            ->limit(300)
+            ->get(['bar_time', 'close'])
+            ->reverse()
+            ->values();
 
-        if (! $row || ! is_numeric($row->rsi_14)) {
+        // MACD's 26-day EMA needs real room to converge; 60 bars is a
+        // practical floor for a trustworthy reading.
+        if ($bars->count() < 60) {
             return null;
         }
 
-        $rsi = (float) $row->rsi_14;
-        $sma20 = (float) $row->sma_20;
-        $sma50 = (float) $row->sma_50;
-        $macd = (float) $row->macd;
-        $macdSignal = (float) $row->macd_signal;
+        $closes = $bars->pluck('close')->map(fn ($v) => (float) $v)->all();
+
+        $sma = fn (array $values, int $period): float => array_sum(array_slice($values, -$period)) / $period;
+        $sma20 = $sma($closes, 20);
+        $sma50 = $sma($closes, 50);
+
+        $rsi = $this->rsi14($closes);
+        $ema12 = $this->emaSeries($closes, 12);
+        $ema26 = $this->emaSeries($closes, 26);
+        $macdSeries = array_map(fn ($a, $b) => $a - $b, array_slice($ema12, -count($ema26)), $ema26);
+        $signalSeries = $this->emaSeries($macdSeries, 9);
+        $macd = end($macdSeries);
+        $macdSignal = end($signalSeries);
 
         return [
-            'as_of' => Carbon::parse($row->bar_time)->toDateString(),
+            'as_of' => Carbon::parse($bars->last()->bar_time)->toDateString(),
             'rsi' => round($rsi, 1),
             'rsi_state' => $rsi >= 70 ? __('Überkauft') : ($rsi <= 30 ? __('Überverkauft') : __('Neutral')),
             'macd' => round($macd, 2),
             'macd_bullish' => $macd > $macdSignal,
             'trend' => $sma20 > $sma50 ? __('Aufwärtstrend') : __('Abwärtstrend'),
             'trend_bullish' => $sma20 > $sma50,
-            'adx' => is_numeric($row->adx_14) ? round((float) $row->adx_14, 1) : null,
+            'adx' => null,
         ];
+    }
+
+    /** Wilder's smoothed RSI over the last 14 periods of the given closes. */
+    private function rsi14(array $closes): float
+    {
+        $period = 14;
+        $recent = array_slice($closes, -($period + 1));
+        $gains = 0.0;
+        $losses = 0.0;
+
+        for ($i = 1; $i < count($recent); $i++) {
+            $delta = $recent[$i] - $recent[$i - 1];
+            if ($delta >= 0) {
+                $gains += $delta;
+            } else {
+                $losses -= $delta;
+            }
+        }
+
+        $avgGain = $gains / $period;
+        $avgLoss = $losses / $period;
+
+        if ($avgLoss == 0.0) {
+            return 100.0;
+        }
+
+        $rs = $avgGain / $avgLoss;
+
+        return 100 - (100 / (1 + $rs));
+    }
+
+    /** @return list<float> the full EMA series, seeded with a simple average over the first $period values. */
+    private function emaSeries(array $values, int $period): array
+    {
+        $k = 2 / ($period + 1);
+        $seed = array_sum(array_slice($values, 0, $period)) / $period;
+        $series = [$seed];
+
+        foreach (array_slice($values, $period) as $value) {
+            $series[] = $value * $k + end($series) * (1 - $k);
+        }
+
+        return $series;
     }
 
     /** @return array<string, mixed> */

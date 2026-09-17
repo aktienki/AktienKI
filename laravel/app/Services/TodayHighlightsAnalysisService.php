@@ -8,11 +8,11 @@ use RuntimeException;
 final class TodayHighlightsAnalysisService
 {
     private const INSTRUCTIONS = <<<'PROMPT'
-Du analysierst vier Highlights des heutigen Handelstags für einen Investor. Jedes Highlight ist eine Aktie mit einem spezifischen Ereignis (beste BUY-Empfehlung, grösste Performance-Bewegung, überraschender Signalwechsel, Trend-Umkehr).
+Du analysierst vier Highlights des heutigen Handelstags für einen Investor. Jedes Highlight ist eine Aktie mit einem spezifischen Ereignis (beste BUY-Empfehlung, grösste Performance-Bewegung, überraschender Signalwechsel, Trend-Umkehr). Zu jedem Highlight bekommst du Kennzahlen (Sektor, Kurs, Risiko, Konfidenz) und, falls vorhanden, einen historischen Vergleichsfall mit tatsächlichem Ergebnis.
 
-Gib für jedes Highlight EINE prägnante Analysezeile (max 15 Wörter): was ist das Signal, und warum ist es relevant?
+Schreibe für jedes Highlight eine fundierte Analyse aus 3-4 Sätzen (ca. 50-70 Wörter): was ist das Signal, warum ist es relevant, was sagen die Kennzahlen (Sektor, Risiko, Konfidenz) darüber aus, und falls ein historischer Vergleichsfall vorliegt, wie ordnet der das Signal ein? Schreibe konkret und sachlich, keine Floskeln, keine Anlageberatung.
 
-Antworte nur mit einem JSON-Objekt mit vier Feldern: top_signal_insight, swing_insight, surprise_insight, trend_switch_insight. Keine Erklärungen, nur die Insights.
+Antworte nur mit einem JSON-Objekt mit vier Feldern: top_signal_insight, swing_insight, surprise_insight, trend_switch_insight. Keine Erklärungen ausserhalb der Felder.
 PROMPT;
 
     public function analyzeHighlights(array $highlights): array
@@ -33,18 +33,18 @@ PROMPT;
                     [
                         'role' => 'user',
                         'content' => json_encode([
-                            'top_signal' => $highlights[0]['data'] ?? null,
-                            'swing' => $highlights[1]['data'] ?? null,
-                            'surprise' => $highlights[2]['data'] ?? null,
-                            'trend_switch' => $highlights[3]['data'] ?? null,
+                            'top_signal' => $this->context($highlights[0] ?? null),
+                            'swing' => $this->context($highlights[1] ?? null),
+                            'surprise' => $this->context($highlights[2] ?? null),
+                            'trend_switch' => $this->context($highlights[3] ?? null),
                         ], JSON_UNESCAPED_UNICODE),
                     ],
                 ],
-                // Reasoning models (e.g. Kimi) spend a large share of this
-                // budget on their internal reasoning trace before writing
-                // the actual JSON answer - too low a limit truncates the
-                // response to nothing before it gets there.
-                'max_tokens' => 1500,
+                // Reasoning models (e.g. Kimi) spend a large, variable share
+                // of this budget on an internal reasoning trace before
+                // writing the actual answer; four 3-4 sentence analyses
+                // need real headroom on top of that.
+                'max_tokens' => 3000,
             ];
 
             $endpoint = (string) config('aktienki.stock_ai_assessment.grid_endpoint', 'https://api.thegrid.ai/v1/chat/completions');
@@ -56,7 +56,7 @@ PROMPT;
                 ->acceptJson()
                 ->asJson()
                 ->connectTimeout(5)
-                ->timeout(30)
+                ->timeout(45)
                 ->retry(3, 1500, throw: false)
                 ->post($endpoint, $payload);
 
@@ -79,6 +79,32 @@ PROMPT;
         } catch (Exception $e) {
             return $this->defaultHighlights($highlights);
         }
+    }
+
+    /** Reduces one highlight to the context worth sending to the model - its data point plus the details/analog enrichment already computed for the card. */
+    private function context(?array $highlight): ?array
+    {
+        if (! $highlight || ! $highlight['data']) {
+            return null;
+        }
+
+        $details = $highlight['details'] ?? null;
+        $analog = $highlight['analog'] ?? null;
+
+        return array_filter([
+            'data' => $highlight['data'],
+            'metric' => $highlight['metric_value'] ?? null,
+            'sector' => $details['sector'] ?? null,
+            'country' => $details['country'] ?? null,
+            'current_price' => $details['current_price'] ?? null,
+            'risk_1_to_10' => $details['risk'] ?? null,
+            'confidence_percent' => $details['confidence'] ?? null,
+            'historical_analog' => $analog ? [
+                'compared_to' => $analog['analog_symbol'],
+                'days_ago' => (int) round(\Illuminate\Support\Carbon::parse($analog['signal_date'])->diffInDays(now())),
+                'actual_outcome_percent' => $analog['outcome_pct'],
+            ] : null,
+        ], fn ($value) => $value !== null);
     }
 
     private function defaultHighlights(array $highlights): array
