@@ -35,7 +35,12 @@ final class TwelveDataPressReleaseImporter
         foreach ($instruments as $instrument) {
             $result['checked']++;
             try {
-                $symbol = $this->marketData->providerSymbol((string) ($instrument->provider_symbol ?: $instrument->symbol));
+                // press_releases rejects the "SYMBOL:MIC" exchange-suffixed
+                // form that providerSymbol() produces for cross-listed
+                // instruments (other endpoints like time_series require it,
+                // this one 404s on it) - every such instrument failed on
+                // every attempt until this was stripped.
+                $symbol = preg_replace('/:.*/', '', $this->marketData->providerSymbol((string) ($instrument->provider_symbol ?: $instrument->symbol)));
                 $from = $instrument->last_success_at
                     ? CarbonImmutable::parse($instrument->last_success_at)->subHours(6)
                     : CarbonImmutable::now()->subDays((int) config('aktienki.news.initial_lookback_days', 7));
