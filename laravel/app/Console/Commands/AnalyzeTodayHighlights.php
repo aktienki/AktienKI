@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\TodayHighlightsAnalysisService;
+use App\Services\TodayHighlightsBuilder;
 use Illuminate\Console\Command;
 
 final class AnalyzeTodayHighlights extends Command
@@ -16,15 +17,14 @@ final class AnalyzeTodayHighlights extends Command
         $this->info("Analyzing highlights for $dateStr...");
 
         try {
-            $dummyHighlights = [
-                ['data' => null],
-                ['data' => null],
-                ['data' => null],
-                ['data' => null],
-            ];
+            $highlights = app(TodayHighlightsBuilder::class)->build($dateStr);
+
+            foreach ($highlights as $h) {
+                $this->line('  '.$h['label'].': '.($h['data'] ?? '(keine Daten)'));
+            }
 
             $service = app(TodayHighlightsAnalysisService::class);
-            $insights = $service->analyzeHighlights($dummyHighlights);
+            $insights = $service->analyzeHighlights($highlights);
 
             $filePath = storage_path('app/cache/today_highlights.json');
             @mkdir(dirname($filePath), 0755, true);
