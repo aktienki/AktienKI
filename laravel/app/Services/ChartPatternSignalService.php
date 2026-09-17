@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class ChartPatternSignalService
 {
-    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v6';
+    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v7';
 
     /** Event types driven by a bounded (0-100) oscillator, shown as its own panel below the candles rather than overlaid on price. */
     private const INDICATOR_EVENT_KEYS = ['rsi_oversold', 'rsi_overbought'];
@@ -103,8 +103,11 @@ final class ChartPatternSignalService
         });
     }
 
+    /** Trading days shown in the candlestick chart and RSI panel. */
+    private const DISPLAY_DAYS = 20;
+
     /**
-     * Attaches a 30-day OHLC candlestick chart (viewBox 0 0 100 32) built
+     * Attaches a 20-day OHLC candlestick chart (viewBox 0 0 100 50) built
      * straight from price_bars, so the actual chart pattern is visible, not
      * just its label - plus, for RSI-driven events, a second 0-100 panel
      * plotting the RSI-14 series underneath, the same way a real charting
@@ -120,7 +123,7 @@ final class ChartPatternSignalService
         $eventDate = $events->first()['time'];
         $instrumentIds = $events->pluck('instrument_id')->unique()->values();
 
-        // 90 calendar days (~60 trading days) covers the 30 displayed bars
+        // 90 calendar days (~60 trading days) covers the 20 displayed bars
         // plus the 14-bar RSI seed with comfortable headroom for weekends/
         // holidays.
         $barsByInstrument = DB::table('price_bars')
@@ -133,7 +136,7 @@ final class ChartPatternSignalService
 
         return $events->map(function (array $event) use ($barsByInstrument): array {
             $bars = $barsByInstrument->get($event['instrument_id']) ?? collect();
-            $window = $bars->slice(-30)->values();
+            $window = $bars->slice(-self::DISPLAY_DAYS)->values();
 
             $event['candles'] = $window->count() >= 2 ? $this->candles($window) : [];
             $event['indicator_series'] = in_array($event['event_key'], self::INDICATOR_EVENT_KEYS, true)
@@ -176,6 +179,9 @@ final class ChartPatternSignalService
         ];
     }
 
+    /** Candlestick chart viewBox height - see the class docblock on why this needed to grow from the original 32: too short and a whole day's wick collapses to a barely-visible sliver. */
+    private const CANDLE_CHART_HEIGHT = 50;
+
     /** @return list<array{x: float, width: float, high_y: float, low_y: float, body_y: float, body_height: float, bullish: bool}> */
     private function candles(Collection $bars): array
     {
@@ -184,7 +190,8 @@ final class ChartPatternSignalService
         $range = $max - $min;
         $count = $bars->count();
         $slot = 100 / $count;
-        $y = fn (float $value): float => $range > 0 ? 32 - (($value - $min) / $range) * 32 : 16;
+        $height = self::CANDLE_CHART_HEIGHT;
+        $y = fn (float $value): float => $range > 0 ? $height - (($value - $min) / $range) * $height : $height / 2;
 
         return $bars->map(function (object $bar, int $i) use ($slot, $y): array {
             $open = (float) $bar->open;
@@ -206,13 +213,17 @@ final class ChartPatternSignalService
         })->values()->all();
     }
 
+    /** RSI panel viewBox height - kept smaller than CANDLE_CHART_HEIGHT since it is a secondary panel, but tall enough (with the matching viewBox in the blade view) to read as a real line, not a sliver. */
+    private const RSI_PANEL_HEIGHT = 25;
+
     /** @return array{label: string, points: string, overbought_y: float, oversold_y: float}|null */
     private function rsiPanel(Collection $bars): ?array
     {
         $closes = $bars->pluck('close')->map(fn ($v) => (float) $v)->values()->all();
         $series = $this->rsiSeries($closes, 14);
-        $displaySeries = array_slice($series, -min(30, count($closes)));
+        $displaySeries = array_slice($series, -min(self::DISPLAY_DAYS, count($closes)));
         $count = count($displaySeries);
+        $height = self::RSI_PANEL_HEIGHT;
 
         $points = [];
         foreach ($displaySeries as $i => $value) {
@@ -220,7 +231,7 @@ final class ChartPatternSignalService
                 continue;
             }
             $x = $count > 1 ? ($i / ($count - 1)) * 100 : 0;
-            $points[] = round($x, 1).','.round(20 - ($value / 100) * 20, 1);
+            $points[] = round($x, 1).','.round($height - ($value / 100) * $height, 1);
         }
 
         if ($points === []) {
@@ -230,8 +241,8 @@ final class ChartPatternSignalService
         return [
             'label' => __('RSI (14)'),
             'points' => implode(' ', $points),
-            'overbought_y' => round(20 - (70 / 100) * 20, 1),
-            'oversold_y' => round(20 - (30 / 100) * 20, 1),
+            'overbought_y' => round($height - (70 / 100) * $height, 1),
+            'oversold_y' => round($height - (30 / 100) * $height, 1),
         ];
     }
 

@@ -1098,20 +1098,20 @@
                                                  event has an indicator sub-panel (only RSI events do), so cards
                                                  line up evenly - the RSI panel's own size is the reference. --}}
                                             <div class="mb-2 rounded-lg bg-[var(--ak-surface-muted)] px-2 py-1.5">
-                                                <div class="mb-1 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf (30T)') }}</div>
-                                                <svg viewBox="0 0 100 32" class="h-8 w-full" preserveAspectRatio="none">
+                                                <div class="mb-1 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf (20T)') }}</div>
+                                                <svg viewBox="0 0 100 50" class="h-20 w-full" preserveAspectRatio="none">
                                                     @foreach($row['candles'] as $candle)
                                                         <line x1="{{ $candle['x'] }}" x2="{{ $candle['x'] }}" y1="{{ $candle['high_y'] }}" y2="{{ $candle['low_y'] }}" stroke="currentColor" stroke-width="1" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
                                                         <rect x="{{ $candle['x'] - $candle['width'] / 2 }}" y="{{ $candle['body_y'] }}" width="{{ $candle['width'] }}" height="{{ $candle['body_height'] }}" fill="currentColor" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
                                                     @endforeach
                                                     @if($row['pattern_range'])
-                                                        <line x1="{{ $row['pattern_range']['start_x'] }}" x2="{{ $row['pattern_range']['start_x'] }}" y1="0" y2="32" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2,1.5" class="text-amber-400" />
-                                                        <line x1="{{ $row['pattern_range']['end_x'] }}" x2="{{ $row['pattern_range']['end_x'] }}" y1="0" y2="32" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2,1.5" class="text-amber-400" />
+                                                        <line x1="{{ $row['pattern_range']['start_x'] }}" x2="{{ $row['pattern_range']['start_x'] }}" y1="0" y2="50" stroke="currentColor" stroke-width="0.5" stroke-dasharray="1.5,1.5" class="text-amber-400/40" />
+                                                        <line x1="{{ $row['pattern_range']['end_x'] }}" x2="{{ $row['pattern_range']['end_x'] }}" y1="0" y2="50" stroke="currentColor" stroke-width="0.5" stroke-dasharray="1.5,1.5" class="text-amber-400/40" />
                                                     @endif
                                                 </svg>
 
                                                 <div class="mb-1 mt-2 text-[8px] uppercase tracking-wide text-[var(--ak-muted)] {{ $row['indicator_series'] ? '' : 'invisible' }}">{{ $row['indicator_series']['label'] ?? __('RSI (14)') }}</div>
-                                                <svg viewBox="0 0 100 20" class="h-5 w-full {{ $row['indicator_series'] ? '' : 'invisible' }}" preserveAspectRatio="none">
+                                                <svg viewBox="0 0 100 25" class="h-10 w-full {{ $row['indicator_series'] ? '' : 'invisible' }}" preserveAspectRatio="none">
                                                     @if($row['indicator_series'])
                                                         <line x1="0" x2="100" y1="{{ $row['indicator_series']['overbought_y'] }}" y2="{{ $row['indicator_series']['overbought_y'] }}" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,2" class="text-rose-400/50" />
                                                         <line x1="0" x2="100" y1="{{ $row['indicator_series']['oversold_y'] }}" y2="{{ $row['indicator_series']['oversold_y'] }}" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,2" class="text-emerald-400/50" />
