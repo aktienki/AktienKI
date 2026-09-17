@@ -1917,24 +1917,54 @@ class StockController extends Controller
         ?CarbonImmutable $focusAt = null,
     ): array {
         if ($this->usesEuroDisplay($instrument)) {
-            try {
-                $providerSymbol = (string) $instrument->german_listing_symbol;
-                if (filled($instrument->german_listing_exchange)) {
-                    $providerSymbol .= ':'.trim((string) $instrument->german_listing_exchange);
+            $eurBars = $this->dailyBars((int) $instrument->id, $focusAt, '1d_eur');
+
+            if ($eurBars->count() < ($focusAt ? 50 : 252)) {
+                try {
+                    $providerSymbol = (string) $instrument->german_listing_symbol;
+                    if (filled($instrument->german_listing_exchange)) {
+                        $providerSymbol .= ':'.trim((string) $instrument->german_listing_exchange);
+                    }
+                    $downloaded = $yahooFinance->dailyCandles($providerSymbol, $focusAt ? 140 : 300);
+
+                    if ($downloaded) {
+                        $now = now();
+                        $rows = collect($downloaded)->map(fn (array $bar) => [
+                            'instrument_id' => (int) $instrument->id,
+                            'interval' => '1d_eur',
+                            'bar_time' => CarbonImmutable::createFromTimestampUTC($bar['timestamp']),
+                            'open' => $bar['open'],
+                            'high' => $bar['high'],
+                            'low' => $bar['low'],
+                            'close' => $bar['close'],
+                            'adjusted_close' => $bar['adjusted_close'] ?? $bar['close'],
+                            'volume' => $bar['volume'],
+                            'source' => 'twelve_data_eur_listing',
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ])->all();
+
+                        DB::table('price_bars')->upsert(
+                            $rows,
+                            ['instrument_id', 'interval', 'bar_time'],
+                            ['open', 'high', 'low', 'close', 'adjusted_close', 'volume', 'source', 'updated_at'],
+                        );
+                        $eurBars = $this->dailyBars((int) $instrument->id, $focusAt, '1d_eur');
+                    }
+                } catch (Throwable $exception) {
+                    report($exception);
                 }
-                $downloaded = $yahooFinance->dailyCandles($providerSymbol, $focusAt ? 140 : 300);
-                if ($downloaded) {
-                    return [
-                        'candles' => collect($downloaded)->map(fn (array $bar): array => [
-                            'x' => CarbonImmutable::createFromTimestampUTC($bar['timestamp'])->getTimestampMs(),
-                            'y' => [(float) $bar['open'], (float) $bar['high'], (float) $bar['low'], (float) $bar['close']],
-                            'volume' => is_numeric($bar['volume'] ?? null) ? (float) $bar['volume'] : null,
-                        ]),
-                        'source' => 'twelve_data_eur_listing',
-                    ];
-                }
-            } catch (Throwable $exception) {
-                report($exception);
+            }
+
+            if ($eurBars->isNotEmpty()) {
+                return [
+                    'candles' => $eurBars->map(fn ($bar): array => [
+                        'x' => CarbonImmutable::parse($bar->bar_time)->getTimestampMs(),
+                        'y' => [(float) $bar->open, (float) $bar->high, (float) $bar->low, (float) $bar->close],
+                        'volume' => is_numeric($bar->volume) ? (float) $bar->volume : null,
+                    ]),
+                    'source' => 'twelve_data_eur_listing',
+                ];
             }
         }
 
@@ -1995,7 +2025,15 @@ class StockController extends Controller
     {
         return strtolower((string) ($instrument->type ?? '')) !== 'index'
             && filled($instrument->german_listing_symbol)
-            && strtoupper((string) ($instrument->german_listing_currency ?? '')) === 'EUR';
+            && strtoupper((string) ($instrument->german_listing_currency ?? '')) === 'EUR'
+            // A stock whose own currency is already EUR (e.g. a native
+            // German listing where german_listing_symbol just points back
+            // to itself) needs no conversion - its own '1d' price_bars are
+            // already EUR-denominated and reliably synced. Routing it
+            // through the EUR cross-listing path anyway meant a live
+            // TwelveData call on every page view instead of using that
+            // already-fresh local data.
+            && strtoupper((string) ($instrument->currency ?? '')) !== 'EUR';
     }
 
     private function applyEuroDisplayValues(
@@ -2041,11 +2079,11 @@ class StockController extends Controller
         }
     }
 
-    private function dailyBars(int $instrumentId, ?CarbonImmutable $focusAt = null)
+    private function dailyBars(int $instrumentId, ?CarbonImmutable $focusAt = null, string $interval = '1d')
     {
         $query = DB::table('price_bars')
             ->where('instrument_id', $instrumentId)
-            ->where('interval', '1d');
+            ->where('interval', $interval);
 
         if ($focusAt) {
             return $query

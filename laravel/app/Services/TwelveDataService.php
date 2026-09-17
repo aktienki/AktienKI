@@ -195,21 +195,31 @@ class TwelveDataService
     public function dailyCandles(string $symbol, int $days = 20): array
     {
         $days = max(5, min(120, $days));
+        $cache = Cache::store('file');
+        $key = 'twelve_data_daily_'.sha1(strtoupper($symbol))."_{$days}";
 
-        return Cache::store('file')->remember(
-            'twelve_data_daily_'.sha1(strtoupper($symbol))."_{$days}",
-            now()->addMinutes(15),
-            function () use ($symbol, $days): array {
-                $series = $this->timeSeries($symbol, '1day', $days, ['adjust' => 'all']);
+        $cached = $cache->get($key);
+        if ($cached !== null) {
+            return $cached;
+        }
 
-                return $this->ohlc($series)
-                    ->map(fn (array $bar): array => [
-                        ...$bar,
-                        'adjusted_close' => $bar['close'],
-                    ])
-                    ->all();
-            },
-        );
+        $series = $this->timeSeries($symbol, '1day', $days, ['adjust' => 'all']);
+        $bars = $this->ohlc($series)
+            ->map(fn (array $bar): array => [
+                ...$bar,
+                'adjusted_close' => $bar['close'],
+            ])
+            ->all();
+
+        // A transient timeout or rate limit yields an empty result without
+        // throwing - caching that for the full 15 minutes would keep every
+        // caller stuck with "no OHLC data" for a quarter hour even once the
+        // provider recovers. Only cache genuine, non-empty answers.
+        if ($bars !== []) {
+            $cache->put($key, $bars, now()->addMinutes(15));
+        }
+
+        return $bars;
     }
 
     public function dailyHistory(string $symbol, int $tradingDays = 800): array

@@ -81,6 +81,14 @@ Schedule::command('markets:refresh-macro-history --range=3y')
     ->weekdays()->dailyAt('23:15')->timezone('Europe/Berlin')
     ->withoutOverlapping(90)->onOneServer()->runInBackground();
 
+// Keep the EUR-converted price history for foreign-currency cross-listings
+// (interval 1d_eur) fresh, so the stock detail chart can serve it from the
+// database instead of calling TwelveData live on every page view. --limit
+// covers the full current cross-listing universe (~144 stocks) in one run.
+Schedule::command('stocks:backfill-eur-history --days=800 --limit=200')
+    ->dailyAt('05:00')->timezone('Europe/Berlin')
+    ->withoutOverlapping(60)->onOneServer()->runInBackground();
+
 // Keep the broad German stock universe current as market caps and the
 // available instrument catalogue grow. It is intentionally not labelled DAX.
 Schedule::command('indices:sync-germany-top500')
@@ -266,6 +274,15 @@ Schedule::command('highlights:refresh-view')
 Schedule::command('highlights:analyze-today')
     ->weekdays()
     ->at('23:10') // After view refresh
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->runInBackground();
+
+// Per-stock AI assessment (via The Grid) for newly appeared BUY signals
+// only - a stock already BUY yesterday is not reassessed.
+Schedule::command('reports:stock-ai-assessments')
+    ->weekdays()
+    ->at('23:15') // After view refresh, alongside the highlights analysis
     ->withoutOverlapping(30)
     ->onOneServer()
     ->runInBackground();
