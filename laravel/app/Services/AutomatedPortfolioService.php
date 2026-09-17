@@ -22,7 +22,25 @@ final class AutomatedPortfolioService
         private readonly TwelveDataService $marketData,
     ) {}
 
+    /**
+     * DISABLED as of 2026-09-17: this whole service reads the local
+     * walk-forward pipeline (predictions/trained_models, horizons
+     * 5/10/15/20T - Vega/Atlas/Nova/Aegis/...), which is being retired in
+     * favor of the serving pipeline (serving_predictions, 10/20/40T,
+     * Standard-Ensemble/Pure TCN). Rewriting execute()/candidates() against
+     * serving_predictions is tracked separately; until then this must not
+     * place any more trades in the 5 live paper depots on stale/wrong
+     * criteria. RunAutomatedPortfolios (scheduled every minute) and
+     * EnsureStrategyTrackingPortfolios's hidden tracking portfolios both
+     * funnel through this single method, so short-circuiting here is
+     * sufficient - no other call site invokes scan() or execute().
+     */
     public function scan(): array
+    {
+        return ['strategies' => 0, 'candidates' => 0, 'purchases' => 0, 'skipped' => 0];
+    }
+
+    private function disabledScan(): array
     {
         $stats = ['strategies' => 0, 'candidates' => 0, 'purchases' => 0, 'skipped' => 0];
 

@@ -9,7 +9,6 @@ use App\Services\IndexAiScoreService;
 use App\Services\MarketOverviewWidgetsService;
 use App\Services\MarketService;
 use App\Services\PanelScoreDriftStatsService;
-use App\Services\PersonalizedSignalService;
 use App\Services\ServingMarketSnapshotService;
 use App\Services\TodayHighlightsAnalysisService;
 use App\Services\TodayHighlightsBuilder;
@@ -87,7 +86,7 @@ final class DashboardConceptController extends Controller
             $this->newsSection('news'),
             $this->eventsSection('upcoming-news', $request),
             $this->earningsDriftSection('earnings-drift', $request),
-            $this->signalTransitionSection('signal-transitions', $request),
+            $this->signalTransitionSection('signal-transitions'),
             $this->classicDashboardSection('classic-dashboard', $request),
         ])->map(function (array $section) use ($leftIcons): array {
             $meta = $leftIcons->firstWhere('id', $section['id']);
@@ -355,70 +354,61 @@ final class DashboardConceptController extends Controller
     }
 
     /**
-     * Every model-signal transition (raw signal at prediction N differs from
-     * the same trained_model_id's immediately preceding prediction) whose
-     * prediction_time falls in the last 48h - a live audit trail of what
-     * moved and why. Shows the raw values a transition happened on (score,
-     * confidence, risk, forecast return) plus the personalized signal
-     * (PersonalizedSignalService - quality gate + risk-profile thresholds)
-     * next to the raw one, since a "raw BUY" and "after your filter" can
-     * legitimately diverge (see AutomatedPortfolioService candidate scans).
+     * Every serving-signal transition (raw signal at as_of N differs from
+     * the same instrument/horizon/variant's immediately preceding as_of)
+     * within the last 48h - a live audit trail of what moved and why. Reads
+     * serving_predictions (10/20/40T, Standard-Ensemble/Pure TCN) restricted
+     * to each instrument's champion release via serving_active_models - the
+     * 2026-09-17 replacement for the retired local walk-forward pipeline
+     * (predictions/trained_models, 5/10/15/20T - see
+     * AutomatedPortfolioService::scan(), disabled the same day).
      */
-    private function signalTransitionSection(string $id, Request $request): array
+    private function signalTransitionSection(string $id): array
     {
-        $signals = app(PersonalizedSignalService::class);
-        $signalSql = $signals->sql('prediction', $request->user());
-        $rawSignalSql = "UPPER(COALESCE(NULLIF(BTRIM(prediction.signal), ''), 'HOLD'))";
-        $previousRawSignalSql = "(SELECT UPPER(COALESCE(NULLIF(BTRIM(pp.signal), ''), 'HOLD'))
-            FROM predictions pp
-            WHERE pp.trained_model_id = prediction.trained_model_id AND pp.id < prediction.id
-            ORDER BY pp.prediction_time DESC, pp.id DESC LIMIT 1)";
+        $previousRawSignalSql = "(SELECT UPPER(pp.signal)
+            FROM serving_predictions pp
+            WHERE pp.instrument_id = prediction.instrument_id
+              AND pp.horizon = prediction.horizon
+              AND pp.variant = prediction.variant
+              AND pp.id < prediction.id
+            ORDER BY pp.as_of DESC, pp.id DESC LIMIT 1)";
 
-        $rows = \DB::table('predictions as prediction')
-            ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
-            ->join('trained_models as trained_model', 'trained_model.id', '=', 'prediction.trained_model_id')
-            ->leftJoin('model_definitions as model_definition', 'model_definition.id', '=', 'trained_model.model_definition_id')
-            ->whereNotNull('prediction.trained_model_id')
-            ->where('instrument.type', 'stock')
-            ->whereNull('instrument.deleted_at')
-            // Only the champion model per instrument/horizon - challengers
-            // ('candidate'/'rejected') and superseded ('archived') trained
-            // models from the same or an earlier training cycle would
-            // otherwise show up as noisy "transitions" nobody is acting on.
-            ->where('trained_model.status', 'active')
-            ->where('prediction.prediction_time', '>=', now()->subHours(48))
+        $rows = \DB::connection('serving')->table('serving_predictions as prediction')
+            ->join('serving_active_models as active', fn ($join) => $join
+                ->on('active.instrument_id', '=', 'prediction.instrument_id')
+                ->on('active.release_id', '=', 'prediction.release_id'))
+            ->join('serving_instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+            ->where('instrument.instrument_type', 'stock')
+            ->where('prediction.as_of', '>=', now()->subHours(48))
             ->selectRaw("
-                prediction.id, instrument.symbol, instrument.name, prediction.prediction_time,
-                COALESCE(model_definition.public_alias, model_definition.name, 'Unbekannt') as model_name,
-                prediction.prediction_horizon_minutes,
+                prediction.id, instrument.symbol, instrument.name, prediction.as_of,
+                prediction.variant, prediction.horizon,
                 {$previousRawSignalSql} as previous_signal,
-                {$rawSignalSql} as raw_signal,
-                ({$signalSql}) as personalized_signal,
-                COALESCE(prediction.ai_score, prediction.prediction_score, 0) as raw_score,
-                prediction.confidence,
-                COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) as raw_risk,
-                ((prediction.predicted_price_5d - prediction.current_price) / NULLIF(prediction.current_price, 0) * 100) as return_5d,
-                ((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0) * 100) as return_20d
+                UPPER(prediction.signal) as raw_signal,
+                prediction.confidence, prediction.risk_score, prediction.expected_return,
+                prediction.compact_context
             ")
             ->get()
             ->filter(fn (object $row): bool => $row->previous_signal !== null && $row->previous_signal !== $row->raw_signal)
-            ->sortByDesc('prediction_time')
+            ->sortByDesc('as_of')
             ->take(100)
-            ->map(fn (object $row): array => [
-                'time' => $row->prediction_time,
-                'symbol' => $row->symbol,
-                'name' => $row->name,
-                'model' => $row->model_name,
-                'horizon_days' => (int) round(((int) $row->prediction_horizon_minutes) / 1440),
-                'previous_signal' => $row->previous_signal,
-                'raw_signal' => $row->raw_signal,
-                'personalized_signal' => $row->personalized_signal,
-                'score' => is_numeric($row->raw_score) ? (float) $row->raw_score : null,
-                'confidence' => is_numeric($row->confidence) ? (float) $row->confidence : null,
-                'risk' => is_numeric($row->raw_risk) ? (float) $row->raw_risk : null,
-                'return_5d' => is_numeric($row->return_5d) ? (float) $row->return_5d : null,
-                'return_20d' => is_numeric($row->return_20d) ? (float) $row->return_20d : null,
-            ])
+            ->map(function (object $row): array {
+                $context = json_decode((string) $row->compact_context, true) ?? [];
+
+                return [
+                    'time' => $row->as_of,
+                    'symbol' => $row->symbol,
+                    'name' => $row->name,
+                    'variant' => $row->variant === 'pure_tcn' ? 'Pure TCN' : 'Standard-Ensemble',
+                    'horizon_days' => (int) $row->horizon,
+                    'previous_signal' => $row->previous_signal,
+                    'raw_signal' => $row->raw_signal,
+                    'confidence' => is_numeric($row->confidence) ? (float) $row->confidence : null,
+                    'risk' => is_numeric($row->risk_score) ? (float) $row->risk_score : null,
+                    'expected_return' => is_numeric($row->expected_return) ? (float) $row->expected_return * 100 : null,
+                    'quality_gate_passed' => data_get($context, 'quality_gate.passed'),
+                ];
+            })
             ->values()
             ->all();
 
