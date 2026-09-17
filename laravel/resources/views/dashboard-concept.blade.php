@@ -483,15 +483,6 @@
                             <div class="ak-detail-design mt-3">
                                 <x-dashboard.macro-indicator-cards :cards="$section['macroCards']" :collapsible="true" />
                             </div>
-
-                            {{-- The Screener/dashboard's "Aktuelle Remote-Aktien"
-                                 stock count + signal-distribution card - same
-                                 partial the classic-dashboard tab uses. --}}
-                            @php $profileUniverseStats = $section['profileUniverseStats']; @endphp
-                            @include('partials.dashboard-styles')
-                            <div class="concept-market-overview-card">
-                                @include('partials.dashboard-market-overview-card')
-                            </div>
                         @elseif($section['kind'] === 'events')
                             @if(count($section['events']))
                                 <div class="grid gap-1.5">

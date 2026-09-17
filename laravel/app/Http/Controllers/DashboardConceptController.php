@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\SmartSelectionLabel;
-use App\Models\User;
 use App\Services\ChartPatternSignalService;
 use App\Services\EarningsDriftStatsService;
 use App\Services\IndexAiScoreService;
@@ -43,7 +42,6 @@ final class DashboardConceptController extends Controller
 
     public function __invoke(Request $request): View
     {
-        $user = $request->user();
         $snapshot = app(ServingMarketSnapshotService::class)->snapshot();
 
         $leftIcons = collect(self::LEFT_COLUMN_ICONS)->map(fn (array $item): array => [
@@ -56,7 +54,7 @@ final class DashboardConceptController extends Controller
         $sections = collect([
             $this->todayFocusSection('today-focus'),
             $this->chartPatternSection('chartview'),
-            $this->marketSection('market-report', $snapshot, $user),
+            $this->marketSection('market-report', $snapshot),
             $this->classicDashboardSection('classic-dashboard', $request),
         ])->map(function (array $section) use ($leftIcons): array {
             $meta = $leftIcons->firstWhere('id', $section['id']);
@@ -168,12 +166,6 @@ final class DashboardConceptController extends Controller
     }
 
     /**
-     * Also folds in the Screener/dashboard's "Aktuelle Remote-Aktien" stock
-     * count + signal-distribution card (DashboardController::
-     * profileUniverseStats(), the same data the real dashboard and the
-     * classic-dashboard tab show) - not just the market-wide score/summary
-     * text this section used to show alone.
-     *
      * Carries the rest of the full Marktübersicht ("Market Command Center")
      * page too, reusing exactly the same building blocks the markets/
      * situation Livewire component (MarketData) renders:
@@ -185,7 +177,7 @@ final class DashboardConceptController extends Controller
      *   stay in sync);
      * - x-dashboard.signal-overview, via the same snapshot()['transition_stats'].
      */
-    private function marketSection(string $id, array $snapshot, User $user): array
+    private function marketSection(string $id, array $snapshot): array
     {
         $assessment = $snapshot['assessment'] ?? null;
         $analysis = $snapshot['analysis'] ?? [];
@@ -215,7 +207,6 @@ final class DashboardConceptController extends Controller
             'countryAiScores' => $indexAiScores->countryScores(),
             'signalTransitionStats' => $snapshot['transition_stats'] ?? [],
             'macroCards' => $widgets->macroCards(),
-            'profileUniverseStats' => app(DashboardController::class)->profileUniverseStats($user),
         ];
     }
 
