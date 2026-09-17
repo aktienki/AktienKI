@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -21,11 +22,92 @@ use Illuminate\Support\Facades\DB;
  */
 final class ChartPatternSignalService
 {
-    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v2';
+    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v3';
 
     public function recentEvents(): Collection
     {
-        return Cache::remember(self::CACHE_KEY, now()->addMinutes(15), fn (): Collection => $this->detect());
+        return Cache::remember(self::CACHE_KEY, now()->addMinutes(15), function (): Collection {
+            $events = $this->detect();
+            $events = $this->attachProbabilities($events);
+
+            return $this->attachSparklines($events);
+        });
+    }
+
+    /**
+     * Attaches each event's historical "does the price rise over the
+     * following 20 trading days" statistic from chartview_signal_statistics
+     * - a 3-year backtest across all detected occurrences of that event
+     * type, refreshed daily by chartview:refresh-signals. That command's own
+     * *recent-event detection* is what's stalled on technical_indicators
+     * (see class docblock); the long-window backtest it also (re)computes
+     * every run is unaffected and safe to reuse here.
+     */
+    private function attachProbabilities(Collection $events): Collection
+    {
+        if ($events->isEmpty()) {
+            return $events;
+        }
+
+        $statistics = DB::table('chartview_signal_statistics')
+            ->get(['event_key', 'rise_probability', 'average_return', 'sample_size'])
+            ->keyBy('event_key');
+
+        return $events->map(function (array $event) use ($statistics): array {
+            $stat = $statistics->get($event['event_key']);
+
+            $event['rise_probability_20d'] = $stat && is_numeric($stat->rise_probability) ? round((float) $stat->rise_probability, 1) : null;
+            $event['average_return_20d'] = $stat && is_numeric($stat->average_return) ? round((float) $stat->average_return, 1) : null;
+            $event['probability_sample_size'] = $stat ? (int) $stat->sample_size : null;
+
+            return $event;
+        });
+    }
+
+    /** Attaches a normalized SVG polyline (viewBox 0 0 100 32) of each event's last ~30 daily closes, so the pattern itself is visible, not just its label. */
+    private function attachSparklines(Collection $events): Collection
+    {
+        if ($events->isEmpty()) {
+            return $events;
+        }
+
+        $eventDate = $events->first()['time'];
+        $instrumentIds = $events->pluck('instrument_id')->unique()->values();
+
+        $seriesByInstrument = DB::table('price_bars')
+            ->whereIn('instrument_id', $instrumentIds)
+            ->where('interval', '1d')
+            ->whereBetween('bar_time', [Carbon::parse($eventDate)->subDays(60), $eventDate])
+            ->orderBy('bar_time')
+            ->get(['instrument_id', 'close', 'adjusted_close'])
+            ->groupBy('instrument_id');
+
+        return $events->map(function (array $event) use ($seriesByInstrument): array {
+            $closes = ($seriesByInstrument->get($event['instrument_id']) ?? collect())
+                ->map(fn (object $bar) => (float) ($bar->adjusted_close ?? $bar->close))
+                ->slice(-30)
+                ->values();
+
+            $event['sparkline'] = $closes->count() >= 2 ? $this->sparkline($closes->all()) : null;
+
+            return $event;
+        });
+    }
+
+    /** @param list<float> $closes */
+    private function sparkline(array $closes): string
+    {
+        $min = min($closes);
+        $max = max($closes);
+        $range = $max - $min;
+        $count = count($closes);
+
+        return collect($closes)->map(function (float $close, int $i) use ($min, $range, $count): string {
+            $x = $count > 1 ? ($i / ($count - 1)) * 100 : 0;
+            $y = $range > 0 ? 32 - (($close - $min) / $range) * 32 : 16;
+
+            return round($x, 1).','.round($y, 1);
+        })->implode(' ');
     }
 
     private function detect(): Collection
