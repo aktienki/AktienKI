@@ -18,7 +18,8 @@ final class ServingMarketSnapshotService
 
         // v2: score moved from a 0-10 to a 0-100 scale - a bumped cache key
         // keeps this from mixing with old-scale cached snapshots/day scores.
-        return $this->cache()->remember('serving.market-snapshot.v2.'.$scope.'.'.app()->getLocale(), now()->addMinutes(2), function () use ($instrumentIds, $scope): array {
+        // v3: added the uncapped opportunitiesFull/risksFull/watchlistFull keys.
+        return $this->cache()->remember('serving.market-snapshot.v3.'.$scope.'.'.app()->getLocale(), now()->addMinutes(2), function () use ($instrumentIds, $scope): array {
             try {
                 $rows = DB::connection('serving')
                     ->table(ServingCurrentSignalSource::relation().' as signal')
@@ -210,6 +211,12 @@ final class ServingMarketSnapshotService
             'opportunities' => $ranked->where('normalized_signal', 'BUY')->take(5)->map(fn (object $row): string => $this->stockLine($row))->values()->all(),
             'risks' => $risks->take(5)->map(fn (object $row): string => $this->riskLine($row))->values()->all(),
             'watchlist' => $rows->where('normalized_signal', 'WATCH')->sortByDesc('rating_percent')->take(5)->map(fn (object $row): string => $this->stockLine($row))->values()->all(),
+            // Same three lists, uncapped beyond a practical page length - for
+            // a dedicated Chancen & Risiken view rather than the market
+            // card's top-5 preview.
+            'opportunitiesFull' => $ranked->where('normalized_signal', 'BUY')->take(30)->map(fn (object $row): string => $this->stockLine($row))->values()->all(),
+            'risksFull' => $risks->take(30)->map(fn (object $row): string => $this->riskLine($row))->values()->all(),
+            'watchlistFull' => $rows->where('normalized_signal', 'WATCH')->sortByDesc('rating_percent')->take(30)->map(fn (object $row): string => $this->stockLine($row))->values()->all(),
             'metrics' => [
                 ['label' => __('Abdeckung'), 'value' => (string) $count, 'detail' => __('Aktien im Serving-Lauf')],
                 ['label' => __('POSITIV-Breite'), 'value' => number_format($count > 0 ? $buyCount / $count * 100 : 0, 0, ',', '.').' %', 'detail' => "{$buyCount} von {$count}"],
@@ -351,6 +358,7 @@ final class ServingMarketSnapshotService
                 'date' => null, 'headline' => __('Keine Serving-Daten verfügbar'),
                 'summary' => __('Der aktuelle Serving-Lauf ist nicht verfügbar.'),
                 'opportunities' => [], 'risks' => [], 'watchlist' => [], 'metrics' => [],
+                'opportunitiesFull' => [], 'risksFull' => [], 'watchlistFull' => [],
             ],
             'transition_stats' => [
                 'source' => 'serving', 'transition_count' => 0, 'positive_count' => 0,

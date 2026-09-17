@@ -36,6 +36,7 @@ final class DashboardConceptController extends Controller
         ['today-focus', 'Heute im Fokus', 'heroicon-o-fire'],
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
         ['chartview', 'ChartView', 'heroicon-o-chart-bar-square'],
+        ['opportunities-risks', 'Chancen & Risiken', 'heroicon-o-scale'],
         ['classic-dashboard', 'Depots', 'heroicon-o-squares-2x2'],
     ];
 
@@ -54,6 +55,7 @@ final class DashboardConceptController extends Controller
             $this->todayFocusSection('today-focus'),
             $this->chartPatternSection('chartview'),
             $this->marketSection('market-report', $snapshot),
+            $this->opportunitiesRisksSection('opportunities-risks', $snapshot),
             $this->classicDashboardSection('classic-dashboard', $request),
         ])->map(function (array $section) use ($leftIcons): array {
             $meta = $leftIcons->firstWhere('id', $section['id']);
@@ -127,6 +129,27 @@ final class DashboardConceptController extends Controller
             'countryAiScores' => $indexAiScores->countryScores(),
             'signalTransitionStats' => $snapshot['transition_stats'] ?? [],
             'macroCards' => $widgets->macroCards(),
+        ];
+    }
+
+    /**
+     * The full-length version of the market section's Chancen/Risiken/
+     * Beobachtungsliste preview (there capped at 5 each) - same snapshot(),
+     * no extra query, just the uncapped opportunitiesFull/risksFull/
+     * watchlistFull keys ServingMarketSnapshotService::analysis() computes
+     * alongside the top-5 ones.
+     */
+    private function opportunitiesRisksSection(string $id, array $snapshot): array
+    {
+        $analysis = $snapshot['analysis'] ?? [];
+
+        return [
+            'id' => $id,
+            'kind' => 'opportunities-risks',
+            'available' => (bool) ($snapshot['available'] ?? false),
+            'opportunities' => $analysis['opportunitiesFull'] ?? [],
+            'risks' => $analysis['risksFull'] ?? [],
+            'watchlist' => $analysis['watchlistFull'] ?? [],
         ];
     }
 
@@ -257,6 +280,7 @@ final class DashboardConceptController extends Controller
             'labels' => route('setup.labels.index'),
             'chartview' => route('predictions.chartview-signals'),
             'market-report' => route('daily-market-analysis'),
+            'opportunities-risks' => route('daily-market-analysis'),
             'signal-transitions' => route('predictions.index'),
             'upcoming-news' => route('upcoming-events.index'),
             'earnings-drift' => route('upcoming-events.index'),

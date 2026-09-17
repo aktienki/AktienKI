@@ -362,40 +362,8 @@
                             @endif
                         @elseif($section['kind'] === 'market')
                             @if($section['available'])
-                                {{-- The full Marktübersicht's "Regelbasierter Marktbericht"
-                                     briefing: sector breadth, Chancen, Risiken,
-                                     Beobachtungsliste - same snapshot(), no extra query. --}}
                                 @if($section['breadth'])
                                     <p class="mt-3 border-t border-[var(--ak-border)] pt-3 text-xs leading-5 text-[var(--ak-muted)]">{{ $section['breadth'] }}</p>
-                                @endif
-                                @if(count($section['opportunities']) || count($section['risks']))
-                                    <div class="mt-3 grid gap-3 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-2">
-                                        @foreach([
-                                            [__('Chancen'), $section['opportunities'], 'text-emerald-500'],
-                                            [__('Risiken'), $section['risks'], 'text-rose-500'],
-                                        ] as [$briefingTitle, $briefingItems, $briefingTone])
-                                            <div>
-                                                <p class="text-[10px] font-black uppercase tracking-[.1em] {{ $briefingTone }}">{{ $briefingTitle }} ({{ count($briefingItems) }})</p>
-                                                <ul class="mt-1.5 grid gap-1">
-                                                    @forelse($briefingItems as $briefingItem)
-                                                        <li class="text-[11px] leading-[1.4] text-[var(--ak-muted)]">{{ $briefingItem }}</li>
-                                                    @empty
-                                                        <li class="text-[11px] text-[var(--ak-muted)]">{{ __('Keine Einträge.') }}</li>
-                                                    @endforelse
-                                                </ul>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                @endif
-                                @if(count($section['watchlist']))
-                                    <div class="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.04] px-3 py-2.5">
-                                        <p class="text-[10px] font-black uppercase tracking-[.1em] text-amber-500">{{ __('Beobachtungsliste') }}</p>
-                                        <ul class="mt-1.5 grid gap-1">
-                                            @foreach($section['watchlist'] as $watchItem)
-                                                <li class="text-[11px] leading-[1.4] text-[var(--ak-muted)]">{{ $watchItem }}</li>
-                                            @endforeach
-                                        </ul>
-                                    </div>
                                 @endif
                             @else
                                 <div class="concept-empty">{{ __('Marktdaten aktuell nicht verfügbar.') }}</div>
@@ -445,6 +413,54 @@
                                         </div>
                                     @endif
                                 </div>
+                            @endif
+
+                            {{-- Chancen/Risiken/Beobachtungsliste as the last
+                                 thing on the page - three equal cards side by
+                                 side instead of a 2-column grid with the
+                                 watchlist as a separate box underneath. --}}
+                            @if(count($section['opportunities']) || count($section['risks']) || count($section['watchlist']))
+                                <div class="mt-3 grid gap-3 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-3">
+                                    @foreach([
+                                        [__('Chancen'), $section['opportunities'], 'text-emerald-500'],
+                                        [__('Risiken'), $section['risks'], 'text-rose-500'],
+                                        [__('Beobachtungsliste'), $section['watchlist'], 'text-amber-500'],
+                                    ] as [$briefingTitle, $briefingItems, $briefingTone])
+                                        <div class="rounded-xl border border-[var(--ak-border)] px-3 py-2.5">
+                                            <p class="text-[10px] font-black uppercase tracking-[.1em] {{ $briefingTone }}">{{ $briefingTitle }} ({{ count($briefingItems) }})</p>
+                                            <ul class="mt-1.5 grid gap-1">
+                                                @forelse($briefingItems as $briefingItem)
+                                                    <li class="text-[11px] leading-[1.4] text-[var(--ak-muted)]">{{ $briefingItem }}</li>
+                                                @empty
+                                                    <li class="text-[11px] text-[var(--ak-muted)]">{{ __('Keine Einträge.') }}</li>
+                                                @endforelse
+                                            </ul>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        @elseif($section['kind'] === 'opportunities-risks')
+                            @if($section['available'])
+                                <div class="grid gap-3 sm:grid-cols-3">
+                                    @foreach([
+                                        [__('Chancen'), $section['opportunities'], 'text-emerald-500'],
+                                        [__('Risiken'), $section['risks'], 'text-rose-500'],
+                                        [__('Beobachtungsliste'), $section['watchlist'], 'text-amber-500'],
+                                    ] as [$listTitle, $listItems, $listTone])
+                                        <div class="rounded-xl border border-[var(--ak-border)] px-3 py-2.5">
+                                            <p class="text-[10px] font-black uppercase tracking-[.1em] {{ $listTone }}">{{ $listTitle }} ({{ count($listItems) }})</p>
+                                            <ul class="mt-1.5 grid gap-1">
+                                                @forelse($listItems as $listItem)
+                                                    <li class="text-[11px] leading-[1.4] text-[var(--ak-muted)]">{{ $listItem }}</li>
+                                                @empty
+                                                    <li class="text-[11px] text-[var(--ak-muted)]">{{ __('Keine Einträge.') }}</li>
+                                                @endforelse
+                                            </ul>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="concept-empty">{{ __('Marktdaten aktuell nicht verfügbar.') }}</div>
                             @endif
                         @elseif($section['kind'] === 'events')
                             @if(count($section['events']))

@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class ChartPatternSignalService
 {
-    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v10';
+    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v11';
 
     /** Event types driven by a bounded (0-100) oscillator, shown as its own panel below the candles rather than overlaid on price. */
     private const INDICATOR_EVENT_KEYS = ['rsi_oversold', 'rsi_overbought'];
@@ -131,17 +131,30 @@ final class ChartPatternSignalService
         $eventDate = $events->first()['time'];
         $instrumentIds = $events->pluck('instrument_id')->unique()->values();
 
+        // Some instruments carry two parallel price_bars feeds that disagree
+        // wildly (seen: a "twelve_data" series around ~11 next to a
+        // "twelvedata|fallback:yfinance" series around ~85 for the same
+        // stock) - and because their bar_time values can straddle midnight
+        // UTC by a couple of hours, they land on *adjacent* calendar dates
+        // rather than colliding on the same one, so the per-day DISTINCT ON
+        // below doesn't catch it: it alternates in and out of the window as
+        // a zigzag instead of a clean duplicate. Pinning every fetch to each
+        // instrument's single dominant source (by row count, over the widest
+        // window used below) avoids mixing the two price scales.
+        $dominantSources = $this->dominantSourceByInstrument($instrumentIds, Carbon::parse($eventDate)->subDays(400), Carbon::parse($eventDate));
+
         // 90 calendar days (~60 trading days) covers the 20 displayed bars
         // plus the 14-bar RSI seed with comfortable headroom for weekends/
         // holidays. DISTINCT ON collapses any instrument+day with more than
-        // one interval='1d' snapshot (see detect()'s daily_bars CTE) down to
-        // the latest one - without it, some instruments show doubled-looking
-        // candles for the same calendar day.
+        // one interval='1d' snapshot from the same source down to the latest
+        // one - without it, some instruments show doubled-looking candles
+        // for the same calendar day.
         $barsByInstrument = DB::table('price_bars')
             ->selectRaw('DISTINCT ON (instrument_id, bar_time::date) instrument_id, bar_time, open, high, low, close')
             ->whereIn('instrument_id', $instrumentIds)
             ->where('interval', '1d')
             ->whereBetween('bar_time', [Carbon::parse($eventDate)->subDays(90), $eventDate])
+            ->where(fn ($query) => $this->constrainToDominantSource($query, $dominantSources))
             ->orderByRaw('instrument_id, bar_time::date, bar_time DESC')
             ->get()
             ->groupBy('instrument_id');
@@ -158,6 +171,7 @@ final class ChartPatternSignalService
             ->whereIn('instrument_id', $smaInstrumentIds)
             ->where('interval', '1d')
             ->whereBetween('bar_time', [Carbon::parse($eventDate)->subDays(400), $eventDate])
+            ->where(fn ($query) => $this->constrainToDominantSource($query, $dominantSources))
             ->orderByRaw('instrument_id, bar_time::date, bar_time DESC')
             ->get()
             ->groupBy('instrument_id');
@@ -218,6 +232,32 @@ final class ChartPatternSignalService
 
             return $event;
         });
+    }
+
+    /** @return Collection<int, string> source keyed by instrument_id, the one with the most rows in the window */
+    private function dominantSourceByInstrument(Collection $instrumentIds, Carbon $since, Carbon $until): Collection
+    {
+        if ($instrumentIds->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('price_bars')
+            ->select('instrument_id', 'source', DB::raw('COUNT(*) as n'))
+            ->whereIn('instrument_id', $instrumentIds)
+            ->where('interval', '1d')
+            ->whereBetween('bar_time', [$since, $until])
+            ->groupBy('instrument_id', 'source')
+            ->get()
+            ->groupBy('instrument_id')
+            ->map(fn (Collection $rows) => $rows->sortByDesc('n')->first()->source);
+    }
+
+    /** @param  \Illuminate\Database\Query\Builder  $query  @param  Collection<int, string>  $dominantSources */
+    private function constrainToDominantSource($query, Collection $dominantSources): void
+    {
+        foreach ($dominantSources as $instrumentId => $source) {
+            $query->orWhere(fn ($nested) => $nested->where('instrument_id', $instrumentId)->where('source', $source));
+        }
     }
 
     /** Colors chosen to stay visually distinct from candles (emerald/rose), the amber pattern markers and the rose/emerald breakout line. */
@@ -396,11 +436,29 @@ final class ChartPatternSignalService
     private function detect(): Collection
     {
         $rows = DB::select(<<<'SQL'
-            WITH daily_bars AS (
-                -- price_bars can hold more than one interval='1d' row per
-                -- calendar day for a given instrument (repeated intraday
+            WITH source_counts AS (
+                -- Some instruments carry two parallel price_bars feeds that
+                -- disagree wildly (seen: a "twelve_data" series around ~11
+                -- next to a "twelvedata|fallback:yfinance" series around ~85
+                -- for the same stock) - and because their bar_time values can
+                -- straddle midnight UTC by a couple of hours, they land on
+                -- *adjacent* calendar dates rather than colliding on the same
+                -- one, so a per-day DISTINCT ON alone doesn't catch it. Pin
+                -- every instrument to its single dominant source (by row
+                -- count) before doing anything else.
+                SELECT pb.instrument_id, pb.source, COUNT(*) AS n
+                FROM price_bars pb
+                WHERE pb.interval = '1d' AND pb.bar_time >= CURRENT_DATE - INTERVAL '400 days'
+                GROUP BY pb.instrument_id, pb.source
+            ), dominant_source AS (
+                SELECT DISTINCT ON (instrument_id) instrument_id, source
+                FROM source_counts
+                ORDER BY instrument_id, n DESC
+            ), daily_bars AS (
+                -- price_bars can also hold more than one interval='1d' row
+                -- per calendar day from the *same* source (repeated intraday
                 -- snapshots at different bar_time values, e.g. 00:00/04:00/
-                -- 22:00 UTC) - without collapsing to one row per day first,
+                -- 22:00 UTC) - without collapsing to one row per day too,
                 -- every window function below treats those as separate
                 -- trading days, corrupting SMA/RSI/Bollinger and producing
                 -- doubled-looking candles later. Keep the latest snapshot of
@@ -408,6 +466,7 @@ final class ChartPatternSignalService
                 SELECT DISTINCT ON (pb.instrument_id, pb.bar_time::date)
                        pb.instrument_id, pb.bar_time, pb.open, pb.high, pb.low, pb.close, pb.adjusted_close
                 FROM price_bars pb
+                JOIN dominant_source ds ON ds.instrument_id = pb.instrument_id AND ds.source = pb.source
                 WHERE pb.interval = '1d' AND pb.bar_time >= CURRENT_DATE - INTERVAL '400 days'
                 ORDER BY pb.instrument_id, pb.bar_time::date, pb.bar_time DESC
             ), bars AS (
