@@ -17,7 +17,7 @@ final class AnalyzeTodayHighlights extends Command
         $this->info("Analyzing highlights for $dateStr...");
 
         try {
-            $highlights = app(TodayHighlightsBuilder::class)->build($dateStr);
+            $highlights = app(TodayHighlightsBuilder::class)->build($dateStr)['highlights'];
 
             foreach ($highlights as $h) {
                 $this->line('  '.$h['label'].': '.($h['data'] ?? '(keine Daten)'));

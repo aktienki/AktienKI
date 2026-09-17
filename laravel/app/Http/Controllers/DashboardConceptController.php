@@ -354,7 +354,9 @@ final class DashboardConceptController extends Controller
         // TEMPORARY DEMO OVERRIDE: showing yesterday's complete trading day
         // so the user can see a fully-populated example. Revert to
         // now()->toDateString() afterwards.
-        $highlights = app(\App\Services\TodayHighlightsBuilder::class)->build(now()->subDay()->toDateString());
+        $built = app(\App\Services\TodayHighlightsBuilder::class)->build(now()->subDay()->toDateString());
+        $highlights = $built['highlights'];
+        $analogs = $built['analogs'];
 
         $insights = $this->loadCachedInsights($highlights)
             ?? app(\App\Services\TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
@@ -367,7 +369,7 @@ final class DashboardConceptController extends Controller
                 $h['insight'] = $insights[$keys[$idx]] ?? '';
                 return $h;
             }, $highlights, array_keys($highlights)),
-            'analogs' => [],
+            'analogs' => $analogs,
         ];
     }
 

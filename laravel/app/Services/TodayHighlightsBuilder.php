@@ -27,6 +27,7 @@ final class TodayHighlightsBuilder
         $swingStock = null;
         $surpriseSignal = null;
         $trendSwitch = null;
+        $analogs = [];
 
         $topBuy = DB::table('today_highlights_mv')
             ->where('serving_signal', 'BUY')
@@ -43,6 +44,12 @@ final class TodayHighlightsBuilder
                 'url' => route('stocks.show', ['symbol' => $topBuy->symbol, 'return_to' => '/dashboard/concept']),
                 'details' => $this->enrich((int) $topBuy->instrument_id),
             ];
+            array_push($analogs, ...$this->findAnalogs(
+                (int) $topBuy->instrument_id,
+                $topBuy->symbol,
+                (float) $topBuy->expected_return,
+                $date,
+            ));
         }
 
         $holdingSwings = DB::table('portfolio_positions as pp')
@@ -85,6 +92,12 @@ final class TodayHighlightsBuilder
                 'url' => route('stocks.show', ['symbol' => $surprise->symbol, 'return_to' => '/dashboard/concept']),
                 'details' => $this->enrich((int) $surprise->instrument_id),
             ];
+            array_push($analogs, ...$this->findAnalogs(
+                (int) $surprise->instrument_id,
+                $surprise->symbol,
+                (float) $surprise->expected_return,
+                $date,
+            ));
         }
 
         $trendSwitchRow = DB::table('today_highlights_mv')
@@ -103,7 +116,7 @@ final class TodayHighlightsBuilder
             ];
         }
 
-        return [
+        $highlights = [
             [
                 'label' => __('Top-Signal'),
                 'subtitle' => __('Beste neue BUY-Empfehlung'),
@@ -149,6 +162,70 @@ final class TodayHighlightsBuilder
                 'metric_value' => $trendSwitch ? __('BUY') : null,
             ],
         ];
+
+        $analogs = collect($analogs)
+            ->unique(fn (array $a) => $a['type'].'|'.$a['analog_symbol'])
+            ->values()
+            ->all();
+
+        return ['highlights' => $highlights, 'analogs' => $analogs];
+    }
+
+    /**
+     * Finds up to two historical analogs for a BUY signal of a given
+     * predicted-return magnitude: the same instrument's most similar past
+     * BUY signal, and the most similar past BUY signal on any other
+     * instrument - both with a resolved (>=25 days old) real outcome.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function findAnalogs(int $instrumentId, string $symbol, float $predictedReturn, string $date): array
+    {
+        $cutoff = \Illuminate\Support\Carbon::parse($date)->subDays(25)->toDateString();
+        $analogs = [];
+
+        $sameStock = DB::table('walk_forward_backtest_trades')
+            ->where('instrument_id', $instrumentId)
+            ->where('signal', 'BUY')
+            ->where('horizon_days', 20)
+            ->where('signal_date', '<=', $cutoff)
+            ->orderByRaw('ABS(predicted_return - ?) ASC', [$predictedReturn])
+            ->select('signal_date', 'net_return')
+            ->first();
+
+        if ($sameStock) {
+            $analogs[] = [
+                'type' => 'same_stock',
+                'symbol' => $symbol,
+                'analog_symbol' => $symbol,
+                'signal_date' => $sameStock->signal_date,
+                'outcome_pct' => round((float) $sameStock->net_return * 100, 1),
+                'url' => route('stocks.show', ['symbol' => $symbol, 'return_to' => '/dashboard/concept']),
+            ];
+        }
+
+        $crossStock = DB::table('walk_forward_backtest_trades as t')
+            ->join('instruments as i', 'i.id', '=', 't.instrument_id')
+            ->where('t.instrument_id', '!=', $instrumentId)
+            ->where('t.signal', 'BUY')
+            ->where('t.horizon_days', 20)
+            ->where('t.signal_date', '<=', $cutoff)
+            ->orderByRaw('ABS(t.predicted_return - ?) ASC', [$predictedReturn])
+            ->select('i.symbol', 't.signal_date', 't.net_return')
+            ->first();
+
+        if ($crossStock) {
+            $analogs[] = [
+                'type' => 'cross_stock',
+                'symbol' => $symbol,
+                'analog_symbol' => $crossStock->symbol,
+                'signal_date' => $crossStock->signal_date,
+                'outcome_pct' => round((float) $crossStock->net_return * 100, 1),
+                'url' => route('stocks.show', ['symbol' => $crossStock->symbol, 'return_to' => '/dashboard/concept']),
+            ];
+        }
+
+        return $analogs;
     }
 
     /** @return array<string, mixed> */

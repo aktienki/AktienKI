@@ -335,11 +335,22 @@
                             </div>
                             @if(count($section['analogs']) > 0)
                                 <div class="mt-4 border-t border-[var(--ak-border)] pt-4">
-                                    <p class="mb-2 text-[10px] font-black uppercase text-[var(--ak-muted)]">{{ __('Historische Analoga') }}</p>
-                                    <div class="space-y-1.5">
+                                    <p class="mb-2 text-[10px] font-black uppercase text-[var(--ak-muted)]">{{ __('Gab es in letzter Zeit ähnliche Fälle?') }}</p>
+                                    <div class="grid gap-1.5 sm:grid-cols-2">
                                         @foreach($section['analogs'] as $analog)
+                                            @php
+                                                $daysAgo = \Illuminate\Support\Carbon::parse($analog['signal_date'])->diffInDays(now());
+                                                $outcomeClass = $analog['outcome_pct'] >= 0 ? 'text-emerald-500' : 'text-rose-500';
+                                            @endphp
                                             <a href="{{ $analog['url'] }}" class="concept-list-item">
-                                                <span class="min-w-0 flex-1 truncate">{{ $analog['symbol'] }} — {{ $analog['analog_symbol'] }} ({{ __('damals') }} +{{ number_format($analog['outcome_pct'], 1, ',', '.') }}%)</span>
+                                                <span class="min-w-0 flex-1 truncate">
+                                                    @if($analog['type'] === 'same_stock')
+                                                        {{ $analog['symbol'] }} {{ __('hatte vor :days Tagen ein ähnliches Signal', ['days' => $daysAgo]) }}
+                                                    @else
+                                                        {{ $analog['analog_symbol'] }} {{ __('zeigte vor :days Tagen ein ähnliches Setup', ['days' => $daysAgo]) }}
+                                                    @endif
+                                                    · <span class="font-black {{ $outcomeClass }}">{{ $analog['outcome_pct'] >= 0 ? '+' : '' }}{{ number_format($analog['outcome_pct'], 1, ',', '.') }}%</span>
+                                                </span>
                                             </a>
                                         @endforeach
                                     </div>
