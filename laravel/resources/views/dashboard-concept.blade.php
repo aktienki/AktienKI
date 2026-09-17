@@ -275,7 +275,7 @@
                         </div>
 
                         @if($section['kind'] === 'today-focus')
-                            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 items-stretch">
+                            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
                                 @foreach($section['highlights'] as $highlight)
                                     @php $wrapper = $highlight['url'] ? 'a' : 'div'; $details = $highlight['details'] ?? null; @endphp
                                     <{{ $wrapper }} @if($highlight['url']) href="{{ $highlight['url'] }}" @endif class="concept-card flex h-full flex-col p-4 hover:border-{{ $highlight['color'] }}-400">
