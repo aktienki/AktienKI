@@ -40,7 +40,11 @@ PROMPT;
                         ], JSON_UNESCAPED_UNICODE),
                     ],
                 ],
-                'max_tokens' => 300,
+                // Reasoning models (e.g. Kimi) spend a large share of this
+                // budget on their internal reasoning trace before writing
+                // the actual JSON answer - too low a limit truncates the
+                // response to nothing before it gets there.
+                'max_tokens' => 1500,
             ];
 
             $endpoint = (string) config('aktienki.stock_ai_assessment.grid_endpoint', 'https://api.thegrid.ai/v1/chat/completions');
@@ -56,6 +60,9 @@ PROMPT;
             }
 
             $text = (string) data_get($response->json(), 'choices.0.message.content', '');
+            // Some models (e.g. Kimi) wrap their JSON answer in a markdown
+            // code fence despite being told to answer with JSON only.
+            $text = preg_replace('/^```(?:json)?\s*|\s*```$/', '', trim($text));
             $insights = json_decode($text, true) ?? [];
 
             return [
