@@ -306,7 +306,7 @@ final class DashboardConceptController extends Controller
         };
     }
 
-    private function loadCachedInsights(): ?array
+    private function loadCachedInsights(array $highlights): ?array
     {
         $filePath = storage_path('app/cache/today_highlights.json');
         if (!file_exists($filePath)) {
@@ -319,8 +319,21 @@ final class DashboardConceptController extends Controller
                 return null;
             }
 
-            $json = file_get_contents($filePath);
-            return json_decode($json, true) ?: null;
+            $cached = json_decode(file_get_contents($filePath), true);
+            if (!is_array($cached) || !isset($cached['insights'], $cached['data_snapshot'])) {
+                return null;
+            }
+
+            // The cache is only valid for the exact highlight data it was
+            // generated from - a stale or manually re-run cache (e.g. from
+            // testing against a different date) must never be shown
+            // alongside today's actual (possibly empty) highlight cards.
+            $currentSnapshot = array_map(fn (array $h) => $h['data'], $highlights);
+            if ($cached['data_snapshot'] !== $currentSnapshot) {
+                return null;
+            }
+
+            return $cached['insights'];
         } catch (\Exception) {
             return null;
         }
@@ -340,7 +353,7 @@ final class DashboardConceptController extends Controller
     {
         $highlights = app(\App\Services\TodayHighlightsBuilder::class)->build();
 
-        $insights = $this->loadCachedInsights()
+        $insights = $this->loadCachedInsights($highlights)
             ?? app(\App\Services\TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
 
         return [
