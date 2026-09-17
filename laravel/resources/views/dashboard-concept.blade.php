@@ -565,6 +565,57 @@
                             @else
                                 <div class="concept-empty">{{ $section['emptyText'] }}</div>
                             @endif
+                        @elseif($section['kind'] === 'signal-transitions')
+                            @if(count($section['rows']))
+                                <div class="overflow-x-auto">
+                                    <table class="w-full min-w-[900px] border-collapse text-[11px]">
+                                        <thead>
+                                            <tr class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                <th class="border-0 pb-1.5 pr-2 text-left font-black">{{ __('Zeit') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Aktie') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Modell') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Horizont') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-center font-black">{{ __('Übergang') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Score') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Konfidenz') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Risiko') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Ø 5T') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Ø 20T') }}</th>
+                                                <th class="border-0 pb-1.5 pl-2 text-center font-black">{{ __('Nach Filter') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @php
+                                                $signalTone = fn (?string $signal) => match ($signal) {
+                                                    'BUY' => 'text-emerald-500', 'WATCH' => 'text-amber-500',
+                                                    'SELL' => 'text-rose-500', default => 'text-[var(--ak-muted)]',
+                                                };
+                                            @endphp
+                                            @foreach($section['rows'] as $row)
+                                                <tr class="border-t border-[var(--ak-border)]">
+                                                    <td class="py-1.5 pr-2 tabular-nums text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($row['time'])->timezone('Europe/Berlin')->format('d.m. H:i') }}</td>
+                                                    <td class="px-2 py-1.5"><span class="font-bold text-[var(--ak-text)]">{{ $row['symbol'] }}</span></td>
+                                                    <td class="px-2 py-1.5 text-[var(--ak-muted)]">{{ $row['model'] }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums text-[var(--ak-muted)]">{{ $row['horizon_days'] }}T</td>
+                                                    <td class="px-2 py-1.5 text-center whitespace-nowrap">
+                                                        <span class="{{ $signalTone($row['previous_signal']) }}">{{ $row['previous_signal'] }}</span>
+                                                        <span class="text-[var(--ak-muted)]">→</span>
+                                                        <span class="font-black {{ $signalTone($row['raw_signal']) }}">{{ $row['raw_signal'] }}</span>
+                                                    </td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ $row['score'] === null ? '—' : number_format($row['score'], 1, ',', '.') }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ $row['confidence'] === null ? '—' : number_format($row['confidence'] * 100, 0, ',', '.').' %' }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ $row['risk'] === null ? '—' : number_format($row['risk'] <= 1 ? $row['risk'] * 100 : $row['risk'], 0, ',', '.').' %' }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums {{ ($row['return_5d'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $row['return_5d'] === null ? '—' : number_format($row['return_5d'], 1, ',', '.').' %' }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums {{ ($row['return_20d'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $row['return_20d'] === null ? '—' : number_format($row['return_20d'], 1, ',', '.').' %' }}</td>
+                                                    <td class="py-1.5 pl-2 text-center font-black {{ $signalTone($row['personalized_signal']) }}">{{ $row['personalized_signal'] }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <div class="concept-empty">{{ $section['emptyText'] }}</div>
+                            @endif
                         @elseif($section['kind'] === 'stock-of-day')
                             @if($section['available'])
                                 <a href="{{ $section['url'] }}" class="block text-decoration-none">

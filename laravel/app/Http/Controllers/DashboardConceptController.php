@@ -9,6 +9,7 @@ use App\Services\IndexAiScoreService;
 use App\Services\MarketOverviewWidgetsService;
 use App\Services\MarketService;
 use App\Services\PanelScoreDriftStatsService;
+use App\Services\PersonalizedSignalService;
 use App\Services\ServingMarketSnapshotService;
 use App\Services\TodayHighlightsAnalysisService;
 use App\Services\TodayHighlightsBuilder;
@@ -42,6 +43,7 @@ final class DashboardConceptController extends Controller
         ['news', 'News', 'heroicon-o-newspaper'],
         ['upcoming-news', 'Anstehende News', 'heroicon-o-calendar-days'],
         ['earnings-drift', 'Quartalszahlen-Historie', 'heroicon-o-chart-bar'],
+        ['signal-transitions', 'Signalübergang', 'heroicon-o-arrows-right-left'],
     ];
 
     public function __invoke(Request $request): View
@@ -85,6 +87,7 @@ final class DashboardConceptController extends Controller
             $this->newsSection('news'),
             $this->eventsSection('upcoming-news', $request),
             $this->earningsDriftSection('earnings-drift', $request),
+            $this->signalTransitionSection('signal-transitions', $request),
             $this->classicDashboardSection('classic-dashboard', $request),
         ])->map(function (array $section) use ($leftIcons): array {
             $meta = $leftIcons->firstWhere('id', $section['id']);
@@ -343,11 +346,83 @@ final class DashboardConceptController extends Controller
             'predictions' => route('predictions.index'),
             'smart-screener' => route('screener.index'),
             'market-report' => route('daily-market-analysis'),
+            'signal-transitions' => route('predictions.index'),
             'upcoming-news' => route('upcoming-events.index'),
             'earnings-drift' => route('upcoming-events.index'),
             'classic-dashboard' => route('dashboard'),
             default => route('dashboard'),
         };
+    }
+
+    /**
+     * Every model-signal transition (raw signal at prediction N differs from
+     * the same trained_model_id's immediately preceding prediction) whose
+     * prediction_time falls in the last 48h - a live audit trail of what
+     * moved and why. Shows the raw values a transition happened on (score,
+     * confidence, risk, forecast return) plus the personalized signal
+     * (PersonalizedSignalService - quality gate + risk-profile thresholds)
+     * next to the raw one, since a "raw BUY" and "after your filter" can
+     * legitimately diverge (see AutomatedPortfolioService candidate scans).
+     */
+    private function signalTransitionSection(string $id, Request $request): array
+    {
+        $signals = app(PersonalizedSignalService::class);
+        $signalSql = $signals->sql('prediction', $request->user());
+        $rawSignalSql = "UPPER(COALESCE(NULLIF(BTRIM(prediction.signal), ''), 'HOLD'))";
+        $previousRawSignalSql = "(SELECT UPPER(COALESCE(NULLIF(BTRIM(pp.signal), ''), 'HOLD'))
+            FROM predictions pp
+            WHERE pp.trained_model_id = prediction.trained_model_id AND pp.id < prediction.id
+            ORDER BY pp.prediction_time DESC, pp.id DESC LIMIT 1)";
+
+        $rows = \DB::table('predictions as prediction')
+            ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+            ->leftJoin('trained_models as trained_model', 'trained_model.id', '=', 'prediction.trained_model_id')
+            ->leftJoin('model_definitions as model_definition', 'model_definition.id', '=', 'trained_model.model_definition_id')
+            ->whereNotNull('prediction.trained_model_id')
+            ->where('instrument.type', 'stock')
+            ->whereNull('instrument.deleted_at')
+            ->where('prediction.prediction_time', '>=', now()->subHours(48))
+            ->selectRaw("
+                prediction.id, instrument.symbol, instrument.name, prediction.prediction_time,
+                COALESCE(model_definition.public_alias, model_definition.name, 'Unbekannt') as model_name,
+                prediction.prediction_horizon_minutes,
+                {$previousRawSignalSql} as previous_signal,
+                {$rawSignalSql} as raw_signal,
+                ({$signalSql}) as personalized_signal,
+                COALESCE(prediction.ai_score, prediction.prediction_score, 0) as raw_score,
+                prediction.confidence,
+                COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) as raw_risk,
+                ((prediction.predicted_price_5d - prediction.current_price) / NULLIF(prediction.current_price, 0) * 100) as return_5d,
+                ((prediction.predicted_price_20d - prediction.current_price) / NULLIF(prediction.current_price, 0) * 100) as return_20d
+            ")
+            ->get()
+            ->filter(fn (object $row): bool => $row->previous_signal !== null && $row->previous_signal !== $row->raw_signal)
+            ->sortByDesc('prediction_time')
+            ->take(100)
+            ->map(fn (object $row): array => [
+                'time' => $row->prediction_time,
+                'symbol' => $row->symbol,
+                'name' => $row->name,
+                'model' => $row->model_name,
+                'horizon_days' => (int) round(((int) $row->prediction_horizon_minutes) / 1440),
+                'previous_signal' => $row->previous_signal,
+                'raw_signal' => $row->raw_signal,
+                'personalized_signal' => $row->personalized_signal,
+                'score' => is_numeric($row->raw_score) ? (float) $row->raw_score : null,
+                'confidence' => is_numeric($row->confidence) ? (float) $row->confidence : null,
+                'risk' => is_numeric($row->raw_risk) ? (float) $row->raw_risk : null,
+                'return_5d' => is_numeric($row->return_5d) ? (float) $row->return_5d : null,
+                'return_20d' => is_numeric($row->return_20d) ? (float) $row->return_20d : null,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'id' => $id,
+            'kind' => 'signal-transitions',
+            'rows' => $rows,
+            'emptyText' => __('Keine Signalübergänge in den letzten 48 Stunden.'),
+        ];
     }
 
     /**
