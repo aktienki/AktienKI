@@ -351,7 +351,10 @@ final class DashboardConceptController extends Controller
      */
     private function todayFocusSection(string $id): array
     {
-        $highlights = app(\App\Services\TodayHighlightsBuilder::class)->build();
+        // TEMPORARY DEMO OVERRIDE: showing yesterday's complete trading day
+        // so the user can see a fully-populated example. Revert to
+        // now()->toDateString() afterwards.
+        $highlights = app(\App\Services\TodayHighlightsBuilder::class)->build(now()->subDay()->toDateString());
 
         $insights = $this->loadCachedInsights($highlights)
             ?? app(\App\Services\TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
