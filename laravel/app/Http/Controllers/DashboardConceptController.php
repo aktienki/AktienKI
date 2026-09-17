@@ -338,10 +338,13 @@ final class DashboardConceptController extends Controller
                 'label' => $event['label'],
                 'tone' => $event['tone'],
                 'change_pct' => $event['change_pct'],
-                'sparkline' => $event['sparkline'],
+                'candles' => $event['candles'],
+                'indicator_series' => $event['indicator_series'],
                 'rise_probability_20d' => $event['rise_probability_20d'],
                 'average_return_20d' => $event['average_return_20d'],
                 'probability_sample_size' => $event['probability_sample_size'],
+                'probability_scope' => $event['probability_scope'],
+                'instrument_occurrence_count' => $event['instrument_occurrence_count'],
                 'url' => route('stocks.show', ['symbol' => $event['symbol'], 'return_to' => '/dashboard/concept']),
             ])
             ->values()

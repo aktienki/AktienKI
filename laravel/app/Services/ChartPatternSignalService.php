@@ -22,7 +22,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class ChartPatternSignalService
 {
-    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v3';
+    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v5';
+
+    /** Event types driven by a bounded (0-100) oscillator, shown as its own panel below the candles rather than overlaid on price. */
+    private const INDICATOR_EVENT_KEYS = ['rsi_oversold', 'rsi_overbought'];
 
     public function recentEvents(): Collection
     {
@@ -30,18 +33,28 @@ final class ChartPatternSignalService
             $events = $this->detect();
             $events = $this->attachProbabilities($events);
 
-            return $this->attachSparklines($events);
+            return $this->attachCharts($events);
         });
     }
 
     /**
      * Attaches each event's historical "does the price rise over the
-     * following 20 trading days" statistic from chartview_signal_statistics
-     * - a 3-year backtest across all detected occurrences of that event
-     * type, refreshed daily by chartview:refresh-signals. That command's own
-     * *recent-event detection* is what's stalled on technical_indicators
-     * (see class docblock); the long-window backtest it also (re)computes
-     * every run is unaffected and safe to reuse here.
+     * following 20 trading days" probability, and whether this exact
+     * event/stock constellation has happened before for this specific
+     * instrument - not just the same event type across all stocks.
+     *
+     * Both come from chartview_signal_statistics (global, per event_key) and
+     * chartview_instrument_signal_statistics (per instrument_id+event_key) -
+     * a 3-year backtest chartview:refresh-signals (re)computes daily. That
+     * command's own *recent-event detection* is what's stalled on
+     * technical_indicators (see class docblock); the long-window backtest it
+     * also recomputes every run is unaffected and safe to reuse here.
+     *
+     * The shown probability blends instrument-specific and global evidence
+     * the same way chartview_signal_events already does: too few own
+     * occurrences (<10) falls back to the global rate entirely, >=30 uses
+     * the instrument's own rate, and in between blends both weighted by
+     * sample size - avoiding a false-precision "73%" off 2 past trades.
      */
     private function attachProbabilities(Collection $events): Collection
     {
@@ -49,23 +62,56 @@ final class ChartPatternSignalService
             return $events;
         }
 
-        $statistics = DB::table('chartview_signal_statistics')
+        $global = DB::table('chartview_signal_statistics')
             ->get(['event_key', 'rise_probability', 'average_return', 'sample_size'])
             ->keyBy('event_key');
 
-        return $events->map(function (array $event) use ($statistics): array {
-            $stat = $statistics->get($event['event_key']);
+        $instrumentIds = $events->pluck('instrument_id')->unique()->values();
+        $perInstrument = DB::table('chartview_instrument_signal_statistics')
+            ->whereIn('instrument_id', $instrumentIds)
+            ->get(['instrument_id', 'event_key', 'rise_probability', 'average_return', 'sample_size'])
+            ->keyBy(fn (object $row): string => $row->instrument_id.':'.$row->event_key);
 
-            $event['rise_probability_20d'] = $stat && is_numeric($stat->rise_probability) ? round((float) $stat->rise_probability, 1) : null;
-            $event['average_return_20d'] = $stat && is_numeric($stat->average_return) ? round((float) $stat->average_return, 1) : null;
-            $event['probability_sample_size'] = $stat ? (int) $stat->sample_size : null;
+        return $events->map(function (array $event) use ($global, $perInstrument): array {
+            $globalStat = $global->get($event['event_key']);
+            $globalProbability = $globalStat && is_numeric($globalStat->rise_probability) ? (float) $globalStat->rise_probability : null;
+
+            $ownStat = $perInstrument->get($event['instrument_id'].':'.$event['event_key']);
+            $ownSampleSize = $ownStat ? (int) $ownStat->sample_size : 0;
+            $ownProbability = $ownStat && is_numeric($ownStat->rise_probability) ? (float) $ownStat->rise_probability : null;
+
+            if ($ownSampleSize < 10 || $ownProbability === null || $globalProbability === null) {
+                $blended = $globalProbability;
+                $scope = 'global';
+                $sampleSize = $globalStat ? (int) $globalStat->sample_size : null;
+            } else {
+                $weight = $ownSampleSize / ($ownSampleSize + 20);
+                $blended = $ownProbability * $weight + $globalProbability * (1 - $weight);
+                $scope = $ownSampleSize < 30 ? 'blended' : 'instrument';
+                $sampleSize = $ownSampleSize;
+            }
+
+            $event['rise_probability_20d'] = $blended !== null ? round($blended, 1) : null;
+            $event['probability_scope'] = $scope;
+            $event['probability_sample_size'] = $sampleSize;
+            $event['average_return_20d'] = $globalStat && is_numeric($globalStat->average_return) ? round((float) $globalStat->average_return, 1) : null;
+            // Has this exact event type already happened for this specific
+            // stock before, independent of the blending threshold above.
+            $event['instrument_occurrence_count'] = $ownSampleSize;
 
             return $event;
         });
     }
 
-    /** Attaches a normalized SVG polyline (viewBox 0 0 100 32) of each event's last ~30 daily closes, so the pattern itself is visible, not just its label. */
-    private function attachSparklines(Collection $events): Collection
+    /**
+     * Attaches a 30-day OHLC candlestick chart (viewBox 0 0 100 32) built
+     * straight from price_bars, so the actual chart pattern is visible, not
+     * just its label - plus, for RSI-driven events, a second 0-100 panel
+     * plotting the RSI-14 series underneath, the same way a real charting
+     * tool keeps a bounded oscillator in its own panel instead of squashing
+     * it onto the price axis.
+     */
+    private function attachCharts(Collection $events): Collection
     {
         if ($events->isEmpty()) {
             return $events;
@@ -74,40 +120,121 @@ final class ChartPatternSignalService
         $eventDate = $events->first()['time'];
         $instrumentIds = $events->pluck('instrument_id')->unique()->values();
 
-        $seriesByInstrument = DB::table('price_bars')
+        // 90 calendar days (~60 trading days) covers the 30 displayed bars
+        // plus the 14-bar RSI seed with comfortable headroom for weekends/
+        // holidays.
+        $barsByInstrument = DB::table('price_bars')
             ->whereIn('instrument_id', $instrumentIds)
             ->where('interval', '1d')
-            ->whereBetween('bar_time', [Carbon::parse($eventDate)->subDays(60), $eventDate])
+            ->whereBetween('bar_time', [Carbon::parse($eventDate)->subDays(90), $eventDate])
             ->orderBy('bar_time')
-            ->get(['instrument_id', 'close', 'adjusted_close'])
+            ->get(['instrument_id', 'open', 'high', 'low', 'close'])
             ->groupBy('instrument_id');
 
-        return $events->map(function (array $event) use ($seriesByInstrument): array {
-            $closes = ($seriesByInstrument->get($event['instrument_id']) ?? collect())
-                ->map(fn (object $bar) => (float) ($bar->adjusted_close ?? $bar->close))
-                ->slice(-30)
-                ->values();
+        return $events->map(function (array $event) use ($barsByInstrument): array {
+            $bars = $barsByInstrument->get($event['instrument_id']) ?? collect();
+            $window = $bars->slice(-30)->values();
 
-            $event['sparkline'] = $closes->count() >= 2 ? $this->sparkline($closes->all()) : null;
+            $event['candles'] = $window->count() >= 2 ? $this->candles($window) : [];
+            $event['indicator_series'] = in_array($event['event_key'], self::INDICATOR_EVENT_KEYS, true)
+                ? $this->rsiPanel($bars)
+                : null;
 
             return $event;
         });
     }
 
-    /** @param list<float> $closes */
-    private function sparkline(array $closes): string
+    /** @return list<array{x: float, width: float, high_y: float, low_y: float, body_y: float, body_height: float, bullish: bool}> */
+    private function candles(Collection $bars): array
     {
-        $min = min($closes);
-        $max = max($closes);
+        $min = $bars->min(fn (object $bar) => (float) $bar->low);
+        $max = $bars->max(fn (object $bar) => (float) $bar->high);
         $range = $max - $min;
-        $count = count($closes);
+        $count = $bars->count();
+        $slot = 100 / $count;
+        $y = fn (float $value): float => $range > 0 ? 32 - (($value - $min) / $range) * 32 : 16;
 
-        return collect($closes)->map(function (float $close, int $i) use ($min, $range, $count): string {
+        return $bars->map(function (object $bar, int $i) use ($slot, $y): array {
+            $open = (float) $bar->open;
+            $close = (float) $bar->close;
+            $bodyTop = $y(max($open, $close));
+            $bodyBottom = $y(min($open, $close));
+
+            return [
+                'x' => round(($i + 0.5) * $slot, 2),
+                'width' => round($slot * 0.6, 2),
+                'high_y' => round($y((float) $bar->high), 2),
+                'low_y' => round($y((float) $bar->low), 2),
+                'body_y' => round($bodyTop, 2),
+                // A doji (open == close) would otherwise draw a zero-height,
+                // invisible body - keep a thin sliver visible instead.
+                'body_height' => round(max($bodyBottom - $bodyTop, 0.6), 2),
+                'bullish' => $close >= $open,
+            ];
+        })->values()->all();
+    }
+
+    /** @return array{label: string, points: string, overbought_y: float, oversold_y: float}|null */
+    private function rsiPanel(Collection $bars): ?array
+    {
+        $closes = $bars->pluck('close')->map(fn ($v) => (float) $v)->values()->all();
+        $series = $this->rsiSeries($closes, 14);
+        $displaySeries = array_slice($series, -min(30, count($closes)));
+        $count = count($displaySeries);
+
+        $points = [];
+        foreach ($displaySeries as $i => $value) {
+            if ($value === null) {
+                continue;
+            }
             $x = $count > 1 ? ($i / ($count - 1)) * 100 : 0;
-            $y = $range > 0 ? 32 - (($close - $min) / $range) * 32 : 16;
+            $points[] = round($x, 1).','.round(20 - ($value / 100) * 20, 1);
+        }
 
-            return round($x, 1).','.round($y, 1);
-        })->implode(' ');
+        if ($points === []) {
+            return null;
+        }
+
+        return [
+            'label' => __('RSI (14)'),
+            'points' => implode(' ', $points),
+            'overbought_y' => round(20 - (70 / 100) * 20, 1),
+            'oversold_y' => round(20 - (30 / 100) * 20, 1),
+        ];
+    }
+
+    /**
+     * Wilder's smoothed RSI as a full series aligned to $closes (first
+     * $period entries are null - not enough history yet to seed them).
+     *
+     * @param  list<float>  $closes
+     * @return list<float|null>
+     */
+    private function rsiSeries(array $closes, int $period): array
+    {
+        $series = array_fill(0, count($closes), null);
+        if (count($closes) <= $period) {
+            return $series;
+        }
+
+        $gains = 0.0;
+        $losses = 0.0;
+        for ($i = 1; $i <= $period; $i++) {
+            $delta = $closes[$i] - $closes[$i - 1];
+            $delta >= 0 ? $gains += $delta : $losses -= $delta;
+        }
+        $avgGain = $gains / $period;
+        $avgLoss = $losses / $period;
+        $series[$period] = $avgLoss == 0.0 ? 100.0 : 100 - (100 / (1 + $avgGain / $avgLoss));
+
+        for ($i = $period + 1; $i < count($closes); $i++) {
+            $delta = $closes[$i] - $closes[$i - 1];
+            $avgGain = ($avgGain * ($period - 1) + max($delta, 0.0)) / $period;
+            $avgLoss = ($avgLoss * ($period - 1) + max(-$delta, 0.0)) / $period;
+            $series[$i] = $avgLoss == 0.0 ? 100.0 : 100 - (100 / (1 + $avgGain / $avgLoss));
+        }
+
+        return $series;
     }
 
     private function detect(): Collection

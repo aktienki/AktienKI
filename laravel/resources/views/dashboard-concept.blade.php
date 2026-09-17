@@ -1094,24 +1094,51 @@
                                                 <div class="text-[13px] font-black text-{{ $tone }}-500">{{ $row['label'] }}</div>
                                             </div>
 
-                                            @if($row['sparkline'])
+                                            @if(count($row['candles']))
                                                 <div class="mb-2 rounded-lg bg-[var(--ak-surface-muted)] px-2 py-1.5">
                                                     <div class="mb-1 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf (30T)') }}</div>
                                                     <svg viewBox="0 0 100 32" class="h-8 w-full" preserveAspectRatio="none">
-                                                        <polyline points="{{ $row['sparkline'] }}" fill="none" stroke="currentColor" stroke-width="3" class="text-{{ $tone }}-500" stroke-linecap="round" stroke-linejoin="round" />
+                                                        @foreach($row['candles'] as $candle)
+                                                            <line x1="{{ $candle['x'] }}" x2="{{ $candle['x'] }}" y1="{{ $candle['high_y'] }}" y2="{{ $candle['low_y'] }}" stroke="currentColor" stroke-width="1" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
+                                                            <rect x="{{ $candle['x'] - $candle['width'] / 2 }}" y="{{ $candle['body_y'] }}" width="{{ $candle['width'] }}" height="{{ $candle['body_height'] }}" fill="currentColor" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
+                                                        @endforeach
                                                     </svg>
+
+                                                    @if($row['indicator_series'])
+                                                        <div class="mb-1 mt-2 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $row['indicator_series']['label'] }}</div>
+                                                        <svg viewBox="0 0 100 20" class="h-5 w-full" preserveAspectRatio="none">
+                                                            <line x1="0" x2="100" y1="{{ $row['indicator_series']['overbought_y'] }}" y2="{{ $row['indicator_series']['overbought_y'] }}" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,2" class="text-rose-400/50" />
+                                                            <line x1="0" x2="100" y1="{{ $row['indicator_series']['oversold_y'] }}" y2="{{ $row['indicator_series']['oversold_y'] }}" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,2" class="text-emerald-400/50" />
+                                                            <polyline points="{{ $row['indicator_series']['points'] }}" fill="none" stroke="currentColor" stroke-width="2" class="text-{{ $tone }}-500" stroke-linecap="round" stroke-linejoin="round" />
+                                                        </svg>
+                                                    @endif
                                                 </div>
                                             @endif
 
+                                            @php
+                                                $scopeLabel = match ($row['probability_scope']) {
+                                                    'instrument' => __('eigene Historie'),
+                                                    'blended' => __('eigene + globale Historie'),
+                                                    default => __('globale Historie'),
+                                                };
+                                            @endphp
                                             <div class="mt-auto grid grid-cols-2 gap-1.5 text-[9px]">
                                                 <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1">
                                                     <span class="block text-[var(--ak-muted)]">{{ __('Kursänderung') }}</span>
                                                     <span class="font-bold {{ ($row['change_pct'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $row['change_pct'] === null ? '—' : number_format($row['change_pct'], 1, ',', '.').' %' }}</span>
                                                 </div>
-                                                <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1" title="{{ $row['probability_sample_size'] !== null ? __('Historisch über :n Fälle (3 Jahre)', ['n' => $row['probability_sample_size']]) : '' }}">
+                                                <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1" title="{{ $row['probability_sample_size'] !== null ? __(':scope, :n Fälle (3 Jahre)', ['scope' => $scopeLabel, 'n' => $row['probability_sample_size']]) : '' }}">
                                                     <span class="block text-[var(--ak-muted)]">{{ __('Anstieg wahrsch. (20T)') }}</span>
                                                     <span class="font-bold text-[var(--ak-text)]">{{ $row['rise_probability_20d'] === null ? '—' : number_format($row['rise_probability_20d'], 0, ',', '.').' %' }}</span>
                                                 </div>
+                                            </div>
+
+                                            <div class="mt-1.5 text-[8px] text-[var(--ak-muted)]">
+                                                @if($row['instrument_occurrence_count'] > 0)
+                                                    {{ __('Konstellation bei :symbol bereits :count× aufgetreten', ['symbol' => $row['symbol'], 'count' => $row['instrument_occurrence_count']]) }}
+                                                @else
+                                                    {{ __('Erstmals bei :symbol in den letzten 3 Jahren', ['symbol' => $row['symbol']]) }}
+                                                @endif
                                             </div>
                                         </a>
                                     @endforeach
