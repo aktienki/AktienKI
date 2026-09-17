@@ -441,6 +441,14 @@
                             @endif
                         @elseif($section['kind'] === 'opportunities-risks')
                             @if($section['available'])
+                                <div class="mb-3 flex items-center justify-between gap-2">
+                                    <span class="rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-[.1em] {{ $section['source'] === 'external' ? 'border-cyan-400/25 bg-cyan-400/[.06] text-cyan-400' : 'border-[var(--ak-border)] text-[var(--ak-muted)]' }}">
+                                        {{ $section['source'] === 'external' ? __('Externe Web-Recherche') : __('Regelbasierte Auswertung') }}
+                                    </span>
+                                    @if($section['date'])
+                                        <span class="text-[9px] font-bold text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($section['date'])->format('d.m.Y') }}</span>
+                                    @endif
+                                </div>
                                 <div class="grid gap-3 sm:grid-cols-3">
                                     @foreach([
                                         [__('Chancen'), $section['opportunities'], 'text-emerald-500'],

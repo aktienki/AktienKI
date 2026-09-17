@@ -141,15 +141,77 @@ final class DashboardConceptController extends Controller
      */
     private function opportunitiesRisksSection(string $id, array $snapshot): array
     {
+        $external = $this->externalMarketAnalysis();
+        if ($external) {
+            return [
+                'id' => $id,
+                'kind' => 'opportunities-risks',
+                'available' => true,
+                'source' => 'external',
+                'date' => $external['date'],
+                'opportunities' => $external['opportunities'],
+                'risks' => $external['risks'],
+                'watchlist' => $external['watchlist'],
+            ];
+        }
+
         $analysis = $snapshot['analysis'] ?? [];
 
         return [
             'id' => $id,
             'kind' => 'opportunities-risks',
             'available' => (bool) ($snapshot['available'] ?? false),
+            'source' => 'internal',
+            'date' => $analysis['date'] ?? null,
             'opportunities' => $analysis['opportunitiesFull'] ?? [],
             'risks' => $analysis['risksFull'] ?? [],
             'watchlist' => $analysis['watchlistFull'] ?? [],
+        ];
+    }
+
+    /**
+     * The daily web-researched market report (GenerateDailyMarketReport,
+     * OpenAI with a live web_search tool - real citations, not just this
+     * app's own data) - preferred over the rule-based internal snapshot's
+     * Chancen/Risiken/Beobachtungsliste when available, same fallback
+     * MarketData::loadExternalMarketAnalysis() was built for (that call site
+     * has since gone missing there - the method itself is still intact, this
+     * just calls the same query directly rather than depending on a Livewire
+     * component's private method).
+     *
+     * @return array{date: string, opportunities: list<string>, risks: list<string>, watchlist: list<string>}|null
+     */
+    private function externalMarketAnalysis(): ?array
+    {
+        $analysis = \DB::table('daily_market_ai_analyses')
+            ->orderByDesc('analysis_date')
+            ->orderByDesc('id')
+            ->first();
+        if (! $analysis) {
+            return null;
+        }
+
+        $raw = is_string($analysis->raw_response ?? null)
+            ? json_decode($analysis->raw_response, true)
+            : (array) ($analysis->raw_response ?? []);
+        if (! data_get($raw, 'external_research', false)) {
+            return null;
+        }
+
+        $decode = fn (mixed $value): array => is_array($value) ? $value : (is_array($decoded = json_decode((string) $value, true)) ? $decoded : []);
+
+        return [
+            'date' => (string) $analysis->analysis_date,
+            'opportunities' => $decode($analysis->opportunities),
+            'risks' => $decode($analysis->risks),
+            // Unlike opportunities/risks (plain strings), watchlist entries
+            // are {symbol, reason} objects - flatten to the same "Symbol:
+            // Begründung" shape the rest of this tile's lists use.
+            'watchlist' => collect($decode($analysis->watchlist))
+                ->map(fn ($item): string => is_array($item)
+                    ? trim(($item['symbol'] ?? '').': '.($item['reason'] ?? ''), ': ')
+                    : (string) $item)
+                ->values()->all(),
         ];
     }
 
