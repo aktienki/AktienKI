@@ -474,7 +474,7 @@
                         @if ($setupMode && ! $shortMode)<label class="ak-quality-select-card"><span>{{ __('Service Quality Gate') }}</span><select name="service_quality_gate" onchange="this.form.requestSubmit()" class="ak-input h-9 w-full rounded-[5px] px-2 text-[11px]"><option value="" @selected(request('service_quality_gate') === null || request('service_quality_gate') === '')>{{ __('Alle Gate-Status') }}</option><option value="passed" @selected(request('service_quality_gate') === 'passed')>{{ __('Bestanden') }}</option><option value="failed" @selected(request('service_quality_gate') === 'failed')>{{ __('Nicht bestanden') }}</option></select></label>@endif
                         <label class="ak-heatmap-range" title="{{ __('Punkt-in-Zeit berechneter Gesamtscore des historischen Handelssignals.') }}"><span>{{ __('Score mindestens') }} <b x-text="score <= 0 ? '{{ __('Alle') }}' : `≥ ${Math.round(score * 10)}`">{{ (float) $rangeValue('score_min', 0, 0, 'score') <= 0 ? __('Alle') : '≥ '.number_format($rangeValue('score_min', 0, 0, 'score') * 10, 0, ',', '.') }}</b></span><input name="score_min" type="range" min="0" max="9" step="1" value="{{ max(0, min(9, floor($rangeValue('score_min', 0, 0, 'score')))) }}" x-model.number="score" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
                         <label class="ak-heatmap-range"><span>{{ __('Konfidenz') }} ≥ <b x-text="`${confidence}%`">{{ number_format((float) request('confidence_min', 0), 0, ',', '.') }}%</b></span><input name="confidence_min" type="range" min="0" max="{{ $rangeMaxima['confidence'] }}" step="5" value="{{ $rangeValue('confidence_min', 0, 0, 'confidence') }}" x-model.number="confidence" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
-                        @if ($setupMode && ! $shortMode)<label class="ak-heatmap-range"><span>{{ __('Hitrate') }} ≥ <b x-text="hitRate <= 0 ? '{{ __('Alle') }}' : `${hitRate.toFixed(0)} %`">{{ (float) request('hit_rate_min', 0) <= 0 ? __('Alle') : number_format((float) request('hit_rate_min'), 0, ',', '.').' %' }}</b></span><input name="hit_rate_min" type="range" min="0" max="{{ $rangeMaxima['hit_rate'] }}" step="5" value="{{ $rangeValue('hit_rate_min', 0, 0, 'hit_rate') }}" x-model.number="hitRate" onchange="this.form.requestSubmit()"></label>@endif
+                        @if ($setupMode && ! $shortMode)<label class="ak-quality-select-card"><span>{{ __('Hitrate') }}</span><select name="hit_rate_min" x-model.number="hitRate" onchange="this.form.requestSubmit()" class="ak-input h-9 w-full rounded-[5px] px-2 text-[11px]"><option value="0" @selected((float) request('hit_rate_min', 0) <= 0)>{{ __('Alle') }}</option>@foreach ([10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as $hitRateOption)<option value="{{ $hitRateOption }}" @selected((int) round((float) request('hit_rate_min', 0)) === $hitRateOption)>&ge; {{ $hitRateOption }} %</option>@endforeach</select></label>@endif
                         <label class="ak-heatmap-range"><span>{{ __('Historische Trades') }} ≥ <b x-text="minimumTrades <= 0 ? '{{ __('Alle') }}' : minimumTrades">{{ (int) request('minimum_trades', 0) <= 0 ? __('Alle') : number_format((int) request('minimum_trades'), 0, ',', '.') }}</b></span><input name="minimum_trades" type="range" min="0" max="{{ (int) $rangeMaxima['trades'] }}" step="5" value="{{ $rangeValue('minimum_trades', 0, 0, 'trades') }}" x-model.number="minimumTrades" onchange="if (!@js($qualitySetupMode)) this.form.requestSubmit()"></label>
                     </div>
                 </section>
@@ -1814,7 +1814,7 @@
                 const scoreInput = filterForm?.querySelector('input[name="score_min"]');
                 const confidenceInput = filterForm?.querySelector('input[name="confidence_min"]');
                 const netReturnInput = filterForm?.querySelector('input[name="profit_per_trade_min"]');
-                const hitRateInput = filterForm?.querySelector('input[name="hit_rate_min"]');
+                const hitRateInput = filterForm?.querySelector('[name="hit_rate_min"]');
                 const volatilityInput = filterForm?.querySelector('input[name="volatility_max"]');
                 const drawdownInput = filterForm?.querySelector('input[name="drawdown_max"]');
                 const riskInput = filterForm?.querySelector('input[name="risk_max"]');
@@ -1961,7 +1961,8 @@
                         netReturnInput.dispatchEvent(new Event('input', { bubbles: true }));
                     }
                     if (activeHeatmapDrag.dataset.heatmapDrag === 'hit_rate' && hitRateInput) {
-                        const hitRate = Math.round(rawAxisPercent / 5) * 5;
+                        // Snapped to 10s to match the dropdown's option steps.
+                        const hitRate = Math.round(rawAxisPercent / 10) * 10;
                         hitRateInput.value = String(hitRate);
                         hitRateInput.dispatchEvent(new Event('input', { bubbles: true }));
                     }
