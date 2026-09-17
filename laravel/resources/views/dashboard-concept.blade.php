@@ -1072,6 +1072,33 @@
                                     </article>
                                 </div>
                             </div>
+                        @elseif($section['kind'] === 'chart-patterns')
+                            @if(count($section['rows']))
+                                <div class="overflow-x-auto">
+                                    <table class="w-full min-w-[560px] border-collapse text-[11px]">
+                                        <thead>
+                                            <tr class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
+                                                <th class="border-0 pb-1.5 pr-2 text-left font-black">{{ __('Zeit') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Aktie') }}</th>
+                                                <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Ereignis') }}</th>
+                                                <th class="border-0 pb-1.5 pl-2 text-right font-black">{{ __('Änderung') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($section['rows'] as $row)
+                                                <tr class="border-t border-[var(--ak-border)]">
+                                                    <td class="py-1.5 pr-2 tabular-nums text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($row['time'])->format('d.m.Y') }}</td>
+                                                    <td class="px-2 py-1.5"><span class="font-bold text-[var(--ak-text)]">{{ $row['symbol'] }}</span></td>
+                                                    <td class="px-2 py-1.5 {{ $row['tone'] === 'positive' ? 'text-emerald-500' : ($row['tone'] === 'negative' ? 'text-rose-500' : 'text-[var(--ak-muted)]') }}">{{ $row['label'] }}</td>
+                                                    <td class="py-1.5 pl-2 text-right tabular-nums {{ ($row['change_pct'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $row['change_pct'] === null ? '—' : number_format($row['change_pct'], 1, ',', '.').' %' }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <div class="concept-empty">{{ $section['emptyText'] }}</div>
+                            @endif
                         @else
                             <p class="text-xs text-[var(--ak-muted)]">{{ $section['description'] }}</p>
                         @endif

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SmartSelectionLabel;
 use App\Models\User;
+use App\Services\ChartPatternSignalService;
 use App\Services\EarningsDriftStatsService;
 use App\Services\IndexAiScoreService;
 use App\Services\MarketOverviewWidgetsService;
@@ -34,9 +35,6 @@ final class DashboardConceptController extends Controller
         ['strategies', 'Strategien', 'heroicon-o-adjustments-horizontal'],
         ['labels', 'Labels', 'heroicon-o-tag'],
         ['chartview', 'ChartView', 'heroicon-o-chart-bar-square'],
-        ['watchlist-screener', 'Watchlist im Screener', 'heroicon-o-funnel'],
-        ['predictions', 'Prognosetabelle', 'heroicon-o-table-cells'],
-        ['smart-screener', 'Smart Screener', 'heroicon-o-magnifying-glass'],
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
         ['stock-of-day', 'Aktie des Tages', 'heroicon-o-sparkles'],
         ['news', 'News', 'heroicon-o-newspaper'],
@@ -77,10 +75,7 @@ final class DashboardConceptController extends Controller
                 SmartSelectionLabel::query()->where('user_id', $user->id)->count(),
                 __('Noch kein Label angelegt.'),
             ),
-            $this->ctaSection('chartview', __('Chartmuster und Signale in der interaktiven Chartansicht erkunden.')),
-            $this->ctaSection('watchlist-screener', __('Die eigene Watchlist mit den Screener-Filtern kombinieren.')),
-            $this->ctaSection('predictions', __('Alle aktuellen KI-Prognosen in der vollständigen Tabelle ansehen.')),
-            $this->ctaSection('smart-screener', __('Aktien nach eigenen Kriterien filtern und sortieren.')),
+            $this->chartPatternSection('chartview'),
             $this->marketSection('market-report', $snapshot, $user),
             $this->stockOfTheDaySection('stock-of-day', $request),
             $this->newsSection('news'),
@@ -194,15 +189,6 @@ final class DashboardConceptController extends Controller
             'items' => $items->values()->all(),
             'total' => $total,
             'emptyText' => $emptyText,
-        ];
-    }
-
-    private function ctaSection(string $id, string $description): array
-    {
-        return [
-            'id' => $id,
-            'kind' => 'cta',
-            'description' => $description,
         ];
     }
 
@@ -334,6 +320,36 @@ final class DashboardConceptController extends Controller
         ];
     }
 
+    /**
+     * Chart patterns and indicator transitions (golden/death cross, SMA/
+     * Bollinger breaks, RSI extremes, candlestick patterns, breakouts) from
+     * the most recent 1-2 trading days - see ChartPatternSignalService for
+     * why this is computed live from price_bars rather than read from the
+     * (currently stalled) technical_indicators-backed chartview tables.
+     */
+    private function chartPatternSection(string $id): array
+    {
+        $rows = app(ChartPatternSignalService::class)->recentEvents()
+            ->take(100)
+            ->map(fn (array $event): array => [
+                'time' => $event['time'],
+                'symbol' => $event['symbol'],
+                'name' => $event['name'],
+                'label' => $event['label'],
+                'tone' => $event['tone'],
+                'change_pct' => $event['change_pct'],
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'id' => $id,
+            'kind' => 'chart-patterns',
+            'rows' => $rows,
+            'emptyText' => __('Keine Chartmuster oder Indikatorübergänge in den letzten Handelstagen.'),
+        ];
+    }
+
     private function urlFor(string $tileId): string
     {
         return match ($tileId) {
@@ -341,9 +357,6 @@ final class DashboardConceptController extends Controller
             'strategies' => route('setup.saved-filters.index'),
             'labels' => route('setup.labels.index'),
             'chartview' => route('predictions.chartview-signals'),
-            'watchlist-screener' => route('screener.index', ['bestand' => 'watchlists']),
-            'predictions' => route('predictions.index'),
-            'smart-screener' => route('screener.index'),
             'market-report' => route('daily-market-analysis'),
             'signal-transitions' => route('predictions.index'),
             'upcoming-news' => route('upcoming-events.index'),
