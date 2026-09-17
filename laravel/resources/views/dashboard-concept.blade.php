@@ -692,6 +692,7 @@
                                                     <thead>
                                                         <tr class="text-[10px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
                                                             <th class="border-0 pb-1.5 pr-2 text-left font-black">{{ __('Depot') }}</th>
+                                                            <th class="border-0 pb-1.5 px-1 text-center font-black">{{ __('Mail') }}</th>
                                                             <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Pos.') }}</th>
                                                             <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Frei') }}</th>
                                                             <th class="border-0 pb-1.5 px-2 text-right font-black">{{ __('Gebunden') }}</th>
@@ -706,8 +707,10 @@
                                                                     <span class="flex min-w-0 items-center gap-1.5">
                                                                         <i class="h-1.5 w-1.5 shrink-0 rounded-full {{ $portfolio->dashboard_live_enabled ? 'bg-emerald-500' : 'bg-slate-400' }}"></i>
                                                                         <span class="truncate font-bold text-[var(--ak-text)] group-hover:text-orange-500">{{ $portfolio->name }}</span>
-                                                                        <span title="{{ $portfolio->dashboard_email_enabled ? __('E-Mail pro Transaktion aktiv') : __('E-Mail pro Transaktion aus') }}"><x-heroicon-o-envelope class="h-3 w-3 shrink-0 {{ $portfolio->dashboard_email_enabled ? 'text-amber-500' : 'text-slate-400/40' }}" /></span>
                                                                     </span>
+                                                                </td>
+                                                                <td class="border-0 px-1 py-1.5 text-center" title="{{ $portfolio->dashboard_email_enabled ? __('E-Mail pro Transaktion aktiv') : __('E-Mail pro Transaktion aus') }}">
+                                                                    <x-heroicon-o-envelope class="mx-auto h-3 w-3 {{ $portfolio->dashboard_email_enabled ? 'text-amber-500' : 'text-slate-400/40' }}" />
                                                                 </td>
                                                                 <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-muted)]">{{ $portfolio->dashboard_position_count }}</td>
                                                                 <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-text)]">{{ number_format((float) $portfolio->dashboard_cash_eur, 0, ',', '.') }} €</td>
