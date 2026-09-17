@@ -278,8 +278,11 @@
                             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
                                 @foreach($section['highlights'] as $highlight)
                                     @php $wrapper = $highlight['url'] ? 'a' : 'div'; $details = $highlight['details'] ?? null; @endphp
-                                    <{{ $wrapper }} @if($highlight['url']) href="{{ $highlight['url'] }}" @endif class="concept-card flex h-full flex-col p-4 hover:border-{{ $highlight['color'] }}-400">
-                                        <div class="flex items-center gap-2 mb-3">
+                                    <{{ $wrapper }} @if($highlight['url']) href="{{ $highlight['url'] }}" @endif class="concept-card relative flex h-full flex-col p-4 hover:border-{{ $highlight['color'] }}-400">
+                                        @if($highlight['date'] ?? null)
+                                            <small class="absolute right-3 top-3 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($highlight['date'])->format('d.m.Y') }}</small>
+                                        @endif
+                                        <div class="flex items-center gap-2 mb-3 pr-14">
                                             <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-{{ $highlight['color'] }}-500/10 text-{{ $highlight['color'] }}-500">
                                                 <x-dynamic-component :component="$highlight['icon']" class="h-4.5 w-4.5" />
                                             </span>
@@ -412,9 +415,74 @@
                                         @endforeach
                                     </div>
                                 @endif
+
+                                {{-- The rest of the full Marktübersicht's "Regelbasierter
+                                     Marktbericht" briefing: sector breadth, Chancen, Risiken,
+                                     Beobachtungsliste - same snapshot(), no extra query. --}}
+                                @if($section['breadth'])
+                                    <p class="mt-3 border-t border-[var(--ak-border)] pt-3 text-xs leading-5 text-[var(--ak-muted)]">{{ $section['breadth'] }}</p>
+                                @endif
+                                @if(count($section['opportunities']) || count($section['risks']))
+                                    <div class="mt-3 grid gap-3 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-2">
+                                        @foreach([
+                                            [__('Chancen'), $section['opportunities'], 'text-emerald-500'],
+                                            [__('Risiken'), $section['risks'], 'text-rose-500'],
+                                        ] as [$briefingTitle, $briefingItems, $briefingTone])
+                                            <div>
+                                                <p class="text-[10px] font-black uppercase tracking-[.1em] {{ $briefingTone }}">{{ $briefingTitle }} ({{ count($briefingItems) }})</p>
+                                                <ul class="mt-1.5 grid gap-1">
+                                                    @forelse($briefingItems as $briefingItem)
+                                                        <li class="text-[11px] leading-[1.4] text-[var(--ak-muted)]">{{ $briefingItem }}</li>
+                                                    @empty
+                                                        <li class="text-[11px] text-[var(--ak-muted)]">{{ __('Keine Einträge.') }}</li>
+                                                    @endforelse
+                                                </ul>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                                @if(count($section['watchlist']))
+                                    <div class="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.04] px-3 py-2.5">
+                                        <p class="text-[10px] font-black uppercase tracking-[.1em] text-amber-500">{{ __('Beobachtungsliste') }}</p>
+                                        <ul class="mt-1.5 grid gap-1">
+                                            @foreach($section['watchlist'] as $watchItem)
+                                                <li class="text-[11px] leading-[1.4] text-[var(--ak-muted)]">{{ $watchItem }}</li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @endif
                             @else
                                 <div class="concept-empty">{{ __('Marktdaten aktuell nicht verfügbar.') }}</div>
                             @endif
+
+                            {{-- Index market tape - same 5 indices as the full
+                                 Marktübersicht, own compact styling (that page's
+                                 .ak-market-tape rules are scoped to its own
+                                 wrapper and don't reach this card). --}}
+                            @if(count($section['markets']))
+                                <div class="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-5">
+                                    @foreach($section['markets'] as $market)
+                                        <div class="min-w-0 rounded-lg border border-[var(--ak-border)] px-2 py-1.5">
+                                            <p class="truncate text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $market['name'] }}</p>
+                                            <p class="mt-0.5 truncate text-xs font-black text-[var(--ak-text)]">{{ is_numeric($market['price'] ?? null) ? number_format($market['price'], 2, ',', '.') : '—' }}</p>
+                                            <p class="text-[10px] font-bold {{ ($market['change'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $market['change'] !== null ? (($market['change'] >= 0 ? '+' : '').number_format($market['change'], 2, ',', '.').' %') : '—' }}</p>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            {{-- The rest of the full Marktübersicht's widgets -
+                                 x-detail-page-theme is the reusable "detail page"
+                                 skin (see its own comment: built so several
+                                 pages besides markets/situation can share it). --}}
+                            <x-detail-page-theme />
+                            <div class="ak-detail-design mt-3 grid gap-3 border-t border-[var(--ak-border)] pt-3 lg:grid-cols-2">
+                                <x-dashboard.market-atlas :country-ai-scores="$section['countryAiScores']" />
+                                <x-dashboard.signal-overview :stats="$section['signalTransitionStats']" />
+                            </div>
+                            <div class="ak-detail-design mt-3">
+                                <x-dashboard.macro-indicator-cards :cards="$section['macroCards']" :collapsible="true" />
+                            </div>
 
                             {{-- The Screener/dashboard's "Aktuelle Remote-Aktien"
                                  stock count + signal-distribution card - same
@@ -438,9 +506,11 @@
                                 <div class="concept-empty">{{ $section['emptyText'] }}</div>
                             @endif
                         @elseif($section['kind'] === 'earnings-drift')
-                            @if(count($section['rows']))
+                            @if(count($section['days']))
                                 <div class="concept-opp-stack">
-                                    @foreach($section['rows'] as $row)
+                                    @foreach($section['days'] as $day)
+                                        <p class="text-[10px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($day['date'])->translatedFormat('D, d.m.Y') }}</p>
+                                        @foreach($day['rows'] as $row)
                                         <div class="concept-opp-card" x-data="{ expanded: false }">
                                             <div class="concept-opp-head">
                                                 <a href="{{ $row['url'] }}" class="min-w-0 no-underline">
@@ -489,6 +559,7 @@
                                                 </div>
                                             @endif
                                         </div>
+                                        @endforeach
                                     @endforeach
                                 </div>
                             @else
@@ -659,7 +730,10 @@
                                             </div>
                                         </article>
                                     @endif
-                                @if ($strategyCompositionByCountry !== [] || $strategyCompositionBySector !== [] || $strategyAverageMetrics['count'] > 0)
+                                {{-- Always rendered - every sub-chart below already has its own
+                                     "keine Positionen" empty state, so hiding the whole card when
+                                     depots hold nothing left it looking like the feature vanished. --}}
+                                @if (true)
                                         @php $compositionPalette = ['#06b6d4', '#f97316', '#10b981', '#8b5cf6', '#f43f5e', '#eab308']; @endphp
                                         <article class="concept-card p-4">
                                             <div class="flex items-center gap-2">

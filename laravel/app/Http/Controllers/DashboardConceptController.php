@@ -5,9 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\SmartSelectionLabel;
 use App\Models\User;
 use App\Services\EarningsDriftStatsService;
+use App\Services\IndexAiScoreService;
+use App\Services\MarketOverviewWidgetsService;
+use App\Services\MarketService;
 use App\Services\PanelScoreDriftStatsService;
 use App\Services\ServingMarketSnapshotService;
+use App\Services\TodayHighlightsAnalysisService;
+use App\Services\TodayHighlightsBuilder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
@@ -204,11 +210,33 @@ final class DashboardConceptController extends Controller
      * profileUniverseStats(), the same data the real dashboard and the
      * classic-dashboard tab show) - not just the market-wide score/summary
      * text this section used to show alone.
+     *
+     * Carries the rest of the full Marktübersicht ("Market Command Center")
+     * page too, reusing exactly the same building blocks the markets/
+     * situation Livewire component (MarketData) renders:
+     * - sector breadth, Chancen, Risiken, Beobachtungsliste from the same
+     *   snapshot()['analysis'] payload already loaded here - no extra query;
+     * - the index market tape + x-dashboard.market-atlas, via
+     *   MarketOverviewWidgetsService (MarketData::databaseMarkets()/
+     *   loadMacroCards() now delegate to that same service, so both places
+     *   stay in sync);
+     * - x-dashboard.signal-overview, via the same snapshot()['transition_stats'].
      */
     private function marketSection(string $id, array $snapshot, User $user): array
     {
         $assessment = $snapshot['assessment'] ?? null;
-        $metrics = $snapshot['analysis']['metrics'] ?? [];
+        $analysis = $snapshot['analysis'] ?? [];
+        $metrics = $analysis['metrics'] ?? [];
+
+        $widgets = app(MarketOverviewWidgetsService::class);
+        $marketService = app(MarketService::class);
+        $indexAiScores = app(IndexAiScoreService::class);
+
+        $markets = $widgets->indexMarkets();
+        $situations = collect($marketService->marketSituations($markets, $indexAiScores->scores()))->keyBy('title');
+        $markets = collect($markets)
+            ->map(fn (array $market): array => array_merge($market, $situations->get($market['name'], [])))
+            ->all();
 
         return [
             'id' => $id,
@@ -216,6 +244,14 @@ final class DashboardConceptController extends Controller
             'available' => (bool) ($snapshot['available'] ?? false),
             'assessment' => $assessment,
             'metrics' => array_slice($metrics, 0, 4),
+            'breadth' => $analysis['breadth'] ?? null,
+            'opportunities' => $analysis['opportunities'] ?? [],
+            'risks' => $analysis['risks'] ?? [],
+            'watchlist' => $analysis['watchlist'] ?? [],
+            'markets' => $markets,
+            'countryAiScores' => $indexAiScores->countryScores(),
+            'signalTransitionStats' => $snapshot['transition_stats'] ?? [],
+            'macroCards' => $widgets->macroCards(),
             'profileUniverseStats' => app(DashboardController::class)->profileUniverseStats($user),
         ];
     }
@@ -279,13 +315,19 @@ final class DashboardConceptController extends Controller
                 ];
             })
             ->filter()
-            ->take(8)
+            ->take(24)
+            ->values();
+
+        $days = $rows
+            ->groupBy(fn (array $row): string => Carbon::parse($row['nextDate'])->toDateString())
+            ->map(fn ($rowsForDay, string $date): array => ['date' => $date, 'rows' => $rowsForDay->values()->all()])
+            ->sortBy('date')
             ->values();
 
         return [
             'id' => $id,
             'kind' => 'earnings-drift',
-            'rows' => $rows->all(),
+            'days' => $days->all(),
             'emptyText' => __('Für keine Aktie mit bevorstehenden Quartalszahlen liegt bereits eigene Historie vor.'),
         ];
     }
@@ -344,7 +386,7 @@ final class DashboardConceptController extends Controller
     private function loadCachedInsights(array $highlights): ?array
     {
         $filePath = storage_path('app/cache/today_highlights.json');
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             return null;
         }
 
@@ -355,7 +397,7 @@ final class DashboardConceptController extends Controller
             }
 
             $cached = json_decode(file_get_contents($filePath), true);
-            if (!is_array($cached) || !isset($cached['insights'], $cached['data_snapshot'])) {
+            if (! is_array($cached) || ! isset($cached['insights'], $cached['data_snapshot'])) {
                 return null;
             }
 
@@ -389,19 +431,25 @@ final class DashboardConceptController extends Controller
         // TEMPORARY DEMO OVERRIDE: showing yesterday's complete trading day
         // so the user can see a fully-populated example. Revert to
         // now()->toDateString() afterwards.
-        $highlights = app(\App\Services\TodayHighlightsBuilder::class)->build(now()->subDay()->toDateString())['highlights'];
+        $date = now()->subDay()->toDateString();
+        $highlights = app(TodayHighlightsBuilder::class)->build($date)['highlights'];
 
         $insights = $this->loadCachedInsights($highlights)
-            ?? app(\App\Services\TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
+            ?? app(TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
 
         return [
             'id' => $id,
             'kind' => 'today-focus',
-            'highlights' => array_map(function ($h, $idx) use ($insights) {
+            'highlights' => array_map(function ($h, $idx) use ($insights, $date) {
                 // The 5th "Indikatoren" card is structured data, not a
                 // signal needing an AI narrative, so it has no insight key.
                 $keys = ['top_signal_insight', 'swing_insight', 'surprise_insight', 'trend_switch_insight'];
                 $h['insight'] = $insights[$keys[$idx] ?? null] ?? '';
+                // Every highlight in this batch describes the same trading
+                // day - shown small top-right on each card so it stays
+                // obvious this is (currently) yesterday's data, not today's.
+                $h['date'] = $date;
+
                 return $h;
             }, $highlights, array_keys($highlights)),
         ];
@@ -434,15 +482,16 @@ final class DashboardConceptController extends Controller
             $maxReturn = $group->max(fn ($p) => (float) ($p->expected_return ?? 0));
             $score = $group->first()->calibrated_score ?? null;
             $risk = $group->first()->risk_score ?? null;
+
             return [
                 'max_return' => $maxReturn,
                 'score' => $score,
                 'risk' => $risk,
-                'horizons' => $group->keyBy('horizon')->mapWithKeys(fn ($p, $h) => [(int)$h.'T' => (float)($p->expected_return ?? 0) * 100]),
+                'horizons' => $group->keyBy('horizon')->mapWithKeys(fn ($p, $h) => [(int) $h.'T' => (float) ($p->expected_return ?? 0) * 100]),
             ];
         })->sortByDesc('max_return')->first();
 
-        if (!$byInstrument) {
+        if (! $byInstrument) {
             return [
                 'id' => $id,
                 'kind' => 'stock-of-day',
@@ -453,7 +502,7 @@ final class DashboardConceptController extends Controller
         $instrumentId = $predictions->groupBy('instrument_id')->sortByDesc(fn ($g) => $g->max(fn ($p) => (float) ($p->expected_return ?? 0)))->keys()->first();
         $instrument = \DB::table('instruments')->where('id', $instrumentId)->select(['symbol', 'name', 'country'])->first();
 
-        if (!$instrument) {
+        if (! $instrument) {
             return [
                 'id' => $id,
                 'kind' => 'stock-of-day',
