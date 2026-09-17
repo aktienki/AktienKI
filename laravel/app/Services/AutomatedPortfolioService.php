@@ -194,6 +194,12 @@ final class AutomatedPortfolioService
         $filters = (array) $strategy->filters;
         $latestPredictionIds = DB::table('predictions')
             ->whereNotNull('trained_model_id')
+            // A model retired/replaced weeks ago still has a MAX(id) row -
+            // without this cutoff its last-ever signal (e.g. a stale BUY
+            // from before it stopped updating) keeps counting as "current"
+            // forever. Active models update at least daily; 3 days covers
+            // weekends/holidays while still dropping anything abandoned.
+            ->where('prediction_time', '>=', now()->subDays(3))
             ->selectRaw('trained_model_id, MAX(id) AS prediction_id')
             ->groupBy('trained_model_id');
         $latestQuoteIds = DB::table('current_stock_quotes')
