@@ -428,7 +428,7 @@
                                     ] as [$briefingTitle, $briefingItems, $briefingTone])
                                         <div class="rounded-xl border border-[var(--ak-border)] px-3 py-2.5">
                                             <p class="text-[10px] font-black uppercase tracking-[.1em] {{ $briefingTone }}">{{ $briefingTitle }} ({{ count($briefingItems) }})</p>
-                                            <ul class="mt-1.5 grid gap-1">
+                                            <ul class="mt-1.5 space-y-1.5">
                                                 @forelse($briefingItems as $briefingItem)
                                                     <li class="text-[11px] leading-[1.4] text-[var(--ak-muted)]">{{ $briefingItem }}</li>
                                                 @empty
@@ -457,7 +457,7 @@
                                     ] as [$listTitle, $listItems, $listTone])
                                         <div class="rounded-xl border border-[var(--ak-border)] px-3 py-2.5">
                                             <p class="text-[10px] font-black uppercase tracking-[.1em] {{ $listTone }}">{{ $listTitle }} ({{ count($listItems) }})</p>
-                                            <ul class="mt-1.5 grid gap-1">
+                                            <ul class="mt-1.5 space-y-1.5">
                                                 @forelse($listItems as $listItem)
                                                     <li class="text-[11px] leading-[1.4] text-[var(--ak-muted)]">{{ $listItem }}</li>
                                                 @empty
