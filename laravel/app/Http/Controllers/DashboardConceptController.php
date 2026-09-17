@@ -376,11 +376,16 @@ final class DashboardConceptController extends Controller
 
         $rows = \DB::table('predictions as prediction')
             ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
-            ->leftJoin('trained_models as trained_model', 'trained_model.id', '=', 'prediction.trained_model_id')
+            ->join('trained_models as trained_model', 'trained_model.id', '=', 'prediction.trained_model_id')
             ->leftJoin('model_definitions as model_definition', 'model_definition.id', '=', 'trained_model.model_definition_id')
             ->whereNotNull('prediction.trained_model_id')
             ->where('instrument.type', 'stock')
             ->whereNull('instrument.deleted_at')
+            // Only the champion model per instrument/horizon - challengers
+            // ('candidate'/'rejected') and superseded ('archived') trained
+            // models from the same or an earlier training cycle would
+            // otherwise show up as noisy "transitions" nobody is acting on.
+            ->where('trained_model.status', 'active')
             ->where('prediction.prediction_time', '>=', now()->subHours(48))
             ->selectRaw("
                 prediction.id, instrument.symbol, instrument.name, prediction.prediction_time,

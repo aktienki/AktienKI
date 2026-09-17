@@ -296,6 +296,16 @@ final class AutomatedPortfolioService
             ->where('instrument.is_active', true)
             ->where('instrument.is_german_tradeable', true)
             ->whereNull('instrument.deleted_at')
+            // Each instrument/horizon has one champion (trained_models.status
+            // = 'active') plus several challengers from the same training
+            // cycle ('candidate'/'rejected') and older, superseded ones
+            // ('archived'). Without this, a challenger's or an archived
+            // model's prediction counted as a trading signal exactly like
+            // the champion's - this turns the LEFT JOIN above into an
+            // effective INNER JOIN, which is intentional: a prediction
+            // whose trained_model row is missing or not active must not
+            // become a candidate.
+            ->where('trained_model.status', 'active')
             // is_german_tradeable only means a EUR cross-listing EXISTS
             // somewhere - it does not mean this specific instrument row
             // trades in EUR itself (ADI/1024.HK/2318.HK all have it true
