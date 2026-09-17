@@ -610,6 +610,8 @@ class DashboardController extends Controller
                     ? (($totalValue - $initialCapital) / $initialCapital) * 100
                     : 0.0);
                 $portfolio->setAttribute('dashboard_live_enabled', (bool) data_get($portfolio->meta, 'automation.live_enabled', false));
+                $portfolio->setAttribute('dashboard_email_enabled', (bool) data_get($portfolio->meta, 'automation.live_enabled', false)
+                    && (bool) data_get($portfolio->meta, 'automation.transaction_email_enabled', false));
                 // Display-only EUR equivalents (see eurConversionRate) so a
                 // mixed-currency depot list can show one consistent column
                 // instead of a separate USD block.

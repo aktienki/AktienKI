@@ -706,6 +706,7 @@
                                                                     <span class="flex min-w-0 items-center gap-1.5">
                                                                         <i class="h-1.5 w-1.5 shrink-0 rounded-full {{ $portfolio->dashboard_live_enabled ? 'bg-emerald-500' : 'bg-slate-400' }}"></i>
                                                                         <span class="truncate font-bold text-[var(--ak-text)] group-hover:text-orange-500">{{ $portfolio->name }}</span>
+                                                                        <span title="{{ $portfolio->dashboard_email_enabled ? __('E-Mail pro Transaktion aktiv') : __('E-Mail pro Transaktion aus') }}"><x-heroicon-o-envelope class="h-3 w-3 shrink-0 {{ $portfolio->dashboard_email_enabled ? 'text-amber-500' : 'text-slate-400/40' }}" /></span>
                                                                     </span>
                                                                 </td>
                                                                 <td class="border-0 px-2 py-1.5 text-right tabular-nums text-[var(--ak-muted)]">{{ $portfolio->dashboard_position_count }}</td>
