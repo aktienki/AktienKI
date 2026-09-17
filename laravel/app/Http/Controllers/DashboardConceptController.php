@@ -536,21 +536,31 @@ final class DashboardConceptController extends Controller
         $insights = $this->loadCachedInsights($highlights)
             ?? app(TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
 
+        $highlights = array_map(function ($h, $idx) use ($insights, $date) {
+            // The 5th "Indikatoren" card is structured data, not a
+            // signal needing an AI narrative, so it has no insight key.
+            $keys = ['top_signal_insight', 'swing_insight', 'surprise_insight', 'trend_switch_insight'];
+            $h['insight'] = $insights[$keys[$idx] ?? null] ?? '';
+            // Every highlight in this batch describes the same trading
+            // day - shown small top-right on each card so it stays
+            // obvious this is (currently) yesterday's data, not today's.
+            $h['date'] = $date;
+
+            return $h;
+        }, $highlights, array_keys($highlights));
+
+        // A trading day without e.g. any SELL->BUY flip is normal, not
+        // broken - don't show a "Keine Daten heute" card for it, only the
+        // highlights that actually have something to show.
+        $highlights = array_values(array_filter(
+            $highlights,
+            fn (array $h): bool => ($h['kind'] ?? null) === 'indicators' ? $h['indicators'] !== null : $h['data'] !== null,
+        ));
+
         return [
             'id' => $id,
             'kind' => 'today-focus',
-            'highlights' => array_map(function ($h, $idx) use ($insights, $date) {
-                // The 5th "Indikatoren" card is structured data, not a
-                // signal needing an AI narrative, so it has no insight key.
-                $keys = ['top_signal_insight', 'swing_insight', 'surprise_insight', 'trend_switch_insight'];
-                $h['insight'] = $insights[$keys[$idx] ?? null] ?? '';
-                // Every highlight in this batch describes the same trading
-                // day - shown small top-right on each card so it stays
-                // obvious this is (currently) yesterday's data, not today's.
-                $h['date'] = $date;
-
-                return $h;
-            }, $highlights, array_keys($highlights)),
+            'highlights' => $highlights,
         ];
     }
 
