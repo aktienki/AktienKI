@@ -10,12 +10,12 @@ use Illuminate\Support\Facades\Http;
 
 class YahooIndexService
 {
-    public function dailyHistory(string $symbol, string $range = '3y'): array
+    public function dailyHistory(string $symbol, string $range = '3y', ?string $expectedCurrency = null): array
     {
         return Cache::remember(
-            'yahoo_index_daily_history_'.sha1(strtoupper($symbol).$range),
+            'yahoo_index_daily_history_'.sha1(strtoupper($symbol).$range.($expectedCurrency ?? '')),
             now()->addDay(),
-            function () use ($symbol, $range): array {
+            function () use ($symbol, $range, $expectedCurrency): array {
                 $response = Http::withHeaders([
                     'Accept' => 'application/json',
                     'User-Agent' => 'Mozilla/5.0 (compatible; AktienKI/1.0)',
@@ -25,6 +25,9 @@ class YahooIndexService
                 );
                 $result = $response->successful() ? $response->json('chart.result.0') : null;
                 if (! is_array($result) || strtoupper((string) data_get($result, 'meta.symbol')) !== strtoupper($symbol)) {
+                    return [];
+                }
+                if ($expectedCurrency !== null && strtoupper((string) data_get($result, 'meta.currency')) !== strtoupper($expectedCurrency)) {
                     return [];
                 }
                 $timestamps = $result['timestamp'] ?? [];
