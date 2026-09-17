@@ -227,6 +227,7 @@ final class DashboardConceptController extends Controller
                 'change_pct' => $event['change_pct'],
                 'candles' => $event['candles'],
                 'indicator_series' => $event['indicator_series'],
+                'overlays' => $event['overlays'],
                 'pattern_range' => $event['pattern_range'],
                 'breakout_level' => $event['breakout_level'],
                 'breakout_line_y' => $event['breakout_line_y'],

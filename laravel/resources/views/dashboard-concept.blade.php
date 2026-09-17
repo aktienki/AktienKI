@@ -361,22 +361,9 @@
                                 <div class="concept-empty">{{ $section['emptyText'] }}</div>
                             @endif
                         @elseif($section['kind'] === 'market')
-                            @if($section['available'] && $section['assessment'])
-                                <p class="text-sm font-bold text-[var(--ak-text)]">{{ $section['assessment']['status'] }} · {{ number_format($section['assessment']['score'], 0) }}/100</p>
-                                <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ $section['assessment']['summary'] }}</p>
-                                @if(count($section['metrics']))
-                                    <div class="mt-3 grid grid-cols-2 gap-3 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-4">
-                                        @foreach($section['metrics'] as $metric)
-                                            <div class="concept-metric">
-                                                <b class="text-base">{{ $metric['value'] }}</b>
-                                                <small>{{ $metric['label'] }}</small>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                @endif
-
-                                {{-- The rest of the full Marktübersicht's "Regelbasierter
-                                     Marktbericht" briefing: sector breadth, Chancen, Risiken,
+                            @if($section['available'])
+                                {{-- The full Marktübersicht's "Regelbasierter Marktbericht"
+                                     briefing: sector breadth, Chancen, Risiken,
                                      Beobachtungsliste - same snapshot(), no extra query. --}}
                                 @if($section['breadth'])
                                     <p class="mt-3 border-t border-[var(--ak-border)] pt-3 text-xs leading-5 text-[var(--ak-muted)]">{{ $section['breadth'] }}</p>
@@ -442,6 +429,23 @@
                             <div class="ak-detail-design mt-3">
                                 <x-dashboard.macro-indicator-cards :cards="$section['macroCards']" :collapsible="true" />
                             </div>
+
+                            @if($section['available'] && $section['assessment'])
+                                <div class="mt-3 border-t border-[var(--ak-border)] pt-3">
+                                    <p class="text-sm font-bold text-[var(--ak-text)]">{{ $section['assessment']['status'] }} · {{ number_format($section['assessment']['score'], 0) }}/100</p>
+                                    <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ $section['assessment']['summary'] }}</p>
+                                    @if(count($section['metrics']))
+                                        <div class="mt-3 grid grid-cols-2 gap-3 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-4">
+                                            @foreach($section['metrics'] as $metric)
+                                                <div class="concept-metric">
+                                                    <b class="text-base">{{ $metric['value'] }}</b>
+                                                    <small>{{ $metric['label'] }}</small>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
                         @elseif($section['kind'] === 'events')
                             @if(count($section['events']))
                                 <div class="grid gap-1.5">
@@ -1041,12 +1045,16 @@
 
                                             <div class="mb-2 rounded-lg bg-{{ $tone }}-500/[.08] px-2.5 py-2">
                                                 <div class="text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Ereignis') }}</div>
-                                                <div class="text-[13px] font-black text-{{ $tone }}-500">{{ $row['label'] }}</div>
+                                                <div class="line-clamp-2 min-h-[2.4em] text-[13px] font-black leading-[1.2em] text-{{ $tone }}-500">{{ $row['label'] }}</div>
                                             </div>
 
                                             {{-- Fixed-height chart block on every card, whether or not this
                                                  event has an indicator sub-panel (only RSI events do), so cards
-                                                 line up evenly - the RSI panel's own size is the reference. --}}
+                                                 line up evenly - the RSI panel's own size is the reference.
+                                                 The event label above is also clamped to a fixed 2-line height
+                                                 (line-clamp-2 + min-h), so a longer label wrapping to a second
+                                                 line doesn't push this block to a different y-offset than its
+                                                 neighbors in the same grid row. --}}
                                             <div class="mb-2 rounded-lg bg-[var(--ak-surface-muted)] px-2 py-1.5">
                                                 <div class="mb-1 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf (20T)') }}</div>
                                                 <svg viewBox="0 0 100 50" class="h-20 w-full" preserveAspectRatio="none">
@@ -1057,11 +1065,22 @@
                                                         <line x1="{{ $candle['x'] }}" x2="{{ $candle['x'] }}" y1="{{ $candle['high_y'] }}" y2="{{ $candle['low_y'] }}" stroke="currentColor" stroke-width="1" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
                                                         <rect x="{{ $candle['x'] - $candle['width'] / 2 }}" y="{{ $candle['body_y'] }}" width="{{ $candle['width'] }}" height="{{ $candle['body_height'] }}" fill="currentColor" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
                                                     @endforeach
+                                                    @foreach($row['overlays'] as $overlay)
+                                                        <polyline points="{{ $overlay['points'] }}" fill="none" stroke="currentColor" stroke-width="1.2" class="text-{{ $overlay['color'] }}-400" stroke-linecap="round" stroke-linejoin="round" />
+                                                    @endforeach
                                                     @if($row['pattern_range'])
                                                         <line x1="{{ $row['pattern_range']['start_x'] }}" x2="{{ $row['pattern_range']['start_x'] }}" y1="0" y2="50" stroke="currentColor" stroke-width="0.5" stroke-dasharray="1.5,1.5" class="text-amber-400/40" />
                                                         <line x1="{{ $row['pattern_range']['end_x'] }}" x2="{{ $row['pattern_range']['end_x'] }}" y1="0" y2="50" stroke="currentColor" stroke-width="0.5" stroke-dasharray="1.5,1.5" class="text-amber-400/40" />
                                                     @endif
                                                 </svg>
+                                                {{-- Fixed-height slot regardless of whether this event has an
+                                                     overlay (only SMA-driven events do), for the same reason the
+                                                     RSI panel below always reserves its own space. --}}
+                                                <div class="mt-1 flex h-[11px] flex-wrap items-center gap-x-2 gap-y-0.5 {{ count($row['overlays']) ? '' : 'invisible' }}">
+                                                    @foreach($row['overlays'] as $overlay)
+                                                        <span class="inline-flex items-center gap-1 text-[8px] font-black text-[var(--ak-muted)]"><i class="h-1.5 w-1.5 rounded-full bg-{{ $overlay['color'] }}-400"></i>{{ $overlay['label'] }}</span>
+                                                    @endforeach
+                                                </div>
 
                                                 <div class="mb-1 mt-2 text-[8px] uppercase tracking-wide text-[var(--ak-muted)] {{ $row['indicator_series'] ? '' : 'invisible' }}">{{ $row['indicator_series']['label'] ?? __('RSI (14)') }}</div>
                                                 <svg viewBox="0 0 100 25" class="h-10 w-full {{ $row['indicator_series'] ? '' : 'invisible' }}" preserveAspectRatio="none">

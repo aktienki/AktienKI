@@ -22,10 +22,18 @@ use Illuminate\Support\Facades\DB;
  */
 final class ChartPatternSignalService
 {
-    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v8';
+    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v10';
 
     /** Event types driven by a bounded (0-100) oscillator, shown as its own panel below the candles rather than overlaid on price. */
     private const INDICATOR_EVENT_KEYS = ['rsi_oversold', 'rsi_overbought'];
+
+    /** Moving-average event types and which SMA periods to draw directly on the price chart - they share the candles' own price scale, unlike RSI. */
+    private const SMA_OVERLAY_EVENT_KEYS = [
+        'golden_cross' => [50, 200],
+        'death_cross' => [50, 200],
+        'price_above_sma50' => [50],
+        'price_below_sma50' => [50],
+    ];
 
     public function recentEvents(): Collection
     {
@@ -125,16 +133,36 @@ final class ChartPatternSignalService
 
         // 90 calendar days (~60 trading days) covers the 20 displayed bars
         // plus the 14-bar RSI seed with comfortable headroom for weekends/
-        // holidays.
+        // holidays. DISTINCT ON collapses any instrument+day with more than
+        // one interval='1d' snapshot (see detect()'s daily_bars CTE) down to
+        // the latest one - without it, some instruments show doubled-looking
+        // candles for the same calendar day.
         $barsByInstrument = DB::table('price_bars')
+            ->selectRaw('DISTINCT ON (instrument_id, bar_time::date) instrument_id, bar_time, open, high, low, close')
             ->whereIn('instrument_id', $instrumentIds)
             ->where('interval', '1d')
             ->whereBetween('bar_time', [Carbon::parse($eventDate)->subDays(90), $eventDate])
-            ->orderBy('bar_time')
-            ->get(['instrument_id', 'open', 'high', 'low', 'close'])
+            ->orderByRaw('instrument_id, bar_time::date, bar_time DESC')
+            ->get()
             ->groupBy('instrument_id');
 
-        return $events->map(function (array $event) use ($barsByInstrument): array {
+        // SMA 200 needs 200 preceding closes just to seed the first point of
+        // the 20-day display window - a much wider lookback than the 90 days
+        // above, so it's only fetched for the instruments that actually need
+        // an overlay (golden/death cross, price vs. SMA 50).
+        $smaInstrumentIds = $events
+            ->filter(fn (array $event): bool => isset(self::SMA_OVERLAY_EVENT_KEYS[$event['event_key']]))
+            ->pluck('instrument_id')->unique()->values();
+        $smaClosesByInstrument = $smaInstrumentIds->isEmpty() ? collect() : DB::table('price_bars')
+            ->selectRaw('DISTINCT ON (instrument_id, bar_time::date) instrument_id, bar_time, close')
+            ->whereIn('instrument_id', $smaInstrumentIds)
+            ->where('interval', '1d')
+            ->whereBetween('bar_time', [Carbon::parse($eventDate)->subDays(400), $eventDate])
+            ->orderByRaw('instrument_id, bar_time::date, bar_time DESC')
+            ->get()
+            ->groupBy('instrument_id');
+
+        return $events->map(function (array $event) use ($barsByInstrument, $smaClosesByInstrument): array {
             $bars = $barsByInstrument->get($event['instrument_id']) ?? collect();
             $window = $bars->slice(-self::DISPLAY_DAYS)->values();
 
@@ -151,13 +179,32 @@ final class ChartPatternSignalService
                     $high = max($high, $event['breakout_level']['value']);
                 }
 
+                $periods = self::SMA_OVERLAY_EVENT_KEYS[$event['event_key']] ?? null;
+                $displaySmaSeries = [];
+                if ($periods) {
+                    $closes = ($smaClosesByInstrument->get($event['instrument_id']) ?? collect())
+                        ->pluck('close')->map(fn ($v) => (float) $v)->values()->all();
+                    foreach ($periods as $period) {
+                        $displaySma = array_slice($this->smaSeries($closes, $period), -$window->count());
+                        foreach ($displaySma as $value) {
+                            if ($value !== null) {
+                                $low = min($low, $value);
+                                $high = max($high, $value);
+                            }
+                        }
+                        $displaySmaSeries[$period] = $displaySma;
+                    }
+                }
+
                 $event['candles'] = $this->candles($window, $low, $high);
                 $event['breakout_line_y'] = $event['breakout_level']
                     ? $this->priceToY($event['breakout_level']['value'], $low, $high)
                     : null;
+                $event['overlays'] = $this->overlaySeries($displaySmaSeries, $window->count(), $low, $high);
             } else {
                 $event['candles'] = [];
                 $event['breakout_line_y'] = null;
+                $event['overlays'] = [];
             }
 
             $event['indicator_series'] = in_array($event['event_key'], self::INDICATOR_EVENT_KEYS, true)
@@ -171,6 +218,44 @@ final class ChartPatternSignalService
 
             return $event;
         });
+    }
+
+    /** Colors chosen to stay visually distinct from candles (emerald/rose), the amber pattern markers and the rose/emerald breakout line. */
+    private const OVERLAY_COLORS = [50 => ['label' => 'SMA 50', 'color' => 'sky'], 200 => ['label' => 'SMA 200', 'color' => 'violet']];
+
+    /**
+     * @param  array<int, list<float|null>>  $displaySmaSeriesByPeriod
+     * @return list<array{label: string, color: string, points: string}>
+     */
+    private function overlaySeries(array $displaySmaSeriesByPeriod, int $count, float $low, float $high): array
+    {
+        $overlays = [];
+        foreach ($displaySmaSeriesByPeriod as $period => $series) {
+            $points = [];
+            foreach ($series as $i => $value) {
+                if ($value === null) {
+                    continue;
+                }
+                $x = $count > 1 ? (($i + 0.5) / $count) * 100 : 50;
+                $points[] = round($x, 2).','.$this->priceToY($value, $low, $high);
+            }
+            if ($points !== []) {
+                $overlays[] = [...self::OVERLAY_COLORS[$period], 'points' => implode(' ', $points)];
+            }
+        }
+
+        return $overlays;
+    }
+
+    /** @param list<float> $closes @return list<float|null> simple moving average aligned to $closes - the first period-1 entries are null (not enough history yet to seed them). */
+    private function smaSeries(array $closes, int $period): array
+    {
+        $series = array_fill(0, count($closes), null);
+        for ($i = $period - 1; $i < count($closes); $i++) {
+            $series[$i] = array_sum(array_slice($closes, $i - $period + 1, $period)) / $period;
+        }
+
+        return $series;
     }
 
     /**
@@ -311,23 +396,36 @@ final class ChartPatternSignalService
     private function detect(): Collection
     {
         $rows = DB::select(<<<'SQL'
-            WITH bars AS (
-                SELECT pb.instrument_id, pb.bar_time, pb.open, pb.high, pb.low,
-                       COALESCE(pb.adjusted_close, pb.close) AS close,
-                       LAG(COALESCE(pb.adjusted_close, pb.close)) OVER w AS previous_close,
-                       LAG(pb.open) OVER w AS previous_open,
-                       MAX(pb.high) OVER (PARTITION BY pb.instrument_id ORDER BY pb.bar_time ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS prior_20_high,
-                       MIN(pb.low) OVER (PARTITION BY pb.instrument_id ORDER BY pb.bar_time ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS prior_20_low,
-                       AVG(COALESCE(pb.adjusted_close, pb.close)) OVER (PARTITION BY pb.instrument_id ORDER BY pb.bar_time ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma_50,
-                       AVG(COALESCE(pb.adjusted_close, pb.close)) OVER (PARTITION BY pb.instrument_id ORDER BY pb.bar_time ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma_200,
-                       AVG(COALESCE(pb.adjusted_close, pb.close)) OVER (PARTITION BY pb.instrument_id ORDER BY pb.bar_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS sma_20,
-                       STDDEV_SAMP(COALESCE(pb.adjusted_close, pb.close)) OVER (PARTITION BY pb.instrument_id ORDER BY pb.bar_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS stddev_20,
-                       ROW_NUMBER() OVER w AS row_number
+            WITH daily_bars AS (
+                -- price_bars can hold more than one interval='1d' row per
+                -- calendar day for a given instrument (repeated intraday
+                -- snapshots at different bar_time values, e.g. 00:00/04:00/
+                -- 22:00 UTC) - without collapsing to one row per day first,
+                -- every window function below treats those as separate
+                -- trading days, corrupting SMA/RSI/Bollinger and producing
+                -- doubled-looking candles later. Keep the latest snapshot of
+                -- each day as the most complete one.
+                SELECT DISTINCT ON (pb.instrument_id, pb.bar_time::date)
+                       pb.instrument_id, pb.bar_time, pb.open, pb.high, pb.low, pb.close, pb.adjusted_close
                 FROM price_bars pb
-                JOIN instruments i ON i.id = pb.instrument_id
                 WHERE pb.interval = '1d' AND pb.bar_time >= CURRENT_DATE - INTERVAL '400 days'
-                  AND i.type = 'stock' AND i.is_active = TRUE AND i.deleted_at IS NULL
-                WINDOW w AS (PARTITION BY pb.instrument_id ORDER BY pb.bar_time)
+                ORDER BY pb.instrument_id, pb.bar_time::date, pb.bar_time DESC
+            ), bars AS (
+                SELECT db.instrument_id, db.bar_time, db.open, db.high, db.low,
+                       COALESCE(db.adjusted_close, db.close) AS close,
+                       LAG(COALESCE(db.adjusted_close, db.close)) OVER w AS previous_close,
+                       LAG(db.open) OVER w AS previous_open,
+                       MAX(db.high) OVER (PARTITION BY db.instrument_id ORDER BY db.bar_time ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS prior_20_high,
+                       MIN(db.low) OVER (PARTITION BY db.instrument_id ORDER BY db.bar_time ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS prior_20_low,
+                       AVG(COALESCE(db.adjusted_close, db.close)) OVER (PARTITION BY db.instrument_id ORDER BY db.bar_time ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma_50,
+                       AVG(COALESCE(db.adjusted_close, db.close)) OVER (PARTITION BY db.instrument_id ORDER BY db.bar_time ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma_200,
+                       AVG(COALESCE(db.adjusted_close, db.close)) OVER (PARTITION BY db.instrument_id ORDER BY db.bar_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS sma_20,
+                       STDDEV_SAMP(COALESCE(db.adjusted_close, db.close)) OVER (PARTITION BY db.instrument_id ORDER BY db.bar_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS stddev_20,
+                       ROW_NUMBER() OVER w AS row_number
+                FROM daily_bars db
+                JOIN instruments i ON i.id = db.instrument_id
+                WHERE i.type = 'stock' AND i.is_active = TRUE AND i.deleted_at IS NULL
+                WINDOW w AS (PARTITION BY db.instrument_id ORDER BY db.bar_time)
             ), indicators AS (
                 SELECT bars.*,
                        sma_20 + (2 * stddev_20) AS bollinger_upper,
