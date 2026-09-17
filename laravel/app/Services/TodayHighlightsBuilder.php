@@ -165,10 +165,17 @@ final class TodayHighlightsBuilder
             ->orderByDesc('quote_time')
             ->value('price');
 
+        // calibrated_score is a formatted return-percentage string (e.g.
+        // "+13.67%"), not a 0-10 quality score - it's redundant with the
+        // card's own metric_value, so it isn't surfaced here. Pin to the
+        // standard/20-day variant so this doesn't land on an arbitrary one
+        // of the several horizon/variant rows sharing the same as_of.
         $serving = DB::connection('serving')->table('serving_predictions')
             ->where('instrument_id', $instrumentId)
+            ->where('variant', 'standard')
+            ->where('horizon', 20)
             ->orderByDesc('as_of')
-            ->select('calibrated_score', 'risk_score', 'confidence')
+            ->select('risk_score', 'confidence')
             ->first();
 
         $country = strtoupper((string) ($instrument->country ?? ''));
@@ -179,7 +186,6 @@ final class TodayHighlightsBuilder
             'sector' => $instrument->sector ?? null,
             'currency' => $instrument->currency ?? null,
             'current_price' => is_numeric($quote) ? (float) $quote : null,
-            'score' => is_numeric($serving?->calibrated_score ?? null) ? round((float) $serving->calibrated_score, 1) : null,
             'risk' => is_numeric($serving?->risk_score ?? null) ? round((float) $serving->risk_score, 1) : null,
             'confidence' => is_numeric($serving?->confidence ?? null)
                 ? round((float) $serving->confidence <= 1 ? (float) $serving->confidence * 100 : (float) $serving->confidence)

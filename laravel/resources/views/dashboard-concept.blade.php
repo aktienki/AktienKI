@@ -278,7 +278,7 @@
                             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
                                 @foreach($section['highlights'] as $highlight)
                                     @php $wrapper = $highlight['url'] ? 'a' : 'div'; $details = $highlight['details'] ?? null; @endphp
-                                    <{{ $wrapper }} @if($highlight['url']) href="{{ $highlight['url'] }}" @endif class="flex h-full flex-col rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-{{ $highlight['color'] }}-400 hover:bg-[var(--ak-card)]">
+                                    <{{ $wrapper }} @if($highlight['url']) href="{{ $highlight['url'] }}" @endif class="concept-card flex h-full flex-col p-4 hover:border-{{ $highlight['color'] }}-400">
                                         <div class="flex items-center gap-2 mb-3">
                                             <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-{{ $highlight['color'] }}-500/10 text-{{ $highlight['color'] }}-500">
                                                 <x-dynamic-component :component="$highlight['icon']" class="h-4.5 w-4.5" />
@@ -305,25 +305,19 @@
 
                                             <div class="grid grid-cols-2 gap-1.5 mb-2 text-[9px]">
                                                 @if($details['current_price'])
-                                                    <div class="rounded bg-[var(--ak-card)] px-2 py-1">
+                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1">
                                                         <span class="block text-[var(--ak-muted)]">{{ __('Kurs') }}</span>
                                                         <span class="font-bold text-[var(--ak-text)]">{{ number_format($details['current_price'], 2, ',', '.') }} {{ $details['currency'] }}</span>
                                                     </div>
                                                 @endif
-                                                @if($details['score'] !== null)
-                                                    <div class="rounded bg-[var(--ak-card)] px-2 py-1">
-                                                        <span class="block text-[var(--ak-muted)]">{{ __('Score') }}</span>
-                                                        <span class="font-bold text-[var(--ak-text)]">{{ $details['score'] }}/10</span>
-                                                    </div>
-                                                @endif
                                                 @if($details['risk'] !== null)
-                                                    <div class="rounded bg-[var(--ak-card)] px-2 py-1">
+                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1">
                                                         <span class="block text-[var(--ak-muted)]">{{ __('Risiko') }}</span>
                                                         <span class="font-bold text-[var(--ak-text)]">{{ $details['risk'] }}/10</span>
                                                     </div>
                                                 @endif
                                                 @if($details['confidence'] !== null)
-                                                    <div class="rounded bg-[var(--ak-card)] px-2 py-1">
+                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1">
                                                         <span class="block text-[var(--ak-muted)]">{{ __('Konfidenz') }}</span>
                                                         <span class="font-bold text-[var(--ak-text)]">{{ $details['confidence'] }}%</span>
                                                     </div>
