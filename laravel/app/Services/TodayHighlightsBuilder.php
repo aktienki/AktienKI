@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -27,7 +28,6 @@ final class TodayHighlightsBuilder
         $swingStock = null;
         $surpriseSignal = null;
         $trendSwitch = null;
-        $analogs = [];
 
         $topBuy = DB::table('today_highlights_mv')
             ->where('serving_signal', 'BUY')
@@ -43,13 +43,8 @@ final class TodayHighlightsBuilder
                 'return' => (float) ($topBuy->expected_return ?? 0) * 100,
                 'url' => route('stocks.show', ['symbol' => $topBuy->symbol, 'return_to' => '/dashboard/concept']),
                 'details' => $this->enrich((int) $topBuy->instrument_id),
+                'analog' => $this->findAnalog((int) $topBuy->instrument_id, $topBuy->symbol, (float) $topBuy->expected_return, $date),
             ];
-            array_push($analogs, ...$this->findAnalogs(
-                (int) $topBuy->instrument_id,
-                $topBuy->symbol,
-                (float) $topBuy->expected_return,
-                $date,
-            ));
         }
 
         $holdingSwings = DB::table('portfolio_positions as pp')
@@ -73,6 +68,7 @@ final class TodayHighlightsBuilder
                 'perf_pct' => (float) $holdingSwings->perf_pct,
                 'url' => route('stocks.show', ['symbol' => $holdingSwings->symbol, 'return_to' => '/dashboard/concept']),
                 'details' => $this->enrich((int) $holdingSwings->instrument_id),
+                'analog' => $this->findAnalog((int) $holdingSwings->instrument_id, $holdingSwings->symbol, (float) $holdingSwings->perf_pct / 100, $date),
             ];
         }
 
@@ -91,20 +87,15 @@ final class TodayHighlightsBuilder
                 'return' => (float) ($surprise->expected_return ?? 0) * 100,
                 'url' => route('stocks.show', ['symbol' => $surprise->symbol, 'return_to' => '/dashboard/concept']),
                 'details' => $this->enrich((int) $surprise->instrument_id),
+                'analog' => $this->findAnalog((int) $surprise->instrument_id, $surprise->symbol, (float) $surprise->expected_return, $date),
             ];
-            array_push($analogs, ...$this->findAnalogs(
-                (int) $surprise->instrument_id,
-                $surprise->symbol,
-                (float) $surprise->expected_return,
-                $date,
-            ));
         }
 
         $trendSwitchRow = DB::table('today_highlights_mv')
             ->where('predictions_signal', 'SELL')
             ->where('serving_signal', 'BUY')
             ->whereDate('prediction_date', $date)
-            ->select('instrument_id', 'symbol', 'name')
+            ->select('instrument_id', 'symbol', 'name', 'expected_return')
             ->first();
 
         if ($trendSwitchRow) {
@@ -113,10 +104,11 @@ final class TodayHighlightsBuilder
                 'name' => $trendSwitchRow->name,
                 'url' => route('stocks.show', ['symbol' => $trendSwitchRow->symbol, 'return_to' => '/dashboard/concept']),
                 'details' => $this->enrich((int) $trendSwitchRow->instrument_id),
+                'analog' => $this->findAnalog((int) $trendSwitchRow->instrument_id, $trendSwitchRow->symbol, (float) ($trendSwitchRow->expected_return ?? 0), $date),
             ];
         }
 
-        $highlights = [
+        return ['highlights' => [
             [
                 'label' => __('Top-Signal'),
                 'subtitle' => __('Beste neue BUY-Empfehlung'),
@@ -125,6 +117,7 @@ final class TodayHighlightsBuilder
                 'data' => $topSignal ? sprintf('%s +%.1f%%', $topSignal['symbol'], $topSignal['return']) : null,
                 'url' => $topSignal['url'] ?? null,
                 'details' => $topSignal['details'] ?? null,
+                'analog' => $topSignal['analog'] ?? null,
                 'metric_label' => __('Erwartete Rendite'),
                 'metric_value' => $topSignal ? sprintf('+%.1f%%', $topSignal['return']) : null,
             ],
@@ -136,6 +129,7 @@ final class TodayHighlightsBuilder
                 'data' => $swingStock ? sprintf('%s %+.1f%%', $swingStock['symbol'], $swingStock['perf_pct']) : null,
                 'url' => $swingStock['url'] ?? null,
                 'details' => $swingStock['details'] ?? null,
+                'analog' => $swingStock['analog'] ?? null,
                 'metric_label' => __('Performance seit Kauf'),
                 'metric_value' => $swingStock ? sprintf('%+.1f%%', $swingStock['perf_pct']) : null,
             ],
@@ -147,6 +141,7 @@ final class TodayHighlightsBuilder
                 'data' => $surpriseSignal ? sprintf('%s (war HOLD)', $surpriseSignal['symbol']) : null,
                 'url' => $surpriseSignal['url'] ?? null,
                 'details' => $surpriseSignal['details'] ?? null,
+                'analog' => $surpriseSignal['analog'] ?? null,
                 'metric_label' => __('Erwartete Rendite'),
                 'metric_value' => $surpriseSignal ? sprintf('+%.1f%%', $surpriseSignal['return']) : null,
             ],
@@ -158,74 +153,104 @@ final class TodayHighlightsBuilder
                 'data' => $trendSwitch ? $trendSwitch['symbol'] : null,
                 'url' => $trendSwitch['url'] ?? null,
                 'details' => $trendSwitch['details'] ?? null,
+                'analog' => $trendSwitch['analog'] ?? null,
                 'metric_label' => __('Neues Signal'),
                 'metric_value' => $trendSwitch ? __('BUY') : null,
             ],
-        ];
-
-        $analogs = collect($analogs)
-            ->unique(fn (array $a) => $a['type'].'|'.$a['analog_symbol'])
-            ->values()
-            ->all();
-
-        return ['highlights' => $highlights, 'analogs' => $analogs];
+        ]];
     }
 
     /**
-     * Finds up to two historical analogs for a BUY signal of a given
-     * predicted-return magnitude: the same instrument's most similar past
-     * BUY signal, and the most similar past BUY signal on any other
-     * instrument - both with a resolved (>=25 days old) real outcome.
-     *
-     * @return list<array<string, mixed>>
+     * Finds the single best historical analog for a BUY signal of a given
+     * return magnitude: prefers the same instrument's most similar past BUY
+     * signal, falling back to the closest match on any other instrument.
+     * Only considers signals >=25 days old, so the outcome is resolved.
+     * Attaches a ready-to-draw sparkline of the analog's own 20-day move.
      */
-    private function findAnalogs(int $instrumentId, string $symbol, float $predictedReturn, string $date): array
+    private function findAnalog(int $instrumentId, string $symbol, float $comparisonReturn, string $date): ?array
     {
-        $cutoff = \Illuminate\Support\Carbon::parse($date)->subDays(25)->toDateString();
-        $analogs = [];
+        $cutoff = Carbon::parse($date)->subDays(25)->toDateString();
 
         $sameStock = DB::table('walk_forward_backtest_trades')
             ->where('instrument_id', $instrumentId)
             ->where('signal', 'BUY')
             ->where('horizon_days', 20)
             ->where('signal_date', '<=', $cutoff)
-            ->orderByRaw('ABS(predicted_return - ?) ASC', [$predictedReturn])
-            ->select('signal_date', 'net_return')
+            ->orderByRaw('ABS(predicted_return - ?) ASC', [$comparisonReturn])
+            ->select('instrument_id', 'signal_date', 'exit_date', 'net_return')
             ->first();
 
-        if ($sameStock) {
-            $analogs[] = [
-                'type' => 'same_stock',
-                'symbol' => $symbol,
-                'analog_symbol' => $symbol,
-                'signal_date' => $sameStock->signal_date,
-                'outcome_pct' => round((float) $sameStock->net_return * 100, 1),
-                'url' => route('stocks.show', ['symbol' => $symbol, 'return_to' => '/dashboard/concept']),
-            ];
+        $match = $sameStock;
+        $matchSymbol = $symbol;
+        $type = 'same_stock';
+
+        if (! $match) {
+            $crossStock = DB::table('walk_forward_backtest_trades as t')
+                ->join('instruments as i', 'i.id', '=', 't.instrument_id')
+                ->where('t.instrument_id', '!=', $instrumentId)
+                ->where('t.signal', 'BUY')
+                ->where('t.horizon_days', 20)
+                ->where('t.signal_date', '<=', $cutoff)
+                ->orderByRaw('ABS(t.predicted_return - ?) ASC', [$comparisonReturn])
+                ->select('t.instrument_id', 'i.symbol', 't.signal_date', 't.exit_date', 't.net_return')
+                ->first();
+
+            if (! $crossStock) {
+                return null;
+            }
+
+            $match = $crossStock;
+            $matchSymbol = $crossStock->symbol;
+            $type = 'cross_stock';
         }
 
-        $crossStock = DB::table('walk_forward_backtest_trades as t')
-            ->join('instruments as i', 'i.id', '=', 't.instrument_id')
-            ->where('t.instrument_id', '!=', $instrumentId)
-            ->where('t.signal', 'BUY')
-            ->where('t.horizon_days', 20)
-            ->where('t.signal_date', '<=', $cutoff)
-            ->orderByRaw('ABS(t.predicted_return - ?) ASC', [$predictedReturn])
-            ->select('i.symbol', 't.signal_date', 't.net_return')
-            ->first();
+        return [
+            'type' => $type,
+            'symbol' => $symbol,
+            'analog_symbol' => $matchSymbol,
+            'signal_date' => $match->signal_date,
+            'outcome_pct' => round((float) $match->net_return * 100, 1),
+            'url' => route('stocks.show', ['symbol' => $matchSymbol, 'return_to' => '/dashboard/concept']),
+            'sparkline' => $this->sparkline((int) $match->instrument_id, $match->signal_date, $match->exit_date),
+        ];
+    }
 
-        if ($crossStock) {
-            $analogs[] = [
-                'type' => 'cross_stock',
-                'symbol' => $symbol,
-                'analog_symbol' => $crossStock->symbol,
-                'signal_date' => $crossStock->signal_date,
-                'outcome_pct' => round((float) $crossStock->net_return * 100, 1),
-                'url' => route('stocks.show', ['symbol' => $crossStock->symbol, 'return_to' => '/dashboard/concept']),
-            ];
+    /**
+     * Renders a normalized SVG polyline (viewBox 0 0 100 32) of the daily
+     * closes between two dates, for a tiny inline "how it went" chart.
+     */
+    private function sparkline(int $instrumentId, string $startDate, ?string $endDate): ?string
+    {
+        // exit_date should always be present for a resolved historical
+        // trade; 28 calendar days is a safe stand-in (~20 trading days).
+        $endDate ??= Carbon::parse($startDate)->addDays(28)->toDateString();
+
+        $closes = DB::table('price_bars')
+            ->where('instrument_id', $instrumentId)
+            ->where('interval', '1d')
+            ->whereBetween('bar_time', [$startDate, Carbon::parse($endDate)->endOfDay()])
+            ->orderBy('bar_time')
+            ->pluck('close')
+            ->map(fn ($v) => (float) $v)
+            ->values();
+
+        if ($closes->count() < 2) {
+            return null;
         }
 
-        return $analogs;
+        $min = $closes->min();
+        $max = $closes->max();
+        $range = $max - $min;
+        $count = $closes->count();
+
+        $points = $closes->map(function (float $close, int $i) use ($min, $range, $count): string {
+            $x = $count > 1 ? ($i / ($count - 1)) * 100 : 0;
+            $y = $range > 0 ? 32 - (($close - $min) / $range) * 32 : 16;
+
+            return round($x, 1).','.round($y, 1);
+        })->implode(' ');
+
+        return $points;
     }
 
     /** @return array<string, mixed> */
