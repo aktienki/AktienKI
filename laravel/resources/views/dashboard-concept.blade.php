@@ -1100,6 +1100,9 @@
                                             <div class="mb-2 rounded-lg bg-[var(--ak-surface-muted)] px-2 py-1.5">
                                                 <div class="mb-1 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf (20T)') }}</div>
                                                 <svg viewBox="0 0 100 50" class="h-20 w-full" preserveAspectRatio="none">
+                                                    @if($row['breakout_level'])
+                                                        <line x1="0" x2="100" y1="{{ $row['breakout_line_y'] }}" y2="{{ $row['breakout_line_y'] }}" stroke="currentColor" stroke-width="0.6" stroke-dasharray="2,1.5" class="{{ $row['breakout_level']['type'] === 'resistance' ? 'text-rose-400/50' : 'text-emerald-400/50' }}" />
+                                                    @endif
                                                     @foreach($row['candles'] as $candle)
                                                         <line x1="{{ $candle['x'] }}" x2="{{ $candle['x'] }}" y1="{{ $candle['high_y'] }}" y2="{{ $candle['low_y'] }}" stroke="currentColor" stroke-width="1" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />
                                                         <rect x="{{ $candle['x'] - $candle['width'] / 2 }}" y="{{ $candle['body_y'] }}" width="{{ $candle['width'] }}" height="{{ $candle['body_height'] }}" fill="currentColor" class="{{ $candle['bullish'] ? 'text-emerald-500' : 'text-rose-500' }}" />

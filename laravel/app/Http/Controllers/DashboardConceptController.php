@@ -36,17 +36,9 @@ final class DashboardConceptController extends Controller
     /** The core navigation destinations for the left column. */
     private const LEFT_COLUMN_ICONS = [
         ['today-focus', 'Heute im Fokus', 'heroicon-o-fire'],
-        ['classic-dashboard', 'Dashboard', 'heroicon-o-squares-2x2'],
-        ['watchlists', 'Watchlists', 'heroicon-o-star'],
-        ['strategies', 'Strategien', 'heroicon-o-adjustments-horizontal'],
-        ['labels', 'Labels', 'heroicon-o-tag'],
-        ['chartview', 'ChartView', 'heroicon-o-chart-bar-square'],
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
-        ['stock-of-day', 'Aktie des Tages', 'heroicon-o-sparkles'],
-        ['news', 'News', 'heroicon-o-newspaper'],
-        ['upcoming-news', 'Anstehende News', 'heroicon-o-calendar-days'],
-        ['earnings-drift', 'Quartalszahlen-Historie', 'heroicon-o-chart-bar'],
-        ['signal-transitions', 'Signalübergang', 'heroicon-o-arrows-right-left'],
+        ['chartview', 'ChartView', 'heroicon-o-chart-bar-square'],
+        ['classic-dashboard', 'Depots', 'heroicon-o-squares-2x2'],
     ];
 
     public function __invoke(Request $request): View
@@ -63,31 +55,8 @@ final class DashboardConceptController extends Controller
 
         $sections = collect([
             $this->todayFocusSection('today-focus'),
-            $this->listSection(
-                'watchlists',
-                $user->watchlists()->orderByDesc('is_default')->orderBy('name')->limit(5)->pluck('name'),
-                $user->watchlists()->count(),
-                __('Noch keine Watchlist angelegt.'),
-            ),
-            $this->listSection(
-                'strategies',
-                $user->savedPredictionFilters()->orderByDesc('id')->limit(5)->pluck('name'),
-                $user->savedPredictionFilters()->count(),
-                __('Noch keine Strategie gespeichert.'),
-            ),
-            $this->listSection(
-                'labels',
-                SmartSelectionLabel::query()->where('user_id', $user->id)->orderByDesc('id')->limit(5)->pluck('name'),
-                SmartSelectionLabel::query()->where('user_id', $user->id)->count(),
-                __('Noch kein Label angelegt.'),
-            ),
             $this->chartPatternSection('chartview'),
             $this->marketSection('market-report', $snapshot, $user),
-            $this->stockOfTheDaySection('stock-of-day', $request),
-            $this->newsSection('news'),
-            $this->eventsSection('upcoming-news', $request),
-            $this->earningsDriftSection('earnings-drift', $request),
-            $this->signalTransitionSection('signal-transitions'),
             $this->classicDashboardSection('classic-dashboard', $request),
         ])->map(function (array $section) use ($leftIcons): array {
             $meta = $leftIcons->firstWhere('id', $section['id']);
@@ -348,6 +317,8 @@ final class DashboardConceptController extends Controller
                 'candles' => $event['candles'],
                 'indicator_series' => $event['indicator_series'],
                 'pattern_range' => $event['pattern_range'],
+                'breakout_level' => $event['breakout_level'],
+                'breakout_line_y' => $event['breakout_line_y'],
                 'rise_probability_20d' => $event['rise_probability_20d'],
                 'average_return_20d' => $event['average_return_20d'],
                 'probability_sample_size' => $event['probability_sample_size'],

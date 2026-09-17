@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class ChartPatternSignalService
 {
-    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v7';
+    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v8';
 
     /** Event types driven by a bounded (0-100) oscillator, shown as its own panel below the candles rather than overlaid on price. */
     private const INDICATOR_EVENT_KEYS = ['rsi_oversold', 'rsi_overbought'];
@@ -138,7 +138,28 @@ final class ChartPatternSignalService
             $bars = $barsByInstrument->get($event['instrument_id']) ?? collect();
             $window = $bars->slice(-self::DISPLAY_DAYS)->values();
 
-            $event['candles'] = $window->count() >= 2 ? $this->candles($window) : [];
+            if ($window->count() >= 2) {
+                $low = $window->min(fn (object $bar) => (float) $bar->low);
+                $high = $window->max(fn (object $bar) => (float) $bar->high);
+                // A breakout level (support/resistance) can sit outside the
+                // visible 20-day high/low - e.g. a 20-day-high breakout is
+                // by definition above every one of those 20 highs - so the
+                // scale has to stretch to include it, or the line would be
+                // drawn off the top/bottom edge of the chart.
+                if ($event['breakout_level']) {
+                    $low = min($low, $event['breakout_level']['value']);
+                    $high = max($high, $event['breakout_level']['value']);
+                }
+
+                $event['candles'] = $this->candles($window, $low, $high);
+                $event['breakout_line_y'] = $event['breakout_level']
+                    ? $this->priceToY($event['breakout_level']['value'], $low, $high)
+                    : null;
+            } else {
+                $event['candles'] = [];
+                $event['breakout_line_y'] = null;
+            }
+
             $event['indicator_series'] = in_array($event['event_key'], self::INDICATOR_EVENT_KEYS, true)
                 ? $this->rsiPanel($bars)
                 : null;
@@ -183,10 +204,8 @@ final class ChartPatternSignalService
     private const CANDLE_CHART_HEIGHT = 50;
 
     /** @return list<array{x: float, width: float, high_y: float, low_y: float, body_y: float, body_height: float, bullish: bool}> */
-    private function candles(Collection $bars): array
+    private function candles(Collection $bars, float $min, float $max): array
     {
-        $min = $bars->min(fn (object $bar) => (float) $bar->low);
-        $max = $bars->max(fn (object $bar) => (float) $bar->high);
         $range = $max - $min;
         $count = $bars->count();
         $slot = 100 / $count;
@@ -211,6 +230,15 @@ final class ChartPatternSignalService
                 'bullish' => $close >= $open,
             ];
         })->values()->all();
+    }
+
+    /** Converts a raw price into the candle chart's y-coordinate, using the same min/max scale candles() was called with. */
+    private function priceToY(float $value, float $min, float $max): float
+    {
+        $range = $max - $min;
+        $height = self::CANDLE_CHART_HEIGHT;
+
+        return round($range > 0 ? $height - (($value - $min) / $range) * $height : $height / 2, 2);
     }
 
     /** RSI panel viewBox height - kept smaller than CANDLE_CHART_HEIGHT since it is a secondary panel, but tall enough (with the matching viewBox in the blade view) to read as a real line, not a sliver. */
@@ -326,6 +354,7 @@ final class ChartPatternSignalService
                 SELECT DISTINCT bar_time FROM series ORDER BY bar_time DESC LIMIT 1
             )
             SELECT s.instrument_id, i.symbol, i.name, i.country, s.bar_time, s.close, s.previous_close,
+                   s.bollinger_upper, s.bollinger_lower, s.prior_20_high, s.prior_20_low,
                    event.event_key, event.label_de, event.tone
             FROM series s
             JOIN instruments i ON i.id = s.instrument_id
@@ -361,6 +390,28 @@ final class ChartPatternSignalService
             'change_pct' => is_numeric($row->close) && is_numeric($row->previous_close) && (float) $row->previous_close !== 0.0
                 ? ((float) $row->close / (float) $row->previous_close - 1) * 100
                 : null,
+            'breakout_level' => $this->breakoutLevel($row),
         ]);
+    }
+
+    /**
+     * The specific price level a breakout event actually broke through - the
+     * Bollinger band for the band-based events, the prior 20-day high/low
+     * for the breakout-pattern events - so the chart can draw the line that
+     * was crossed instead of leaving the reader to infer it from the label.
+     */
+    private function breakoutLevel(object $row): ?array
+    {
+        return match ($row->event_key) {
+            'resistance_breakout' => is_numeric($row->bollinger_upper)
+                ? ['type' => 'resistance', 'value' => (float) $row->bollinger_upper] : null,
+            'support_breakdown' => is_numeric($row->bollinger_lower)
+                ? ['type' => 'support', 'value' => (float) $row->bollinger_lower] : null,
+            'pattern_upside_breakout' => is_numeric($row->prior_20_high)
+                ? ['type' => 'resistance', 'value' => (float) $row->prior_20_high] : null,
+            'pattern_downside_breakout' => is_numeric($row->prior_20_low)
+                ? ['type' => 'support', 'value' => (float) $row->prior_20_low] : null,
+            default => null,
+        };
     }
 }
