@@ -1074,27 +1074,34 @@
                             </div>
                         @elseif($section['kind'] === 'chart-patterns')
                             @if(count($section['rows']))
-                                <div class="overflow-x-auto">
-                                    <table class="w-full min-w-[560px] border-collapse text-[11px]">
-                                        <thead>
-                                            <tr class="text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
-                                                <th class="border-0 pb-1.5 pr-2 text-left font-black">{{ __('Zeit') }}</th>
-                                                <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Aktie') }}</th>
-                                                <th class="border-0 pb-1.5 px-2 text-left font-black">{{ __('Ereignis') }}</th>
-                                                <th class="border-0 pb-1.5 pl-2 text-right font-black">{{ __('Änderung') }}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($section['rows'] as $row)
-                                                <tr class="border-t border-[var(--ak-border)]">
-                                                    <td class="py-1.5 pr-2 tabular-nums text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($row['time'])->format('d.m.Y') }}</td>
-                                                    <td class="px-2 py-1.5"><span class="font-bold text-[var(--ak-text)]">{{ $row['symbol'] }}</span></td>
-                                                    <td class="px-2 py-1.5 {{ $row['tone'] === 'positive' ? 'text-emerald-500' : ($row['tone'] === 'negative' ? 'text-rose-500' : 'text-[var(--ak-muted)]') }}">{{ $row['label'] }}</td>
-                                                    <td class="py-1.5 pl-2 text-right tabular-nums {{ ($row['change_pct'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $row['change_pct'] === null ? '—' : number_format($row['change_pct'], 1, ',', '.').' %' }}</td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
+                                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
+                                    @foreach($section['rows'] as $row)
+                                        @php $tone = $row['tone'] === 'positive' ? 'emerald' : ($row['tone'] === 'negative' ? 'rose' : 'slate'); @endphp
+                                        <a href="{{ $row['url'] }}" class="concept-card relative flex h-full flex-col p-4 hover:border-{{ $tone }}-400">
+                                            <small class="absolute right-3 top-3 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($row['time'])->format('d.m.Y') }}</small>
+                                            <div class="mb-3 flex items-center gap-2 pr-14">
+                                                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-{{ $tone }}-500/10 text-{{ $tone }}-500">
+                                                    <x-dynamic-component :component="$row['tone'] === 'negative' ? 'heroicon-o-arrow-trending-down' : 'heroicon-o-arrow-trending-up'" class="h-4.5 w-4.5" />
+                                                </span>
+                                                <div class="min-w-0">
+                                                    <b class="block truncate text-[12px] font-black text-[var(--ak-text)]">{{ $row['symbol'] }}</b>
+                                                    <small class="block truncate text-[9px] text-[var(--ak-muted)]">{{ $row['name'] }}</small>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-2 rounded-lg bg-{{ $tone }}-500/[.08] px-2.5 py-2">
+                                                <div class="text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Ereignis') }}</div>
+                                                <div class="text-[13px] font-black text-{{ $tone }}-500">{{ $row['label'] }}</div>
+                                            </div>
+
+                                            <div class="mt-auto grid grid-cols-1 gap-1.5 text-[9px]">
+                                                <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1">
+                                                    <span class="block text-[var(--ak-muted)]">{{ __('Kursänderung') }}</span>
+                                                    <span class="font-bold {{ ($row['change_pct'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $row['change_pct'] === null ? '—' : number_format($row['change_pct'], 1, ',', '.').' %' }}</span>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    @endforeach
                                 </div>
                             @else
                                 <div class="concept-empty">{{ $section['emptyText'] }}</div>

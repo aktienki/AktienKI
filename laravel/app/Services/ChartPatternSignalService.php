@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Detects classic chart patterns and indicator transitions (golden/death
  * cross, SMA/Bollinger breaks, RSI extremes, candlestick patterns, 20-day
- * breakouts) directly from price_bars for the most recent trading day(s).
+ * breakouts) directly from price_bars for the most recent trading day
+ * (~last 24h).
  *
  * technical_indicators - the table chartview:refresh-signals reads for the
  * same kind of detection - is fed by an external pipeline that stalled
@@ -20,7 +21,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class ChartPatternSignalService
 {
-    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v1';
+    private const CACHE_KEY = 'dashboard.chart-pattern-signals.v2';
 
     public function recentEvents(): Collection
     {
@@ -66,7 +67,11 @@ final class ChartPatternSignalService
                 FROM indicators
                 WINDOW w AS (PARTITION BY instrument_id ORDER BY bar_time)
             ), recent_days AS (
-                SELECT DISTINCT bar_time FROM series ORDER BY bar_time DESC LIMIT 2
+                -- Daily bars only ever advance once per trading day, so "the
+                -- last 24h" of events is just the single most recent
+                -- bar_time - not a rolling now()-24h window, which would
+                -- intermittently see zero rows depending on time of day.
+                SELECT DISTINCT bar_time FROM series ORDER BY bar_time DESC LIMIT 1
             )
             SELECT s.instrument_id, i.symbol, i.name, s.bar_time, s.close, s.previous_close,
                    event.event_key, event.label_de, event.tone

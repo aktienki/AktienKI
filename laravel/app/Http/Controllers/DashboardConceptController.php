@@ -330,7 +330,7 @@ final class DashboardConceptController extends Controller
     private function chartPatternSection(string $id): array
     {
         $rows = app(ChartPatternSignalService::class)->recentEvents()
-            ->take(100)
+            ->take(60)
             ->map(fn (array $event): array => [
                 'time' => $event['time'],
                 'symbol' => $event['symbol'],
@@ -338,6 +338,7 @@ final class DashboardConceptController extends Controller
                 'label' => $event['label'],
                 'tone' => $event['tone'],
                 'change_pct' => $event['change_pct'],
+                'url' => route('stocks.show', ['symbol' => $event['symbol'], 'return_to' => '/dashboard/concept']),
             ])
             ->values()
             ->all();
@@ -346,7 +347,7 @@ final class DashboardConceptController extends Controller
             'id' => $id,
             'kind' => 'chart-patterns',
             'rows' => $rows,
-            'emptyText' => __('Keine Chartmuster oder Indikatorübergänge in den letzten Handelstagen.'),
+            'emptyText' => __('Keine Chartmuster oder Indikatorübergänge in den letzten 24 Stunden.'),
         ];
     }
 
