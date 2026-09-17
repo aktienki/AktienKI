@@ -60,9 +60,30 @@ final class GenerateStockAiAssessments extends Command
 
         $generated = 0;
         $failed = 0;
-        foreach ($stocks as $stock) {
+        // Batched: the shared system prompt is only paid for once per
+        // chunk instead of once per stock. Chunked (not one giant call) so
+        // an unusually active day can't push a single request past a safe
+        // token/time budget.
+        foreach ($stocks->chunk(10) as $chunk) {
             try {
-                $generation = $assessments->generate($stock);
+                $batch = $assessments->generateBatch($chunk->all());
+            } catch (Throwable $exception) {
+                $failed += $chunk->count();
+                report($exception);
+                $this->error('Batch von '.$chunk->count().' Aktien fehlgeschlagen: '.$exception->getMessage());
+
+                continue;
+            }
+
+            foreach ($chunk as $stock) {
+                $generation = $batch[$stock->symbol] ?? null;
+                if ($generation === null) {
+                    $failed++;
+                    $this->error("{$stock->symbol}: fehlte in der Batch-Antwort.");
+
+                    continue;
+                }
+
                 $result = $generation['result'];
 
                 DB::table('stock_ai_assessments')->updateOrInsert(
@@ -83,10 +104,6 @@ final class GenerateStockAiAssessments extends Command
                     ],
                 );
                 $generated++;
-            } catch (Throwable $exception) {
-                $failed++;
-                report($exception);
-                $this->error("{$stock->symbol}: ".$exception->getMessage());
             }
         }
 

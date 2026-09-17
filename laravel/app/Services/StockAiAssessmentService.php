@@ -25,63 +25,121 @@ PROMPT;
 
     public function generate(object $stock): array
     {
+        return $this->generateBatch([$stock])[$stock->symbol];
+    }
+
+    /**
+     * Assesses several stocks in a single Grid request instead of one call
+     * per stock: the system instructions (and their token cost) are paid
+     * for once regardless of how many stocks are in the batch.
+     *
+     * @param  iterable<object>  $stocks
+     * @return array<string, array{result: array, model: string, input_snapshot: array, raw_response: array}> keyed by symbol
+     */
+    public function generateBatch(iterable $stocks): array
+    {
         $apiKey = trim((string) config('aktienki.stock_ai_assessment.grid_api_key'));
         if ($apiKey === '') {
             throw new RuntimeException('GRID_API_KEY ist für die KI-Einordnung nicht konfiguriert.');
         }
 
-        $input = $this->stockContext($stock);
+        $inputs = [];
+        foreach ($stocks as $stock) {
+            $inputs[] = $this->stockContext($stock);
+        }
+        if ($inputs === []) {
+            return [];
+        }
+
         $model = (string) config('aktienki.stock_ai_assessment.grid_model', 'text-standard');
         $payload = [
             'model' => $model,
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => self::INSTRUCTIONS."\n\nAntworte ausschließlich mit einem einzigen JSON-Objekt gemäß dem vorgegebenen Schema - kein Fließtext davor oder danach.",
+                    'content' => self::INSTRUCTIONS."\n\nDu bekommst eine Liste von Aktien. Antworte ausschließlich mit einem einzigen JSON-Objekt gemäß dem vorgegebenen Schema, das für JEDE Aktie aus der Liste einen Eintrag enthält (gleiche Reihenfolge, jeweils mit ihrem symbol) - kein Fließtext davor oder danach.",
                 ],
                 [
                     'role' => 'user',
-                    'content' => json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+                    'content' => json_encode(['stocks' => $inputs], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
                 ],
             ],
             'response_format' => [
                 'type' => 'json_schema',
-                'json_schema' => ['schema' => $this->resultSchema()],
+                'json_schema' => ['schema' => $this->batchResultSchema()],
             ],
-            'max_tokens' => max(400, (int) config('aktienki.stock_ai_assessment.max_output_tokens', 900)),
+            // Each stock needs roughly a single-assessment's worth of
+            // reasoning + output budget; the shared system prompt is paid
+            // for once, not per stock.
+            'max_tokens' => min(16000, max(3500, count($inputs) * 1800)),
         ];
 
         $endpoint = (string) config('aktienki.stock_ai_assessment.grid_endpoint', 'https://api.thegrid.ai/v1/chat/completions');
         // The Grid's backend load-balances across providers; roughly one in
         // three requests using response_format/tools transiently 500s or
-        // 400s on a provider that doesn't support the requested feature.
-        // A short retry almost always lands on a working provider.
-        try {
-            $response = Http::withToken($apiKey)
-                ->acceptJson()
-                ->asJson()
-                ->connectTimeout(15)
-                ->timeout(120)
-                ->retry(3, 1500)
-                ->post($endpoint, $payload);
-        } catch (\Illuminate\Http\Client\RequestException $e) {
-            throw new RuntimeException($this->providerError($e->response));
+        // 400s on a provider that doesn't support the requested feature -
+        // Http::retry() catches that. But a provider can also return 200
+        // with malformed/incomplete content despite the schema (observed
+        // directly), which isn't an HTTP-level failure, so it needs its
+        // own retry around the decode step too.
+        $lastError = null;
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                $response = Http::withToken($apiKey)
+                    ->acceptJson()
+                    ->asJson()
+                    ->connectTimeout(15)
+                    ->timeout(180)
+                    ->retry(3, 1500)
+                    ->post($endpoint, $payload);
+            } catch (\Illuminate\Http\Client\RequestException $e) {
+                $lastError = new RuntimeException($this->providerError($e->response));
+
+                continue;
+            }
+
+            $rawResponse = $response->json();
+            if (! is_array($rawResponse)) {
+                $lastError = new RuntimeException('The Grid lieferte keine gültige JSON-Antwort.');
+
+                continue;
+            }
+
+            $text = (string) data_get($rawResponse, 'choices.0.message.content', '');
+
+            try {
+                $decoded = $this->decodeBatchResult($text);
+            } catch (RuntimeException $e) {
+                $lastError = $e;
+
+                continue;
+            }
+
+            $lastError = null;
+            break;
         }
 
-        $rawResponse = $response->json();
-        if (! is_array($rawResponse)) {
-            throw new RuntimeException('The Grid lieferte keine gültige JSON-Antwort.');
+        if ($lastError !== null) {
+            throw $lastError;
         }
 
-        $text = (string) data_get($rawResponse, 'choices.0.message.content', '');
-        $result = $this->decodeResult($text);
+        $results = [];
+        foreach ($inputs as $input) {
+            $symbol = $input['symbol'];
+            $entry = $decoded[$symbol] ?? null;
+            if ($entry === null) {
+                continue;
+            }
 
-        return [
-            'result' => $result,
-            'model' => (string) ($rawResponse['model'] ?? $model),
-            'input_snapshot' => $input,
-            'raw_response' => $rawResponse,
-        ];
+            $results[$symbol] = [
+                'result' => $entry,
+                'model' => (string) ($rawResponse['model'] ?? $model),
+                'input_snapshot' => $input,
+                'raw_response' => $rawResponse,
+            ];
+        }
+
+        return $results;
     }
 
     /** @return array<string, mixed> */
@@ -108,46 +166,86 @@ PROMPT;
     }
 
     /** @return array<string, mixed> */
-    private function resultSchema(): array
+    private function assessmentSchema(bool $withSymbol): array
+    {
+        $properties = [
+            'recommendation' => ['type' => 'string', 'enum' => self::RECOMMENDATIONS],
+            'confidence' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100],
+            'summary' => ['type' => 'string', 'maxLength' => 600],
+            'opportunities' => ['type' => 'array', 'minItems' => 2, 'maxItems' => 4, 'items' => ['type' => 'string', 'maxLength' => 250]],
+            'risks' => ['type' => 'array', 'minItems' => 2, 'maxItems' => 4, 'items' => ['type' => 'string', 'maxLength' => 250]],
+            'key_factors' => ['type' => 'array', 'minItems' => 2, 'maxItems' => 4, 'items' => ['type' => 'string', 'maxLength' => 250]],
+        ];
+        $required = ['recommendation', 'confidence', 'summary', 'opportunities', 'risks', 'key_factors'];
+
+        if ($withSymbol) {
+            $properties = ['symbol' => ['type' => 'string']] + $properties;
+            array_unshift($required, 'symbol');
+        }
+
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => $required,
+            'properties' => $properties,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function batchResultSchema(): array
     {
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['recommendation', 'confidence', 'summary', 'opportunities', 'risks', 'key_factors'],
+            'required' => ['assessments'],
             'properties' => [
-                'recommendation' => ['type' => 'string', 'enum' => self::RECOMMENDATIONS],
-                'confidence' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100],
-                'summary' => ['type' => 'string', 'maxLength' => 600],
-                'opportunities' => ['type' => 'array', 'minItems' => 2, 'maxItems' => 4, 'items' => ['type' => 'string', 'maxLength' => 250]],
-                'risks' => ['type' => 'array', 'minItems' => 2, 'maxItems' => 4, 'items' => ['type' => 'string', 'maxLength' => 250]],
-                'key_factors' => ['type' => 'array', 'minItems' => 2, 'maxItems' => 4, 'items' => ['type' => 'string', 'maxLength' => 250]],
+                'assessments' => [
+                    'type' => 'array',
+                    'items' => $this->assessmentSchema(withSymbol: true),
+                ],
             ],
         ];
     }
 
-    /** @return array{recommendation: string, confidence: int, summary: string, opportunities: array, risks: array, key_factors: array} */
-    private function decodeResult(string $text): array
+    /** @return array<string, array{recommendation: string, confidence: int, summary: string, opportunities: array, risks: array, key_factors: array}> keyed by symbol */
+    private function decodeBatchResult(string $text): array
     {
-        $text = trim($text);
+        // A request routed to a provider that doesn't fully honor
+        // response_format can still wrap otherwise-valid JSON in a
+        // markdown code fence, same as observed on plain-prompted calls.
+        $text = trim((string) preg_replace('/^```(?:json)?\s*|\s*```$/', '', trim($text)));
 
         try {
-            $result = json_decode($text, true, flags: JSON_THROW_ON_ERROR);
+            $decoded = json_decode($text, true, flags: JSON_THROW_ON_ERROR);
         } catch (\JsonException $exception) {
             throw new RuntimeException('The Grid lieferte trotz Schema kein gültiges Ergebnis-JSON.', previous: $exception);
         }
 
-        if (! is_array($result) || ! in_array($result['recommendation'] ?? null, self::RECOMMENDATIONS, true)) {
-            throw new RuntimeException('The Grid lieferte keine gültige Einordnung.');
+        $assessments = $decoded['assessments'] ?? null;
+        if (! is_array($assessments)) {
+            throw new RuntimeException('The Grid lieferte keine gültige Liste von Einordnungen.');
         }
 
-        return [
-            'recommendation' => $result['recommendation'],
-            'confidence' => max(0, min(100, (int) ($result['confidence'] ?? 0))),
-            'summary' => trim((string) ($result['summary'] ?? '')),
-            'opportunities' => $this->stringList($result['opportunities'] ?? []),
-            'risks' => $this->stringList($result['risks'] ?? []),
-            'key_factors' => $this->stringList($result['key_factors'] ?? []),
-        ];
+        $results = [];
+        foreach ($assessments as $entry) {
+            if (! is_array($entry) || ! is_string($entry['symbol'] ?? null)) {
+                continue;
+            }
+            if (! in_array($entry['recommendation'] ?? null, self::RECOMMENDATIONS, true)) {
+                continue;
+            }
+
+            $results[$entry['symbol']] = [
+                'recommendation' => $entry['recommendation'],
+                'confidence' => max(0, min(100, (int) ($entry['confidence'] ?? 0))),
+                'summary' => trim((string) ($entry['summary'] ?? '')),
+                'opportunities' => $this->stringList($entry['opportunities'] ?? []),
+                'risks' => $this->stringList($entry['risks'] ?? []),
+                'key_factors' => $this->stringList($entry['key_factors'] ?? []),
+            ];
+        }
+
+        return $results;
     }
 
     /** @return array<int, string> */
