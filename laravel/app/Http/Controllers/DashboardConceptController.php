@@ -363,8 +363,10 @@ final class DashboardConceptController extends Controller
             'id' => $id,
             'kind' => 'today-focus',
             'highlights' => array_map(function ($h, $idx) use ($insights) {
+                // The 5th "Indikatoren" card is structured data, not a
+                // signal needing an AI narrative, so it has no insight key.
                 $keys = ['top_signal_insight', 'swing_insight', 'surprise_insight', 'trend_switch_insight'];
-                $h['insight'] = $insights[$keys[$idx]] ?? '';
+                $h['insight'] = $insights[$keys[$idx] ?? null] ?? '';
                 return $h;
             }, $highlights, array_keys($highlights)),
         ];

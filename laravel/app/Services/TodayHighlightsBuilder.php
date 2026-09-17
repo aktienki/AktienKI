@@ -36,6 +36,8 @@ final class TodayHighlightsBuilder
             ->select('instrument_id', 'expected_return', 'symbol', 'name')
             ->first();
 
+        $topSignalIndicators = null;
+
         if ($topBuy) {
             $topSignal = [
                 'symbol' => $topBuy->symbol,
@@ -45,6 +47,7 @@ final class TodayHighlightsBuilder
                 'details' => $this->enrich((int) $topBuy->instrument_id),
                 'analog' => $this->findAnalog((int) $topBuy->instrument_id, $topBuy->symbol, (float) $topBuy->expected_return, $date),
             ];
+            $topSignalIndicators = $this->technicalIndicators((int) $topBuy->instrument_id);
         }
 
         $holdingSwings = DB::table('portfolio_positions as pp')
@@ -157,6 +160,16 @@ final class TodayHighlightsBuilder
                 'metric_label' => __('Neues Signal'),
                 'metric_value' => $trendSwitch ? __('BUY') : null,
             ],
+            [
+                'label' => __('Indikatoren'),
+                'subtitle' => $topSignal ? __('Top-Signal: :symbol', ['symbol' => $topSignal['symbol']]) : __('Technische Kennzahlen'),
+                'icon' => 'heroicon-o-signal',
+                'color' => 'violet',
+                'kind' => 'indicators',
+                'data' => $topSignalIndicators ? $topSignal['symbol'] : null,
+                'url' => $topSignal['url'] ?? null,
+                'indicators' => $topSignalIndicators,
+            ],
         ]];
     }
 
@@ -251,6 +264,43 @@ final class TodayHighlightsBuilder
         })->implode(' ');
 
         return $points;
+    }
+
+    /**
+     * Snapshot of the latest available technical indicators for an
+     * instrument. technical_indicators is only refreshed sporadically, so
+     * as_of is surfaced explicitly rather than implying it's today's value.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function technicalIndicators(int $instrumentId): ?array
+    {
+        $row = DB::table('technical_indicators')
+            ->where('instrument_id', $instrumentId)
+            ->where('interval', '1d')
+            ->orderByDesc('bar_time')
+            ->first();
+
+        if (! $row || ! is_numeric($row->rsi_14)) {
+            return null;
+        }
+
+        $rsi = (float) $row->rsi_14;
+        $sma20 = (float) $row->sma_20;
+        $sma50 = (float) $row->sma_50;
+        $macd = (float) $row->macd;
+        $macdSignal = (float) $row->macd_signal;
+
+        return [
+            'as_of' => Carbon::parse($row->bar_time)->toDateString(),
+            'rsi' => round($rsi, 1),
+            'rsi_state' => $rsi >= 70 ? __('Überkauft') : ($rsi <= 30 ? __('Überverkauft') : __('Neutral')),
+            'macd' => round($macd, 2),
+            'macd_bullish' => $macd > $macdSignal,
+            'trend' => $sma20 > $sma50 ? __('Aufwärtstrend') : __('Abwärtstrend'),
+            'trend_bullish' => $sma20 > $sma50,
+            'adx' => is_numeric($row->adx_14) ? round((float) $row->adx_14, 1) : null,
+        ];
     }
 
     /** @return array<string, mixed> */

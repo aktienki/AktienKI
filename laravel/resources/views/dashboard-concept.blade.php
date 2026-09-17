@@ -275,7 +275,7 @@
                         </div>
 
                         @if($section['kind'] === 'today-focus')
-                            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
+                            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 items-stretch">
                                 @foreach($section['highlights'] as $highlight)
                                     @php $wrapper = $highlight['url'] ? 'a' : 'div'; $details = $highlight['details'] ?? null; @endphp
                                     <{{ $wrapper }} @if($highlight['url']) href="{{ $highlight['url'] }}" @endif class="concept-card flex h-full flex-col p-4 hover:border-{{ $highlight['color'] }}-400">
@@ -289,7 +289,38 @@
                                             </div>
                                         </div>
 
-                                        @if($highlight['data'] && $details)
+                                        @if(($highlight['kind'] ?? null) === 'indicators')
+                                            @php $indicators = $highlight['indicators'] ?? null; @endphp
+                                            @if($indicators)
+                                                <div class="mb-2 text-[8px] text-[var(--ak-muted)]">{{ __('Stand: :date', ['date' => \Illuminate\Support\Carbon::parse($indicators['as_of'])->format('d.m.Y')]) }}</div>
+                                                <div class="grid grid-cols-2 gap-1.5 text-[9px]">
+                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1.5">
+                                                        <span class="block text-[var(--ak-muted)]">{{ __('RSI 14') }}</span>
+                                                        <span class="font-bold text-[var(--ak-text)]">{{ $indicators['rsi'] }}</span>
+                                                        <span class="block text-[8px] text-[var(--ak-muted)]">{{ $indicators['rsi_state'] }}</span>
+                                                    </div>
+                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1.5">
+                                                        <span class="block text-[var(--ak-muted)]">{{ __('MACD') }}</span>
+                                                        <span class="font-bold {{ $indicators['macd_bullish'] ? 'text-emerald-500' : 'text-rose-500' }}">{{ $indicators['macd'] }}</span>
+                                                        <span class="block text-[8px] text-[var(--ak-muted)]">{{ $indicators['macd_bullish'] ? __('Bullisch') : __('Bärisch') }}</span>
+                                                    </div>
+                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1.5">
+                                                        <span class="block text-[var(--ak-muted)]">{{ __('Trend') }}</span>
+                                                        <span class="font-bold {{ $indicators['trend_bullish'] ? 'text-emerald-500' : 'text-rose-500' }}">{{ $indicators['trend'] }}</span>
+                                                        <span class="block text-[8px] text-[var(--ak-muted)]">{{ __('SMA20 vs. SMA50') }}</span>
+                                                    </div>
+                                                    @if($indicators['adx'] !== null)
+                                                        <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1.5">
+                                                            <span class="block text-[var(--ak-muted)]">{{ __('ADX 14') }}</span>
+                                                            <span class="font-bold text-[var(--ak-text)]">{{ $indicators['adx'] }}</span>
+                                                            <span class="block text-[8px] text-[var(--ak-muted)]">{{ $indicators['adx'] >= 25 ? __('Starker Trend') : __('Schwacher Trend') }}</span>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @else
+                                                <div class="flex flex-1 items-center justify-center text-[9px] text-[var(--ak-muted)] italic">{{ __('Keine Daten heute') }}</div>
+                                            @endif
+                                        @elseif($highlight['data'] && $details)
                                             <div class="flex items-center gap-1.5 mb-2">
                                                 <span class="text-base leading-none">{{ $details['country_flag'] }}</span>
                                                 <span class="text-[13px] font-black text-[var(--ak-text)]">{{ explode(' ', $highlight['data'])[0] }}</span>
