@@ -275,26 +275,66 @@
                         </div>
 
                         @if($section['kind'] === 'today-focus')
-                            <div class="grid gap-2 sm:grid-cols-2">
+                            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
                                 @foreach($section['highlights'] as $highlight)
-                                    @php $wrapper = $highlight['url'] ? 'a' : 'div'; @endphp
-                                    <{{ $wrapper }} @if($highlight['url']) href="{{ $highlight['url'] }}" @endif class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-3 transition hover:border-{{ $highlight['color'] }}-400 hover:bg-[var(--ak-card)]">
-                                        <div class="flex items-center gap-2 mb-2">
-                                            <span class="grid h-6 w-6 shrink-0 place-items-center rounded text-{{ $highlight['color'] }}-500">
-                                                <x-dynamic-component :component="$highlight['icon']" class="h-4 w-4" />
+                                    @php $wrapper = $highlight['url'] ? 'a' : 'div'; $details = $highlight['details'] ?? null; @endphp
+                                    <{{ $wrapper }} @if($highlight['url']) href="{{ $highlight['url'] }}" @endif class="flex h-full flex-col rounded-xl border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] p-4 transition hover:border-{{ $highlight['color'] }}-400 hover:bg-[var(--ak-card)]">
+                                        <div class="flex items-center gap-2 mb-3">
+                                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-{{ $highlight['color'] }}-500/10 text-{{ $highlight['color'] }}-500">
+                                                <x-dynamic-component :component="$highlight['icon']" class="h-4.5 w-4.5" />
                                             </span>
                                             <div class="min-w-0">
-                                                <b class="block text-[11px] font-black text-[var(--ak-text)]">{{ $highlight['label'] }}</b>
-                                                <small class="block text-[8px] text-[var(--ak-muted)]">{{ $highlight['subtitle'] }}</small>
+                                                <b class="block text-[12px] font-black text-[var(--ak-text)]">{{ $highlight['label'] }}</b>
+                                                <small class="block text-[9px] text-[var(--ak-muted)]">{{ $highlight['subtitle'] }}</small>
                                             </div>
                                         </div>
-                                        @if($highlight['data'])
-                                            <div class="text-[10px] font-bold text-{{ $highlight['color'] }}-500">{{ $highlight['data'] }}</div>
+
+                                        @if($highlight['data'] && $details)
+                                            <div class="flex items-center gap-1.5 mb-2">
+                                                <span class="text-base leading-none">{{ $details['country_flag'] }}</span>
+                                                <span class="text-[13px] font-black text-[var(--ak-text)]">{{ explode(' ', $highlight['data'])[0] }}</span>
+                                            </div>
+                                            @if($details['sector'])
+                                                <div class="text-[9px] uppercase tracking-wide text-[var(--ak-muted)] mb-2">{{ $details['sector'] }}</div>
+                                            @endif
+
+                                            <div class="mb-2 rounded-lg bg-{{ $highlight['color'] }}-500/[.08] px-2.5 py-2">
+                                                <div class="text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $highlight['metric_label'] }}</div>
+                                                <div class="text-[15px] font-black text-{{ $highlight['color'] }}-500">{{ $highlight['metric_value'] }}</div>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-1.5 mb-2 text-[9px]">
+                                                @if($details['current_price'])
+                                                    <div class="rounded bg-[var(--ak-card)] px-2 py-1">
+                                                        <span class="block text-[var(--ak-muted)]">{{ __('Kurs') }}</span>
+                                                        <span class="font-bold text-[var(--ak-text)]">{{ number_format($details['current_price'], 2, ',', '.') }} {{ $details['currency'] }}</span>
+                                                    </div>
+                                                @endif
+                                                @if($details['score'] !== null)
+                                                    <div class="rounded bg-[var(--ak-card)] px-2 py-1">
+                                                        <span class="block text-[var(--ak-muted)]">{{ __('Score') }}</span>
+                                                        <span class="font-bold text-[var(--ak-text)]">{{ $details['score'] }}/10</span>
+                                                    </div>
+                                                @endif
+                                                @if($details['risk'] !== null)
+                                                    <div class="rounded bg-[var(--ak-card)] px-2 py-1">
+                                                        <span class="block text-[var(--ak-muted)]">{{ __('Risiko') }}</span>
+                                                        <span class="font-bold text-[var(--ak-text)]">{{ $details['risk'] }}/10</span>
+                                                    </div>
+                                                @endif
+                                                @if($details['confidence'] !== null)
+                                                    <div class="rounded bg-[var(--ak-card)] px-2 py-1">
+                                                        <span class="block text-[var(--ak-muted)]">{{ __('Konfidenz') }}</span>
+                                                        <span class="font-bold text-[var(--ak-text)]">{{ $details['confidence'] }}%</span>
+                                                    </div>
+                                                @endif
+                                            </div>
+
                                             @if($highlight['insight'])
-                                                <div class="mt-1.5 text-[9px] text-[var(--ak-muted)]">{{ $highlight['insight'] }}</div>
+                                                <div class="mt-auto pt-2 border-t border-[var(--ak-border)] text-[9px] leading-4 text-[var(--ak-muted)]">{{ $highlight['insight'] }}</div>
                                             @endif
                                         @else
-                                            <div class="text-[9px] text-[var(--ak-muted)] italic">{{ __('Keine Daten heute') }}</div>
+                                            <div class="flex flex-1 items-center justify-center text-[9px] text-[var(--ak-muted)] italic">{{ __('Keine Daten heute') }}</div>
                                         @endif
                                     </{{ $wrapper }}>
                                 @endforeach
