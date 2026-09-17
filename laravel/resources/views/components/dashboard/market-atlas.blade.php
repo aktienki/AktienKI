@@ -2,11 +2,16 @@
 
 <x-dashboard.card id="market-atlas" class="ak-standard-card ak-card-static ak-dashboard-card ak-dashboard-atlas flex min-h-[260px] flex-col scroll-mt-24 p-4 lg:min-h-0">
     <div class="ak-standard-card-head flex flex-wrap items-start justify-between gap-2">
-        <div>
-            <p class="text-xs font-black uppercase tracking-[.18em]" style="color:#334155!important;opacity:1!important">{{ __('Global Market Map') }}</p>
-            <p class="mt-1 text-xs" style="color:#475569!important;opacity:1!important">{{ __('Tagesentwicklung der verfügbaren Indizes nach Land') }}</p>
+        <div class="flex min-w-0 items-start gap-2.5">
+            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-cyan-500/10 text-cyan-500">
+                <x-heroicon-o-globe-europe-africa class="h-4.5 w-4.5" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-xs font-black uppercase tracking-[.18em] text-[var(--ak-muted)]">{{ __('Global Market Map') }}</p>
+                <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Tagesentwicklung der verfügbaren Indizes nach Land') }}</p>
+            </div>
         </div>
-        <span class="rounded-lg border px-2.5 py-1 text-[10px] font-bold" style="border-color:#64748b!important;background:#475569!important;color:#fff!important;opacity:1!important">
+        <span class="rounded-lg border border-[var(--ak-border)] bg-[var(--ak-surface-muted)] px-2.5 py-1 text-[10px] font-bold text-[var(--ak-text)]">
             {{ count($countryAiScores) }} {{ __('Länder') }}
         </span>
     </div>
