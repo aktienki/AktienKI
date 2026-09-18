@@ -88,6 +88,13 @@ Schedule::command('markets:refresh-macro-history --range=3y')
     ->weekdays()->dailyAt('23:15')->timezone('Europe/Berlin')
     ->withoutOverlapping(90)->onOneServer()->runInBackground();
 
+// Was previously unscheduled entirely (price_bars stayed empty for WTI/
+// Brent/gold indefinitely) - commodities trade near-continuously, so this
+// runs daily rather than weekdays-only like the equity-session jobs above.
+Schedule::command('commodities:refresh-history')
+    ->dailyAt('23:20')->timezone('Europe/Berlin')
+    ->withoutOverlapping(30)->onOneServer()->runInBackground();
+
 // Keep the EUR-converted price history for foreign-currency cross-listings
 // (interval 1d_eur) fresh, so the stock detail chart can serve it from the
 // database instead of calling TwelveData live on every page view. --limit

@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\YahooIndexService;
+use App\Services\TwelveDataService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +14,22 @@ final class RefreshCommodityHistory extends Command
 
     protected $description = 'Refresh active commodity daily prices and remove commodity bars outside the retention window';
 
-    public function handle(YahooIndexService $marketData): int
+    /**
+     * serving_instruments.provider_symbol carries Yahoo-style futures
+     * tickers (e.g. GC=F) that TwelveData doesn't accept - verified live
+     * against TwelveData's quote endpoint: bare tickers like "CL"/"BZ"
+     * silently resolve to unrelated equities instead of failing, so a wrong
+     * guess here would corrupt data rather than error. XAUUSD's own
+     * provider_symbol (XAU/USD) already happens to match TwelveData's
+     * forex-style spot-commodity format and needs no override.
+     */
+    private const TWELVE_DATA_SYMBOL_OVERRIDES = [
+        'XAU_EUR' => 'XAU/EUR',
+        'WTI' => 'WTI/USD',
+        'BRENT' => 'XBR/USD',
+    ];
+
+    public function handle(TwelveDataService $marketData): int
     {
         $days = max(30, min(3650, (int) $this->option('days')));
         $cutoff = now()->subDays($days)->startOfDay();
@@ -28,7 +43,8 @@ final class RefreshCommodityHistory extends Command
         $failed = [];
         foreach ($commodities as $commodity) {
             $symbol = strtoupper(trim((string) $commodity->symbol));
-            $providerSymbol = trim((string) ($commodity->provider_symbol ?: $symbol));
+            $providerSymbol = self::TWELVE_DATA_SYMBOL_OVERRIDES[$symbol]
+                ?? trim((string) ($commodity->provider_symbol ?: $symbol));
             try {
                 $instrumentId = DB::table('instruments')
                     ->where('type', 'commodity')
@@ -40,7 +56,7 @@ final class RefreshCommodityHistory extends Command
                         'name' => (string) ($commodity->name ?: $symbol), 'short_name' => $symbol,
                         'currency' => (string) ($commodity->currency ?: 'USD'),
                         'is_active' => true, 'is_tradeable' => false,
-                        'meta' => json_encode(['source' => 'serving', 'history_provider' => 'yahoo']),
+                        'meta' => json_encode(['source' => 'serving', 'history_provider' => 'twelve_data']),
                         'created_at' => now(), 'updated_at' => now(),
                     ]);
                 } else {
@@ -49,7 +65,7 @@ final class RefreshCommodityHistory extends Command
                     ]);
                 }
 
-                $history = collect($marketData->dailyHistory($providerSymbol, '2y'))
+                $history = collect($marketData->dailyHistory($providerSymbol, min(5000, $days + 50)))
                     ->filter(fn (array $bar): bool => isset($bar['timestamp'])
                         && Carbon::createFromTimestampUTC((int) $bar['timestamp'])->gte($cutoff));
                 if ($history->isEmpty()) {
@@ -61,7 +77,7 @@ final class RefreshCommodityHistory extends Command
                     'bar_time' => Carbon::createFromTimestampUTC((int) $bar['timestamp']),
                     'open' => $bar['open'], 'high' => $bar['high'], 'low' => $bar['low'], 'close' => $bar['close'],
                     'adjusted_close' => $bar['adjusted_close'] ?? $bar['close'], 'volume' => $bar['volume'] ?? null,
-                    'source' => 'yahoo_commodity_history', 'created_at' => now(), 'updated_at' => now(),
+                    'source' => 'twelve_data_commodity_history', 'created_at' => now(), 'updated_at' => now(),
                 ])->all();
                 foreach (array_chunk($rows, 500) as $chunk) {
                     DB::table('price_bars')->upsert($chunk, ['instrument_id', 'interval', 'bar_time'], [
