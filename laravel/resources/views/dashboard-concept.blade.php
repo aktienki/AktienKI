@@ -241,7 +241,7 @@
                                         @if($highlight['date'] ?? null)
                                             <small class="absolute right-3 top-3 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($highlight['date'])->format('d.m.Y') }}</small>
                                         @endif
-                                        <div class="flex items-center gap-2 mb-3 pr-14">
+                                        <div class="flex items-center gap-2 mb-3 pb-3 pr-14 border-b border-[var(--ak-border)]">
                                             <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-{{ $highlight['color'] }}-500/10 text-{{ $highlight['color'] }}-500">
                                                 <x-dynamic-component :component="$highlight['icon']" class="h-4.5 w-4.5" />
                                             </span>
