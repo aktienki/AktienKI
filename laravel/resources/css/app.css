@@ -8465,8 +8465,8 @@ body .ak-topbar-menu > a:focus-visible {
 
     .screener-page .screener-live-dot {
         position:absolute;
-        top:.3rem;
-        right:.3rem;
+        top:0;
+        right:-.55rem;
         width:.4rem;
         height:.4rem;
         border-radius:999px;
@@ -8646,7 +8646,6 @@ body .ak-topbar-menu > a:focus-visible {
     }
 
     .screener-page .screener-desktop-price {
-        position:relative;
         display:grid !important;
         grid-template-columns:minmax(68px,auto) 54px;
         gap:.4rem;
@@ -8654,6 +8653,7 @@ body .ak-topbar-menu > a:focus-visible {
     }
 
     .screener-page .screener-desktop-price > span {
+        position:relative;
         display:flex;
         min-width:0;
         flex-direction:column;
