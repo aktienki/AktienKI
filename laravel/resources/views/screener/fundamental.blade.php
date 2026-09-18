@@ -6,21 +6,14 @@
     </header>
 
     <div class="fundamental-layout">
-        <nav class="ak-master-card fundamental-symbol-panel" aria-label="{{ __('Aktienauswahl') }}">
-            <form method="GET" class="fundamental-search">
-                <input type="text" name="q" value="{{ $searchTerm }}" placeholder="{{ __('Symbol oder Name suchen') }}" class="ak-input h-9 w-full text-xs" oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.requestSubmit(),400)">
-            </form>
-            <div class="fundamental-symbol-list">
-                @forelse($instruments as $instrument)
-                    <a href="{{ route('fundamental.index', array_filter(['symbol' => $instrument->symbol, 'q' => $searchTerm])) }}"
-                       class="fundamental-symbol-item {{ $selected && $selected->id === $instrument->id ? 'is-active' : '' }}">
-                        <span class="sym">{{ $instrument->symbol }}</span>
-                        <small>{{ $instrument->name }}</small>
-                    </a>
-                @empty
-                    <p class="px-3 py-4 text-xs text-[var(--ak-muted)]">{{ __('Keine Treffer.') }}</p>
-                @endforelse
-            </div>
+        <nav class="fundamental-symbol-grid" aria-label="{{ __('Aktienauswahl') }}">
+            @forelse($instruments as $instrument)
+                <a href="{{ route('fundamental.index', ['symbol' => $instrument->symbol]) }}"
+                   class="fundamental-symbol-tile {{ $selected && $selected->id === $instrument->id ? 'is-active' : '' }}"
+                   title="{{ $instrument->name }}">{{ $instrument->symbol }}</a>
+            @empty
+                <p class="px-3 py-4 text-xs text-[var(--ak-muted)]">{{ __('Keine Aktien gefunden.') }}</p>
+            @endforelse
         </nav>
 
         <section class="fundamental-main">
@@ -94,15 +87,23 @@
 
 <style>
     #fundamental-page .fundamental-layout { display: grid; gap: 1rem; grid-template-columns: 1fr; margin-top: .25rem; }
-    @media (min-width: 900px) { #fundamental-page .fundamental-layout { grid-template-columns: 260px minmax(0, 1fr); align-items: start; } }
+    @media (min-width: 900px) { #fundamental-page .fundamental-layout { grid-template-columns: 96px minmax(0, 1fr); align-items: start; } }
 
-    #fundamental-page .fundamental-symbol-panel { padding: .75rem; display: flex; flex-direction: column; gap: .6rem; max-height: calc(100dvh - 160px); }
-    #fundamental-page .fundamental-symbol-list { overflow-y: auto; display: flex; flex-direction: column; gap: .15rem; }
-    #fundamental-page .fundamental-symbol-item { display: flex; flex-direction: column; gap: .05rem; padding: .45rem .6rem; border-radius: .6rem; text-decoration: none; color: var(--ak-text); }
-    #fundamental-page .fundamental-symbol-item:hover { background: var(--ak-surface-muted); }
-    #fundamental-page .fundamental-symbol-item.is-active { background: color-mix(in srgb, #22d3ee 14%, transparent); }
-    #fundamental-page .fundamental-symbol-item .sym { font-size: .74rem; font-weight: 900; }
-    #fundamental-page .fundamental-symbol-item small { font-size: .62rem; font-weight: 600; color: var(--ak-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Same tile pattern as the Concept Dashboard's left icon grid
+       (#dashboard-concept-page .concept-icon-grid/.concept-icon-tile),
+       just with a stock symbol instead of an icon+label, and a real link
+       (page navigation) instead of Alpine client-side section swapping -
+       there are hundreds of stocks here, not six fixed sections. */
+    #fundamental-page .fundamental-symbol-grid { display: grid; grid-template-columns: 1fr; gap: .5rem; padding: .75rem; align-self: start; max-height: calc(100dvh - 160px); overflow-y: auto; }
+    #fundamental-page .fundamental-symbol-tile {
+        display: flex; align-items: center; justify-content: center; text-align: center;
+        aspect-ratio: 1 / 1; border-radius: .9rem; border: 1.5px solid var(--ak-border-strong);
+        background: none; color: var(--ak-text); text-decoration: none; cursor: pointer; width: 100%;
+        font-size: .62rem; font-weight: 800; line-height: 1.1; padding: .2rem;
+        transition: border-color .15s ease, background .15s ease, color .15s ease;
+    }
+    #fundamental-page .fundamental-symbol-tile:hover { border-color: color-mix(in srgb, #22d3ee 45%, transparent); }
+    #fundamental-page .fundamental-symbol-tile.is-active { border-color: #22d3ee; background: color-mix(in srgb, #22d3ee 14%, transparent); color: #22d3ee; }
 
     #fundamental-page .fundamental-head-card { margin-bottom: 1rem; }
     #fundamental-page .fundamental-head-inner { padding: 1rem 1.1rem; }
