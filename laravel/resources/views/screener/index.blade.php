@@ -182,7 +182,7 @@
             <div class="mb-3 rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-xs font-bold text-rose-300">{{ $errors->first() }}</div>
         @endif
 
-        <section x-data="{ filtersOpen: localStorage.getItem('screenerFilters') === 'open', toggleFilters() { this.filtersOpen = ! this.filtersOpen; localStorage.setItem('screenerFilters', this.filtersOpen ? 'open' : 'closed') } }" class="screener-filter-shell mb-5 shrink-0">
+        <section x-data="{ filtersOpen: false, toggleFilters() { this.filtersOpen = ! this.filtersOpen } }" class="screener-filter-shell mb-5 shrink-0">
         <button type="button" @click="toggleFilters()" :aria-expanded="filtersOpen" class="flex h-10 w-full items-center justify-between rounded-xl border border-cyan-400/30 bg-[var(--ak-card)] px-4 text-xs font-black text-cyan-300 shadow-[var(--ak-shadow)]">
             <span class="inline-flex items-center gap-2"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" />{{ __('Filter anzeigen') }}</span>
             <x-heroicon-o-chevron-down class="h-4 w-4 transition" x-bind:class="filtersOpen && 'rotate-180'" />
