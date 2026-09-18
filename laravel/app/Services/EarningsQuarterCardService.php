@@ -151,9 +151,31 @@ class EarningsQuarterCardService
         $kgvBars = array_slice($kgvBars, -self::TREND_QUARTERS_SHOWN);
         $growthBars = array_slice($growthBars, -self::TREND_QUARTERS_SHOWN);
 
+        // Dividendenrendite per REAL payment (instrument_dividends), not the
+        // instrument_fundamentals snapshot - that table has no history at
+        // all, whereas dividend payments are genuine dated events, even
+        // though most instruments only have 1-2 of them on record. Yield
+        // here is this single payment over the price near its ex-date, not
+        // annualized - we don't reliably know the payment frequency.
+        $dividendBars = DB::table('instrument_dividends')->where('instrument_id', $instrumentId)
+            ->whereNotNull('amount')->whereNotNull('ex_date')
+            ->orderBy('ex_date')
+            ->get(['ex_date', 'amount'])
+            ->map(function ($d) use ($bars) {
+                $date = CarbonImmutable::parse($d->ex_date);
+                $price = $this->closeOnOrAfter($bars, $date->toDateString());
+
+                return [
+                    'label' => $date->format('d.m.').'\''.$date->format('y'),
+                    'value' => ($price !== null && $price > 0) ? round(((float) $d->amount / $price) * 100, 2) : null,
+                ];
+            })
+            ->values()->all();
+        $dividendBars = array_slice($dividendBars, -self::TREND_QUARTERS_SHOWN);
+
         $fundamental = DB::table('instrument_fundamentals')->where('instrument_id', $instrumentId)
             ->orderByDesc('snapshot_date')->orderByDesc('id')
-            ->first(['return_on_equity', 'dividend_yield']);
+            ->first(['return_on_equity']);
 
         return [
             'trailing_pe' => ['label' => __('KGV'), 'unit' => 'x', 'bars' => $kgvBars],
@@ -162,10 +184,7 @@ class EarningsQuarterCardService
                 'label' => __('ROE'), 'unit' => '%',
                 'bars' => [['label' => __('aktuell'), 'value' => $fundamental?->return_on_equity !== null ? round((float) $fundamental->return_on_equity * 100, 1) : null]],
             ],
-            'dividend_yield' => [
-                'label' => __('Dividendenrendite'), 'unit' => '%',
-                'bars' => [['label' => __('aktuell'), 'value' => $fundamental?->dividend_yield !== null ? round(FundamentalHeatmapService::normalizeYieldPercent($fundamental->dividend_yield), 1) : null]],
-            ],
+            'dividend_yield' => ['label' => __('Dividendenrendite'), 'unit' => '%', 'bars' => $dividendBars],
         ];
     }
 
