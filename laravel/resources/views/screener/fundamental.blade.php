@@ -571,9 +571,9 @@
     #fundamental-page .fundamental-ratio span { display: block; font-size: .6rem; font-weight: 800; color: var(--ak-muted); text-transform: uppercase; letter-spacing: .02em; }
     #fundamental-page .fundamental-ratio b { display: block; margin-top: .25rem; font-size: 1rem; font-weight: 900; }
     #fundamental-page .fundamental-footnote { margin-top: 1rem; font-size: .68rem; color: var(--ak-muted); line-height: 1.6; }
-    #fundamental-page .fundamental-trend-grid { display: flex; flex-wrap: wrap; align-items: stretch; gap: .9rem; padding: 1.1rem; }
-    #fundamental-page .fundamental-trend-card { flex: 1 1 340px; border: 1px solid var(--ak-border); border-radius: .8rem; padding: .8rem .9rem 1.6rem; min-width: 0; }
-    #fundamental-page .fundamental-trend-card--narrow { flex: 0 1 190px; }
+    #fundamental-page .fundamental-trend-grid { display: flex; flex-wrap: nowrap; align-items: stretch; gap: .9rem; padding: 1.1rem; overflow-x: auto; }
+    #fundamental-page .fundamental-trend-card { flex: 1 1 240px; min-width: 200px; border: 1px solid var(--ak-border); border-radius: .8rem; padding: .8rem .9rem 1.6rem; }
+    #fundamental-page .fundamental-trend-card--narrow { flex: 0 1 150px; min-width: 140px; }
     #fundamental-page .fundamental-trend-title { font-size: .68rem; font-weight: 800; color: var(--ak-text); text-transform: uppercase; letter-spacing: .02em; }
     #fundamental-page .fundamental-trend-title span { font-weight: 600; color: var(--ak-muted); text-transform: none; letter-spacing: normal; }
     #fundamental-page .fundamental-trend-empty { margin-top: 1.5rem; font-size: .68rem; color: var(--ak-muted); }
