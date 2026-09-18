@@ -1128,7 +1128,7 @@
                                                  (line-clamp-2 + min-h), so a longer label wrapping to a second
                                                  line doesn't push this block to a different y-offset than its
                                                  neighbors in the same grid row. --}}
-                                            <div class="mb-2 rounded-lg bg-[var(--ak-surface-muted)] px-2 py-1.5">
+                                            <div class="mb-2 rounded-lg border border-[var(--ak-border)] px-2 py-1.5">
                                                 <div class="mb-1 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf (20T)') }}</div>
                                                 <svg viewBox="0 0 100 50" class="h-20 w-full" preserveAspectRatio="none">
                                                     @if($row['breakout_level'])
@@ -1173,11 +1173,11 @@
                                                 };
                                             @endphp
                                             <div class="mt-auto grid grid-cols-2 gap-1.5 text-[9px]">
-                                                <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1">
+                                                <div class="rounded border border-[var(--ak-border)] px-2 py-1">
                                                     <span class="block text-[var(--ak-muted)]">{{ __('Kursänderung') }}</span>
                                                     <span class="font-bold {{ ($row['change_pct'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $row['change_pct'] === null ? '—' : number_format($row['change_pct'], 1, ',', '.').' %' }}</span>
                                                 </div>
-                                                <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1" title="{{ $row['probability_sample_size'] !== null ? __(':scope, :n Fälle (3 Jahre)', ['scope' => $scopeLabel, 'n' => $row['probability_sample_size']]) : '' }}">
+                                                <div class="rounded border border-[var(--ak-border)] px-2 py-1" title="{{ $row['probability_sample_size'] !== null ? __(':scope, :n Fälle (3 Jahre)', ['scope' => $scopeLabel, 'n' => $row['probability_sample_size']]) : '' }}">
                                                     <span class="block text-[var(--ak-muted)]">{{ __('Anstieg wahrsch. (20T)') }}</span>
                                                     <span class="font-bold text-[var(--ak-text)]">{{ $row['rise_probability_20d'] === null ? '—' : number_format($row['rise_probability_20d'], 0, ',', '.').' %' }}</span>
                                                 </div>
