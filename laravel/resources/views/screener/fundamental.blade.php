@@ -72,11 +72,20 @@
             }
             $metricUrlParam = ['trailing_pe' => 'pe', 'dividend_yield' => 'dy', 'return_on_equity' => 'roe', 'operating_margin' => 'om'];
         @endphp
+        @php
+            // KGV: lower is generally "better" (cheaper), so its slider
+            // works as a MAXIMUM ("up to") instead of the usual MINIMUM
+            // ("at least") - dragging it left tightens the filter, same
+            // direction as every other slider, but it keeps the cheap
+            // (left) side and dims the expensive (right) side.
+            $invertedMetrics = ['trailing_pe'];
+        @endphp
         <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4"
              x-data="{
-                thresholds: { trailing_pe: 0, dividend_yield: 0, return_on_equity: 0, operating_margin: 0 },
+                thresholds: { trailing_pe: 9, dividend_yield: 0, return_on_equity: 0, operating_margin: 0 },
                 boundaries: {{ json_encode($boundariesByMetric) }},
                 urlParam: {{ json_encode($metricUrlParam) }},
+                inverted: {{ json_encode($invertedMetrics) }},
                 dragging: null, changed: false,
                 pctFromEvent(e, axis, panel) {
                     const r = this.$refs['plot' + panel].getBoundingClientRect();
@@ -94,8 +103,15 @@
                         const form = this.$refs.filterForm;
                         for (const metric in this.thresholds) {
                             const t = this.thresholds[metric], b = this.boundaries[metric], p = this.urlParam[metric];
-                            const minField = form.elements[p + '_min'];
-                            minField.value = (t > 0 && b && b.length > 0) ? b[t - 1] : '';
+                            const isInverted = this.inverted.includes(metric);
+                            const minField = form.elements[p + '_min'], maxField = form.elements[p + '_max'];
+                            minField.value = ''; maxField.value = '';
+                            if (!b || b.length === 0) continue;
+                            if (isInverted) {
+                                if (t < 9) maxField.value = b[t];
+                            } else {
+                                if (t > 0) minField.value = b[t - 1];
+                            }
                         }
                         form.elements['page'].value = '';
                         form.requestSubmit();
@@ -113,9 +129,14 @@
                 <input type="hidden" name="page" value="">
                 @foreach($metricUrlParam as $param)
                     <input type="hidden" name="{{ $param }}_min" value="{{ $metricRangeParams[$param]['min'] ?? '' }}">
+                    <input type="hidden" name="{{ $param }}_max" value="{{ $metricRangeParams[$param]['max'] ?? '' }}">
                 @endforeach
             </form>
             @foreach($panels as $i => $panel)
+                @php
+                    $xInverted = in_array($panel['x_key'], $invertedMetrics, true);
+                    $yInverted = in_array($panel['y_key'], $invertedMetrics, true);
+                @endphp
                 <div class="fundamental-heatmap-card flex h-auto min-w-0 flex-col rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-4 shadow-[var(--ak-shadow)]">
                     <header class="mb-2">
                         <h3 class="text-xs font-black">{{ $panel['title'] }}</h3>
@@ -135,10 +156,12 @@
                                         @php
                                             $count = $panel['grid'][$yb][$xb];
                                             $intensity = $panel['max'] > 0 ? $count / $panel['max'] : 0;
+                                            $xDim = $xInverted ? "{$xb} > thresholds.{$panel['x_key']}" : "{$xb} < thresholds.{$panel['x_key']}";
+                                            $yDim = $yInverted ? "{$yb} > thresholds.{$panel['y_key']}" : "{$yb} < thresholds.{$panel['y_key']}";
                                         @endphp
                                         <div
                                             class="fundamental-heatmap-cell relative flex aspect-square min-h-0 min-w-0 items-center justify-center rounded-[3px] border border-[rgba(34,211,238,.10)]"
-                                            :class="({{ $xb }} < thresholds.{{ $panel['x_key'] }} || {{ $yb }} < thresholds.{{ $panel['y_key'] }}) && 'is-dimmed'"
+                                            :class="({{ $xDim }} || {{ $yDim }}) && 'is-dimmed'"
                                             style="background-color: color-mix(in srgb, #22d3ee {{ round($intensity * 55, 1) }}%, transparent);"
                                             title="{{ __(':x_label :x_val :x_unit / :y_label :y_val :y_unit: :n Aktien', ['x_label' => $panel['x_label'], 'x_val' => $panel['x_ticks'][$xb], 'x_unit' => $panel['x_unit'], 'y_label' => $panel['y_label'], 'y_val' => $panel['y_ticks'][$yb], 'y_unit' => $panel['y_unit'], 'n' => $count]) }}"
                                         ><span class="text-[6px] font-black tabular-nums text-[var(--ak-text)] {{ $count === 0 ? 'opacity-20' : '' }}">{{ $count }}</span></div>
