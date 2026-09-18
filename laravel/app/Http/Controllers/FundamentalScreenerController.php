@@ -24,9 +24,28 @@ final class FundamentalScreenerController extends Controller
         $panels = [];
         $capGroup = $request->query('cap');
         $capGroup = in_array($capGroup, array_keys(FundamentalHeatmapService::CAP_GROUPS), true) ? $capGroup : null;
+        $sector = $request->query('sector') ?: null;
+        $country = $request->query('country') ?: null;
+        $region = $request->query('region');
+        $region = isset(FundamentalHeatmapService::REGIONS[$region]) ? $region : null;
+
+        $table = [];
+        $filterOptions = ['sectors' => [], 'countries' => []];
 
         if (! $selected) {
-            $panels = $heatmaps->build($capGroup);
+            $panels = $heatmaps->build($capGroup, $sector, $country, $region);
+            $filterOptions = $heatmaps->filterOptions();
+            $table = $heatmaps->table(
+                $capGroup,
+                (string) $request->query('sort', 'market_cap'),
+                (string) $request->query('dir', 'desc'),
+                $request->query('q'),
+                max(1, (int) $request->query('page', 1)),
+                50,
+                $sector,
+                $country,
+                $region,
+            );
         }
 
         if ($selected) {
@@ -53,6 +72,12 @@ final class FundamentalScreenerController extends Controller
             'ratios' => $ratios,
             'panels' => $panels,
             'capGroup' => $capGroup,
+            'sector' => $sector,
+            'country' => $country,
+            'region' => $region,
+            'filterOptions' => $filterOptions,
+            'table' => $table,
+            'tableSearch' => (string) $request->query('q', ''),
         ]);
     }
 }

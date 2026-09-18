@@ -30,9 +30,55 @@ class FundamentalHeatmapService
         'large' => ['label' => 'Large Cap', 'min' => 10_000_000_000],
     ];
 
-    public function build(?string $capGroup = null): array
+    /** Same country groupings as FreeRegionalStockUniverseService, extended to cover this wider universe's countries. */
+    public const REGIONS = [
+        'europe' => ['label' => 'Europa', 'countries' => ['AT', 'BE', 'BG', 'CH', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK']],
+        'north_america' => ['label' => 'Nordamerika', 'countries' => ['US', 'CA']],
+        'asia_pacific' => ['label' => 'Asien-Pazifik', 'countries' => ['AU', 'CN', 'HK', 'ID', 'JP', 'SG', 'TH']],
+        'other' => ['label' => 'Sonstige', 'countries' => ['AR', 'BM', 'CL', 'IL', 'KY', 'ZA']],
+    ];
+
+    private const COUNTRY_NAMES = [
+        'AR' => 'Argentinien', 'AT' => 'Österreich', 'AU' => 'Australien', 'BE' => 'Belgien',
+        'BM' => 'Bermuda', 'CA' => 'Kanada', 'CH' => 'Schweiz', 'CL' => 'Chile', 'CN' => 'China',
+        'DE' => 'Deutschland', 'DK' => 'Dänemark', 'ES' => 'Spanien', 'FI' => 'Finnland',
+        'FR' => 'Frankreich', 'GB' => 'Vereinigtes Königreich', 'HK' => 'Hongkong', 'ID' => 'Indonesien',
+        'IE' => 'Irland', 'IL' => 'Israel', 'IT' => 'Italien', 'JP' => 'Japan', 'KY' => 'Kaimaninseln',
+        'LU' => 'Luxemburg', 'NL' => 'Niederlande', 'SE' => 'Schweden', 'SG' => 'Singapur',
+        'TH' => 'Thailand', 'US' => 'USA', 'ZA' => 'Südafrika',
+    ];
+
+    public static function countryName(string $code): string
     {
-        $rows = $this->latestSnapshotPerInstrument();
+        return self::COUNTRY_NAMES[strtoupper($code)] ?? strtoupper($code);
+    }
+
+    /** ISO 3166-1 alpha-2 -> flag emoji, via Unicode regional indicator symbols (works for any valid code, no lookup table needed). */
+    public static function countryFlag(string $code): string
+    {
+        $code = strtoupper($code);
+        if (strlen($code) !== 2) {
+            return '';
+        }
+
+        return mb_chr(0x1F1E6 + (ord($code[0]) - 65)).mb_chr(0x1F1E6 + (ord($code[1]) - 65));
+    }
+
+    /** @return array{sectors: string[], countries: string[]} distinct values present in the stock universe, for populating filter dropdowns. */
+    public function filterOptions(): array
+    {
+        return [
+            'sectors' => DB::table('instruments')->where('type', 'stock')->whereNull('deleted_at')
+                ->whereNotNull('sector')->where('sector', '!=', '')->distinct()->orderBy('sector')->pluck('sector')->all(),
+            'countries' => DB::table('instruments')->where('type', 'stock')->whereNull('deleted_at')
+                ->whereNotNull('country')->where('country', '!=', '')->distinct()->pluck('country')
+                ->sort(fn ($a, $b) => self::countryName($a) <=> self::countryName($b))->values()->all(),
+        ];
+    }
+
+    public function build(?string $capGroup = null, ?string $sector = null, ?string $country = null, ?string $region = null): array
+    {
+        $rows = $this->latestSnapshotPerInstrument($sector, $country, $region);
 
         if ($capGroup !== null && isset(self::CAP_GROUPS[$capGroup])) {
             $range = self::CAP_GROUPS[$capGroup];
@@ -48,20 +94,20 @@ class FundamentalHeatmapService
 
         $metrics = [
             'trailing_pe' => [
-                'label' => __('KGV'),
+                'label' => __('KGV'), 'unit' => 'x',
                 'values' => $rows->pluck('trailing_pe')->filter(fn ($v) => $v !== null && $v > 0 && $v < 200)->values(),
             ],
             'dividend_yield' => [
-                'label' => __('Dividendenrendite'),
+                'label' => __('Dividendenrendite'), 'unit' => '%',
                 'values' => $rows->pluck('dividend_yield')->filter(fn ($v) => $v !== null && $v >= 0 && $v <= 20)->values(),
             ],
             'market_cap' => [
-                'label' => __('Marktkapitalisierung'),
+                'label' => __('Marktkapitalisierung'), 'unit' => __('Mrd.'),
                 // log scale - raw values span many orders of magnitude.
-                'values' => $rows->pluck('market_cap')->filter(fn ($v) => $v !== null && $v > 0)->map(fn ($v) => log($v, 10))->values(),
+                'values' => $rows->pluck('market_cap')->filter(fn ($v) => $v !== null && $v > 0 && $v < 5_000_000_000_000)->map(fn ($v) => log($v, 10))->values(),
             ],
             'revenue_growth' => [
-                'label' => __('Umsatzwachstum'),
+                'label' => __('Umsatzwachstum'), 'unit' => '%',
                 'values' => $rows->pluck('revenue_growth')->filter(fn ($v) => $v !== null && $v > -100 && $v < 300)->values(),
             ],
         ];
@@ -112,9 +158,10 @@ class FundamentalHeatmapService
             return [
                 'x_key' => $xKey, 'y_key' => $yKey,
                 'x_label' => $metrics[$xKey]['label'], 'y_label' => $metrics[$yKey]['label'],
+                'x_unit' => $metrics[$xKey]['unit'], 'y_unit' => $metrics[$yKey]['unit'],
                 'title' => $metrics[$xKey]['label'].' × '.$metrics[$yKey]['label'],
-                'x_boundaries' => $boundaries[$xKey],
-                'y_boundaries' => $boundaries[$yKey],
+                'x_ticks' => $this->axisTicks($xKey, $boundaries[$xKey]),
+                'y_ticks' => $this->axisTicks($yKey, $boundaries[$yKey]),
                 'grid' => $grid,
                 'max' => $max,
                 'instruments_used' => $used,
@@ -122,13 +169,87 @@ class FundamentalHeatmapService
         })->all();
     }
 
-    private function latestSnapshotPerInstrument(): Collection
+    private const SORTABLE_COLUMNS = ['symbol', 'name', 'trailing_pe', 'dividend_yield', 'market_cap', 'revenue_growth'];
+
+    /**
+     * Sortable/filterable/paginated stock list backing the table below the
+     * heatmaps - same latest-snapshot-per-instrument data and cap-group
+     * filter, joined to instruments for symbol/name/sector.
+     */
+    public function table(?string $capGroup, string $sort, string $dir, ?string $search, int $page, int $perPage = 50, ?string $sector = null, ?string $country = null, ?string $region = null): array
     {
-        return collect(DB::select("
-            select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, revenue_growth
-            from instrument_fundamentals
-            order by instrument_id, snapshot_date desc, id desc
-        "))->map(fn ($row) => (object) [
+        $sort = in_array($sort, self::SORTABLE_COLUMNS, true) ? $sort : 'market_cap';
+        $dir = $dir === 'asc' ? 'asc' : 'desc';
+
+        $query = DB::table('instruments as i')
+            ->joinSub(
+                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, revenue_growth
+                 from instrument_fundamentals order by instrument_id, snapshot_date desc, id desc",
+                'f',
+                'f.instrument_id', '=', 'i.id',
+            )
+            ->where('i.type', 'stock')->whereNull('i.deleted_at')
+            ->when($sector !== null && $sector !== '', fn ($q) => $q->where('i.sector', $sector))
+            ->when($country !== null && $country !== '', fn ($q) => $q->where('i.country', $country))
+            ->when($region !== null && isset(self::REGIONS[$region]), fn ($q) => $q->whereIn('i.country', self::REGIONS[$region]['countries']))
+            // A handful of .JO/.T listings have a market_cap several orders
+            // of magnitude too large (likely a currency-unit conversion bug
+            // in the source feed, e.g. JSE prices quoted in ZA cents) - hide
+            // rather than let them dominate a market-cap sort.
+            ->where(fn ($q) => $q->whereNull('f.market_cap')->orWhere('f.market_cap', '<', 5_000_000_000_000))
+            ->select([
+                'i.symbol', 'i.name', 'i.sector', 'i.country',
+                'f.trailing_pe', DB::raw('f.dividend_yield * 100 as dividend_yield'),
+                'f.market_cap', DB::raw('f.revenue_growth * 100 as revenue_growth'),
+            ]);
+
+        if ($capGroup !== null && isset(self::CAP_GROUPS[$capGroup])) {
+            $range = self::CAP_GROUPS[$capGroup];
+            $query->whereNotNull('f.market_cap');
+            if (isset($range['min'])) {
+                $query->where('f.market_cap', '>=', $range['min']);
+            }
+            if (isset($range['max'])) {
+                $query->where('f.market_cap', '<', $range['max']);
+            }
+        }
+
+        if ($search !== null && trim($search) !== '') {
+            $term = '%'.trim($search).'%';
+            $query->where(fn ($q) => $q->where('i.symbol', 'ilike', $term)->orWhere('i.name', 'ilike', $term));
+        }
+
+        $total = (clone $query)->count();
+
+        $rows = $query->orderByRaw("{$sort} {$dir} NULLS LAST")->orderBy('i.symbol')
+            ->forPage($page, $perPage)->get();
+
+        return ['rows' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'sort' => $sort, 'dir' => $dir];
+    }
+
+    private function latestSnapshotPerInstrument(?string $sector = null, ?string $country = null, ?string $region = null): Collection
+    {
+        $query = DB::table('instruments as i')
+            ->joinSub(
+                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, revenue_growth
+                 from instrument_fundamentals order by instrument_id, snapshot_date desc, id desc",
+                'f',
+                'f.instrument_id', '=', 'i.id',
+            )
+            ->where('i.type', 'stock')->whereNull('i.deleted_at')
+            ->select(['f.instrument_id', 'f.trailing_pe', 'f.dividend_yield', 'f.market_cap', 'f.revenue_growth']);
+
+        if ($sector !== null && $sector !== '') {
+            $query->where('i.sector', $sector);
+        }
+        if ($country !== null && $country !== '') {
+            $query->where('i.country', $country);
+        }
+        if ($region !== null && isset(self::REGIONS[$region])) {
+            $query->whereIn('i.country', self::REGIONS[$region]['countries']);
+        }
+
+        return collect($query->get())->map(fn ($row) => (object) [
             'instrument_id' => (int) $row->instrument_id,
             'trailing_pe' => $row->trailing_pe !== null ? (float) $row->trailing_pe : null,
             'dividend_yield' => $row->dividend_yield !== null ? (float) $row->dividend_yield * 100 : null,
@@ -153,6 +274,39 @@ class FundamentalHeatmapService
         }
 
         return $boundaries;
+    }
+
+    /**
+     * One label per bucket (0-9), showing that bucket's LOWER real-value
+     * edge (market cap converted back out of log scale, into Mrd.), so
+     * the grid reads in actual KGV/%/Mrd. numbers instead of abstract
+     * decile indices. Bucket 0 has no lower edge to show (it's
+     * "everything below boundaries[0]"), so it's labelled with a "<".
+     */
+    private function axisTicks(string $key, array $boundaries): array
+    {
+        if ($boundaries === []) {
+            return array_fill(0, self::BUCKETS, '–');
+        }
+
+        $format = function (float $v) use ($key): string {
+            if ($key === 'market_cap') {
+                $v = (10 ** $v) / 1_000_000_000;
+            }
+
+            return $v >= 100 ? number_format($v, 0, ',', '.') : number_format($v, 1, ',', '.');
+        };
+
+        $ticks = [];
+        for ($bucket = 0; $bucket < self::BUCKETS; $bucket++) {
+            if ($bucket === 0) {
+                $ticks[] = '<'.$format($boundaries[0]);
+            } else {
+                $ticks[] = $format($boundaries[$bucket - 1]);
+            }
+        }
+
+        return $ticks;
     }
 
     private function bucketFor(float $value, array $boundaries): ?int

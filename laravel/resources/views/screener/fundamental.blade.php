@@ -12,11 +12,35 @@
     @if(!$selected)
         <p class="mb-3 text-xs font-semibold text-[var(--ak-muted)]">{{ __('Verteilung der gesamten Aktien-Universum über die 4 Kernkennzahlen. Regler filtern je Achse ab welchem Dezil Zellen hervorgehoben bleiben. Klick auf eine Aktie im Screener öffnet ihre eigene Detailseite.') }}</p>
 
-        <div class="fundamental-cap-filters mb-4 flex flex-wrap gap-2">
-            <a href="{{ route('fundamental.index') }}" class="fundamental-cap-pill {{ $capGroup === null ? 'is-active' : '' }}">{{ __('Alle Größen') }}</a>
-            <a href="{{ route('fundamental.index', ['cap' => 'small']) }}" class="fundamental-cap-pill {{ $capGroup === 'small' ? 'is-active' : '' }}">{{ __('Small Cap · unter 2 Mrd.') }}</a>
-            <a href="{{ route('fundamental.index', ['cap' => 'mid']) }}" class="fundamental-cap-pill {{ $capGroup === 'mid' ? 'is-active' : '' }}">{{ __('Mid Cap · 2 bis unter 10 Mrd.') }}</a>
-            <a href="{{ route('fundamental.index', ['cap' => 'large']) }}" class="fundamental-cap-pill {{ $capGroup === 'large' ? 'is-active' : '' }}">{{ __('Large Cap · ab 10 Mrd.') }}</a>
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+            <div class="fundamental-cap-filters flex flex-wrap gap-2">
+                <a href="{{ route('fundamental.index', array_filter(['sector' => $sector, 'country' => $country, 'region' => $region])) }}" class="fundamental-cap-pill {{ $capGroup === null ? 'is-active' : '' }}">{{ __('Alle Größen') }}</a>
+                <a href="{{ route('fundamental.index', array_filter(['cap' => 'small', 'sector' => $sector, 'country' => $country, 'region' => $region])) }}" class="fundamental-cap-pill {{ $capGroup === 'small' ? 'is-active' : '' }}">{{ __('Small Cap · unter 2 Mrd.') }}</a>
+                <a href="{{ route('fundamental.index', array_filter(['cap' => 'mid', 'sector' => $sector, 'country' => $country, 'region' => $region])) }}" class="fundamental-cap-pill {{ $capGroup === 'mid' ? 'is-active' : '' }}">{{ __('Mid Cap · 2 bis unter 10 Mrd.') }}</a>
+                <a href="{{ route('fundamental.index', array_filter(['cap' => 'large', 'sector' => $sector, 'country' => $country, 'region' => $region])) }}" class="fundamental-cap-pill {{ $capGroup === 'large' ? 'is-active' : '' }}">{{ __('Large Cap · ab 10 Mrd.') }}</a>
+            </div>
+
+            <form method="GET" class="flex flex-wrap gap-2">
+                @if($capGroup)<input type="hidden" name="cap" value="{{ $capGroup }}">@endif
+                <select name="sector" onchange="this.form.requestSubmit()" class="fundamental-select">
+                    <option value="">{{ __('Alle Sektoren') }}</option>
+                    @foreach($filterOptions['sectors'] as $s)
+                        <option value="{{ $s }}" @selected($sector === $s)>{{ __($s) }}</option>
+                    @endforeach
+                </select>
+                <select name="region" onchange="this.form.requestSubmit()" class="fundamental-select">
+                    <option value="">{{ __('Alle Regionen') }}</option>
+                    @foreach(\App\Services\FundamentalHeatmapService::REGIONS as $key => $r)
+                        <option value="{{ $key }}" @selected($region === $key)>{{ __($r['label']) }}</option>
+                    @endforeach
+                </select>
+                <select name="country" onchange="this.form.requestSubmit()" class="fundamental-select">
+                    <option value="">{{ __('Alle Länder') }}</option>
+                    @foreach($filterOptions['countries'] as $c)
+                        <option value="{{ $c }}" @selected($country === $c)>{{ \App\Services\FundamentalHeatmapService::countryFlag($c) }} {{ \App\Services\FundamentalHeatmapService::countryName($c) }}</option>
+                    @endforeach
+                </select>
+            </form>
         </div>
 
         <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4"
@@ -42,9 +66,9 @@
                     </header>
 
                     <div class="flex gap-1">
-                        <div class="flex flex-col justify-between py-[1px] text-[6px] font-bold text-[var(--ak-muted)]">
+                        <div class="flex flex-col justify-between py-[1px] text-right text-[6px] font-bold text-[var(--ak-muted)]">
                             @for($yb = 9; $yb >= 0; $yb--)
-                                <span>{{ $yb === 9 ? '9+' : $yb }}</span>
+                                <span>{{ $panel['y_ticks'][$yb] }}</span>
                             @endfor
                         </div>
                         <div class="min-w-0 flex-1">
@@ -59,7 +83,7 @@
                                             class="fundamental-heatmap-cell relative flex aspect-square min-h-0 min-w-0 items-center justify-center rounded-[3px] border border-[rgba(34,211,238,.10)]"
                                             :class="(thresholds.{{ $panel['x_key'] }} > {{ $xb }} || thresholds.{{ $panel['y_key'] }} > {{ $yb }}) && 'is-dimmed'"
                                             style="background-color: color-mix(in srgb, #22d3ee {{ round($intensity * 55, 1) }}%, transparent);"
-                                            title="{{ __('Dezil :x / :y: :n Aktien', ['x' => $xb, 'y' => $yb, 'n' => $count]) }}"
+                                            title="{{ __(':x_label :x_val :x_unit / :y_label :y_val :y_unit: :n Aktien', ['x_label' => $panel['x_label'], 'x_val' => $panel['x_ticks'][$xb], 'x_unit' => $panel['x_unit'], 'y_label' => $panel['y_label'], 'y_val' => $panel['y_ticks'][$yb], 'y_unit' => $panel['y_unit'], 'n' => $count]) }}"
                                         ><span class="text-[6px] font-black tabular-nums text-[var(--ak-text)] {{ $count === 0 ? 'opacity-20' : '' }}">{{ $count }}</span></div>
                                     @endfor
                                 @endfor
@@ -73,22 +97,96 @@
                             </div>
                             <div class="mt-1 flex justify-between text-[6px] font-bold text-[var(--ak-muted)]">
                                 @for($xb = 0; $xb <= 9; $xb++)
-                                    <span>{{ $xb === 9 ? '9+' : $xb }}</span>
+                                    <span>{{ $panel['x_ticks'][$xb] }}</span>
                                 @endfor
                             </div>
                         </div>
                     </div>
-                    <p class="mt-1 text-center text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ $panel['x_label'] }}</p>
+                    <p class="mt-1 text-center text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ $panel['x_label'] }} <span class="normal-case tracking-normal text-[var(--ak-muted)]">({{ $panel['x_unit'] }})</span></p>
                     <p class="mt-1.5 flex items-center justify-between text-[9px] font-bold text-[var(--ak-muted)]">
-                        <span>{{ $panel['y_label'] }}: <b class="text-[var(--ak-text)]" x-text="thresholds.{{ $panel['y_key'] }} === 0 ? '{{ __('Alle') }}' : thresholds.{{ $panel['y_key'] }} + '. Dezil+'"></b></span>
-                        <span>{{ $panel['x_label'] }}: <b class="text-[var(--ak-text)]" x-text="thresholds.{{ $panel['x_key'] }} === 0 ? '{{ __('Alle') }}' : thresholds.{{ $panel['x_key'] }} + '. Dezil+'"></b></span>
+                        <span>{{ $panel['y_label'] }} <span class="opacity-70">({{ $panel['y_unit'] }})</span>: <b class="text-[var(--ak-text)]" x-text="thresholds.{{ $panel['y_key'] }} === 0 ? '{{ __('Alle') }}' : '{{ __('ab') }} ' + {{ json_encode($panel['y_ticks']) }}[thresholds.{{ $panel['y_key'] }}]"></b></span>
+                        <span>{{ $panel['x_label'] }} <span class="opacity-70">({{ $panel['x_unit'] }})</span>: <b class="text-[var(--ak-text)]" x-text="thresholds.{{ $panel['x_key'] }} === 0 ? '{{ __('Alle') }}' : '{{ __('ab') }} ' + {{ json_encode($panel['x_ticks']) }}[thresholds.{{ $panel['x_key'] }}]"></b></span>
                     </p>
                 </div>
             @endforeach
         </section>
+
+        <div class="ak-master-card fundamental-table-card mt-5">
+            <div class="ak-master-card-header fundamental-table-head">
+                <h3 class="text-sm font-black">{{ __('Aktien') }}</h3>
+                <form method="GET" class="fundamental-table-search">
+                    @if($capGroup)<input type="hidden" name="cap" value="{{ $capGroup }}">@endif
+                    @if($sector)<input type="hidden" name="sector" value="{{ $sector }}">@endif
+                    @if($country)<input type="hidden" name="country" value="{{ $country }}">@endif
+                    @if($region)<input type="hidden" name="region" value="{{ $region }}">@endif
+                    <input type="hidden" name="sort" value="{{ $table['sort'] }}">
+                    <input type="hidden" name="dir" value="{{ $table['dir'] }}">
+                    <input type="text" name="q" value="{{ $tableSearch }}" placeholder="{{ __('Symbol oder Name suchen') }}" class="ak-input h-8 text-xs" oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.requestSubmit(),400)">
+                </form>
+            </div>
+
+            @php
+                $sortLink = function (string $col, string $label) use ($table, $capGroup, $sector, $country, $region, $tableSearch) {
+                    $nextDir = ($table['sort'] === $col && $table['dir'] === 'desc') ? 'asc' : 'desc';
+                    $params = array_filter(['cap' => $capGroup, 'sector' => $sector, 'country' => $country, 'region' => $region, 'q' => $tableSearch, 'sort' => $col, 'dir' => $nextDir]);
+                    $icon = $table['sort'] === $col ? ($table['dir'] === 'desc' ? '↓' : '↑') : '';
+
+                    return '<a href="'.route('fundamental.index', $params).'" class="fundamental-table-sort">'.$label.' '.$icon.'</a>';
+                };
+            @endphp
+
+            <div class="fundamental-table-scroll">
+                <table class="fundamental-table">
+                    <thead>
+                        <tr>
+                            <th>{!! $sortLink('symbol', __('Symbol')) !!}</th>
+                            <th>{!! $sortLink('name', __('Name')) !!}</th>
+                            <th>{{ __('Land') }}</th>
+                            <th>{{ __('Sektor') }}</th>
+                            <th class="text-right">{!! $sortLink('trailing_pe', __('KGV')) !!}</th>
+                            <th class="text-right">{!! $sortLink('dividend_yield', __('Div.-Rendite')) !!}</th>
+                            <th class="text-right">{!! $sortLink('market_cap', __('Marktkap.')) !!}</th>
+                            <th class="text-right">{!! $sortLink('revenue_growth', __('Umsatzwachstum')) !!}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($table['rows'] as $row)
+                            <tr onclick="window.location='{{ route('fundamental.index', ['symbol' => $row->symbol]) }}'">
+                                <td class="font-black">{{ $row->symbol }}</td>
+                                <td class="fundamental-table-name">{{ $row->name }}</td>
+                                <td>{{ \App\Services\FundamentalHeatmapService::countryFlag($row->country) }} {{ $row->country }}</td>
+                                <td>{{ __($row->sector ?: '—') }}</td>
+                                <td class="text-right tabular-nums">{{ $row->trailing_pe !== null ? number_format($row->trailing_pe, 1, ',', '.') : '–' }}</td>
+                                <td class="text-right tabular-nums">{{ $row->dividend_yield !== null ? number_format($row->dividend_yield, 2, ',', '.').' %' : '–' }}</td>
+                                <td class="text-right tabular-nums">{{ $row->market_cap !== null ? number_format($row->market_cap / 1_000_000_000, 1, ',', '.').' Mrd.' : '–' }}</td>
+                                <td class="text-right tabular-nums">{{ $row->revenue_growth !== null ? number_format($row->revenue_growth, 1, ',', '.').' %' : '–' }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="8" class="py-6 text-center text-[var(--ak-muted)]">{{ __('Keine Treffer.') }}</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            @php $lastPage = max(1, (int) ceil($table['total'] / $table['per_page'])); @endphp
+            <div class="fundamental-table-pagination">
+                <span>{{ __(':total Aktien · Seite :page von :last', ['total' => $table['total'], 'page' => $table['page'], 'last' => $lastPage]) }}</span>
+                <div class="flex gap-2">
+                    @if($table['page'] > 1)
+                        <a href="{{ route('fundamental.index', array_filter(['cap' => $capGroup, 'sector' => $sector, 'country' => $country, 'region' => $region, 'q' => $tableSearch, 'sort' => $table['sort'], 'dir' => $table['dir'], 'page' => $table['page'] - 1])) }}" class="fundamental-cap-pill">{{ __('Zurück') }}</a>
+                    @endif
+                    @if($table['page'] < $lastPage)
+                        <a href="{{ route('fundamental.index', array_filter(['cap' => $capGroup, 'sector' => $sector, 'country' => $country, 'region' => $region, 'q' => $tableSearch, 'sort' => $table['sort'], 'dir' => $table['dir'], 'page' => $table['page'] + 1])) }}" class="fundamental-cap-pill">{{ __('Weiter') }}</a>
+                    @endif
+                </div>
+            </div>
+        </div>
     @else
         <div class="fundamental-layout">
             <nav class="fundamental-symbol-grid" aria-label="{{ __('Ansicht') }}">
+                <a href="{{ route('fundamental.index') }}" class="fundamental-symbol-tile fundamental-symbol-tile--current" title="{{ __('Zurück zur Übersicht') }}">
+                    <strong>{{ $selected->symbol }}</strong>
+                </a>
                 <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'ratios' }" @click="active = 'ratios'">
                     <x-heroicon-o-calculator class="h-5 w-5" />
                     <small>{{ __('Kennzahlen') }}</small>
@@ -192,6 +290,9 @@
     }
     #fundamental-page .fundamental-symbol-tile:hover { border-color: color-mix(in srgb, #22d3ee 45%, transparent); }
     #fundamental-page .fundamental-symbol-tile.is-active { border-color: #22d3ee; background: color-mix(in srgb, #22d3ee 14%, transparent); color: #22d3ee; }
+    #fundamental-page .fundamental-symbol-tile--current { border-color: rgba(251,191,36,.5); background: rgba(251,191,36,.08); }
+    #fundamental-page .fundamental-symbol-tile--current:hover { border-color: #fbbf24; }
+    #fundamental-page .fundamental-symbol-tile--current strong { font-size: .58rem; font-weight: 900; text-align: center; line-height: 1.05; color: #fbbf24; word-break: break-word; }
     #fundamental-page .fundamental-symbol-tile svg { width: 1.15rem; height: 1.15rem; flex: none; }
     #fundamental-page .fundamental-symbol-tile small { font-size: .5rem; font-weight: 800; text-align: center; line-height: 1.05; }
 
@@ -208,6 +309,20 @@
     #fundamental-page .fundamental-cap-pill { display: inline-flex; align-items: center; padding: .5rem .9rem; border-radius: .7rem; border: 1px solid var(--ak-border); font-size: .72rem; font-weight: 800; color: var(--ak-muted); text-decoration: none; transition: border-color .15s ease, background .15s ease, color .15s ease; }
     #fundamental-page .fundamental-cap-pill:hover { border-color: color-mix(in srgb, #22d3ee 45%, transparent); color: var(--ak-text); }
     #fundamental-page .fundamental-cap-pill.is-active { border-color: #22d3ee; background: color-mix(in srgb, #22d3ee 14%, transparent); color: #22d3ee; }
+    #fundamental-page .fundamental-select { padding: .5rem .7rem; border-radius: .7rem; border: 1px solid var(--ak-border); background: var(--ak-card); font-size: .72rem; font-weight: 700; color: var(--ak-text); }
+
+    #fundamental-page .fundamental-table-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: 1rem 1.1rem; flex-wrap: wrap; }
+    #fundamental-page .fundamental-table-search input { width: 220px; }
+    #fundamental-page .fundamental-table-scroll { overflow-x: auto; }
+    #fundamental-page .fundamental-table { width: 100%; border-collapse: collapse; font-size: .74rem; }
+    #fundamental-page .fundamental-table th { padding: .55rem .9rem; text-align: left; font-size: .62rem; font-weight: 800; color: var(--ak-muted); text-transform: uppercase; letter-spacing: .02em; border-bottom: 1px solid var(--ak-border); white-space: nowrap; }
+    #fundamental-page .fundamental-table td { padding: .55rem .9rem; border-bottom: 1px solid var(--ak-border); white-space: nowrap; }
+    #fundamental-page .fundamental-table tbody tr { cursor: pointer; }
+    #fundamental-page .fundamental-table tbody tr:hover { background: var(--ak-surface-muted); }
+    #fundamental-page .fundamental-table-name { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+    #fundamental-page .fundamental-table-sort { color: inherit; text-decoration: none; }
+    #fundamental-page .fundamental-table-sort:hover { color: #22d3ee; }
+    #fundamental-page .fundamental-table-pagination { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .85rem 1.1rem; font-size: .68rem; color: var(--ak-muted); flex-wrap: wrap; }
 
     #fundamental-page .fundamental-heatmap-cell { transition: opacity .15s ease; }
     #fundamental-page .fundamental-heatmap-cell.is-dimmed { opacity: .18; }
