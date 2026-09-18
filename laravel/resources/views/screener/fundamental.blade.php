@@ -19,23 +19,23 @@
             <a href="{{ route('fundamental.index', ['cap' => 'large']) }}" class="fundamental-cap-pill {{ $capGroup === 'large' ? 'is-active' : '' }}">{{ __('Large Cap · ab 10 Mrd.') }}</a>
         </div>
 
-        <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4"
+             x-data="{
+                thresholds: { trailing_pe: 0, dividend_yield: 0, market_cap: 0, revenue_growth: 0 },
+                dragging: null,
+                pctFromEvent(e, axis, panel) {
+                    const r = this.$refs['plot' + panel].getBoundingClientRect();
+                    const p = axis === 'x' ? (e.clientX - r.left) / r.width : (r.bottom - e.clientY) / r.height;
+                    return Math.min(9, Math.max(0, Math.round(Math.min(1, Math.max(0, p)) * 10)));
+                },
+                onMove(e) {
+                    if (!this.dragging) return;
+                    this.thresholds[this.dragging.metric] = this.pctFromEvent(e, this.dragging.axis, this.dragging.panel);
+                },
+             }"
+             @pointermove.window="onMove($event)" @pointerup.window="dragging = null">
             @foreach($panels as $i => $panel)
-                <div class="fundamental-heatmap-card flex h-auto min-w-0 flex-col rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-4 shadow-[var(--ak-shadow)]"
-                     x-data="{
-                        xMin: 0, yMin: 0, dragging: null,
-                        pctFromEvent(e, axis) {
-                            const r = this.$refs.plot.getBoundingClientRect();
-                            const p = axis === 'x' ? (e.clientX - r.left) / r.width : (r.bottom - e.clientY) / r.height;
-                            return Math.min(9, Math.max(0, Math.round(Math.min(1, Math.max(0, p)) * 10)));
-                        },
-                        onMove(e) {
-                            if (!this.dragging) return;
-                            const v = this.pctFromEvent(e, this.dragging);
-                            if (this.dragging === 'x') this.xMin = v; else this.yMin = v;
-                        },
-                     }"
-                     @pointermove.window="onMove($event)" @pointerup.window="dragging = null">
+                <div class="fundamental-heatmap-card flex h-auto min-w-0 flex-col rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-4 shadow-[var(--ak-shadow)]">
                     <header class="mb-2">
                         <h3 class="text-xs font-black">{{ $panel['title'] }}</h3>
                         <p class="text-[10px] font-semibold text-[var(--ak-muted)]">{{ $panel['instruments_used'] }} {{ __('Aktien') }}</p>
@@ -48,7 +48,7 @@
                             @endfor
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div x-ref="plot" class="fundamental-heatmap-plot relative grid aspect-square h-auto w-full grid-cols-10 grid-rows-10 gap-[3px]">
+                            <div x-ref="plot{{ $i }}" class="fundamental-heatmap-plot relative grid aspect-square h-auto w-full grid-cols-10 grid-rows-10 gap-[3px]">
                                 @for($yb = 9; $yb >= 0; $yb--)
                                     @for($xb = 0; $xb <= 9; $xb++)
                                         @php
@@ -57,17 +57,17 @@
                                         @endphp
                                         <div
                                             class="fundamental-heatmap-cell relative flex aspect-square min-h-0 min-w-0 items-center justify-center rounded-[3px] border border-[rgba(34,211,238,.10)]"
-                                            :class="(xMin > {{ $xb }} || yMin > {{ $yb }}) && 'is-dimmed'"
+                                            :class="(thresholds.{{ $panel['x_key'] }} > {{ $xb }} || thresholds.{{ $panel['y_key'] }} > {{ $yb }}) && 'is-dimmed'"
                                             style="background-color: color-mix(in srgb, #22d3ee {{ round($intensity * 55, 1) }}%, transparent);"
                                             title="{{ __('Dezil :x / :y: :n Aktien', ['x' => $xb, 'y' => $yb, 'n' => $count]) }}"
                                         ><span class="text-[6px] font-black tabular-nums text-[var(--ak-text)] {{ $count === 0 ? 'opacity-20' : '' }}">{{ $count }}</span></div>
                                     @endfor
                                 @endfor
 
-                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--x" :style="`left: calc(${xMin * 10}% - ${xMin === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = 'x'">
+                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--x" :style="`left: calc(${thresholds.{{ $panel['x_key'] }} * 10}% - ${thresholds.{{ $panel['x_key'] }} === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['x_key'] }}', axis: 'x', panel: {{ $i }} }">
                                     <b></b><i></i>
                                 </span>
-                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--y" :style="`bottom: calc(${yMin * 10}% - ${yMin === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = 'y'">
+                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--y" :style="`bottom: calc(${thresholds.{{ $panel['y_key'] }} * 10}% - ${thresholds.{{ $panel['y_key'] }} === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['y_key'] }}', axis: 'y', panel: {{ $i }} }">
                                     <b></b><i></i>
                                 </span>
                             </div>
@@ -80,8 +80,8 @@
                     </div>
                     <p class="mt-1 text-center text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ $panel['x_label'] }}</p>
                     <p class="mt-1.5 flex items-center justify-between text-[9px] font-bold text-[var(--ak-muted)]">
-                        <span>{{ $panel['y_label'] }}: <b class="text-[var(--ak-text)]" x-text="yMin === 0 ? '{{ __('Alle') }}' : yMin + '. Dezil+'"></b></span>
-                        <span>{{ $panel['x_label'] }}: <b class="text-[var(--ak-text)]" x-text="xMin === 0 ? '{{ __('Alle') }}' : xMin + '. Dezil+'"></b></span>
+                        <span>{{ $panel['y_label'] }}: <b class="text-[var(--ak-text)]" x-text="thresholds.{{ $panel['y_key'] }} === 0 ? '{{ __('Alle') }}' : thresholds.{{ $panel['y_key'] }} + '. Dezil+'"></b></span>
+                        <span>{{ $panel['x_label'] }}: <b class="text-[var(--ak-text)]" x-text="thresholds.{{ $panel['x_key'] }} === 0 ? '{{ __('Alle') }}' : thresholds.{{ $panel['x_key'] }} + '. Dezil+'"></b></span>
                     </p>
                 </div>
             @endforeach
