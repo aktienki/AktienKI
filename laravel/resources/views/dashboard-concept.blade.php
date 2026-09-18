@@ -1192,6 +1192,17 @@
                                                     <span class="font-bold text-[var(--ak-text)]">{{ $scenarioProbability === null ? '—' : number_format($scenarioProbability, 0, ',', '.').' %' }}</span>
                                                 </div>
                                             </div>
+                                            <div class="mt-1.5 grid grid-cols-2 gap-1.5 text-[9px]">
+                                                <div class="rounded border border-[var(--ak-border)] px-2 py-1">
+                                                    <span class="block text-[var(--ak-muted)]">{{ __('KI-Score') }}</span>
+                                                    <span class="font-bold text-[var(--ak-text)]">{{ $row['score'] === null ? '—' : $row['score'].'/100' }}</span>
+                                                </div>
+                                                <div class="rounded border border-[var(--ak-border)] px-2 py-1">
+                                                    <span class="block text-[var(--ak-muted)]">{{ __('Panel-Perzentil') }}</span>
+                                                    <span class="font-bold text-[var(--ak-text)]">{{ $row['panel_percentile'] === null ? '—' : $row['panel_percentile'].' %' }}</span>
+                                                    <span class="block text-[8px] text-[var(--ak-muted)]">{{ $row['panel_decile'] === null ? '' : __('Dezil :decile/10', ['decile' => $row['panel_decile']]) }}</span>
+                                                </div>
+                                            </div>
 
                                             <div class="mt-1.5 text-[8px] text-[var(--ak-muted)]">
                                                 @if($row['instrument_occurrence_count'] > 0)

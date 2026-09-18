@@ -10,6 +10,7 @@ use App\Services\MarketOverviewWidgetsService;
 use App\Services\MarketService;
 use App\Services\PanelScoreDriftStatsService;
 use App\Services\ServingMarketSnapshotService;
+use App\Services\ServingScreenerService;
 use App\Services\TodayHighlightsAnalysisService;
 use App\Services\TodayHighlightsBuilder;
 use Illuminate\Http\Request;
@@ -300,29 +301,41 @@ final class DashboardConceptController extends Controller
      */
     private function chartPatternSection(string $id): array
     {
+        // Same 0-100 composite score and cross-sectional panel percentile/
+        // decile shown on the screener and stock detail page - keyed once
+        // per request instead of per row.
+        $scoreUniverse = app(ServingScreenerService::class)->currentStocks()->keyBy('instrument_id');
+
         $rows = app(ChartPatternSignalService::class)->recentEvents()
             ->take(60)
-            ->map(fn (array $event): array => [
-                'time' => $event['time'],
-                'symbol' => $event['symbol'],
-                'name' => $event['name'],
-                'country_flag' => self::COUNTRY_FLAGS[$event['country']] ?? '🌐',
-                'label' => $event['label'],
-                'tone' => $event['tone'],
-                'change_pct' => $event['change_pct'],
-                'candles' => $event['candles'],
-                'indicator_series' => $event['indicator_series'],
-                'overlays' => $event['overlays'],
-                'pattern_range' => $event['pattern_range'],
-                'breakout_level' => $event['breakout_level'],
-                'breakout_line_y' => $event['breakout_line_y'],
-                'rise_probability_20d' => $event['rise_probability_20d'],
-                'average_return_20d' => $event['average_return_20d'],
-                'probability_sample_size' => $event['probability_sample_size'],
-                'probability_scope' => $event['probability_scope'],
-                'instrument_occurrence_count' => $event['instrument_occurrence_count'],
-                'url' => route('stocks.show', ['symbol' => $event['symbol'], 'return_to' => '/dashboard/concept']),
-            ])
+            ->map(function (array $event) use ($scoreUniverse): array {
+                $scored = $scoreUniverse->get($event['instrument_id']);
+
+                return [
+                    'time' => $event['time'],
+                    'symbol' => $event['symbol'],
+                    'name' => $event['name'],
+                    'country_flag' => self::COUNTRY_FLAGS[$event['country']] ?? '🌐',
+                    'label' => $event['label'],
+                    'tone' => $event['tone'],
+                    'change_pct' => $event['change_pct'],
+                    'candles' => $event['candles'],
+                    'indicator_series' => $event['indicator_series'],
+                    'overlays' => $event['overlays'],
+                    'pattern_range' => $event['pattern_range'],
+                    'breakout_level' => $event['breakout_level'],
+                    'breakout_line_y' => $event['breakout_line_y'],
+                    'rise_probability_20d' => $event['rise_probability_20d'],
+                    'average_return_20d' => $event['average_return_20d'],
+                    'probability_sample_size' => $event['probability_sample_size'],
+                    'probability_scope' => $event['probability_scope'],
+                    'instrument_occurrence_count' => $event['instrument_occurrence_count'],
+                    'score' => $scored?->composite_score !== null ? (int) $scored->composite_score : null,
+                    'panel_percentile' => $scored?->panel_percentile !== null ? (int) $scored->panel_percentile : null,
+                    'panel_decile' => $scored?->panel_decile !== null ? (int) $scored->panel_decile : null,
+                    'url' => route('stocks.show', ['symbol' => $event['symbol'], 'return_to' => '/dashboard/concept']),
+                ];
+            })
             ->values()
             ->all();
 
