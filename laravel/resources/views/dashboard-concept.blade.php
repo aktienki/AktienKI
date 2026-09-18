@@ -1298,6 +1298,119 @@
                             @else
                                 <div class="concept-empty">{{ $section['emptyText'] }}</div>
                             @endif
+                        @elseif($section['kind'] === 'pattern-analysis')
+                            <div class="grid gap-3 lg:grid-cols-2">
+                                {{-- Chartmuster-Rangliste --}}
+                                <div class="ak-master-card">
+                                    <div class="ak-master-card-header">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-violet-500/10 text-violet-500">
+                                            <x-heroicon-o-chart-bar-square class="h-4.5 w-4.5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <b class="block text-[12px] font-black text-[var(--ak-text)]">{{ __('Chartmuster-Rangliste') }}</b>
+                                            <small class="block text-[9px] text-[var(--ak-muted)]">{{ __('Anstiegswahrscheinlichkeit (20T) · min. 30 Fälle') }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="ak-master-card-body grid gap-1.5">
+                                        @forelse($section['chartPatterns'] as $pattern)
+                                            <div class="rounded-lg border border-[var(--ak-border)] px-2.5 py-2">
+                                                <div class="flex items-center justify-between gap-2 text-[10px]">
+                                                    <span class="min-w-0 truncate font-bold text-[var(--ak-text)]">{{ $pattern['label'] }}</span>
+                                                    <span class="shrink-0 font-black {{ $pattern['rise_probability'] >= 50 ? 'text-emerald-500' : 'text-rose-500' }}">{{ number_format($pattern['rise_probability'], 0, ',', '.') }} %</span>
+                                                </div>
+                                                <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--ak-surface-muted)]">
+                                                    <div class="h-full rounded-full {{ $pattern['rise_probability'] >= 50 ? 'bg-emerald-500' : 'bg-rose-500' }}" style="width: {{ number_format($pattern['rise_probability'], 1, '.', '') }}%"></div>
+                                                </div>
+                                                <div class="mt-1 text-[8px] text-[var(--ak-muted)]">{{ __('Ø Rendite :return % · :n Fälle', ['return' => number_format($pattern['average_return'] ?? 0, 1, ',', '.'), 'n' => $pattern['sample_size']]) }}</div>
+                                            </div>
+                                        @empty
+                                            <div class="concept-empty">{{ __('Keine Chartmuster mit ausreichender Stichprobe.') }}</div>
+                                        @endforelse
+                                    </div>
+                                </div>
+
+                                {{-- Panel-Score-Dezile --}}
+                                <div class="ak-master-card">
+                                    <div class="ak-master-card-header">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-cyan-500/10 text-cyan-500">
+                                            <x-heroicon-o-presentation-chart-bar class="h-4.5 w-4.5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <b class="block text-[12px] font-black text-[var(--ak-text)]">{{ __('Panel-Score vs. Rendite') }}</b>
+                                            <small class="block text-[9px] text-[var(--ak-muted)]">{{ __('Ø Rendite +20T je Dezil (1 = niedrigster, 10 = höchster Score)') }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="ak-master-card-body">
+                                        <div class="flex h-32 items-end gap-1.5">
+                                            @forelse($section['panelDeciles'] as $decile)
+                                                @php $barHeightPercent = max(4, abs($decile['avg_forward_return']) / $section['maxAbsPanelReturn'] * 100); @endphp
+                                                <div class="flex min-w-0 flex-1 flex-col items-center justify-end gap-1" title="{{ __('Dezil :decile: :return % (n=:n)', ['decile' => $decile['decile'], 'return' => $decile['avg_forward_return'], 'n' => $decile['sample_size']]) }}">
+                                                    <span class="text-[8px] font-black text-[var(--ak-muted)]">{{ number_format($decile['avg_forward_return'], 1, ',', '.') }}</span>
+                                                    <div class="w-full rounded-t {{ $decile['avg_forward_return'] >= 0 ? 'bg-emerald-500' : 'bg-rose-500' }}" style="height: {{ number_format($barHeightPercent, 1, '.', '') }}%"></div>
+                                                    <span class="text-[8px] font-bold text-[var(--ak-muted)]">{{ $decile['decile'] }}</span>
+                                                </div>
+                                            @empty
+                                                <div class="concept-empty">{{ __('Keine Panel-Daten verfügbar.') }}</div>
+                                            @endforelse
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Earnings-Drift Top-Muster --}}
+                                <div class="ak-master-card">
+                                    <div class="ak-master-card-header">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-500">
+                                            <x-heroicon-o-calendar-days class="h-4.5 w-4.5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <b class="block text-[12px] font-black text-[var(--ak-text)]">{{ __('Earnings-Drift Top-Muster') }}</b>
+                                            <small class="block text-[9px] text-[var(--ak-muted)]">{{ __('Ø Kursreaktion +3T nach Quartalszahlen') }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="ak-master-card-body grid gap-1.5">
+                                        @forelse($section['earningsDrift'] as $drift)
+                                            <div class="flex items-center gap-2 rounded-lg border border-[var(--ak-border)] px-2.5 py-2">
+                                                <span class="min-w-0 flex-1">
+                                                    <b class="block truncate text-[10px] text-[var(--ak-text)]">{{ $drift['symbol'] }}</b>
+                                                    <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $drift['name'] }} · {{ __(':n Termine', ['n' => $drift['n']]) }}</small>
+                                                </span>
+                                                <span class="shrink-0 text-right text-[9px]">
+                                                    <span class="block text-[var(--ak-muted)]">{{ __('Beat') }} <b class="font-black {{ ($drift['post3dBeat'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $drift['post3dBeat'] === null ? '—' : number_format($drift['post3dBeat'], 1, ',', '.').' %' }}</b></span>
+                                                    <span class="block text-[var(--ak-muted)]">{{ __('Miss') }} <b class="font-black {{ ($drift['post3dMiss'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $drift['post3dMiss'] === null ? '—' : number_format($drift['post3dMiss'], 1, ',', '.').' %' }}</b></span>
+                                                </span>
+                                            </div>
+                                        @empty
+                                            <div class="concept-empty">{{ __('Keine Earnings-Drift-Daten verfügbar.') }}</div>
+                                        @endforelse
+                                    </div>
+                                </div>
+
+                                {{-- Sektor-Vergleich --}}
+                                <div class="ak-master-card">
+                                    <div class="ak-master-card-header">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                                            <x-heroicon-o-building-office-2 class="h-4.5 w-4.5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <b class="block text-[12px] font-black text-[var(--ak-text)]">{{ __('Sektor-Vergleich') }}</b>
+                                            <small class="block text-[9px] text-[var(--ak-muted)]">{{ __('Ø KI-Score je Sektor · min. 5 Aktien') }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="ak-master-card-body grid gap-1.5">
+                                        @forelse($section['sectorScores'] as $sector)
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-28 shrink-0 truncate text-[9px] font-bold text-[var(--ak-text)]">{{ $sector['sector'] }}</span>
+                                                <div class="h-2 flex-1 overflow-hidden rounded-full bg-[var(--ak-surface-muted)]">
+                                                    <div class="h-full rounded-full bg-emerald-500" style="width: {{ number_format($sector['avg_score'], 1, '.', '') }}%"></div>
+                                                </div>
+                                                <span class="w-16 shrink-0 text-right text-[9px] font-black text-[var(--ak-text)]">{{ number_format($sector['avg_score'], 1, ',', '.') }} <span class="text-[8px] font-bold text-[var(--ak-muted)]">({{ $sector['stock_count'] }})</span></span>
+                                            </div>
+                                        @empty
+                                            <div class="concept-empty">{{ __('Keine Sektordaten verfügbar.') }}</div>
+                                        @endforelse
+                                    </div>
+                                </div>
+                            </div>
                         @else
                             <p class="text-xs text-[var(--ak-muted)]">{{ $section['description'] }}</p>
                         @endif

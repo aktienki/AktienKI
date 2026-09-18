@@ -37,8 +37,29 @@ final class DashboardConceptController extends Controller
         ['today-focus', 'Heute im Fokus', 'heroicon-o-fire'],
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
         ['chartview', 'ChartView', 'heroicon-o-chart-bar-square'],
+        ['pattern-analysis', 'Muster & Wahrscheinlichkeiten', 'heroicon-o-puzzle-piece'],
         ['opportunities-risks', 'Chancen & Risiken', 'heroicon-o-scale'],
         ['classic-dashboard', 'Depots', 'heroicon-o-squares-2x2'],
+    ];
+
+    /** event_key => [label, tone] - mirrors ChartPatternSignalService's own
+     *  SQL VALUES(...) label mapping (see recentEvents()) so the ranking
+     *  here uses the exact same German labels the ChartView cards show. */
+    private const PATTERN_EVENT_LABELS = [
+        'golden_cross' => ['Golden Cross: SMA 50 über SMA 200', 'positive'],
+        'death_cross' => ['Death Cross: SMA 50 unter SMA 200', 'negative'],
+        'price_above_sma50' => ['Kurs über SMA 50', 'positive'],
+        'price_below_sma50' => ['Kurs unter SMA 50', 'negative'],
+        'rsi_oversold' => ['RSI überverkauft', 'positive'],
+        'rsi_overbought' => ['RSI überkauft', 'negative'],
+        'resistance_breakout' => ['Widerstand überschritten', 'positive'],
+        'support_breakdown' => ['Unterstützung unterschritten', 'negative'],
+        'pattern_bullish_engulfing' => ['Chartmuster: Bullish Engulfing', 'positive'],
+        'pattern_bearish_engulfing' => ['Chartmuster: Bearish Engulfing', 'negative'],
+        'pattern_bullish_pin_bar' => ['Chartmuster: Bullish Pin Bar', 'positive'],
+        'pattern_bearish_pin_bar' => ['Chartmuster: Bearish Pin Bar', 'negative'],
+        'pattern_upside_breakout' => ['Chartmuster: 20-Tage-Ausbruch nach oben', 'positive'],
+        'pattern_downside_breakout' => ['Chartmuster: 20-Tage-Ausbruch nach unten', 'negative'],
     ];
 
     public function __invoke(Request $request): View
@@ -55,6 +76,7 @@ final class DashboardConceptController extends Controller
         $sections = collect([
             $this->todayFocusSection('today-focus', $request),
             $this->chartPatternSection('chartview'),
+            $this->patternAnalysisSection('pattern-analysis'),
             $this->marketSection('market-report', $snapshot),
             $this->opportunitiesRisksSection('opportunities-risks', $snapshot),
             $this->classicDashboardSection('classic-dashboard', $request),
@@ -344,6 +366,92 @@ final class DashboardConceptController extends Controller
             'kind' => 'chart-patterns',
             'rows' => $rows,
             'emptyText' => __('Keine Chartmuster oder Indikatorübergänge in den letzten 24 Stunden.'),
+        ];
+    }
+
+    /**
+     * Surfaces the statistical "has this happened before, and what tended
+     * to follow" methodology already built for ChartView, EarningsDrift and
+     * the panel model - as rankings/aggregates instead of per-event cards,
+     * so a pattern's overall track record is visible without having to spot
+     * a live occurrence first. Every number here is plain SQL/statistics
+     * (rise_probability, avg forward return), never an LLM guess.
+     */
+    private function patternAnalysisSection(string $id): array
+    {
+        // Same minimum-sample-size discipline established earlier this
+        // session for the serving-model profit-factor analysis: a handful
+        // of occurrences produces an unstable rise_probability, so patterns
+        // below this threshold are dropped rather than ranked alongside
+        // well-sampled ones.
+        $minSampleSize = 30;
+
+        $chartPatterns = \DB::table('chartview_signal_statistics')
+            ->where('sample_size', '>=', $minSampleSize)
+            ->get(['event_key', 'rise_probability', 'average_return', 'sample_size'])
+            ->map(function (object $row): array {
+                [$label, $tone] = self::PATTERN_EVENT_LABELS[$row->event_key] ?? [$row->event_key, 'neutral'];
+
+                return [
+                    'event_key' => $row->event_key,
+                    'label' => $label,
+                    'tone' => $tone,
+                    'rise_probability' => round((float) $row->rise_probability, 1),
+                    'average_return' => is_numeric($row->average_return) ? round((float) $row->average_return, 1) : null,
+                    'sample_size' => (int) $row->sample_size,
+                ];
+            })
+            ->sortByDesc(fn (array $row): float => abs($row['rise_probability'] - 50))
+            ->take(8)
+            ->values()
+            ->all();
+
+        $panelDeciles = app(PanelScoreDriftStatsService::class)->decileBreakdown()
+            ->map(fn (array $row): array => [
+                'decile' => $row['decile'],
+                'avg_forward_return' => round($row['avgForwardReturn'] * 100, 1),
+                'sample_size' => $row['n'],
+            ])
+            ->all();
+        $maxAbsPanelReturn = max(1.0, collect($panelDeciles)->map(fn (array $row) => abs($row['avg_forward_return']))->max() ?: 1.0);
+
+        $earningsDrift = app(EarningsDriftStatsService::class)->forAllStocks(minSample: 5)
+            ->map(fn (array $row): array => [
+                'symbol' => $row['symbol'],
+                'name' => $row['name'],
+                'n' => $row['n'],
+                // return_post_3d/post_3d are already stored as percent
+                // values (e.g. -9.03 = -9.03%), not decimal fractions -
+                // no *100 here, unlike the panel model's fwd_ret_20d below.
+                'post3dBeat' => $row['post3dBeat'] !== null ? round($row['post3dBeat'], 1) : null,
+                'post3dMiss' => $row['post3dMiss'] !== null ? round($row['post3dMiss'], 1) : null,
+            ])
+            ->sortByDesc(fn (array $row): float => max(abs($row['post3dBeat'] ?? 0), abs($row['post3dMiss'] ?? 0)))
+            ->take(8)
+            ->values()
+            ->all();
+
+        $sectorScores = app(ServingScreenerService::class)->currentStocks()
+            ->filter(fn (object $stock): bool => filled($stock->sector) && $stock->composite_score !== null)
+            ->groupBy('sector')
+            ->map(fn (Collection $stocks, string $sector): array => [
+                'sector' => $sector,
+                'avg_score' => round($stocks->avg('composite_score'), 1),
+                'stock_count' => $stocks->count(),
+            ])
+            ->filter(fn (array $row): bool => $row['stock_count'] >= 5)
+            ->sortByDesc('avg_score')
+            ->values()
+            ->all();
+
+        return [
+            'id' => $id,
+            'kind' => 'pattern-analysis',
+            'chartPatterns' => $chartPatterns,
+            'panelDeciles' => $panelDeciles,
+            'maxAbsPanelReturn' => $maxAbsPanelReturn,
+            'earningsDrift' => $earningsDrift,
+            'sectorScores' => $sectorScores,
         ];
     }
 
