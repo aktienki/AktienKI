@@ -4,6 +4,23 @@
             && ((bool) (auth()->user()?->is_admin ?? false) || strtolower((string) (auth()->user()?->role ?? '')) === 'admin');
     @endphp
     <style>
+        /* Master card shell (see .ak-master-card in app.css) applied to the
+           stock cards: this component has no header row to tint like the
+           Concept Dashboard cards do (dense data grid, not icon+title), so
+           only the shell - radius/border/background/shadow, no hover lift -
+           is aligned here; the card's own content/layout is untouched. */
+        .screener-page .screener-stock-card {
+            border-radius: 1.25rem;
+            border-color: var(--ak-border);
+            background: var(--ak-card);
+            box-shadow: var(--ak-shadow);
+        }
+        .screener-page .screener-stock-card:hover {
+            transform: none;
+            border-color: var(--ak-border-strong);
+            background: var(--ak-card);
+            box-shadow: var(--ak-shadow-hover, var(--ak-shadow));
+        }
         .screener-page .screener-signal-score-donut .segmented-score{position:relative;display:grid;width:3rem;height:3rem;place-items:center}
         .screener-page .screener-signal-score-donut .segmented-score-ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
         .screener-page .screener-signal-score-donut .segmented-score-sector{fill:none;stroke-width:8px;stroke-linecap:butt;opacity:.66}
@@ -165,7 +182,7 @@
             <div class="mb-3 rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-xs font-bold text-rose-300">{{ $errors->first() }}</div>
         @endif
 
-        <section x-data="{ filtersOpen: localStorage.getItem('screenerFilters') !== 'closed', toggleFilters() { this.filtersOpen = ! this.filtersOpen; localStorage.setItem('screenerFilters', this.filtersOpen ? 'open' : 'closed') } }" class="screener-filter-shell mb-5 shrink-0">
+        <section x-data="{ filtersOpen: localStorage.getItem('screenerFilters') === 'open', toggleFilters() { this.filtersOpen = ! this.filtersOpen; localStorage.setItem('screenerFilters', this.filtersOpen ? 'open' : 'closed') } }" class="screener-filter-shell mb-5 shrink-0">
         <button type="button" @click="toggleFilters()" :aria-expanded="filtersOpen" class="flex h-10 w-full items-center justify-between rounded-xl border border-cyan-400/30 bg-[var(--ak-card)] px-4 text-xs font-black text-cyan-300 shadow-[var(--ak-shadow)]">
             <span class="inline-flex items-center gap-2"><x-heroicon-o-adjustments-horizontal class="h-4 w-4" />{{ __('Filter anzeigen') }}</span>
             <x-heroicon-o-chevron-down class="h-4 w-4 transition" x-bind:class="filtersOpen && 'rotate-180'" />
