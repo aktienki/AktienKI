@@ -3,13 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Services\EarningsQuarterCardService;
+use App\Services\FundamentalHeatmapService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 final class FundamentalScreenerController extends Controller
 {
-    public function __invoke(Request $request, EarningsQuarterCardService $cards): View
+    public function __invoke(Request $request, EarningsQuarterCardService $cards, FundamentalHeatmapService $heatmaps): View
     {
         $requestedSymbol = strtoupper(trim((string) $request->query('symbol', '')));
 
@@ -20,6 +21,11 @@ final class FundamentalScreenerController extends Controller
 
         $years = [];
         $ratios = null;
+        $panels = [];
+
+        if (! $selected) {
+            $panels = $heatmaps->build();
+        }
 
         if ($selected) {
             $years = $cards->forInstrument($selected->id);
@@ -43,6 +49,7 @@ final class FundamentalScreenerController extends Controller
             'selected' => $selected,
             'years' => $years,
             'ratios' => $ratios,
+            'panels' => $panels,
         ]);
     }
 }

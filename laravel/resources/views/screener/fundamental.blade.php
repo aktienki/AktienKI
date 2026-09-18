@@ -10,9 +10,52 @@
     </header>
 
     @if(!$selected)
-        <div class="ak-master-card p-8 text-center text-sm text-[var(--ak-muted)]">
-            {{ __('Keine Aktie ausgewählt. Diese Seite wird über einen Link von einer Aktie aus geöffnet (z.B. aus dem Screener), mit ?symbol=SYMBOL in der URL.') }}
-        </div>
+        <p class="mb-3 text-xs font-semibold text-[var(--ak-muted)]">{{ __('Verteilung der gesamten Aktien-Universum über die 4 Kernkennzahlen. Regler filtern je Achse ab welchem Dezil Zellen hervorgehoben bleiben. Klick auf eine Aktie im Screener öffnet ihre eigene Detailseite.') }}</p>
+        <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
+            @foreach($panels as $i => $panel)
+                <div class="fundamental-heatmap-card flex h-auto min-w-0 flex-col rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-4 shadow-[var(--ak-shadow)]" x-data="{ xMin: 0, yMin: 0 }">
+                    <header class="mb-2">
+                        <h3 class="text-xs font-black">{{ $panel['title'] }}</h3>
+                        <p class="text-[10px] font-semibold text-[var(--ak-muted)]">{{ $panel['instruments_used'] }} {{ __('Aktien') }}</p>
+                    </header>
+
+                    <div class="fundamental-heatmap-plot grid aspect-square h-auto w-full flex-none grid-cols-[24px_repeat(10,minmax(0,1fr))] grid-rows-[repeat(10,minmax(0,1fr))_12px] gap-[3px]">
+                        <div></div>
+                        @for($xb = 0; $xb <= 9; $xb++)
+                            <div class="flex items-end justify-center pb-0.5 text-[6px] font-bold text-[var(--ak-muted)]">{{ $xb === 9 ? '9+' : $xb }}</div>
+                        @endfor
+
+                        @for($yb = 9; $yb >= 0; $yb--)
+                            <div class="flex items-center justify-end pr-0.5 text-[6px] font-bold text-[var(--ak-muted)]">{{ $yb === 9 ? '9+' : $yb }}</div>
+                            @for($xb = 0; $xb <= 9; $xb++)
+                                @php
+                                    $count = $panel['grid'][$yb][$xb];
+                                    $intensity = $panel['max'] > 0 ? $count / $panel['max'] : 0;
+                                @endphp
+                                <div
+                                    class="fundamental-heatmap-cell relative flex aspect-square min-h-0 min-w-0 items-center justify-center rounded-[3px] border border-[rgba(34,211,238,.10)]"
+                                    :class="(xMin > {{ $xb }} || yMin > {{ $yb }}) && 'is-dimmed'"
+                                    style="background-color: color-mix(in srgb, #22d3ee {{ round($intensity * 55, 1) }}%, transparent);"
+                                    title="{{ __('Dezil :x / :y: :n Aktien', ['x' => $xb, 'y' => $yb, 'n' => $count]) }}"
+                                ><span class="text-[6px] font-black tabular-nums text-[var(--ak-text)] {{ $count === 0 ? 'opacity-20' : '' }}">{{ $count }}</span></div>
+                            @endfor
+                        @endfor
+                    </div>
+                    <p class="mt-1 text-center text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ $panel['x_label'] }}</p>
+
+                    <div class="mt-2.5 grid gap-2">
+                        <label class="fundamental-heatmap-range">
+                            <span>{{ $panel['x_label'] }} <b x-text="xMin === 0 ? '{{ __('Alle') }}' : xMin + '. Dezil+'"></b></span>
+                            <input type="range" min="0" max="9" step="1" x-model.number="xMin">
+                        </label>
+                        <label class="fundamental-heatmap-range">
+                            <span>{{ $panel['y_label'] }} <b x-text="yMin === 0 ? '{{ __('Alle') }}' : yMin + '. Dezil+'"></b></span>
+                            <input type="range" min="0" max="9" step="1" x-model.number="yMin">
+                        </label>
+                    </div>
+                </div>
+            @endforeach
+        </section>
     @else
         <div class="fundamental-layout">
             <nav class="fundamental-symbol-grid" aria-label="{{ __('Ansicht') }}">
@@ -131,6 +174,15 @@
     #fundamental-page .fundamental-ratio span { display: block; font-size: .6rem; font-weight: 800; color: var(--ak-muted); text-transform: uppercase; letter-spacing: .02em; }
     #fundamental-page .fundamental-ratio b { display: block; margin-top: .25rem; font-size: 1rem; font-weight: 900; }
     #fundamental-page .fundamental-footnote { margin-top: 1rem; font-size: .68rem; color: var(--ak-muted); line-height: 1.6; }
+
+    #fundamental-page .fundamental-heatmap-cell { transition: opacity .15s ease; }
+    #fundamental-page .fundamental-heatmap-cell.is-dimmed { opacity: .18; }
+    #fundamental-page .fundamental-heatmap-range { display: block; font-size: .58rem; }
+    #fundamental-page .fundamental-heatmap-range span { display: flex; justify-content: space-between; font-weight: 700; color: var(--ak-muted); margin-bottom: .2rem; }
+    #fundamental-page .fundamental-heatmap-range b { color: var(--ak-text); font-weight: 900; }
+    #fundamental-page .fundamental-heatmap-range input[type="range"] { width: 100%; height: 4px; -webkit-appearance: none; appearance: none; background: var(--ak-border); border-radius: 999px; outline: none; }
+    #fundamental-page .fundamental-heatmap-range input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #22d3ee; cursor: pointer; box-shadow: 0 0 0 3px color-mix(in srgb, #22d3ee 25%, transparent); }
+    #fundamental-page .fundamental-heatmap-range input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #22d3ee; cursor: pointer; box-shadow: 0 0 0 3px color-mix(in srgb, #22d3ee 25%, transparent); }
 
     #fundamental-page .fy-block { margin-top: 1.4rem; }
     #fundamental-page .fy-block:first-child { margin-top: 0; }
