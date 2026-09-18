@@ -8465,7 +8465,7 @@ body .ak-topbar-menu > a:focus-visible {
 
     .screener-page .screener-live-dot {
         position:absolute;
-        top:-.1rem;
+        top:-.35rem;
         right:-.1rem;
         width:.4rem;
         height:.4rem;
