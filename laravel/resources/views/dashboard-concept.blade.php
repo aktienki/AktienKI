@@ -280,21 +280,21 @@
                                             @php $indicators = $highlight['indicators'] ?? null; @endphp
                                             @if($indicators)
                                                 <div class="mb-2 text-[8px] text-[var(--ak-muted)]">{{ __('Stand: :date', ['date' => \Illuminate\Support\Carbon::parse($indicators['as_of'])->format('d.m.Y')]) }}</div>
-                                                <div class="grid grid-cols-2 gap-1.5 text-[9px]">
-                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1.5">
+                                                <div class="grid grid-cols-3 gap-1.5 text-[9px]">
+                                                    <div class="rounded border border-[var(--ak-border)] px-2 py-1.5">
                                                         <span class="block text-[var(--ak-muted)]">{{ __('Relative Stärke (14 Tage)') }}</span>
                                                         <span class="font-bold text-[var(--ak-text)]">{{ $indicators['rsi'] }}</span>
                                                         <span class="block text-[8px] text-[var(--ak-muted)]">{{ $indicators['rsi_state'] }}</span>
                                                     </div>
-                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1.5">
+                                                    <div class="rounded border border-[var(--ak-border)] px-2 py-1.5">
                                                         <span class="block text-[var(--ak-muted)]">{{ __('Trendfolge-Indikator') }}</span>
                                                         <span class="font-bold {{ $indicators['macd_bullish'] ? 'text-emerald-500' : 'text-rose-500' }}">{{ $indicators['macd'] }}</span>
                                                         <span class="block text-[8px] text-[var(--ak-muted)]">{{ $indicators['macd_bullish'] ? __('Bullisch') : __('Bärisch') }}</span>
                                                     </div>
-                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1.5 col-span-2">
+                                                    <div class="rounded border border-[var(--ak-border)] px-2 py-1.5">
                                                         <span class="block text-[var(--ak-muted)]">{{ __('Kurstrend') }}</span>
                                                         <span class="font-bold {{ $indicators['trend_bullish'] ? 'text-emerald-500' : 'text-rose-500' }}">{{ $indicators['trend'] }}</span>
-                                                        <span class="block text-[8px] text-[var(--ak-muted)]">{{ __('gleitender 20-Tage- vs. 50-Tage-Durchschnitt') }}</span>
+                                                        <span class="block text-[8px] text-[var(--ak-muted)]">{{ __('20T vs. 50T') }}</span>
                                                     </div>
                                                 </div>
                                             @else
