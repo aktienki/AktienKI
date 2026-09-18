@@ -12,16 +12,22 @@
     @if(!$selected)
         <p class="mb-3 text-xs font-semibold text-[var(--ak-muted)]">{{ __('Verteilung der gesamten Aktien-Universum über die 4 Kernkennzahlen. Regler filtern je Achse ab welchem Dezil Zellen hervorgehoben bleiben. Klick auf eine Aktie im Screener öffnet ihre eigene Detailseite.') }}</p>
 
+        @php
+            $carry = ['q' => $tableSearch ?: null, 'sort' => $table['sort'] ?? null, 'dir' => $table['dir'] ?? null];
+        @endphp
         <div class="mb-4 flex flex-wrap items-center gap-3">
             <div class="fundamental-cap-filters flex flex-wrap gap-2">
-                <a href="{{ route('fundamental.index', array_filter(['sector' => $sector, 'country' => $country, 'region' => $region])) }}" class="fundamental-cap-pill {{ $capGroup === null ? 'is-active' : '' }}">{{ __('Alle Größen') }}</a>
-                <a href="{{ route('fundamental.index', array_filter(['cap' => 'small', 'sector' => $sector, 'country' => $country, 'region' => $region])) }}" class="fundamental-cap-pill {{ $capGroup === 'small' ? 'is-active' : '' }}">{{ __('Small Cap · unter 2 Mrd.') }}</a>
-                <a href="{{ route('fundamental.index', array_filter(['cap' => 'mid', 'sector' => $sector, 'country' => $country, 'region' => $region])) }}" class="fundamental-cap-pill {{ $capGroup === 'mid' ? 'is-active' : '' }}">{{ __('Mid Cap · 2 bis unter 10 Mrd.') }}</a>
-                <a href="{{ route('fundamental.index', array_filter(['cap' => 'large', 'sector' => $sector, 'country' => $country, 'region' => $region])) }}" class="fundamental-cap-pill {{ $capGroup === 'large' ? 'is-active' : '' }}">{{ __('Large Cap · ab 10 Mrd.') }}</a>
+                <a href="{{ route('fundamental.index', array_filter(['sector' => $sector, 'country' => $country, 'region' => $region, ...$carry])) }}" class="fundamental-cap-pill {{ $capGroup === null ? 'is-active' : '' }}">{{ __('Alle Größen') }}</a>
+                <a href="{{ route('fundamental.index', array_filter(['cap' => 'small', 'sector' => $sector, 'country' => $country, 'region' => $region, ...$carry])) }}" class="fundamental-cap-pill {{ $capGroup === 'small' ? 'is-active' : '' }}">{{ __('Small Cap · unter 2 Mrd.') }}</a>
+                <a href="{{ route('fundamental.index', array_filter(['cap' => 'mid', 'sector' => $sector, 'country' => $country, 'region' => $region, ...$carry])) }}" class="fundamental-cap-pill {{ $capGroup === 'mid' ? 'is-active' : '' }}">{{ __('Mid Cap · 2 bis unter 10 Mrd.') }}</a>
+                <a href="{{ route('fundamental.index', array_filter(['cap' => 'large', 'sector' => $sector, 'country' => $country, 'region' => $region, ...$carry])) }}" class="fundamental-cap-pill {{ $capGroup === 'large' ? 'is-active' : '' }}">{{ __('Large Cap · ab 10 Mrd.') }}</a>
             </div>
 
             <form method="GET" class="flex flex-wrap gap-2">
                 @if($capGroup)<input type="hidden" name="cap" value="{{ $capGroup }}">@endif
+                @foreach($carry as $key => $value)
+                    @if($value !== null)<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endif
+                @endforeach
                 <select name="sector" onchange="this.form.requestSubmit()" class="fundamental-select">
                     <option value="">{{ __('Alle Sektoren') }}</option>
                     @foreach($filterOptions['sectors'] as $s)
