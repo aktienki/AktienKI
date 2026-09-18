@@ -192,7 +192,7 @@
                                             $yDim = $yInverted ? "{$yb} > thresholds.{$panel['y_key']}" : "{$yb} < thresholds.{$panel['y_key']}";
                                         @endphp
                                         <div
-                                            class="fundamental-heatmap-cell relative flex aspect-square min-h-0 min-w-0 items-center justify-center rounded-[3px] border border-[rgba(34,211,238,.10)]"
+                                            class="fundamental-heatmap-cell relative flex aspect-square min-h-0 min-w-0 items-center justify-center rounded-[3px] border border-[rgba(34,211,238,.10)] {{ $panel['reduced'][$yb][$xb] ? 'is-dimmed' : '' }}"
                                             :class="({{ $xDim }} || {{ $yDim }}) && 'is-dimmed'"
                                             style="background-color: color-mix(in srgb, #22d3ee {{ round($intensity * 55, 1) }}%, transparent);"
                                             title="{{ __(':x_label :x_val :x_unit / :y_label :y_val :y_unit: :n Aktien', ['x_label' => $panel['x_label'], 'x_val' => $panel['x_ticks'][$xb], 'x_unit' => $panel['x_unit'], 'y_label' => $panel['y_label'], 'y_val' => $panel['y_ticks'][$yb], 'y_unit' => $panel['y_unit'], 'n' => $count]) }}"

@@ -53,13 +53,14 @@ final class FundamentalScreenerController extends Controller
         $filterOptions = ['sectors' => [], 'countries' => []];
 
         if (! $selected) {
-            $panels = $heatmaps->build($capGroup, $sector, $country, $region, $metricRanges);
+            $search = $request->query('q');
+            $panels = $heatmaps->build($capGroup, $sector, $country, $region, $metricRanges, $search);
             $filterOptions = $heatmaps->filterOptions();
             $table = $heatmaps->table(
                 $capGroup,
                 (string) $request->query('sort', 'market_cap'),
                 (string) $request->query('dir', 'desc'),
-                $request->query('q'),
+                $search,
                 max(1, (int) $request->query('page', 1)),
                 50,
                 $sector,

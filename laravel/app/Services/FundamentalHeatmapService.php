@@ -106,8 +106,9 @@ class FundamentalHeatmapService
 
     /**
      * @param  array<string, array{min?: float, max?: float}>  $metricRanges  Real-value min/max per metric key (trailing_pe, dividend_yield, return_on_equity, operating_margin, market_cap in raw currency), from dragging the heatmap axis lines.
+     * @param  string|null  $search  Symbol/name filter from the table's search box - applied to the heatmaps' baseline too, so typing a name also narrows what the panels count.
      */
-    public function build(?string $capGroup = null, ?string $sector = null, ?string $country = null, ?string $region = null, array $metricRanges = []): array
+    public function build(?string $capGroup = null, ?string $sector = null, ?string $country = null, ?string $region = null, array $metricRanges = [], ?string $search = null): array
     {
         $labels = [
             'trailing_pe' => ['label' => __('KGV'), 'unit' => 'x'],
@@ -131,12 +132,12 @@ class FundamentalHeatmapService
             fn ($_, $key) => $this->decileBoundaries($this->sanitizedMetricValues($universe, $key))
         );
 
-        $rows = $this->latestSnapshotPerInstrument($sector, $country, $region)
+        $baselineRows = $this->latestSnapshotPerInstrument($sector, $country, $region, $search)
             ->filter(fn ($row) => $this->hasAllFourMetrics($row))->values();
 
         if ($capGroup !== null && isset(self::CAP_GROUPS[$capGroup])) {
             $range = self::CAP_GROUPS[$capGroup];
-            $rows = $rows->filter(function ($row) use ($range) {
+            $baselineRows = $baselineRows->filter(function ($row) use ($range) {
                 if ($row->market_cap === null) {
                     return false;
                 }
@@ -146,7 +147,13 @@ class FundamentalHeatmapService
             })->values();
         }
 
-        $rows = $this->applyMetricRanges($rows, $metricRanges);
+        // "Baseline" = sector/country/region/cap applied (those affect every
+        // panel identically already), but WITHOUT the per-axis slider
+        // filters (metricRanges) - the reference used to grey out cells in
+        // panels that don't share the dragged axis, so dragging e.g. the
+        // KGV line visibly affects the ROE/Op.-Margin-only panels too,
+        // instead of only the panels that happen to plot KGV themselves.
+        $rows = $this->applyMetricRanges($baselineRows, $metricRanges);
 
         $metrics = $labels;
 
@@ -157,13 +164,13 @@ class FundamentalHeatmapService
             ['x' => 'dividend_yield', 'y' => 'operating_margin'],
         ];
 
-        return collect($panels)->map(function (array $pair) use ($rows, $metrics, $boundaries): array {
+        $buildGrid = function (array $pair, Collection $rowSet) use ($boundaries, $metrics): array {
             [$xKey, $yKey] = [$pair['x'], $pair['y']];
 
             $grid = array_fill(0, self::BUCKETS, array_fill(0, self::BUCKETS, 0));
             $used = 0;
 
-            foreach ($rows as $row) {
+            foreach ($rowSet as $row) {
                 $x = $row->{$xKey};
                 $y = $row->{$yKey};
                 if ($x === null || $y === null) {
@@ -195,6 +202,26 @@ class FundamentalHeatmapService
                 'max' => $max,
                 'instruments_used' => $used,
             ];
+        };
+
+        return collect($panels)->map(function (array $pair) use ($rows, $baselineRows, $buildGrid): array {
+            $current = $buildGrid($pair, $rows);
+            $baseline = $buildGrid($pair, $baselineRows);
+
+            // A cell is "reduced" if some active filter (including ones
+            // from OTHER axes, e.g. dragging the KGV line on a panel that
+            // doesn't even plot KGV) removed stocks from it, so every panel
+            // visibly reacts to every active filter - not just the 1-2
+            // panels that happen to share the dragged metric.
+            $reduced = array_map(
+                fn (array $currentRow, array $baselineRow) => array_map(
+                    fn (int $c, int $b) => $c < $b,
+                    $currentRow, $baselineRow,
+                ),
+                $current['grid'], $baseline['grid'],
+            );
+
+            return [...$current, 'reduced' => $reduced];
         })->all();
     }
 
@@ -342,7 +369,7 @@ class FundamentalHeatmapService
         return ['rows' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'sort' => $sort, 'dir' => $dir];
     }
 
-    private function latestSnapshotPerInstrument(?string $sector = null, ?string $country = null, ?string $region = null): Collection
+    private function latestSnapshotPerInstrument(?string $sector = null, ?string $country = null, ?string $region = null, ?string $search = null): Collection
     {
         $query = DB::table('instruments as i')
             ->joinSub(
@@ -362,6 +389,10 @@ class FundamentalHeatmapService
         }
         if ($region !== null && isset(self::REGIONS[$region])) {
             $query->whereIn('i.country', self::REGIONS[$region]['countries']);
+        }
+        if ($search !== null && trim($search) !== '') {
+            $term = '%'.trim($search).'%';
+            $query->where(fn ($q) => $q->where('i.symbol', 'ilike', $term)->orWhere('i.name', 'ilike', $term));
         }
 
         return collect($query->get())->map(fn ($row) => (object) [
