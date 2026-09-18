@@ -13,6 +13,31 @@
             border-color: var(--ak-border-strong);
             box-shadow: var(--ak-shadow-hover);
         }
+        /* Re-skin the shared dashboard-card components (market-atlas,
+           signal-overview, macro-indicator-cards) used inside the
+           Marktübersicht tab to match the master card language, without
+           touching .ak-standard-card globally - the same components are
+           also used on the main dashboard and should keep their own look
+           there. */
+        #dashboard-concept-page .ak-standard-card {
+            border-radius: 1.25rem !important;
+            box-shadow: var(--ak-shadow) !important;
+        }
+        #dashboard-concept-page .ak-standard-card-head {
+            background: var(--ak-surface-muted) !important;
+            border-bottom: 1px solid var(--ak-border) !important;
+            box-shadow: none !important;
+        }
+        /* Macro-indicator-cards use their own teal-tinted article/header
+           instead of .ak-standard-card-head - same neutral re-skin here. */
+        #dashboard-concept-page .ak-standard-card.rounded-2xl {
+            border-color: var(--ak-border) !important;
+            background: var(--ak-card) !important;
+        }
+        #dashboard-concept-page .ak-macro-card-head {
+            background: var(--ak-surface-muted) !important;
+            border-bottom-color: var(--ak-border) !important;
+        }
         #dashboard-concept-page .concept-layout {
             display: grid;
             gap: 1rem;
