@@ -94,16 +94,25 @@ class FundamentalHeatmapService
             'panel_score' => ['label' => __('Panel'), 'unit' => __('Pkt.')],
         ];
 
+        // Same stock base for all 4 panels: only instruments that have all
+        // 4 metrics at once, so "n Aktien" means the same thing on every
+        // panel instead of each pairing silently using whichever subset
+        // happens to have that particular pair of metrics (Panel coverage
+        // is much sparser than the others, so panels involving it would
+        // otherwise show noticeably fewer instruments).
+        $universe = $this->latestSnapshotPerInstrument()->filter(fn ($row) => $this->hasAllFourMetrics($row))->values();
+
         // The axis SCALE (decile boundaries) is fixed from the whole,
         // unfiltered universe - only which cells are populated should react
         // to sector/country/region/cap/range filters, not the axis itself,
         // otherwise every filter change reshuffles the grid and comparisons
         // across filter states become meaningless.
         $boundaries = collect($labels)->map(
-            fn ($_, $key) => $this->decileBoundaries($this->sanitizedMetricValues($this->latestSnapshotPerInstrument(), $key))
+            fn ($_, $key) => $this->decileBoundaries($this->sanitizedMetricValues($universe, $key))
         );
 
-        $rows = $this->latestSnapshotPerInstrument($sector, $country, $region);
+        $rows = $this->latestSnapshotPerInstrument($sector, $country, $region)
+            ->filter(fn ($row) => $this->hasAllFourMetrics($row))->values();
 
         if ($capGroup !== null && isset(self::CAP_GROUPS[$capGroup])) {
             $range = self::CAP_GROUPS[$capGroup];
@@ -358,6 +367,18 @@ class FundamentalHeatmapService
                 'ki_score' => is_numeric($s->ranking_score ?? null) ? (float) $s->ranking_score : null,
                 'panel_score' => is_numeric($s->panel_percentile ?? null) ? (float) $s->panel_percentile : null,
             ]);
+    }
+
+    /** True if a row has a plausible (sanitized) value for all 4 heatmap metrics - see sanitizedMetricValues() for the same bounds applied per-metric across a collection. */
+    private function hasAllFourMetrics(object $row): bool
+    {
+        foreach (['trailing_pe', 'dividend_yield', 'ki_score', 'panel_score'] as $key) {
+            if ($this->sanitizedMetricValues(collect([$row]), $key)->isEmpty()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** Same per-metric plausibility bounds used everywhere else in this class, extracted so the axis-scale computation (unfiltered universe) and the actual bucketing (filtered universe) apply identical sanitization. */
