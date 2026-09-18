@@ -35,26 +35,29 @@
     @if(!$selected)
         <div class="mb-3 flex items-start gap-1.5">
             <p class="text-xs font-semibold text-[var(--ak-muted)]">{{ __('Verteilung der gesamten Aktien-Universum über die 4 Kernkennzahlen. Regler filtern je Achse ab welchem Dezil Zellen hervorgehoben bleiben. Klick auf eine Aktie im Screener öffnet ihre eigene Detailseite.') }}</p>
-            <div class="fundamental-help" x-data="{ open: false }" @click.outside="open = false">
+            <div class="fundamental-help" x-data="{ open: false }" @keydown.escape.window="open = false">
                 <button type="button" class="fundamental-help-btn" @click="open = !open" :aria-expanded="open" aria-label="{{ __('Hilfe: Kennzahlen und Heatmaps erklärt') }}">
                     <x-heroicon-o-question-mark-circle class="h-4 w-4" />
                 </button>
-                <div class="fundamental-help-panel" x-show="open" x-cloak x-transition.opacity>
-                    <h4>{{ __('Kennzahlen') }}</h4>
-                    <dl>
-                        <dt>{{ __('KGV (Kurs-Gewinn-Verhältnis)') }}</dt>
-                        <dd>{{ __('Aktienkurs geteilt durch Gewinn je Aktie (trailing, letzte 12 Monate). Niedriger = die Aktie kostet weniger pro Euro/Dollar Gewinn – gilt grob als "günstiger". Sehr niedrige Werte können aber auch Zweifel am Geschäft widerspiegeln, sehr hohe hohe Wachstumserwartungen.') }}</dd>
-                        <dt>{{ __('Dividendenrendite') }}</dt>
-                        <dd>{{ __('Jährliche Dividende geteilt durch den Aktienkurs, in Prozent. Höher = mehr Ausschüttung pro investiertem Euro/Dollar. Ungewöhnlich hohe Werte (⚠️ in der Tabelle) sind oft eine "Dividend Trap": der Kurs ist eingebrochen, die alte Dividende wurde aber noch nicht gekürzt.') }}</dd>
-                        <dt>{{ __('ROE (Eigenkapitalrendite)') }}</dt>
-                        <dd>{{ __('Jahresgewinn geteilt durch das Eigenkapital, in Prozent. Misst, wie effizient ein Unternehmen mit dem Kapital seiner Aktionäre Gewinn erwirtschaftet – höher ist besser, aber auch stark schuldenfinanzierte Firmen können hier künstlich hoch stehen.') }}</dd>
-                        <dt>{{ __('Operating Margin') }}</dt>
-                        <dd>{{ __('Operatives Ergebnis geteilt durch Umsatz, in Prozent. Zeigt, wie viel vom Umsatz nach den laufenden Betriebskosten übrig bleibt, vor Zinsen und Steuern – höher bedeutet ein profitableres Kerngeschäft.') }}</dd>
-                    </dl>
-                    <h4>{{ __('Heatmaps benutzen') }}</h4>
-                    <p>{{ __('Jede Kachel zeigt zwei Kennzahlen gegeneinander: x-Achse und y-Achse sind je in 10 Dezile eingeteilt (gleich viele Aktien pro Dezil), die Zahl in jeder Zelle ist die Anzahl Aktien in genau dieser Kombination. Je dunkler/heller der Hintergrund, desto mehr Aktien liegen dort.') }}</p>
-                    <p>{{ __('Die gestrichelte Linie an jeder Achse ist ein Regler: anfassen und ziehen, beim Loslassen wird gefiltert. Bei KGV wirkt der Regler als Obergrenze ("bis X", günstige Seite bleibt erhalten), bei den anderen drei Kennzahlen als Untergrenze ("ab X"). Der aktuelle Filterwert steht unter jeder Heatmap.') }}</p>
-                    <p>{{ __('Da alle 4 Panels dieselbe Aktienauswahl teilen, wirkt ein Regler auf allen 4 Heatmaps gleichzeitig – auch auf Panels, die die gezogene Kennzahl gar nicht selbst zeigen. Zellen, die dadurch Aktien verloren haben, werden abgedunkelt statt ausgeblendet, damit die Gesamtstruktur sichtbar bleibt.') }}</p>
+                <div class="fundamental-help-backdrop" x-show="open" x-cloak x-transition.opacity @click="open = false">
+                    <div class="fundamental-help-panel" @click.stop>
+                        <button type="button" class="fundamental-help-close" @click="open = false" aria-label="{{ __('Schließen') }}">&times;</button>
+                        <h4>{{ __('Kennzahlen') }}</h4>
+                        <dl>
+                            <dt>{{ __('KGV (Kurs-Gewinn-Verhältnis)') }}</dt>
+                            <dd>{{ __('Aktienkurs geteilt durch Gewinn je Aktie (trailing, letzte 12 Monate). Niedriger = die Aktie kostet weniger pro Euro/Dollar Gewinn – gilt grob als "günstiger". Sehr niedrige Werte können aber auch Zweifel am Geschäft widerspiegeln, sehr hohe hohe Wachstumserwartungen.') }}</dd>
+                            <dt>{{ __('Dividendenrendite') }}</dt>
+                            <dd>{{ __('Jährliche Dividende geteilt durch den Aktienkurs, in Prozent. Höher = mehr Ausschüttung pro investiertem Euro/Dollar. Ungewöhnlich hohe Werte (⚠️ in der Tabelle) sind oft eine "Dividend Trap": der Kurs ist eingebrochen, die alte Dividende wurde aber noch nicht gekürzt.') }}</dd>
+                            <dt>{{ __('ROE (Eigenkapitalrendite)') }}</dt>
+                            <dd>{{ __('Jahresgewinn geteilt durch das Eigenkapital, in Prozent. Misst, wie effizient ein Unternehmen mit dem Kapital seiner Aktionäre Gewinn erwirtschaftet – höher ist besser, aber auch stark schuldenfinanzierte Firmen können hier künstlich hoch stehen.') }}</dd>
+                            <dt>{{ __('Operating Margin') }}</dt>
+                            <dd>{{ __('Operatives Ergebnis geteilt durch Umsatz, in Prozent. Zeigt, wie viel vom Umsatz nach den laufenden Betriebskosten übrig bleibt, vor Zinsen und Steuern – höher bedeutet ein profitableres Kerngeschäft.') }}</dd>
+                        </dl>
+                        <h4>{{ __('Heatmaps benutzen') }}</h4>
+                        <p>{{ __('Jede Kachel zeigt zwei Kennzahlen gegeneinander: x-Achse und y-Achse sind je in 10 Dezile eingeteilt (gleich viele Aktien pro Dezil), die Zahl in jeder Zelle ist die Anzahl Aktien in genau dieser Kombination. Je dunkler/heller der Hintergrund, desto mehr Aktien liegen dort.') }}</p>
+                        <p>{{ __('Die gestrichelte Linie an jeder Achse ist ein Regler: anfassen und ziehen, beim Loslassen wird gefiltert. Bei KGV wirkt der Regler als Obergrenze ("bis X", günstige Seite bleibt erhalten), bei den anderen drei Kennzahlen als Untergrenze ("ab X"). Der aktuelle Filterwert steht unter jeder Heatmap.') }}</p>
+                        <p>{{ __('Da alle 4 Panels dieselbe Aktienauswahl teilen, wirkt ein Regler auf allen 4 Heatmaps gleichzeitig – auch auf Panels, die die gezogene Kennzahl gar nicht selbst zeigen. Zellen, die dadurch Aktien verloren haben, werden abgedunkelt statt ausgeblendet, damit die Gesamtstruktur sichtbar bleibt.') }}</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -223,9 +226,9 @@
                     </header>
 
                     <div class="flex gap-1">
-                        <div class="flex flex-col justify-between py-[1px] text-right text-[6px] font-bold text-[var(--ak-muted)]">
+                        <div class="grid grid-rows-10 gap-[3px] text-right text-[6px] font-bold text-[var(--ak-muted)]">
                             @for($yb = 9; $yb >= 0; $yb--)
-                                <span>{{ $panel['y_ticks'][$yb] }}</span>
+                                <span class="flex items-center justify-end">{{ $panel['y_ticks'][$yb] }}</span>
                             @endfor
                         </div>
                         <div class="min-w-0 flex-1">
@@ -247,16 +250,16 @@
                                     @endfor
                                 @endfor
 
-                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--x" :style="`left: calc(${thresholds.{{ $panel['x_key'] }} * 10}% - ${thresholds.{{ $panel['x_key'] }} === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['x_key'] }}', axis: 'x', panel: {{ $i }} }">
+                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--x" :style="`left: calc((100% - 27px) * ${thresholds.{{ $panel['x_key'] }}} / 10 + ${thresholds.{{ $panel['x_key'] }} * 3}px - ${thresholds.{{ $panel['x_key'] }} === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['x_key'] }}', axis: 'x', panel: {{ $i }} }">
                                     <b></b><i></i>
                                 </span>
-                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--y" :style="`bottom: calc(${thresholds.{{ $panel['y_key'] }} * 10}% - ${thresholds.{{ $panel['y_key'] }} === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['y_key'] }}', axis: 'y', panel: {{ $i }} }">
+                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--y" :style="`bottom: calc((100% - 27px) * ${thresholds.{{ $panel['y_key'] }}} / 10 + ${thresholds.{{ $panel['y_key'] }} * 3}px - ${thresholds.{{ $panel['y_key'] }} === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['y_key'] }}', axis: 'y', panel: {{ $i }} }">
                                     <b></b><i></i>
                                 </span>
                             </div>
-                            <div class="mt-1 flex justify-between text-[6px] font-bold text-[var(--ak-muted)]">
+                            <div class="mt-1 grid grid-cols-10 gap-[3px] text-[6px] font-bold text-[var(--ak-muted)]">
                                 @for($xb = 0; $xb <= 9; $xb++)
-                                    <span>{{ $panel['x_ticks'][$xb] }}</span>
+                                    <span class="text-center">{{ $panel['x_ticks'][$xb] }}</span>
                                 @endfor
                             </div>
                         </div>
@@ -509,17 +512,28 @@
     }
     #fundamental-page .fundamental-help-btn:hover,
     #fundamental-page .fundamental-help-btn[aria-expanded="true"] { border-color: #22d3ee; color: #22d3ee; }
-    #fundamental-page .fundamental-help-panel {
-        position: absolute; z-index: 40; top: calc(100% + .4rem); left: 50%; transform: translateX(-50%);
-        width: min(26rem, 88vw); max-height: 70vh; overflow-y: auto; padding: .9rem 1rem; border-radius: .9rem;
-        border: 1px solid var(--ak-border); background: var(--ak-card); box-shadow: var(--ak-shadow);
+    #fundamental-page .fundamental-help-backdrop {
+        position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
+        padding: 1rem; background: rgba(2,8,20,.66);
     }
-    #fundamental-page .fundamental-help-panel h4 { font-size: .74rem; font-weight: 900; color: var(--ak-text); margin: 0 0 .4rem; }
+    #fundamental-page .fundamental-help-panel {
+        position: relative; width: min(30rem, 92vw); max-height: 80vh; overflow-y: auto;
+        padding: 1.1rem 1.25rem; border-radius: 1rem; border: 1px solid rgba(83,226,240,.25);
+        background: #071725; box-shadow: 0 30px 90px rgba(0,0,0,.6);
+    }
+    #fundamental-page .fundamental-help-close {
+        position: absolute; top: .6rem; right: .6rem; display: flex; align-items: center; justify-content: center;
+        width: 1.6rem; height: 1.6rem; border-radius: .5rem; border: 1px solid rgba(83,226,240,.25);
+        background: transparent; color: #9bb4ba; font-size: 1.1rem; line-height: 1; cursor: pointer;
+        transition: border-color .15s ease, color .15s ease;
+    }
+    #fundamental-page .fundamental-help-close:hover { color: #56e7f1; border-color: #56e7f1; }
+    #fundamental-page .fundamental-help-panel h4 { font-size: .78rem; font-weight: 900; color: #edf9fa; margin: 0 .8rem .4rem 0; }
     #fundamental-page .fundamental-help-panel h4:not(:first-child) { margin-top: .8rem; }
-    #fundamental-page .fundamental-help-panel dt { font-size: .68rem; font-weight: 800; color: #22d3ee; margin-top: .5rem; }
+    #fundamental-page .fundamental-help-panel dt { font-size: .7rem; font-weight: 800; color: #56e7f1; margin-top: .5rem; }
     #fundamental-page .fundamental-help-panel dt:first-child { margin-top: 0; }
-    #fundamental-page .fundamental-help-panel dd { font-size: .68rem; font-weight: 500; line-height: 1.45; color: var(--ak-muted); margin: .15rem 0 0; }
-    #fundamental-page .fundamental-help-panel p { font-size: .68rem; font-weight: 500; line-height: 1.45; color: var(--ak-muted); margin: .5rem 0 0; }
+    #fundamental-page .fundamental-help-panel dd { font-size: .7rem; font-weight: 500; line-height: 1.5; color: #9bb4ba; margin: .15rem 0 0; }
+    #fundamental-page .fundamental-help-panel p { font-size: .7rem; font-weight: 500; line-height: 1.5; color: #9bb4ba; margin: .5rem 0 0; }
     #fundamental-page .fundamental-pe-diff { font-size: .62rem; font-weight: 700; color: var(--ak-muted); margin-left: .2rem; }
     #fundamental-page .fundamental-pe-diff.pos { color: #34d399; }
     #fundamental-page .fundamental-pe-diff.neg { color: #fb7185; }
