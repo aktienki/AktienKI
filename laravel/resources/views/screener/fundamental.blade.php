@@ -9,8 +9,55 @@
         </div>
     </header>
 
+    <div class="fundamental-layout">
+        <nav class="fundamental-symbol-grid" aria-label="{{ __('Ansicht') }}">
+            @if($selected)
+                <a href="{{ route('fundamental.index') }}" class="fundamental-symbol-tile fundamental-symbol-tile--current" title="{{ __('Zurück zur Übersicht') }}">
+                    <strong>{{ $selected->symbol }}</strong>
+                </a>
+            @else
+                <div class="fundamental-symbol-tile fundamental-symbol-tile--current is-disabled" title="{{ __('Noch keine Aktie ausgewählt') }}">
+                    <x-heroicon-o-magnifying-glass class="h-5 w-5" />
+                    <small>{{ __('Kein Symbol') }}</small>
+                </div>
+            @endif
+            <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'ratios' }" @click="active = 'ratios'" @if(!$selected) disabled @endif>
+                <x-heroicon-o-calculator class="h-5 w-5" />
+                <small>{{ __('Kennzahlen') }}</small>
+            </button>
+            <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'quarters' }" @click="active = 'quarters'" @if(!$selected) disabled @endif>
+                <x-heroicon-o-document-chart-bar class="h-5 w-5" />
+                <small>{{ __('Quartalszahlen') }}</small>
+            </button>
+        </nav>
+
+        <section class="fundamental-main">
     @if(!$selected)
-        <p class="mb-3 text-xs font-semibold text-[var(--ak-muted)]">{{ __('Verteilung der gesamten Aktien-Universum über die 4 Kernkennzahlen. Regler filtern je Achse ab welchem Dezil Zellen hervorgehoben bleiben. Klick auf eine Aktie im Screener öffnet ihre eigene Detailseite.') }}</p>
+        <div class="mb-3 flex items-start gap-1.5">
+            <p class="text-xs font-semibold text-[var(--ak-muted)]">{{ __('Verteilung der gesamten Aktien-Universum über die 4 Kernkennzahlen. Regler filtern je Achse ab welchem Dezil Zellen hervorgehoben bleiben. Klick auf eine Aktie im Screener öffnet ihre eigene Detailseite.') }}</p>
+            <div class="fundamental-help" x-data="{ open: false }" @click.outside="open = false">
+                <button type="button" class="fundamental-help-btn" @click="open = !open" :aria-expanded="open" aria-label="{{ __('Hilfe: Kennzahlen und Heatmaps erklärt') }}">
+                    <x-heroicon-o-question-mark-circle class="h-4 w-4" />
+                </button>
+                <div class="fundamental-help-panel" x-show="open" x-cloak x-transition.opacity>
+                    <h4>{{ __('Kennzahlen') }}</h4>
+                    <dl>
+                        <dt>{{ __('KGV (Kurs-Gewinn-Verhältnis)') }}</dt>
+                        <dd>{{ __('Aktienkurs geteilt durch Gewinn je Aktie (trailing, letzte 12 Monate). Niedriger = die Aktie kostet weniger pro Euro/Dollar Gewinn – gilt grob als "günstiger". Sehr niedrige Werte können aber auch Zweifel am Geschäft widerspiegeln, sehr hohe hohe Wachstumserwartungen.') }}</dd>
+                        <dt>{{ __('Dividendenrendite') }}</dt>
+                        <dd>{{ __('Jährliche Dividende geteilt durch den Aktienkurs, in Prozent. Höher = mehr Ausschüttung pro investiertem Euro/Dollar. Ungewöhnlich hohe Werte (⚠️ in der Tabelle) sind oft eine "Dividend Trap": der Kurs ist eingebrochen, die alte Dividende wurde aber noch nicht gekürzt.') }}</dd>
+                        <dt>{{ __('ROE (Eigenkapitalrendite)') }}</dt>
+                        <dd>{{ __('Jahresgewinn geteilt durch das Eigenkapital, in Prozent. Misst, wie effizient ein Unternehmen mit dem Kapital seiner Aktionäre Gewinn erwirtschaftet – höher ist besser, aber auch stark schuldenfinanzierte Firmen können hier künstlich hoch stehen.') }}</dd>
+                        <dt>{{ __('Operating Margin') }}</dt>
+                        <dd>{{ __('Operatives Ergebnis geteilt durch Umsatz, in Prozent. Zeigt, wie viel vom Umsatz nach den laufenden Betriebskosten übrig bleibt, vor Zinsen und Steuern – höher bedeutet ein profitableres Kerngeschäft.') }}</dd>
+                    </dl>
+                    <h4>{{ __('Heatmaps benutzen') }}</h4>
+                    <p>{{ __('Jede Kachel zeigt zwei Kennzahlen gegeneinander: x-Achse und y-Achse sind je in 10 Dezile eingeteilt (gleich viele Aktien pro Dezil), die Zahl in jeder Zelle ist die Anzahl Aktien in genau dieser Kombination. Je dunkler/heller der Hintergrund, desto mehr Aktien liegen dort.') }}</p>
+                    <p>{{ __('Die gestrichelte Linie an jeder Achse ist ein Regler: anfassen und ziehen, beim Loslassen wird gefiltert. Bei KGV wirkt der Regler als Obergrenze ("bis X", günstige Seite bleibt erhalten), bei den anderen drei Kennzahlen als Untergrenze ("ab X"). Der aktuelle Filterwert steht unter jeder Heatmap.') }}</p>
+                    <p>{{ __('Da alle 4 Panels dieselbe Aktienauswahl teilen, wirkt ein Regler auf allen 4 Heatmaps gleichzeitig – auch auf Panels, die die gezogene Kennzahl gar nicht selbst zeigen. Zellen, die dadurch Aktien verloren haben, werden abgedunkelt statt ausgeblendet, damit die Gesamtstruktur sichtbar bleibt.') }}</p>
+                </div>
+            </div>
+        </div>
 
         @php
             // Every param that can currently be active, so every link/form on
@@ -217,11 +264,17 @@
                     <p class="mt-1 text-center text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ $panel['x_label'] }} <span class="normal-case tracking-normal text-[var(--ak-muted)]">({{ $panel['x_unit'] }})</span></p>
                     <p class="mt-1.5 flex items-center justify-between text-[9px] font-bold text-[var(--ak-muted)]">
                         @php
-                            $thresholdExpr = fn (string $metric, array $ticks) =>
-                                "thresholds.{$metric} === 0 ? '".__('Alle')."' : '".__('ab')." ' + ".json_encode($ticks)."[thresholds.{$metric}]";
+                            // Inverted (KGV): "no filter" rests at threshold===9 and the
+                            // cap is an UPPER bound, so the label must read "bis <upper
+                            // edge of the highest kept bucket>" - using ticks[threshold+1]
+                            // since ticks[b] holds bucket b's LOWER edge. Normal metrics
+                            // keep the original "ab <lower edge>" / threshold===0 = "Alle".
+                            $thresholdExpr = fn (string $metric, array $ticks, bool $inverted) => $inverted
+                                ? "thresholds.{$metric} === 9 ? '".__('Alle')."' : '".__('bis')." ' + ".json_encode($ticks)."[thresholds.{$metric} + 1]"
+                                : "thresholds.{$metric} === 0 ? '".__('Alle')."' : '".__('ab')." ' + ".json_encode($ticks)."[thresholds.{$metric}]";
                         @endphp
-                        <span>{{ $panel['y_label'] }} <span class="opacity-70">({{ $panel['y_unit'] }})</span>: <b class="text-[var(--ak-text)]" x-text="{{ $thresholdExpr($panel['y_key'], $panel['y_ticks']) }}"></b></span>
-                        <span>{{ $panel['x_label'] }} <span class="opacity-70">({{ $panel['x_unit'] }})</span>: <b class="text-[var(--ak-text)]" x-text="{{ $thresholdExpr($panel['x_key'], $panel['x_ticks']) }}"></b></span>
+                        <span>{{ $panel['y_label'] }} <span class="opacity-70">({{ $panel['y_unit'] }})</span>: <b class="text-[var(--ak-text)]" x-text="{{ $thresholdExpr($panel['y_key'], $panel['y_ticks'], $yInverted) }}"></b></span>
+                        <span>{{ $panel['x_label'] }} <span class="opacity-70">({{ $panel['x_unit'] }})</span>: <b class="text-[var(--ak-text)]" x-text="{{ $thresholdExpr($panel['x_key'], $panel['x_ticks'], $xInverted) }}"></b></span>
                     </p>
                 </div>
             @endforeach
@@ -326,22 +379,6 @@
             </div>
         </div>
     @else
-        <div class="fundamental-layout">
-            <nav class="fundamental-symbol-grid" aria-label="{{ __('Ansicht') }}">
-                <a href="{{ route('fundamental.index') }}" class="fundamental-symbol-tile fundamental-symbol-tile--current" title="{{ __('Zurück zur Übersicht') }}">
-                    <strong>{{ $selected->symbol }}</strong>
-                </a>
-                <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'ratios' }" @click="active = 'ratios'">
-                    <x-heroicon-o-calculator class="h-5 w-5" />
-                    <small>{{ __('Kennzahlen') }}</small>
-                </button>
-                <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'quarters' }" @click="active = 'quarters'">
-                    <x-heroicon-o-document-chart-bar class="h-5 w-5" />
-                    <small>{{ __('Quartalszahlen') }}</small>
-                </button>
-            </nav>
-
-            <section class="fundamental-main">
                 <div class="ak-master-card fundamental-section" x-show="active === 'ratios'" x-cloak>
                     <div class="ak-master-card-header fundamental-head-inner"><h2 class="text-base font-black">{{ __('Kennzahlen') }}</h2></div>
                     <div class="fundamental-ratios-body">
@@ -411,9 +448,9 @@
                     @endforeach
                     <p class="fundamental-footnote">{{ __('Kerzenchart = ±10 Handelstage um den Termin, gestrichelte Linie markiert den Bericht. Quartale sind nach Kalenderquartal des Berichtsdatums gruppiert (Q1=Jan-Mär …).') }}</p>
                 </div>
-            </section>
-        </div>
     @endif
+        </section>
+    </div>
 </div>
 
 <style>
@@ -439,6 +476,14 @@
     #fundamental-page .fundamental-symbol-tile--current strong { font-size: .58rem; font-weight: 900; text-align: center; line-height: 1.05; color: #fbbf24; word-break: break-word; }
     #fundamental-page .fundamental-symbol-tile svg { width: 1.15rem; height: 1.15rem; flex: none; }
     #fundamental-page .fundamental-symbol-tile small { font-size: .5rem; font-weight: 800; text-align: center; line-height: 1.05; }
+    #fundamental-page .fundamental-symbol-tile:disabled,
+    #fundamental-page .fundamental-symbol-tile.is-disabled {
+        cursor: not-allowed; opacity: .35; border-color: var(--ak-border-strong);
+        background: none; color: var(--ak-text);
+    }
+    #fundamental-page .fundamental-symbol-tile.is-disabled strong { color: var(--ak-text); }
+    #fundamental-page .fundamental-symbol-tile:disabled:hover,
+    #fundamental-page .fundamental-symbol-tile.is-disabled:hover { border-color: var(--ak-border-strong); }
 
     #fundamental-page .fundamental-section { padding: 0; }
     #fundamental-page .fundamental-head-inner { padding: 1rem 1.1rem; }
@@ -456,6 +501,25 @@
     #fundamental-page .fundamental-select { padding: .5rem .7rem; border-radius: .7rem; border: 1px solid var(--ak-border); background: var(--ak-card); font-size: .72rem; font-weight: 700; color: var(--ak-text); }
     #fundamental-page .fundamental-reset-pill { display: inline-flex; align-items: center; gap: .3rem; padding: .5rem .8rem; border-radius: .7rem; border: 1px solid rgba(251,113,133,.35); background: rgba(251,113,133,.06); font-size: .72rem; font-weight: 800; color: #fb7185; text-decoration: none; transition: background .15s ease; }
     #fundamental-page .fundamental-reset-pill:hover { background: rgba(251,113,133,.14); }
+    #fundamental-page .fundamental-help { position: relative; flex: none; }
+    #fundamental-page .fundamental-help-btn {
+        display: flex; align-items: center; justify-content: center; width: 1.15rem; height: 1.15rem;
+        border-radius: 999px; border: 1px solid var(--ak-border); background: var(--ak-card);
+        color: var(--ak-muted); cursor: pointer; transition: border-color .15s ease, color .15s ease;
+    }
+    #fundamental-page .fundamental-help-btn:hover,
+    #fundamental-page .fundamental-help-btn[aria-expanded="true"] { border-color: #22d3ee; color: #22d3ee; }
+    #fundamental-page .fundamental-help-panel {
+        position: absolute; z-index: 40; top: calc(100% + .4rem); left: 0; width: min(26rem, 88vw);
+        max-height: 70vh; overflow-y: auto; padding: .9rem 1rem; border-radius: .9rem;
+        border: 1px solid var(--ak-border); background: var(--ak-card); box-shadow: var(--ak-shadow);
+    }
+    #fundamental-page .fundamental-help-panel h4 { font-size: .74rem; font-weight: 900; color: var(--ak-text); margin: 0 0 .4rem; }
+    #fundamental-page .fundamental-help-panel h4:not(:first-child) { margin-top: .8rem; }
+    #fundamental-page .fundamental-help-panel dt { font-size: .68rem; font-weight: 800; color: #22d3ee; margin-top: .5rem; }
+    #fundamental-page .fundamental-help-panel dt:first-child { margin-top: 0; }
+    #fundamental-page .fundamental-help-panel dd { font-size: .68rem; font-weight: 500; line-height: 1.45; color: var(--ak-muted); margin: .15rem 0 0; }
+    #fundamental-page .fundamental-help-panel p { font-size: .68rem; font-weight: 500; line-height: 1.45; color: var(--ak-muted); margin: .5rem 0 0; }
     #fundamental-page .fundamental-pe-diff { font-size: .62rem; font-weight: 700; color: var(--ak-muted); margin-left: .2rem; }
     #fundamental-page .fundamental-pe-diff.pos { color: #34d399; }
     #fundamental-page .fundamental-pe-diff.neg { color: #fb7185; }
