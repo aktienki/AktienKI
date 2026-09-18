@@ -314,21 +314,21 @@
                                                 <div class="text-[15px] font-black text-{{ $highlight['color'] }}-500">{{ $highlight['metric_value'] }}</div>
                                             </div>
 
-                                            <div class="grid grid-cols-2 gap-1.5 mb-2 text-[9px]">
+                                            <div class="grid grid-cols-3 gap-1.5 mb-2 text-[9px]">
                                                 @if($details['current_price'])
-                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1">
+                                                    <div class="rounded border border-[var(--ak-border)] px-2 py-1">
                                                         <span class="block text-[var(--ak-muted)]">{{ __('Kurs') }}</span>
                                                         <span class="font-bold text-[var(--ak-text)]">{{ number_format($details['current_price'], 2, ',', '.') }} {{ $details['currency'] }}</span>
                                                     </div>
                                                 @endif
                                                 @if($details['risk'] !== null)
-                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1">
+                                                    <div class="rounded border border-[var(--ak-border)] px-2 py-1">
                                                         <span class="block text-[var(--ak-muted)]">{{ __('Risiko') }}</span>
                                                         <span class="font-bold text-[var(--ak-text)]">{{ $details['risk'] }}/10</span>
                                                     </div>
                                                 @endif
                                                 @if($details['confidence'] !== null)
-                                                    <div class="rounded bg-[var(--ak-surface-muted)] px-2 py-1">
+                                                    <div class="rounded border border-[var(--ak-border)] px-2 py-1">
                                                         <span class="block text-[var(--ak-muted)]">{{ __('Konfidenz') }}</span>
                                                         <span class="font-bold text-[var(--ak-text)]">{{ $details['confidence'] }}%</span>
                                                     </div>
@@ -345,7 +345,7 @@
                                                      anchors are invalid HTML), and the analog's stock can differ
                                                      from the card's own, so it isn't safe to just reuse the outer
                                                      href either. --}}
-                                                <div class="mb-2 flex items-center gap-2 rounded-lg bg-[var(--ak-surface-muted)] px-2 py-1.5">
+                                                <div class="mb-2 flex items-center gap-2 rounded-lg border border-[var(--ak-border)] px-2 py-1.5">
                                                     <span class="min-w-0 flex-1 text-[9px] leading-4 text-[var(--ak-muted)]">
                                                         <span class="text-[var(--ak-text)]">•</span>
                                                         @if($analog['type'] === 'same_stock')
