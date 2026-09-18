@@ -3978,7 +3978,7 @@ main:has(#stock-matrix) form select option {
         border-left: 1px solid color-mix(in srgb, var(--ak-muted) 13%, transparent);
     }
 
-    .screener-desktop-price strong { position: relative; display: inline-block; white-space: nowrap; font-size: .88rem; font-weight: 900; }
+    .screener-desktop-price strong { position: relative; display: inline-block; align-self: flex-start; white-space: nowrap; font-size: .88rem; font-weight: 900; }
     .screener-desktop-price strong em { color:var(--ak-muted); font-size:.65rem; font-style:normal; }
     .screener-desktop-price small,
     .screener-desktop-signal small,
@@ -8465,8 +8465,8 @@ body .ak-topbar-menu > a:focus-visible {
 
     .screener-page .screener-live-dot {
         position:absolute;
-        top:-.25rem;
-        right:-.45rem;
+        top:-.1rem;
+        right:-.1rem;
         width:.4rem;
         height:.4rem;
         border-radius:999px;
