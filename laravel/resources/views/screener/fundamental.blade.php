@@ -270,7 +270,17 @@
                                 <td>{{ \App\Services\FundamentalHeatmapService::countryFlag($row->country) }} {{ $row->country }}</td>
                                 <td>{{ __($row->sector ?: '—') }}</td>
                                 <td class="text-right tabular-nums">{{ $row->trailing_pe !== null ? number_format($row->trailing_pe, 1, ',', '.') : '–' }}</td>
-                                <td class="text-right tabular-nums">{{ $row->dividend_yield !== null ? number_format($row->dividend_yield, 2, ',', '.').' %' : '–' }}</td>
+                                <td class="text-right tabular-nums">
+                                    @if($row->dividend_yield !== null)
+                                        @if($row->dividend_yield > 20)
+                                            <span title="{{ __('Unplausibel hoch – möglicherweise fehlerhafter oder veralteter Rohwert der Datenquelle, nicht rausgefiltert um Transparenz zu wahren.') }}">⚠️ {{ number_format($row->dividend_yield, 2, ',', '.') }} %</span>
+                                        @else
+                                            {{ number_format($row->dividend_yield, 2, ',', '.') }} %
+                                        @endif
+                                    @else
+                                        –
+                                    @endif
+                                </td>
                                 <td class="text-right tabular-nums">{{ $row->return_on_equity !== null ? number_format($row->return_on_equity, 1, ',', '.').' %' : '–' }}</td>
                                 <td class="text-right tabular-nums">{{ $row->operating_margin !== null ? number_format($row->operating_margin, 1, ',', '.').' %' : '–' }}</td>
                                 <td class="text-right tabular-nums">{{ $row->market_cap !== null ? number_format($row->market_cap / 1_000_000_000, 1, ',', '.').' Mrd.' : '–' }}</td>
