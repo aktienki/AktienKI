@@ -22,9 +22,11 @@ final class FundamentalScreenerController extends Controller
         $years = [];
         $ratios = null;
         $panels = [];
+        $capGroup = $request->query('cap');
+        $capGroup = in_array($capGroup, array_keys(FundamentalHeatmapService::CAP_GROUPS), true) ? $capGroup : null;
 
         if (! $selected) {
-            $panels = $heatmaps->build();
+            $panels = $heatmaps->build($capGroup);
         }
 
         if ($selected) {
@@ -50,6 +52,7 @@ final class FundamentalScreenerController extends Controller
             'years' => $years,
             'ratios' => $ratios,
             'panels' => $panels,
+            'capGroup' => $capGroup,
         ]);
     }
 }

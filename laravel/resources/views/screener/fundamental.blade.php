@@ -11,6 +11,14 @@
 
     @if(!$selected)
         <p class="mb-3 text-xs font-semibold text-[var(--ak-muted)]">{{ __('Verteilung der gesamten Aktien-Universum über die 4 Kernkennzahlen. Regler filtern je Achse ab welchem Dezil Zellen hervorgehoben bleiben. Klick auf eine Aktie im Screener öffnet ihre eigene Detailseite.') }}</p>
+
+        <div class="fundamental-cap-filters mb-4 flex flex-wrap gap-2">
+            <a href="{{ route('fundamental.index') }}" class="fundamental-cap-pill {{ $capGroup === null ? 'is-active' : '' }}">{{ __('Alle Größen') }}</a>
+            <a href="{{ route('fundamental.index', ['cap' => 'small']) }}" class="fundamental-cap-pill {{ $capGroup === 'small' ? 'is-active' : '' }}">{{ __('Small Cap · unter 2 Mrd.') }}</a>
+            <a href="{{ route('fundamental.index', ['cap' => 'mid']) }}" class="fundamental-cap-pill {{ $capGroup === 'mid' ? 'is-active' : '' }}">{{ __('Mid Cap · 2 bis unter 10 Mrd.') }}</a>
+            <a href="{{ route('fundamental.index', ['cap' => 'large']) }}" class="fundamental-cap-pill {{ $capGroup === 'large' ? 'is-active' : '' }}">{{ __('Large Cap · ab 10 Mrd.') }}</a>
+        </div>
+
         <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
             @foreach($panels as $i => $panel)
                 <div class="fundamental-heatmap-card flex h-auto min-w-0 flex-col rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-4 shadow-[var(--ak-shadow)]"
@@ -196,6 +204,10 @@
     #fundamental-page .fundamental-ratio span { display: block; font-size: .6rem; font-weight: 800; color: var(--ak-muted); text-transform: uppercase; letter-spacing: .02em; }
     #fundamental-page .fundamental-ratio b { display: block; margin-top: .25rem; font-size: 1rem; font-weight: 900; }
     #fundamental-page .fundamental-footnote { margin-top: 1rem; font-size: .68rem; color: var(--ak-muted); line-height: 1.6; }
+
+    #fundamental-page .fundamental-cap-pill { display: inline-flex; align-items: center; padding: .5rem .9rem; border-radius: .7rem; border: 1px solid var(--ak-border); font-size: .72rem; font-weight: 800; color: var(--ak-muted); text-decoration: none; transition: border-color .15s ease, background .15s ease, color .15s ease; }
+    #fundamental-page .fundamental-cap-pill:hover { border-color: color-mix(in srgb, #22d3ee 45%, transparent); color: var(--ak-text); }
+    #fundamental-page .fundamental-cap-pill.is-active { border-color: #22d3ee; background: color-mix(in srgb, #22d3ee 14%, transparent); color: #22d3ee; }
 
     #fundamental-page .fundamental-heatmap-cell { transition: opacity .15s ease; }
     #fundamental-page .fundamental-heatmap-cell.is-dimmed { opacity: .18; }

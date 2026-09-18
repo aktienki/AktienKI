@@ -23,9 +23,28 @@ class FundamentalHeatmapService
 {
     private const BUCKETS = 10;
 
-    public function build(): array
+    /** Same thresholds as AutomatedPortfolioService's market_cap_group filter. */
+    public const CAP_GROUPS = [
+        'small' => ['label' => 'Small Cap', 'max' => 2_000_000_000],
+        'mid' => ['label' => 'Mid Cap', 'min' => 2_000_000_000, 'max' => 10_000_000_000],
+        'large' => ['label' => 'Large Cap', 'min' => 10_000_000_000],
+    ];
+
+    public function build(?string $capGroup = null): array
     {
         $rows = $this->latestSnapshotPerInstrument();
+
+        if ($capGroup !== null && isset(self::CAP_GROUPS[$capGroup])) {
+            $range = self::CAP_GROUPS[$capGroup];
+            $rows = $rows->filter(function ($row) use ($range) {
+                if ($row->market_cap === null) {
+                    return false;
+                }
+
+                return (! isset($range['min']) || $row->market_cap >= $range['min'])
+                    && (! isset($range['max']) || $row->market_cap < $range['max']);
+            })->values();
+        }
 
         $metrics = [
             'trailing_pe' => [
