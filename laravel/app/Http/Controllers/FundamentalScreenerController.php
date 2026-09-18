@@ -33,7 +33,7 @@ final class FundamentalScreenerController extends Controller
         // (released -> page reload). market cap travels in Mrd. in the URL
         // for readability, converted back to raw currency here.
         $metricRanges = [];
-        $metricParams = ['pe' => 'trailing_pe', 'dy' => 'dividend_yield', 'mc' => 'market_cap', 'rg' => 'revenue_growth'];
+        $metricParams = ['pe' => 'trailing_pe', 'dy' => 'dividend_yield', 'ks' => 'ki_score', 'ps' => 'panel_score', 'rg' => 'revenue_growth', 'mc' => 'market_cap'];
         foreach ($metricParams as $param => $key) {
             $min = $request->query("{$param}_min");
             $max = $request->query("{$param}_max");
@@ -57,7 +57,7 @@ final class FundamentalScreenerController extends Controller
             $filterOptions = $heatmaps->filterOptions();
             $table = $heatmaps->table(
                 $capGroup,
-                (string) $request->query('sort', 'market_cap'),
+                (string) $request->query('sort', 'ki_score'),
                 (string) $request->query('dir', 'desc'),
                 $request->query('q'),
                 max(1, (int) $request->query('page', 1)),

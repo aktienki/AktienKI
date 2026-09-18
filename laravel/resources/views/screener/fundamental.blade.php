@@ -56,6 +56,12 @@
                     @endforeach
                 </select>
             </form>
+
+            @if($allParams !== [])
+                <a href="{{ route('fundamental.index') }}" class="fundamental-reset-pill" title="{{ __('Alle Filter zurücksetzen') }}">
+                    <x-heroicon-o-x-mark class="h-3.5 w-3.5" />{{ __('Zurücksetzen') }}
+                </a>
+            @endif
         </div>
 
         @php
@@ -64,7 +70,7 @@
                 $boundariesByMetric[$panel['x_key']] = $panel['x_boundaries_raw'];
                 $boundariesByMetric[$panel['y_key']] = $panel['y_boundaries_raw'];
             }
-            $metricUrlParam = ['trailing_pe' => 'pe', 'dividend_yield' => 'dy', 'market_cap' => 'mc', 'revenue_growth' => 'rg'];
+            $metricUrlParam = ['trailing_pe' => 'pe', 'dividend_yield' => 'dy', 'ki_score' => 'ks', 'panel_score' => 'ps'];
         @endphp
         <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4"
              x-data="{
@@ -212,7 +218,9 @@
                             <th>{{ __('Sektor') }}</th>
                             <th class="text-right">{!! $sortLink('trailing_pe', __('KGV')) !!}</th>
                             <th class="text-right">{!! $sortLink('dividend_yield', __('Div.-Rendite')) !!}</th>
-                            <th class="text-right">{!! $sortLink('market_cap', __('Marktkap.')) !!}</th>
+                            <th class="text-right">{!! $sortLink('ki_score', __('Score')) !!}</th>
+                            <th class="text-right">{!! $sortLink('panel_score', __('Panel')) !!}</th>
+                            <th class="text-right">{{ __('Marktkap.') }}</th>
                             <th class="text-right">{!! $sortLink('revenue_growth', __('Umsatzwachstum')) !!}</th>
                         </tr>
                     </thead>
@@ -225,11 +233,13 @@
                                 <td>{{ __($row->sector ?: '—') }}</td>
                                 <td class="text-right tabular-nums">{{ $row->trailing_pe !== null ? number_format($row->trailing_pe, 1, ',', '.') : '–' }}</td>
                                 <td class="text-right tabular-nums">{{ $row->dividend_yield !== null ? number_format($row->dividend_yield, 2, ',', '.').' %' : '–' }}</td>
+                                <td class="text-right tabular-nums">{{ $row->ki_score !== null ? number_format($row->ki_score, 0, ',', '.') : '–' }}</td>
+                                <td class="text-right tabular-nums">{{ $row->panel_score !== null ? number_format($row->panel_score, 0, ',', '.') : '–' }}</td>
                                 <td class="text-right tabular-nums">{{ $row->market_cap !== null ? number_format($row->market_cap / 1_000_000_000, 1, ',', '.').' Mrd.' : '–' }}</td>
                                 <td class="text-right tabular-nums">{{ $row->revenue_growth !== null ? number_format($row->revenue_growth, 1, ',', '.').' %' : '–' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="py-6 text-center text-[var(--ak-muted)]">{{ __('Keine Treffer.') }}</td></tr>
+                            <tr><td colspan="10" class="py-6 text-center text-[var(--ak-muted)]">{{ __('Keine Treffer.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -377,6 +387,8 @@
     #fundamental-page .fundamental-cap-pill:hover { border-color: color-mix(in srgb, #22d3ee 45%, transparent); color: var(--ak-text); }
     #fundamental-page .fundamental-cap-pill.is-active { border-color: #22d3ee; background: color-mix(in srgb, #22d3ee 14%, transparent); color: #22d3ee; }
     #fundamental-page .fundamental-select { padding: .5rem .7rem; border-radius: .7rem; border: 1px solid var(--ak-border); background: var(--ak-card); font-size: .72rem; font-weight: 700; color: var(--ak-text); }
+    #fundamental-page .fundamental-reset-pill { display: inline-flex; align-items: center; gap: .3rem; padding: .5rem .8rem; border-radius: .7rem; border: 1px solid rgba(251,113,133,.35); background: rgba(251,113,133,.06); font-size: .72rem; font-weight: 800; color: #fb7185; text-decoration: none; transition: background .15s ease; }
+    #fundamental-page .fundamental-reset-pill:hover { background: rgba(251,113,133,.14); }
 
     #fundamental-page .fundamental-table-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: 1rem 1.1rem; flex-wrap: wrap; }
     #fundamental-page .fundamental-table-search input { width: 220px; }
