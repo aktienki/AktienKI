@@ -218,6 +218,22 @@
                 @php
                     $xInverted = in_array($panel['x_key'], $invertedMetrics, true);
                     $yInverted = in_array($panel['y_key'], $invertedMetrics, true);
+                    // The drag line marks the boundary between the last KEPT
+                    // bucket and the first DIMMED one. For normal metrics
+                    // (dim bucket < threshold) that's the start of bucket
+                    // `threshold` itself. For inverted ones (dim bucket >
+                    // threshold, i.e. threshold IS the last kept bucket)
+                    // it's one bucket further right: the start of
+                    // `threshold + 1`. Without this, "no filter" (max
+                    // threshold) draws the line before the last column
+                    // instead of past it.
+                    $xPos = $xInverted ? "(thresholds.{$panel['x_key']} + 1)" : "thresholds.{$panel['x_key']}";
+                    $yPos = $yInverted ? "(thresholds.{$panel['y_key']} + 1)" : "thresholds.{$panel['y_key']}";
+                    // Built as plain PHP string concatenation (not Blade
+                    // {{ }} interpolation) so the literal JS "${" here can't
+                    // collide with Blade's own brace-matching.
+                    $xDragStyle = 'left: calc((100% - 27px) * ${'.$xPos.'} / 10 + ${'.$xPos.' * 3}px - ${'.$xPos.' === 0 ? 0 : 1.5}px)';
+                    $yDragStyle = 'bottom: calc((100% - 27px) * ${'.$yPos.'} / 10 + ${'.$yPos.' * 3}px - ${'.$yPos.' === 0 ? 0 : 1.5}px)';
                 @endphp
                 <div class="fundamental-heatmap-card flex h-auto min-w-0 flex-col rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-4 shadow-[var(--ak-shadow)]">
                     <header class="mb-2">
@@ -250,10 +266,10 @@
                                     @endfor
                                 @endfor
 
-                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--x" :style="`left: calc((100% - 27px) * ${thresholds.{{ $panel['x_key'] }}} / 10 + ${thresholds.{{ $panel['x_key'] }} * 3}px - ${thresholds.{{ $panel['x_key'] }} === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['x_key'] }}', axis: 'x', panel: {{ $i }} }">
+                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--x" :style="`{{ $xDragStyle }}`" @pointerdown="dragging = { metric: '{{ $panel['x_key'] }}', axis: 'x', panel: {{ $i }} }">
                                     <b></b><i></i>
                                 </span>
-                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--y" :style="`bottom: calc((100% - 27px) * ${thresholds.{{ $panel['y_key'] }}} / 10 + ${thresholds.{{ $panel['y_key'] }} * 3}px - ${thresholds.{{ $panel['y_key'] }} === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['y_key'] }}', axis: 'y', panel: {{ $i }} }">
+                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--y" :style="`{{ $yDragStyle }}`" @pointerdown="dragging = { metric: '{{ $panel['y_key'] }}', axis: 'y', panel: {{ $i }} }">
                                     <b></b><i></i>
                                 </span>
                             </div>
