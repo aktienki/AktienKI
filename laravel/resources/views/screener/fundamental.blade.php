@@ -79,10 +79,42 @@
             // direction as every other slider, but it keeps the cheap
             // (left) side and dims the expensive (right) side.
             $invertedMetrics = ['trailing_pe'];
+
+            // Rebuild the slider's starting decile position from whatever
+            // pe_max/dy_min/etc. is currently active in the URL, so a
+            // reload (from dragging, or from any other filter link/form on
+            // this page) doesn't snap the handle back to "no filter" while
+            // the grid itself stays filtered.
+            $initialThresholds = [];
+            foreach ($metricUrlParam as $key => $param) {
+                $bounds = $boundariesByMetric[$key] ?? [];
+                $inverted = in_array($key, $invertedMetrics, true);
+                $active = $inverted ? ($metricRangeParams[$param]['max'] ?? null) : ($metricRangeParams[$param]['min'] ?? null);
+                $default = $inverted ? 9 : 0;
+
+                if ($active === null || $bounds === []) {
+                    $initialThresholds[$key] = $default;
+
+                    continue;
+                }
+
+                $activeValue = (float) $active;
+                $closestIndex = null;
+                $closestDiff = null;
+                foreach ($bounds as $index => $boundary) {
+                    $diff = abs($boundary - $activeValue);
+                    if ($closestDiff === null || $diff < $closestDiff) {
+                        $closestDiff = $diff;
+                        $closestIndex = $index;
+                    }
+                }
+
+                $initialThresholds[$key] = $inverted ? $closestIndex : $closestIndex + 1;
+            }
         @endphp
         <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4"
              x-data="{
-                thresholds: { trailing_pe: 9, dividend_yield: 0, return_on_equity: 0, operating_margin: 0 },
+                thresholds: {{ json_encode($initialThresholds) }},
                 boundaries: {{ json_encode($boundariesByMetric) }},
                 urlParam: {{ json_encode($metricUrlParam) }},
                 inverted: {{ json_encode($invertedMetrics) }},
