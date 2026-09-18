@@ -1171,6 +1171,16 @@
                                                     'blended' => __('eigene + globale Historie'),
                                                     default => __('globale Historie'),
                                                 };
+                                                // For a bearish pattern, "scenario probability" means the
+                                                // chance the price FALLS, not the raw rise_probability_20d
+                                                // the stats tables store - show its complement with a
+                                                // matching label instead of a rise-probability number that
+                                                // would read backwards next to a bearish signal.
+                                                $isBearish = $row['tone'] === 'negative';
+                                                $scenarioLabel = $isBearish ? __('Rückgang wahrsch. (20T)') : __('Anstieg wahrsch. (20T)');
+                                                $scenarioProbability = $row['rise_probability_20d'] === null
+                                                    ? null
+                                                    : ($isBearish ? 100 - $row['rise_probability_20d'] : $row['rise_probability_20d']);
                                             @endphp
                                             <div class="mt-auto grid grid-cols-2 gap-1.5 text-[9px]">
                                                 <div class="rounded border border-[var(--ak-border)] px-2 py-1">
@@ -1178,8 +1188,8 @@
                                                     <span class="font-bold {{ ($row['change_pct'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $row['change_pct'] === null ? '—' : number_format($row['change_pct'], 1, ',', '.').' %' }}</span>
                                                 </div>
                                                 <div class="rounded border border-[var(--ak-border)] px-2 py-1" title="{{ $row['probability_sample_size'] !== null ? __(':scope, :n Fälle (3 Jahre)', ['scope' => $scopeLabel, 'n' => $row['probability_sample_size']]) : '' }}">
-                                                    <span class="block text-[var(--ak-muted)]">{{ __('Anstieg wahrsch. (20T)') }}</span>
-                                                    <span class="font-bold text-[var(--ak-text)]">{{ $row['rise_probability_20d'] === null ? '—' : number_format($row['rise_probability_20d'], 0, ',', '.').' %' }}</span>
+                                                    <span class="block text-[var(--ak-muted)]">{{ $scenarioLabel }}</span>
+                                                    <span class="font-bold text-[var(--ak-text)]">{{ $scenarioProbability === null ? '—' : number_format($scenarioProbability, 0, ',', '.').' %' }}</span>
                                                 </div>
                                             </div>
 
