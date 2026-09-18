@@ -63,9 +63,9 @@ class FundamentalHeatmapService
     }
 
     /** ISO 3166-1 alpha-2 -> flag emoji, via Unicode regional indicator symbols (works for any valid code, no lookup table needed). */
-    public static function countryFlag(string $code): string
+    public static function countryFlag(?string $code): string
     {
-        $code = strtoupper($code);
+        $code = strtoupper((string) $code);
         if (strlen($code) !== 2) {
             return '';
         }
