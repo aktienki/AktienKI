@@ -184,6 +184,15 @@ final class ServingScreenerService
         $instrumentIds = $rows->pluck('instrument_id')->map(fn ($id): int => (int) $id)->all();
         $batchIds = $rows->pluck('batch_id')->filter()->unique()->all();
         $snapshotKey = sha1(implode(',', $instrumentIds).'|'.implode(',', $batchIds));
+        // serving_instruments.sector_code (used below in stock()) is largely
+        // unpopulated - the local instruments.sector column (TwelveData free
+        // text, e.g. "Industrials") has real coverage for the same stocks,
+        // so it's the fallback whenever the serving side comes back empty.
+        $localSectors = $instrumentIds === []
+            ? collect()
+            : Cache::store('file')->remember('screener.serving.local-sectors.v1.'.$snapshotKey, now()->addMinutes(5), fn () => DB::table('instruments')
+                ->whereIn('id', $instrumentIds)
+                ->pluck('sector', 'id'));
         $predictions = $instrumentIds === []
             ? collect()
             : Cache::store('file')->remember('screener.serving.predictions.v1.'.$snapshotKey, now()->addMinutes(5), fn () => DB::connection('serving')->table('serving_predictions')
@@ -224,19 +233,24 @@ final class ServingScreenerService
                 ->unique('instrument_id')
                 ->keyBy('instrument_id');
 
-        $stocks = $rows->map(function (object $row) use ($predictions, $statuses, $transitions, $request): object {
+        $stocks = $rows->map(function (object $row) use ($predictions, $statuses, $transitions, $request, $localSectors): object {
             $stockPredictions = collect($predictions->get((int) $row->instrument_id, collect()))
                 ->filter(fn (object $prediction): bool => (string) $prediction->batch_id === (string) $row->batch_id)
                 ->values();
             $stockStatuses = collect($statuses->get((int) $row->instrument_id, collect()));
 
-            return $this->stock(
+            $stock = $this->stock(
                 $row,
                 $stockPredictions,
                 $stockStatuses,
                 $transitions->get((int) $row->instrument_id),
                 $request,
             );
+            if ($stock->sector === '') {
+                $stock->sector = (string) ($localSectors->get((int) $row->instrument_id) ?? '');
+            }
+
+            return $stock;
         });
         $canUsePro = $request->user() && $this->plans->allowsTariff($request->user(), PlanLevel::Pro);
         if ($canUsePro) {
