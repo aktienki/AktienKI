@@ -176,7 +176,15 @@
                 },
                 onMove(e) {
                     if (!this.dragging) return;
-                    const v = this.pctFromEvent(e, this.dragging.axis, this.dragging.panel);
+                    let v = this.pctFromEvent(e, this.dragging.axis, this.dragging.panel);
+                    // For an inverted metric the line renders one bucket
+                    // past the threshold (see $xDragStyle/$yDragStyle in the
+                    // blade above), so the achievable line positions are
+                    // shifted right by one bucket-width relative to the raw
+                    // pointer-to-bucket reading - shift the detected bucket
+                    // back by one to match, or the line would visibly lag
+                    // the cursor by a full column while dragging.
+                    if (this.inverted.includes(this.dragging.metric)) v = Math.max(0, v - 1);
                     if (this.thresholds[this.dragging.metric] !== v) this.changed = true;
                     this.thresholds[this.dragging.metric] = v;
                 },
