@@ -44,10 +44,15 @@
             grid-template-columns: 1fr;
         }
         @media (min-width: 900px) {
-            #dashboard-concept-page .concept-layout { grid-template-columns: 96px minmax(0, 1fr); align-items: start; }
+            #dashboard-concept-page .concept-layout { grid-template-columns: 96px minmax(0, 1fr); }
         }
         /* Left column: a fixed 1-wide grid, not flex-wrap, so it can never
-           accidentally reflow into more than one column. */
+           accidentally reflow into more than one column. align-self: start
+           keeps its own intrinsic height (never stretches to match the
+           scrollable content column's height) - the content column is
+           left at the grid default (stretch) so its own min-h-0 +
+           overflow-y-auto utility classes can actually bound and scroll
+           it instead of growing to fit everything. */
         #dashboard-concept-page .concept-icon-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -57,6 +62,7 @@
             background: none;
             border: 0;
             box-shadow: none;
+            align-self: start;
         }
         #dashboard-concept-page .concept-icon-tile {
             display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3rem;
@@ -220,8 +226,8 @@
         }
     </style>
 
-    <div id="dashboard-concept-page" x-data="{ active: 'today-focus' }">
-        <header class="mb-5">
+    <div id="dashboard-concept-page" x-data="{ active: 'today-focus' }" class="flex min-h-[calc(100dvh-73px)] flex-col xl:h-[calc(100dvh-89px)] xl:min-h-0">
+        <header class="mb-5 shrink-0">
             <p class="text-[10px] font-black uppercase tracking-[.16em] text-cyan-500">{{ __('Konzept') }}</p>
             <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)]">{{ __('Persönlicher Bereich') }}</h1>
             <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Links: 1×8-Symbolraster. Ein Klick auf ein Symbol wechselt den Inhalt rechts zur Kurzübersicht dieses Bereichs.') }}</p>
@@ -229,9 +235,14 @@
             <a href="{{ route('upcoming-events.index') }}" class="mt-1 ml-3 inline-flex items-center gap-1 text-[10px] font-black text-cyan-500 hover:text-cyan-400">{{ __('Anstehende News') }} →</a>
         </header>
 
-        <div class="concept-layout">
+        {{-- Only this row scrolls internally (min-h-0 lets the grid item
+             shrink below its content size so overflow-y-auto below can
+             actually engage) - header above and the icon nav inside it
+             stay in place, same fixed-viewport pattern as
+             setup/saved-filters.blade.php's #personal-dashboard. --}}
+        <div class="concept-layout min-h-0 flex-1">
             {{-- Left: 1x8 icon grid - stays exactly as-is, just gains an active state --}}
-            <nav class="concept-card concept-icon-grid" aria-label="{{ __('Persönlicher Bereich') }}">
+            <nav class="concept-card concept-icon-grid shrink-0" aria-label="{{ __('Persönlicher Bereich') }}">
                 @foreach($leftIcons as $item)
                     <button
                         type="button"
@@ -247,7 +258,7 @@
             </nav>
 
             {{-- Right: defaults straight to Heute im Fokus, swaps to whichever section is active --}}
-            <div>
+            <div class="min-h-0 overflow-y-auto pr-1">
                 @foreach($sections as $section)
                     <section class="concept-card concept-main-card" x-show="active === '{{ $section['id'] }}'" x-cloak>
                         <div class="concept-main-header">
