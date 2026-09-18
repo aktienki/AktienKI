@@ -406,6 +406,75 @@ final class DashboardConceptController extends Controller
             ->values()
             ->all();
 
+        // Explicit, actionable candidates for the next ~48h: patterns that
+        // actually just triggered (not the abstract ranking above), kept
+        // only when their own historical track record clears a real edge
+        // (>=60%, same minimum sample as the ranking) - not every fresh
+        // signal, just the ones worth acting on. Reuses recentEvents()'s
+        // existing 1-day window widened to 2 days (its own days param,
+        // added for this) rather than a separate detection query.
+        $minOpportunityProbability = 60.0;
+        $opportunities = app(ChartPatternSignalService::class)->recentEvents(2)
+            ->map(function (array $event): array {
+                $isBearish = $event['tone'] === 'negative';
+                $scenarioProbability = $event['rise_probability_20d'] === null
+                    ? null
+                    : ($isBearish ? 100 - $event['rise_probability_20d'] : $event['rise_probability_20d']);
+
+                return [
+                    'symbol' => $event['symbol'],
+                    'name' => $event['name'],
+                    'country_flag' => self::COUNTRY_FLAGS[$event['country']] ?? '🌐',
+                    'label' => $event['label'],
+                    'tone' => $event['tone'],
+                    'time' => $event['time'],
+                    'sample_size' => $event['probability_sample_size'],
+                    'scenario_probability' => $scenarioProbability,
+                    'url' => route('stocks.show', ['symbol' => $event['symbol'], 'return_to' => '/dashboard/concept']),
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['scenario_probability'] !== null
+                && $row['scenario_probability'] >= $minOpportunityProbability
+                && $row['sample_size'] !== null && $row['sample_size'] >= $minSampleSize)
+            ->sortByDesc('scenario_probability')
+            ->take(10)
+            ->values()
+            ->all();
+
+        // "Quartalszahlen in den nächsten 48h - wie reagiert der Markt
+        // normalerweise, Enttäuschungs-/Überraschungspotenzial?": the event
+        // itself is forward-looking (corporate_events), the answer is this
+        // stock's own historical beat/miss reaction (earnings_price_reactions
+        // via EarningsDriftStatsService) - no minimum sample here, since
+        // "kaum Historie vorhanden" is itself useful information for an
+        // imminent report, not something to hide.
+        $upcomingEarnings = \App\Models\CorporateEvent::query()
+            ->with('instrument:id,symbol,name')
+            ->where('event_type', 'earnings')
+            ->whereBetween('event_date', [now()->toDateString(), now()->addHours(48)->toDateString()])
+            ->get()
+            ->filter(fn (\App\Models\CorporateEvent $event): bool => $event->instrument !== null);
+        $earningsHistory = app(EarningsDriftStatsService::class)
+            ->forInstruments($upcomingEarnings->pluck('instrument_id')->unique()->all());
+        $upcomingEarningsWithHistory = $upcomingEarnings
+            ->map(function (\App\Models\CorporateEvent $event) use ($earningsHistory): array {
+                $history = $earningsHistory->get($event->instrument_id);
+
+                return [
+                    'symbol' => $event->instrument->symbol,
+                    'name' => $event->instrument->name,
+                    'date' => Carbon::parse($event->event_date)->format('d.m.Y'),
+                    'post3dBeat' => $history && $history['post3dBeat'] !== null ? round($history['post3dBeat'], 1) : null,
+                    'post3dMiss' => $history && $history['post3dMiss'] !== null ? round($history['post3dMiss'], 1) : null,
+                    'n' => $history['n'] ?? 0,
+                    'url' => route('stocks.show', ['symbol' => $event->instrument->symbol, 'return_to' => '/dashboard/concept']),
+                ];
+            })
+            ->sortByDesc(fn (array $row): float => max(abs($row['post3dBeat'] ?? 0), abs($row['post3dMiss'] ?? 0)))
+            ->take(10)
+            ->values()
+            ->all();
+
         $panelDeciles = app(PanelScoreDriftStatsService::class)->decileBreakdown()
             ->map(fn (array $row): array => [
                 'decile' => $row['decile'],
@@ -448,6 +517,8 @@ final class DashboardConceptController extends Controller
             'id' => $id,
             'kind' => 'pattern-analysis',
             'chartPatterns' => $chartPatterns,
+            'opportunities' => $opportunities,
+            'upcomingEarnings' => $upcomingEarningsWithHistory,
             'panelDeciles' => $panelDeciles,
             'maxAbsPanelReturn' => $maxAbsPanelReturn,
             'earningsDrift' => $earningsDrift,

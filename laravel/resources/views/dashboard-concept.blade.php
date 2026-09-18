@@ -1300,6 +1300,62 @@
                             @endif
                         @elseif($section['kind'] === 'pattern-analysis')
                             <div class="grid gap-3 lg:grid-cols-2">
+                                {{-- Aktuelle Handelsmöglichkeiten: ausgelöste Muster --}}
+                                <div class="ak-master-card">
+                                    <div class="ak-master-card-header">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                                            <x-heroicon-o-bolt class="h-4.5 w-4.5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <b class="block text-[12px] font-black text-[var(--ak-text)]">{{ __('Aktuelle Handelsmöglichkeiten') }}</b>
+                                            <small class="block text-[9px] text-[var(--ak-muted)]">{{ __('Ausgelöste Muster (48h) · ≥60 % Trefferquote') }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="ak-master-card-body grid gap-1.5">
+                                        @forelse($section['opportunities'] as $opp)
+                                            <a href="{{ $opp['url'] }}" class="flex items-center gap-2 rounded-lg border border-[var(--ak-border)] px-2.5 py-2 transition hover:border-{{ $opp['tone'] === 'negative' ? 'rose' : 'emerald' }}-400">
+                                                <span class="text-base leading-none">{{ $opp['country_flag'] }}</span>
+                                                <span class="min-w-0 flex-1">
+                                                    <b class="block truncate text-[10px] text-[var(--ak-text)]">{{ $opp['symbol'] }} · {{ $opp['label'] }}</b>
+                                                    <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $opp['name'] }} · {{ __(':n Fälle', ['n' => $opp['sample_size']]) }}</small>
+                                                </span>
+                                                <span class="shrink-0 text-[11px] font-black {{ $opp['tone'] === 'negative' ? 'text-rose-500' : 'text-emerald-500' }}">{{ number_format($opp['scenario_probability'], 0, ',', '.') }} %</span>
+                                            </a>
+                                        @empty
+                                            <div class="concept-empty">{{ __('Aktuell kein Muster mit ausreichender Trefferquote ausgelöst.') }}</div>
+                                        @endforelse
+                                    </div>
+                                </div>
+
+                                {{-- Aktuelle Handelsmöglichkeiten: anstehende Quartalszahlen --}}
+                                <div class="ak-master-card">
+                                    <div class="ak-master-card-header">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-500">
+                                            <x-heroicon-o-exclamation-triangle class="h-4.5 w-4.5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <b class="block text-[12px] font-black text-[var(--ak-text)]">{{ __('Überraschungspotenzial') }}</b>
+                                            <small class="block text-[9px] text-[var(--ak-muted)]">{{ __('Quartalszahlen (48h) · historische Reaktion') }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="ak-master-card-body grid gap-1.5">
+                                        @forelse($section['upcomingEarnings'] as $earnings)
+                                            <a href="{{ $earnings['url'] }}" class="flex items-center gap-2 rounded-lg border border-[var(--ak-border)] px-2.5 py-2 transition hover:border-amber-400">
+                                                <span class="min-w-0 flex-1">
+                                                    <b class="block truncate text-[10px] text-[var(--ak-text)]">{{ $earnings['symbol'] }}</b>
+                                                    <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $earnings['name'] }} · {{ $earnings['date'] }} · {{ $earnings['n'] > 0 ? __(':n Termine Historie', ['n' => $earnings['n']]) : __('keine Historie') }}</small>
+                                                </span>
+                                                <span class="shrink-0 text-right text-[9px]">
+                                                    <span class="block text-[var(--ak-muted)]">{{ __('Beat') }} <b class="font-black {{ ($earnings['post3dBeat'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $earnings['post3dBeat'] === null ? '—' : number_format($earnings['post3dBeat'], 1, ',', '.').' %' }}</b></span>
+                                                    <span class="block text-[var(--ak-muted)]">{{ __('Miss') }} <b class="font-black {{ ($earnings['post3dMiss'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $earnings['post3dMiss'] === null ? '—' : number_format($earnings['post3dMiss'], 1, ',', '.').' %' }}</b></span>
+                                                </span>
+                                            </a>
+                                        @empty
+                                            <div class="concept-empty">{{ __('Keine Quartalszahlen in den nächsten 48 Stunden.') }}</div>
+                                        @endforelse
+                                    </div>
+                                </div>
+
                                 {{-- Chartmuster-Rangliste --}}
                                 <div class="ak-master-card">
                                     <div class="ak-master-card-header">

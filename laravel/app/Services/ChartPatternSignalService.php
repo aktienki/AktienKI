@@ -35,10 +35,10 @@ final class ChartPatternSignalService
         'price_below_sma50' => [50],
     ];
 
-    public function recentEvents(): Collection
+    public function recentEvents(int $days = 1): Collection
     {
-        return Cache::remember(self::CACHE_KEY, now()->addMinutes(15), function (): Collection {
-            $events = $this->detect();
+        return Cache::remember(self::CACHE_KEY.'.days'.$days, now()->addMinutes(15), function () use ($days): Collection {
+            $events = $this->detect($days);
             $events = $this->attachProbabilities($events);
 
             return $this->attachCharts($events);
@@ -433,7 +433,7 @@ final class ChartPatternSignalService
         return $series;
     }
 
-    private function detect(): Collection
+    private function detect(int $days = 1): Collection
     {
         $rows = DB::select(<<<'SQL'
             WITH source_counts AS (
@@ -505,10 +505,10 @@ final class ChartPatternSignalService
                 WINDOW w AS (PARTITION BY instrument_id ORDER BY bar_time)
             ), recent_days AS (
                 -- Daily bars only ever advance once per trading day, so "the
-                -- last 24h" of events is just the single most recent
-                -- bar_time - not a rolling now()-24h window, which would
-                -- intermittently see zero rows depending on time of day.
-                SELECT DISTINCT bar_time FROM series ORDER BY bar_time DESC LIMIT 1
+                -- last N days" of events is just the N most recent distinct
+                -- bar_times - not a rolling now()-N*24h window, which would
+                -- intermittently see fewer rows depending on time of day.
+                SELECT DISTINCT bar_time FROM series ORDER BY bar_time DESC LIMIT ?
             )
             SELECT s.instrument_id, i.symbol, i.name, i.country, s.bar_time, s.close, s.previous_close,
                    s.bollinger_upper, s.bollinger_lower, s.prior_20_high, s.prior_20_low,
@@ -533,7 +533,7 @@ final class ChartPatternSignalService
             ) AS event(event_key, label_de, tone, triggered)
             WHERE event.triggered AND s.bar_time IN (SELECT bar_time FROM recent_days)
             ORDER BY s.bar_time DESC, i.symbol
-        SQL);
+        SQL, [max(1, $days)]);
 
         return collect($rows)->map(fn (object $row): array => [
             'instrument_id' => (int) $row->instrument_id,
