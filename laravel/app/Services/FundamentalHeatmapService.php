@@ -261,10 +261,16 @@ class FundamentalHeatmapService
 
         $query = DB::table('instruments as i')
             ->joinSub(
-                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, return_on_equity, operating_margin
+                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, return_on_equity, operating_margin, shares_outstanding
                  from instrument_fundamentals order by instrument_id, snapshot_date desc, id desc",
                 'f',
                 'f.instrument_id', '=', 'i.id',
+            )
+            ->leftJoinSub(
+                "select distinct on (instrument_id) instrument_id, close as current_close
+                 from price_bars where interval = '1d' order by instrument_id, bar_time desc",
+                'p',
+                'p.instrument_id', '=', 'i.id',
             )
             ->where('i.type', 'stock')->whereNull('i.deleted_at')
             ->when($sector !== null && $sector !== '', fn ($q) => $q->where('i.sector', $sector))
@@ -288,6 +294,16 @@ class FundamentalHeatmapService
                 'f.market_cap',
                 DB::raw('f.return_on_equity * 100 as return_on_equity'),
                 DB::raw('f.operating_margin * 100 as operating_margin'),
+                // Live KGV = stored trailing_pe scaled by how much the price has
+                // moved since the fundamentals snapshot (snapshot price =
+                // market_cap / shares_outstanding) - same trailing EPS, current
+                // price. NULLIF guards div-by-zero on missing shares_outstanding.
+                DB::raw("
+                    CASE WHEN f.trailing_pe IS NOT NULL AND p.current_close IS NOT NULL
+                              AND f.market_cap IS NOT NULL AND NULLIF(f.shares_outstanding, 0) IS NOT NULL
+                         THEN f.trailing_pe * (p.current_close / (f.market_cap / f.shares_outstanding))
+                    END as trailing_pe_live
+                "),
             ]);
 
         if ($capGroup !== null && isset(self::CAP_GROUPS[$capGroup])) {

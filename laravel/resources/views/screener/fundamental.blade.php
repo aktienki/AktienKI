@@ -256,6 +256,7 @@
                             <th>{{ __('Land') }}</th>
                             <th>{{ __('Sektor') }}</th>
                             <th class="text-right">{!! $sortLink('trailing_pe', __('KGV')) !!}</th>
+                            <th class="text-right" title="{{ __('KGV mit dem gespeicherten KGV skaliert auf den aktuellen Kurs (gleicher Gewinn, aktueller Kurs statt Kurs zum Snapshot-Zeitpunkt).') }}">{{ __('KGV (aktuell)') }}</th>
                             <th class="text-right">{!! $sortLink('dividend_yield', __('Div.-Rendite')) !!}</th>
                             <th class="text-right">{!! $sortLink('return_on_equity', __('ROE')) !!}</th>
                             <th class="text-right">{!! $sortLink('operating_margin', __('Op.-Marge')) !!}</th>
@@ -270,6 +271,15 @@
                                 <td>{{ \App\Services\FundamentalHeatmapService::countryFlag($row->country) }} {{ $row->country }}</td>
                                 <td>{{ __($row->sector ?: '—') }}</td>
                                 <td class="text-right tabular-nums">{{ $row->trailing_pe !== null ? number_format($row->trailing_pe, 1, ',', '.') : '–' }}</td>
+                                <td class="text-right tabular-nums">
+                                    @if($row->trailing_pe_live !== null)
+                                        @php $peDiff = $row->trailing_pe_live - $row->trailing_pe; @endphp
+                                        {{ number_format($row->trailing_pe_live, 1, ',', '.') }}
+                                        <span class="fundamental-pe-diff {{ $peDiff < 0 ? 'pos' : ($peDiff > 0 ? 'neg' : '') }}">({{ $peDiff >= 0 ? '+' : '' }}{{ number_format($peDiff, 1, ',', '.') }})</span>
+                                    @else
+                                        –
+                                    @endif
+                                </td>
                                 <td class="text-right tabular-nums">
                                     @if($row->dividend_yield !== null)
                                         @if($row->dividend_yield > 20)
@@ -286,7 +296,7 @@
                                 <td class="text-right tabular-nums">{{ $row->market_cap !== null ? number_format($row->market_cap / 1_000_000_000, 1, ',', '.').' Mrd.' : '–' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="py-6 text-center text-[var(--ak-muted)]">{{ __('Keine Treffer.') }}</td></tr>
+                            <tr><td colspan="10" class="py-6 text-center text-[var(--ak-muted)]">{{ __('Keine Treffer.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -436,6 +446,9 @@
     #fundamental-page .fundamental-select { padding: .5rem .7rem; border-radius: .7rem; border: 1px solid var(--ak-border); background: var(--ak-card); font-size: .72rem; font-weight: 700; color: var(--ak-text); }
     #fundamental-page .fundamental-reset-pill { display: inline-flex; align-items: center; gap: .3rem; padding: .5rem .8rem; border-radius: .7rem; border: 1px solid rgba(251,113,133,.35); background: rgba(251,113,133,.06); font-size: .72rem; font-weight: 800; color: #fb7185; text-decoration: none; transition: background .15s ease; }
     #fundamental-page .fundamental-reset-pill:hover { background: rgba(251,113,133,.14); }
+    #fundamental-page .fundamental-pe-diff { font-size: .62rem; font-weight: 700; color: var(--ak-muted); margin-left: .2rem; }
+    #fundamental-page .fundamental-pe-diff.pos { color: #34d399; }
+    #fundamental-page .fundamental-pe-diff.neg { color: #fb7185; }
 
     #fundamental-page .fundamental-table-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: 1rem 1.1rem; flex-wrap: wrap; }
     #fundamental-page .fundamental-table-search input { width: 220px; }
