@@ -74,10 +74,7 @@
         @endphp
         <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4"
              x-data="{
-                thresholds: {
-                    trailing_pe: { min: 0, max: 9 }, dividend_yield: { min: 0, max: 9 },
-                    market_cap: { min: 0, max: 9 }, revenue_growth: { min: 0, max: 9 },
-                },
+                thresholds: { trailing_pe: 0, dividend_yield: 0, ki_score: 0, panel_score: 0 },
                 boundaries: {{ json_encode($boundariesByMetric) }},
                 urlParam: {{ json_encode($metricUrlParam) }},
                 dragging: null, changed: false,
@@ -89,21 +86,16 @@
                 onMove(e) {
                     if (!this.dragging) return;
                     const v = this.pctFromEvent(e, this.dragging.axis, this.dragging.panel);
-                    const t = this.thresholds[this.dragging.metric];
-                    const before = JSON.stringify(t);
-                    if (this.dragging.bound === 'min') { t.min = Math.min(v, t.max); } else { t.max = Math.max(v, t.min); }
-                    if (JSON.stringify(t) !== before) this.changed = true;
+                    if (this.thresholds[this.dragging.metric] !== v) this.changed = true;
+                    this.thresholds[this.dragging.metric] = v;
                 },
                 onRelease() {
                     if (this.dragging && this.changed) {
                         const form = this.$refs.filterForm;
                         for (const metric in this.thresholds) {
                             const t = this.thresholds[metric], b = this.boundaries[metric], p = this.urlParam[metric];
-                            const minField = form.elements[p + '_min'], maxField = form.elements[p + '_max'];
-                            minField.value = ''; maxField.value = '';
-                            if (!b || b.length === 0) continue;
-                            if (t.min > 0) minField.value = metric === 'market_cap' ? (b[t.min - 1] / 1e9) : b[t.min - 1];
-                            if (t.max < 9) maxField.value = metric === 'market_cap' ? (b[t.max] / 1e9) : b[t.max];
+                            const minField = form.elements[p + '_min'];
+                            minField.value = (t > 0 && b && b.length > 0) ? b[t - 1] : '';
                         }
                         form.elements['page'].value = '';
                         form.requestSubmit();
@@ -121,7 +113,6 @@
                 <input type="hidden" name="page" value="">
                 @foreach($metricUrlParam as $param)
                     <input type="hidden" name="{{ $param }}_min" value="{{ $metricRangeParams[$param]['min'] ?? '' }}">
-                    <input type="hidden" name="{{ $param }}_max" value="{{ $metricRangeParams[$param]['max'] ?? '' }}">
                 @endforeach
             </form>
             @foreach($panels as $i => $panel)
@@ -147,23 +138,17 @@
                                         @endphp
                                         <div
                                             class="fundamental-heatmap-cell relative flex aspect-square min-h-0 min-w-0 items-center justify-center rounded-[3px] border border-[rgba(34,211,238,.10)]"
-                                            :class="({{ $xb }} < thresholds.{{ $panel['x_key'] }}.min || {{ $xb }} > thresholds.{{ $panel['x_key'] }}.max || {{ $yb }} < thresholds.{{ $panel['y_key'] }}.min || {{ $yb }} > thresholds.{{ $panel['y_key'] }}.max) && 'is-dimmed'"
+                                            :class="({{ $xb }} < thresholds.{{ $panel['x_key'] }} || {{ $yb }} < thresholds.{{ $panel['y_key'] }}) && 'is-dimmed'"
                                             style="background-color: color-mix(in srgb, #22d3ee {{ round($intensity * 55, 1) }}%, transparent);"
                                             title="{{ __(':x_label :x_val :x_unit / :y_label :y_val :y_unit: :n Aktien', ['x_label' => $panel['x_label'], 'x_val' => $panel['x_ticks'][$xb], 'x_unit' => $panel['x_unit'], 'y_label' => $panel['y_label'], 'y_val' => $panel['y_ticks'][$yb], 'y_unit' => $panel['y_unit'], 'n' => $count]) }}"
                                         ><span class="text-[6px] font-black tabular-nums text-[var(--ak-text)] {{ $count === 0 ? 'opacity-20' : '' }}">{{ $count }}</span></div>
                                     @endfor
                                 @endfor
 
-                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--x" :style="`left: calc(${thresholds.{{ $panel['x_key'] }}.min * 10}% - ${thresholds.{{ $panel['x_key'] }}.min === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['x_key'] }}', axis: 'x', bound: 'min', panel: {{ $i }} }">
+                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--x" :style="`left: calc(${thresholds.{{ $panel['x_key'] }} * 10}% - ${thresholds.{{ $panel['x_key'] }} === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['x_key'] }}', axis: 'x', panel: {{ $i }} }">
                                     <b></b><i></i>
                                 </span>
-                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--x" :style="`left: calc(${(thresholds.{{ $panel['x_key'] }}.max + 1) * 10}% - ${thresholds.{{ $panel['x_key'] }}.max === 9 ? 3 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['x_key'] }}', axis: 'x', bound: 'max', panel: {{ $i }} }">
-                                    <b></b><i></i>
-                                </span>
-                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--y" :style="`bottom: calc(${thresholds.{{ $panel['y_key'] }}.min * 10}% - ${thresholds.{{ $panel['y_key'] }}.min === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['y_key'] }}', axis: 'y', bound: 'min', panel: {{ $i }} }">
-                                    <b></b><i></i>
-                                </span>
-                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--y" :style="`bottom: calc(${(thresholds.{{ $panel['y_key'] }}.max + 1) * 10}% - ${thresholds.{{ $panel['y_key'] }}.max === 9 ? 3 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['y_key'] }}', axis: 'y', bound: 'max', panel: {{ $i }} }">
+                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--y" :style="`bottom: calc(${thresholds.{{ $panel['y_key'] }} * 10}% - ${thresholds.{{ $panel['y_key'] }} === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = { metric: '{{ $panel['y_key'] }}', axis: 'y', panel: {{ $i }} }">
                                     <b></b><i></i>
                                 </span>
                             </div>
@@ -177,12 +162,11 @@
                     <p class="mt-1 text-center text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ $panel['x_label'] }} <span class="normal-case tracking-normal text-[var(--ak-muted)]">({{ $panel['x_unit'] }})</span></p>
                     <p class="mt-1.5 flex items-center justify-between text-[9px] font-bold text-[var(--ak-muted)]">
                         @php
-                            $rangeExpr = fn (string $metric, array $ticks) =>
-                                "(thresholds.{$metric}.min === 0 && thresholds.{$metric}.max === 9) ? '".__('Alle')."' : "
-                                .json_encode($ticks)."[thresholds.{$metric}.min] + ' – ' + (thresholds.{$metric}.max === 9 ? ".json_encode(end($ticks))." + '+' : ".json_encode($ticks)."[thresholds.{$metric}.max + 1])";
+                            $thresholdExpr = fn (string $metric, array $ticks) =>
+                                "thresholds.{$metric} === 0 ? '".__('Alle')."' : '".__('ab')." ' + ".json_encode($ticks)."[thresholds.{$metric}]";
                         @endphp
-                        <span>{{ $panel['y_label'] }} <span class="opacity-70">({{ $panel['y_unit'] }})</span>: <b class="text-[var(--ak-text)]" x-text="{{ $rangeExpr($panel['y_key'], $panel['y_ticks']) }}"></b></span>
-                        <span>{{ $panel['x_label'] }} <span class="opacity-70">({{ $panel['x_unit'] }})</span>: <b class="text-[var(--ak-text)]" x-text="{{ $rangeExpr($panel['x_key'], $panel['x_ticks']) }}"></b></span>
+                        <span>{{ $panel['y_label'] }} <span class="opacity-70">({{ $panel['y_unit'] }})</span>: <b class="text-[var(--ak-text)]" x-text="{{ $thresholdExpr($panel['y_key'], $panel['y_ticks']) }}"></b></span>
+                        <span>{{ $panel['x_label'] }} <span class="opacity-70">({{ $panel['x_unit'] }})</span>: <b class="text-[var(--ak-text)]" x-text="{{ $thresholdExpr($panel['x_key'], $panel['x_ticks']) }}"></b></span>
                     </p>
                 </div>
             @endforeach
