@@ -435,7 +435,13 @@ final class AutomatedPortfolioService
             ->when((float) ($filters['profit_per_trade_min'] ?? 0) > 0, fn ($q) => $q->whereRaw("COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'average_net_trade')::numeric, 0) * 100 >= ?", [(float) $filters['profit_per_trade_min']]))
             ->when(is_numeric($filters['median_return_min'] ?? null), fn ($q) => $q->whereRaw("COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'median_net_trade')::numeric, 0) * 100 >= ?", [(float) $filters['median_return_min']]))
             ->when((float) ($filters['profit_factor_min'] ?? 0) > 0, fn ($q) => $q->whereRaw("COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'profit_factor')::numeric, 0) >= ?", [(float) $filters['profit_factor_min']]))
-            ->when((float) ($filters['hit_rate_min'] ?? 0) > 0, fn ($q) => $q->whereRaw("COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'hit_rate')::numeric, 0) * 100 >= ?", [(float) $filters['hit_rate_min']]));
+            ->when((float) ($filters['hit_rate_min'] ?? 0) > 0, fn ($q) => $q->whereRaw("COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'hit_rate')::numeric, 0) * 100 >= ?", [(float) $filters['hit_rate_min']]))
+            // Scopes with few backtested trades produce unstable per-trade
+            // ratios (profit_factor can swing into the hundreds off a single
+            // lucky trade) - minimum_trades is the existing strategy-builder
+            // filter field for this, just not yet applied to the serving
+            // pipeline's own oos_metrics.trades count.
+            ->when((int) ($filters['minimum_trades'] ?? 0) > 0, fn ($q) => $q->whereRaw("COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'trades')::numeric, 0) >= ?", [(int) $filters['minimum_trades']]));
 
         if ($servingConfigurations->isEmpty()) {
             $rows = $defaultHorizons->flatMap(fn (int $horizon): array => $base()
