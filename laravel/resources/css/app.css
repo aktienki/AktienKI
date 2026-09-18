@@ -997,6 +997,42 @@
     --ak-shadow-hover: 0 14px 34px rgba(15, 23, 42, .12);
 }
 
+/*
+ * Master card design - the canonical "concept dashboard" card language
+ * (rounded-xl bordered card, tinted header row set off with a bottom
+ * divider, matching footer divider). Built from the Concept Dashboard's
+ * Heute-im-Fokus highlight cards; use .ak-master-card / .ak-master-card-header
+ * anywhere a page needs this look instead of redefining it locally
+ * (.concept-card in dashboard-concept.blade.php is this same recipe, scoped
+ * to that page for legacy reasons). Fully theme-adaptive since every value
+ * is one of the shared --ak-* tokens, already defined for dark/light above.
+ */
+.ak-master-card {
+    border: 1px solid var(--ak-border);
+    background: var(--ak-card);
+    border-radius: 1.25rem;
+    box-shadow: var(--ak-shadow);
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.ak-master-card:hover {
+    border-color: var(--ak-border-strong);
+    box-shadow: var(--ak-shadow-hover, var(--ak-shadow));
+}
+.ak-master-card-header {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: -1px -1px 0 -1px;
+    padding: 1rem 1rem .75rem 1rem;
+    border-bottom: 1px solid var(--ak-border);
+    border-top-left-radius: 1.24rem;
+    border-top-right-radius: 1.24rem;
+    background: var(--ak-surface-muted);
+}
+.ak-master-card-body {
+    padding: 1rem;
+}
+
 /* Use cyan as the primary orange accent in light mode. */
 :root[data-theme="light"] :is(.text-orange-300, .text-orange-400, .text-orange-500, .text-orange-600) {
     color: rgb(8 145 178 / var(--tw-text-opacity, 1)) !important;

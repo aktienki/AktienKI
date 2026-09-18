@@ -374,14 +374,22 @@
                                  .ak-market-tape rules are scoped to its own
                                  wrapper and don't reach this card). --}}
                             @if(count($section['markets']))
-                                <div class="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-5">
-                                    @foreach($section['markets'] as $market)
-                                        <div class="min-w-0 rounded-lg border border-[var(--ak-border)] px-2 py-1.5">
-                                            <p class="truncate text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $market['name'] }}</p>
-                                            <p class="mt-0.5 truncate text-xs font-black text-[var(--ak-text)]">{{ is_numeric($market['price'] ?? null) ? number_format($market['price'], 2, ',', '.') : '—' }}</p>
-                                            <p class="text-[10px] font-bold {{ ($market['change'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $market['change'] !== null ? (($market['change'] >= 0 ? '+' : '').number_format($market['change'], 2, ',', '.').' %') : '—' }}</p>
-                                        </div>
-                                    @endforeach
+                                <div class="ak-master-card mt-3">
+                                    <div class="ak-master-card-header">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-cyan-500/10 text-cyan-500">
+                                            <x-heroicon-o-globe-alt class="h-4.5 w-4.5" />
+                                        </span>
+                                        <b class="text-[12px] font-black text-[var(--ak-text)]">{{ __('Marktindizes') }}</b>
+                                    </div>
+                                    <div class="ak-master-card-body grid grid-cols-2 gap-2 sm:grid-cols-5">
+                                        @foreach($section['markets'] as $market)
+                                            <div class="min-w-0 rounded-lg border border-[var(--ak-border)] px-2 py-1.5">
+                                                <p class="truncate text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ $market['name'] }}</p>
+                                                <p class="mt-0.5 truncate text-xs font-black text-[var(--ak-text)]">{{ is_numeric($market['price'] ?? null) ? number_format($market['price'], 2, ',', '.') : '—' }}</p>
+                                                <p class="text-[10px] font-bold {{ ($market['change'] ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $market['change'] !== null ? (($market['change'] >= 0 ? '+' : '').number_format($market['change'], 2, ',', '.').' %') : '—' }}</p>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </div>
                             @endif
 
@@ -399,19 +407,27 @@
                             </div>
 
                             @if($section['available'] && $section['assessment'])
-                                <div class="mt-3 border-t border-[var(--ak-border)] pt-3">
-                                    <p class="text-sm font-bold text-[var(--ak-text)]">{{ $section['assessment']['status'] }} · {{ number_format($section['assessment']['score'], 0) }}/100</p>
-                                    <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ $section['assessment']['summary'] }}</p>
-                                    @if(count($section['metrics']))
-                                        <div class="mt-3 grid grid-cols-2 gap-3 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-4">
-                                            @foreach($section['metrics'] as $metric)
-                                                <div class="concept-metric">
-                                                    <b class="text-base">{{ $metric['value'] }}</b>
-                                                    <small>{{ $metric['label'] }}</small>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @endif
+                                <div class="ak-master-card mt-3">
+                                    <div class="ak-master-card-header">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-violet-500/10 text-violet-500">
+                                            <x-heroicon-o-scale class="h-4.5 w-4.5" />
+                                        </span>
+                                        <b class="text-[12px] font-black text-[var(--ak-text)]">{{ __('Bewertung') }}</b>
+                                    </div>
+                                    <div class="ak-master-card-body">
+                                        <p class="text-sm font-bold text-[var(--ak-text)]">{{ $section['assessment']['status'] }} · {{ number_format($section['assessment']['score'], 0) }}/100</p>
+                                        <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ $section['assessment']['summary'] }}</p>
+                                        @if(count($section['metrics']))
+                                            <div class="mt-3 grid grid-cols-2 gap-3 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-4">
+                                                @foreach($section['metrics'] as $metric)
+                                                    <div class="concept-metric">
+                                                        <b class="text-base">{{ $metric['value'] }}</b>
+                                                        <small>{{ $metric['label'] }}</small>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
                             @endif
 
@@ -420,23 +436,31 @@
                                  side instead of a 2-column grid with the
                                  watchlist as a separate box underneath. --}}
                             @if(count($section['opportunities']) || count($section['risks']) || count($section['watchlist']))
-                                <div class="mt-3 grid gap-3 border-t border-[var(--ak-border)] pt-3 sm:grid-cols-3">
-                                    @foreach([
-                                        [__('Chancen'), $section['opportunities'], 'text-emerald-500'],
-                                        [__('Risiken'), $section['risks'], 'text-rose-500'],
-                                        [__('Beobachtungsliste'), $section['watchlist'], 'text-amber-500'],
-                                    ] as [$briefingTitle, $briefingItems, $briefingTone])
-                                        <div class="rounded-xl border border-[var(--ak-border)] px-3 py-2.5">
-                                            <p class="text-[10px] font-black uppercase tracking-[.1em] {{ $briefingTone }}">{{ $briefingTitle }} ({{ count($briefingItems) }})</p>
-                                            <ul class="mt-1.5 space-y-1.5">
-                                                @forelse($briefingItems as $briefingItem)
-                                                    <li class="text-[11px] leading-[1.4] text-[var(--ak-muted)]">{{ $briefingItem }}</li>
-                                                @empty
-                                                    <li class="text-[11px] text-[var(--ak-muted)]">{{ __('Keine Einträge.') }}</li>
-                                                @endforelse
-                                            </ul>
-                                        </div>
-                                    @endforeach
+                                <div class="ak-master-card mt-3">
+                                    <div class="ak-master-card-header">
+                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-500">
+                                            <x-heroicon-o-light-bulb class="h-4.5 w-4.5" />
+                                        </span>
+                                        <b class="text-[12px] font-black text-[var(--ak-text)]">{{ __('Chancen & Risiken') }}</b>
+                                    </div>
+                                    <div class="ak-master-card-body grid gap-3 sm:grid-cols-3">
+                                        @foreach([
+                                            [__('Chancen'), $section['opportunities'], 'text-emerald-500'],
+                                            [__('Risiken'), $section['risks'], 'text-rose-500'],
+                                            [__('Beobachtungsliste'), $section['watchlist'], 'text-amber-500'],
+                                        ] as [$briefingTitle, $briefingItems, $briefingTone])
+                                            <div class="rounded-xl border border-[var(--ak-border)] px-3 py-2.5">
+                                                <p class="text-[10px] font-black uppercase tracking-[.1em] {{ $briefingTone }}">{{ $briefingTitle }} ({{ count($briefingItems) }})</p>
+                                                <ul class="mt-1.5 space-y-1.5">
+                                                    @forelse($briefingItems as $briefingItem)
+                                                        <li class="text-[11px] leading-[1.4] text-[var(--ak-muted)]">{{ $briefingItem }}</li>
+                                                    @empty
+                                                        <li class="text-[11px] text-[var(--ak-muted)]">{{ __('Keine Einträge.') }}</li>
+                                                    @endforelse
+                                                </ul>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </div>
                             @endif
                         @elseif($section['kind'] === 'opportunities-risks')
