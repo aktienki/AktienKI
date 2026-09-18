@@ -33,7 +33,7 @@ final class FundamentalScreenerController extends Controller
         // (released -> page reload). market cap travels in Mrd. in the URL
         // for readability, converted back to raw currency here.
         $metricRanges = [];
-        $metricParams = ['pe' => 'trailing_pe', 'dy' => 'dividend_yield', 'roe' => 'return_on_equity', 'om' => 'operating_margin', 'mc' => 'market_cap'];
+        $metricParams = ['pe' => 'trailing_pe', 'dy' => 'dividend_yield', 'roe' => 'return_on_equity', 'eg' => 'earnings_growth', 'mc' => 'market_cap'];
         foreach ($metricParams as $param => $key) {
             $min = $request->query("{$param}_min");
             $max = $request->query("{$param}_max");

@@ -8,18 +8,21 @@ use Illuminate\Support\Facades\DB;
 /**
  * Builds 4 decile x decile (10x10) heatmap panels over the whole stock
  * universe's latest fundamentals snapshot, pairing KGV and Dividendenrendite
- * (valuation/income) against Return on Equity and Operating Margin
- * (quality/efficiency) - all 4 from instrument_fundamentals directly:
- *   KGV x ROE, KGV x Operating Margin,
- *   Dividendenrendite x ROE, Dividendenrendite x Operating Margin
+ * (valuation/income) against Return on Equity and Gewinnwachstum (quality/
+ * growth) - KGV x ROE, KGV x Gewinnwachstum,
+ *   Dividendenrendite x ROE, Dividendenrendite x Gewinnwachstum
  *
- * (Market cap, revenue growth, and two serving-DB model scores - KI-Score/
- * Panel - were tried as axes here first; market cap and revenue growth were
- * dropped by request, and KI-Score/Panel were dropped because the serving
- * DB's active-prediction-universe + frozen-panel-model coverage shrank the
- * "all 4 metrics present" intersection down to ~330 instruments. ROE/
- * Operating Margin come straight from instrument_fundamentals like KGV/
- * Dividendenrendite, so coverage stays in the low thousands instead.)
+ * (Market cap, revenue growth, Operating Margin, and two serving-DB model
+ * scores - KI-Score/Panel - were tried as axes here first; market cap and
+ * revenue growth were dropped by request, KI-Score/Panel were dropped
+ * because the serving DB's active-prediction-universe + frozen-panel-model
+ * coverage shrank the "all 4 metrics present" intersection down to ~330
+ * instruments, and Operating Margin was later swapped for Gewinnwachstum
+ * (quarterly YoY earnings growth) by request. Gewinnwachstum isn't a
+ * dedicated instrument_fundamentals column - it's extracted from the
+ * statistics.statistics.financials.income_statement.quarterly_earnings_growth_yoy
+ * path inside the jsonb raw_data blob, same source data as everything else
+ * on this page.)
  *
  * Buckets are PERCENTILE deciles (evenly populated), not fixed absolute
  * ranges - trailing PE is heavily right-skewed, so a fixed step size would
@@ -105,7 +108,7 @@ class FundamentalHeatmapService
     }
 
     /**
-     * @param  array<string, array{min?: float, max?: float}>  $metricRanges  Real-value min/max per metric key (trailing_pe, dividend_yield, return_on_equity, operating_margin, market_cap in raw currency), from dragging the heatmap axis lines.
+     * @param  array<string, array{min?: float, max?: float}>  $metricRanges  Real-value min/max per metric key (trailing_pe, dividend_yield, return_on_equity, earnings_growth, market_cap in raw currency), from dragging the heatmap axis lines.
      * @param  string|null  $search  Symbol/name filter from the table's search box - applied to the heatmaps' baseline too, so typing a name also narrows what the panels count.
      */
     public function build(?string $capGroup = null, ?string $sector = null, ?string $country = null, ?string $region = null, array $metricRanges = [], ?string $search = null): array
@@ -114,7 +117,7 @@ class FundamentalHeatmapService
             'trailing_pe' => ['label' => __('KGV'), 'unit' => 'x'],
             'dividend_yield' => ['label' => __('Dividendenrendite'), 'unit' => '%'],
             'return_on_equity' => ['label' => __('ROE'), 'unit' => '%'],
-            'operating_margin' => ['label' => __('Operating Margin'), 'unit' => '%'],
+            'earnings_growth' => ['label' => __('Gewinnwachstum'), 'unit' => '%'],
         ];
 
         // Same stock base for all 4 panels: only instruments that have all
@@ -159,9 +162,9 @@ class FundamentalHeatmapService
 
         $panels = [
             ['x' => 'trailing_pe', 'y' => 'return_on_equity'],
-            ['x' => 'trailing_pe', 'y' => 'operating_margin'],
+            ['x' => 'trailing_pe', 'y' => 'earnings_growth'],
             ['x' => 'dividend_yield', 'y' => 'return_on_equity'],
-            ['x' => 'dividend_yield', 'y' => 'operating_margin'],
+            ['x' => 'dividend_yield', 'y' => 'earnings_growth'],
         ];
 
         $buildGrid = function (array $pair, Collection $rowSet) use ($boundaries, $metrics): array {
@@ -229,7 +232,7 @@ class FundamentalHeatmapService
     private function applyMetricRanges(Collection $rows, array $metricRanges): Collection
     {
         foreach ($metricRanges as $key => $range) {
-            if (! in_array($key, ['trailing_pe', 'dividend_yield', 'market_cap', 'return_on_equity', 'operating_margin'], true)) {
+            if (! in_array($key, ['trailing_pe', 'dividend_yield', 'market_cap', 'return_on_equity', 'earnings_growth'], true)) {
                 continue;
             }
             $rows = $rows->filter(function ($row) use ($key, $range) {
@@ -250,7 +253,7 @@ class FundamentalHeatmapService
     {
         $columns = [
             'trailing_pe' => 'f.trailing_pe', 'dividend_yield' => 'f.dividend_yield', 'market_cap' => 'f.market_cap',
-            'return_on_equity' => 'f.return_on_equity', 'operating_margin' => 'f.operating_margin',
+            'return_on_equity' => 'f.return_on_equity', 'earnings_growth' => 'f.earnings_growth',
         ];
 
         foreach ($metricRanges as $key => $range) {
@@ -258,10 +261,10 @@ class FundamentalHeatmapService
                 continue;
             }
             $column = $columns[$key];
-            // dividend_yield/return_on_equity/operating_margin are stored as
+            // dividend_yield/return_on_equity/earnings_growth are stored as
             // fractions (0.05 = 5%) in instrument_fundamentals; the range
             // comes in already as percent from the heatmap, so convert back.
-            $scale = in_array($key, ['dividend_yield', 'return_on_equity', 'operating_margin'], true) ? 100 : 1;
+            $scale = in_array($key, ['dividend_yield', 'return_on_equity', 'earnings_growth'], true) ? 100 : 1;
             if (isset($range['min'])) {
                 $query->where($column, '>=', $range['min'] / $scale);
             }
@@ -273,7 +276,7 @@ class FundamentalHeatmapService
         return $query;
     }
 
-    private const SORTABLE_COLUMNS = ['symbol', 'name', 'trailing_pe', 'dividend_yield', 'return_on_equity', 'operating_margin', 'market_cap'];
+    private const SORTABLE_COLUMNS = ['symbol', 'name', 'trailing_pe', 'dividend_yield', 'return_on_equity', 'earnings_growth', 'market_cap'];
 
     /**
      * Sortable/filterable/paginated stock list backing the table below the
@@ -288,7 +291,8 @@ class FundamentalHeatmapService
 
         $query = DB::table('instruments as i')
             ->joinSub(
-                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, return_on_equity, operating_margin, shares_outstanding
+                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, return_on_equity, shares_outstanding,
+                        (raw_data #>> '{statistics,statistics,financials,income_statement,quarterly_earnings_growth_yoy}')::float as earnings_growth
                  from instrument_fundamentals order by instrument_id, snapshot_date desc, id desc",
                 'f',
                 'f.instrument_id', '=', 'i.id',
@@ -320,7 +324,7 @@ class FundamentalHeatmapService
                 DB::raw('CASE WHEN f.dividend_yield > 1 THEN f.dividend_yield ELSE f.dividend_yield * 100 END as dividend_yield'),
                 'f.market_cap',
                 DB::raw('f.return_on_equity * 100 as return_on_equity'),
-                DB::raw('f.operating_margin * 100 as operating_margin'),
+                DB::raw('f.earnings_growth * 100 as earnings_growth'),
                 // Live KGV = stored trailing_pe scaled by how much the price has
                 // moved since the fundamentals snapshot (snapshot price =
                 // market_cap / shares_outstanding) - same trailing EPS, current
@@ -373,13 +377,14 @@ class FundamentalHeatmapService
     {
         $query = DB::table('instruments as i')
             ->joinSub(
-                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, return_on_equity, operating_margin
+                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, return_on_equity,
+                        (raw_data #>> '{statistics,statistics,financials,income_statement,quarterly_earnings_growth_yoy}')::float as earnings_growth
                  from instrument_fundamentals order by instrument_id, snapshot_date desc, id desc",
                 'f',
                 'f.instrument_id', '=', 'i.id',
             )
             ->where('i.type', 'stock')->whereNull('i.deleted_at')
-            ->select(['f.instrument_id', 'f.trailing_pe', 'f.dividend_yield', 'f.market_cap', 'f.return_on_equity', 'f.operating_margin']);
+            ->select(['f.instrument_id', 'f.trailing_pe', 'f.dividend_yield', 'f.market_cap', 'f.return_on_equity', 'f.earnings_growth']);
 
         if ($sector !== null && $sector !== '') {
             $query->where('i.sector', $sector);
@@ -401,14 +406,14 @@ class FundamentalHeatmapService
             'dividend_yield' => self::normalizeYieldPercent($row->dividend_yield),
             'market_cap' => $row->market_cap !== null ? (float) $row->market_cap : null,
             'return_on_equity' => $row->return_on_equity !== null ? (float) $row->return_on_equity * 100 : null,
-            'operating_margin' => $row->operating_margin !== null ? (float) $row->operating_margin * 100 : null,
+            'earnings_growth' => $row->earnings_growth !== null ? (float) $row->earnings_growth * 100 : null,
         ]);
     }
 
     /** True if a row has a plausible (sanitized) value for all 4 heatmap metrics - see sanitizedMetricValues() for the same bounds applied per-metric across a collection. */
     private function hasAllFourMetrics(object $row): bool
     {
-        foreach (['trailing_pe', 'dividend_yield', 'return_on_equity', 'operating_margin'] as $key) {
+        foreach (['trailing_pe', 'dividend_yield', 'return_on_equity', 'earnings_growth'] as $key) {
             if ($this->sanitizedMetricValues(collect([$row]), $key)->isEmpty()) {
                 return false;
             }
@@ -424,7 +429,11 @@ class FundamentalHeatmapService
             'trailing_pe' => $rows->pluck('trailing_pe')->filter(fn ($v) => $v !== null && $v > 0 && $v < 200),
             'dividend_yield' => $rows->pluck('dividend_yield')->filter(fn ($v) => $v !== null && $v >= 0 && $v <= 20),
             'return_on_equity' => $rows->pluck('return_on_equity')->filter(fn ($v) => $v !== null && $v > -100 && $v < 200),
-            'operating_margin' => $rows->pluck('operating_margin')->filter(fn ($v) => $v !== null && $v > -100 && $v < 100),
+            // quarterly YoY earnings growth is far more right-skewed than a
+            // margin (a near-zero prior-year base can blow the ratio up to
+            // several thousand percent) - 300% still keeps ~96% of the
+            // instruments that have a value at all.
+            'earnings_growth' => $rows->pluck('earnings_growth')->filter(fn ($v) => $v !== null && $v > -100 && $v < 300),
             default => $rows->pluck($key)->filter(fn ($v) => $v !== null),
         };
 

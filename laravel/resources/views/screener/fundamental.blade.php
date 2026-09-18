@@ -50,8 +50,8 @@
                             <dd>{{ __('Jährliche Dividende geteilt durch den Aktienkurs, in Prozent. Höher = mehr Ausschüttung pro investiertem Euro/Dollar. Ungewöhnlich hohe Werte (⚠️ in der Tabelle) sind oft eine "Dividend Trap": der Kurs ist eingebrochen, die alte Dividende wurde aber noch nicht gekürzt.') }}</dd>
                             <dt>{{ __('ROE (Eigenkapitalrendite)') }}</dt>
                             <dd>{{ __('Jahresgewinn geteilt durch das Eigenkapital, in Prozent. Misst, wie effizient ein Unternehmen mit dem Kapital seiner Aktionäre Gewinn erwirtschaftet – höher ist besser, aber auch stark schuldenfinanzierte Firmen können hier künstlich hoch stehen.') }}</dd>
-                            <dt>{{ __('Operating Margin') }}</dt>
-                            <dd>{{ __('Operatives Ergebnis geteilt durch Umsatz, in Prozent. Zeigt, wie viel vom Umsatz nach den laufenden Betriebskosten übrig bleibt, vor Zinsen und Steuern – höher bedeutet ein profitableres Kerngeschäft.') }}</dd>
+                            <dt>{{ __('Gewinnwachstum') }}</dt>
+                            <dd>{{ __('Wachstum des Quartalsgewinns gegenüber demselben Quartal im Vorjahr, in Prozent. Höher = das Unternehmen verdient deutlich mehr als vor einem Jahr. Sehr hohe Ausschläge (weit über 100 %) kommen oft von einer sehr niedrigen Vorjahresbasis und sagen wenig über nachhaltiges Wachstum aus.') }}</dd>
                         </dl>
                         <h4>{{ __('Heatmaps benutzen') }}</h4>
                         <p>{{ __('Jede Kachel zeigt zwei Kennzahlen gegeneinander: x-Achse und y-Achse sind je in 10 Dezile eingeteilt (gleich viele Aktien pro Dezil), die Zahl in jeder Zelle ist die Anzahl Aktien in genau dieser Kombination. Je dunkler/heller der Hintergrund, desto mehr Aktien liegen dort.') }}</p>
@@ -120,7 +120,7 @@
                 $boundariesByMetric[$panel['x_key']] = $panel['x_boundaries_raw'];
                 $boundariesByMetric[$panel['y_key']] = $panel['y_boundaries_raw'];
             }
-            $metricUrlParam = ['trailing_pe' => 'pe', 'dividend_yield' => 'dy', 'return_on_equity' => 'roe', 'operating_margin' => 'om'];
+            $metricUrlParam = ['trailing_pe' => 'pe', 'dividend_yield' => 'dy', 'return_on_equity' => 'roe', 'earnings_growth' => 'eg'];
         @endphp
         @php
             // KGV: lower is generally "better" (cheaper), so its slider
@@ -316,7 +316,7 @@
                             <th class="text-right">{!! $sortLink('dividend_yield', __('Div.-Rendite')) !!}</th>
                             <th class="text-right" title="{{ __('Dividendenrendite mit derselben Ausschüttung skaliert auf den aktuellen Kurs.') }}">{{ __('Div. (aktuell)') }}</th>
                             <th class="text-right">{!! $sortLink('return_on_equity', __('ROE')) !!}</th>
-                            <th class="text-right">{!! $sortLink('operating_margin', __('Op.-Marge')) !!}</th>
+                            <th class="text-right">{!! $sortLink('earnings_growth', __('Gewinnwachstum')) !!}</th>
                             <th class="text-right">{!! $sortLink('market_cap', __('Marktkap.')) !!}</th>
                         </tr>
                     </thead>
@@ -358,7 +358,7 @@
                                     @endif
                                 </td>
                                 <td class="text-right tabular-nums">{{ $row->return_on_equity !== null ? number_format($row->return_on_equity, 1, ',', '.').' %' : '–' }}</td>
-                                <td class="text-right tabular-nums">{{ $row->operating_margin !== null ? number_format($row->operating_margin, 1, ',', '.').' %' : '–' }}</td>
+                                <td class="text-right tabular-nums">{{ $row->earnings_growth !== null ? number_format($row->earnings_growth, 1, ',', '.').' %' : '–' }}</td>
                                 <td class="text-right tabular-nums">{{ $row->market_cap !== null ? number_format($row->market_cap / 1_000_000_000, 1, ',', '.').' Mrd.' : '–' }}</td>
                             </tr>
                         @empty
