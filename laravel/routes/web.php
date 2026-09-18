@@ -10,6 +10,7 @@ use App\Http\Controllers\CommodityScreenerController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DailyMarketAnalysisController;
+use App\Http\Controllers\CalendarEventReminderController;
 use App\Http\Controllers\DashboardConceptController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepotController;
@@ -275,6 +276,7 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::post('/live-prices/subscribe', LivePriceSubscriptionController::class)->name('live-prices.subscribe');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/dashboard/concept', DashboardConceptController::class)->name('dashboard.concept');
+    Route::post('/dashboard/concept/calendar-reminders/toggle', [CalendarEventReminderController::class, 'toggle'])->name('calendar-event-reminders.toggle');
     Route::get('/anstehende-news', UpcomingEventsController::class)->name('upcoming-events.index');
     Route::get('/tabellen/performance-transparenz', PerformanceTransparencyController::class)
         ->middleware('plan:pro')

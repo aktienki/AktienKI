@@ -53,7 +53,7 @@ final class DashboardConceptController extends Controller
         ]);
 
         $sections = collect([
-            $this->todayFocusSection('today-focus'),
+            $this->todayFocusSection('today-focus', $request),
             $this->chartPatternSection('chartview'),
             $this->marketSection('market-report', $snapshot),
             $this->opportunitiesRisksSection('opportunities-risks', $snapshot),
@@ -507,7 +507,7 @@ final class DashboardConceptController extends Controller
      * not support the real dashboard's per-user card drag/resize
      * customization, it just shows every card in its default place.
      */
-    private function todayFocusSection(string $id): array
+    private function todayFocusSection(string $id, Request $request): array
     {
         // TEMPORARY DEMO OVERRIDE: showing yesterday's complete trading day
         // so the user can see a fully-populated example. Revert to
@@ -538,6 +538,60 @@ final class DashboardConceptController extends Controller
             $highlights,
             fn (array $h): bool => ($h['kind'] ?? null) === 'indicators' ? $h['indicators'] !== null : $h['data'] !== null,
         ));
+
+        // Reuses classicDashboardSection()'s own data source
+        // (DashboardController::buildViewData()'s strategyPositionEvents,
+        // itself earnings + planned-sell events over the next 21 days) -
+        // narrowed here to the next 7 days ("diese Woche") instead of
+        // duplicating that query with a different window. Appended after
+        // the insight-analysis/date-stamping above since this card is
+        // forward-looking (not "yesterday's trading day" like the rest)
+        // and has no AI narrative to align by index with.
+        $weekEvents = app(DashboardController::class)->buildViewData($request)['strategyPositionEvents']
+            ->filter(fn (array $event): bool => $event['sort_at'] <= now()->addDays(7)->toDateString())
+            ->take(6)
+            ->values();
+        if ($weekEvents->isNotEmpty()) {
+            $symbolToInstrumentId = \DB::table('instruments')
+                ->whereIn('symbol', $weekEvents->pluck('symbol')->unique())
+                ->pluck('id', 'symbol');
+            $userId = $request->user()?->id;
+            $reminderStates = $userId
+                ? \App\Models\CalendarEventReminder::query()
+                    ->where('user_id', $userId)
+                    ->get(['event_type', 'reference_id', 'enabled'])
+                    ->keyBy(fn ($r) => $r->event_type.':'.$r->reference_id)
+                : collect();
+
+            $weekEvents = $weekEvents->map(function (array $event) use ($symbolToInstrumentId, $reminderStates): array {
+                // upcomingPositionEvents() ids are "earnings-{corporate_event_id}"
+                // / "exit-{position_id}" - the numeric suffix is the reference_id
+                // calendar_event_reminders needs, and 'exit' maps to the
+                // reminder's own 'sell' event_type.
+                $referenceId = (int) \Illuminate\Support\Str::afterLast($event['id'], '-');
+                $reminderType = $event['type'] === 'sell' ? 'sell' : 'earnings';
+                $reminder = $reminderStates->get($reminderType.':'.$referenceId);
+                $event['reference_id'] = $referenceId;
+                $event['instrument_id'] = $symbolToInstrumentId->get($event['symbol']);
+                $event['reminder_type'] = $reminderType;
+                $event['reminder_enabled'] = $reminder?->enabled ?? false;
+
+                return $event;
+            });
+
+            $highlights[] = [
+                'kind' => 'upcoming-events',
+                'label' => __('Diese Woche'),
+                'subtitle' => __('Quartalszahlen & geplante Verkäufe'),
+                'icon' => 'heroicon-o-calendar-days',
+                'color' => 'cyan',
+                'url' => null,
+                'data' => null,
+                'date' => null,
+                'insight' => '',
+                'events' => $weekEvents->all(),
+            ];
+        }
 
         return [
             'id' => $id,

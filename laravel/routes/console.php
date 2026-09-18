@@ -30,6 +30,13 @@ Schedule::command('predictions:send-purchase-reminders')
     ->onOneServer()
     ->runInBackground();
 
+Schedule::command('reminders:send-calendar-events')
+    ->dailyAt('07:05')
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping(15)
+    ->onOneServer()
+    ->runInBackground();
+
 Schedule::command('opportunities:purge')
     ->hourly()
     ->withoutOverlapping(10)
