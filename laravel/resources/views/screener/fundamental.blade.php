@@ -13,46 +13,68 @@
         <p class="mb-3 text-xs font-semibold text-[var(--ak-muted)]">{{ __('Verteilung der gesamten Aktien-Universum über die 4 Kernkennzahlen. Regler filtern je Achse ab welchem Dezil Zellen hervorgehoben bleiben. Klick auf eine Aktie im Screener öffnet ihre eigene Detailseite.') }}</p>
         <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
             @foreach($panels as $i => $panel)
-                <div class="fundamental-heatmap-card flex h-auto min-w-0 flex-col rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-4 shadow-[var(--ak-shadow)]" x-data="{ xMin: 0, yMin: 0 }">
+                <div class="fundamental-heatmap-card flex h-auto min-w-0 flex-col rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-4 shadow-[var(--ak-shadow)]"
+                     x-data="{
+                        xMin: 0, yMin: 0, dragging: null,
+                        pctFromEvent(e, axis) {
+                            const r = this.$refs.plot.getBoundingClientRect();
+                            const p = axis === 'x' ? (e.clientX - r.left) / r.width : (r.bottom - e.clientY) / r.height;
+                            return Math.min(9, Math.max(0, Math.round(Math.min(1, Math.max(0, p)) * 10)));
+                        },
+                        onMove(e) {
+                            if (!this.dragging) return;
+                            const v = this.pctFromEvent(e, this.dragging);
+                            if (this.dragging === 'x') this.xMin = v; else this.yMin = v;
+                        },
+                     }"
+                     @pointermove.window="onMove($event)" @pointerup.window="dragging = null">
                     <header class="mb-2">
                         <h3 class="text-xs font-black">{{ $panel['title'] }}</h3>
                         <p class="text-[10px] font-semibold text-[var(--ak-muted)]">{{ $panel['instruments_used'] }} {{ __('Aktien') }}</p>
                     </header>
 
-                    <div class="fundamental-heatmap-plot grid aspect-square h-auto w-full flex-none grid-cols-[24px_repeat(10,minmax(0,1fr))] grid-rows-[repeat(10,minmax(0,1fr))_12px] gap-[3px]">
-                        <div></div>
-                        @for($xb = 0; $xb <= 9; $xb++)
-                            <div class="flex items-end justify-center pb-0.5 text-[6px] font-bold text-[var(--ak-muted)]">{{ $xb === 9 ? '9+' : $xb }}</div>
-                        @endfor
-
-                        @for($yb = 9; $yb >= 0; $yb--)
-                            <div class="flex items-center justify-end pr-0.5 text-[6px] font-bold text-[var(--ak-muted)]">{{ $yb === 9 ? '9+' : $yb }}</div>
-                            @for($xb = 0; $xb <= 9; $xb++)
-                                @php
-                                    $count = $panel['grid'][$yb][$xb];
-                                    $intensity = $panel['max'] > 0 ? $count / $panel['max'] : 0;
-                                @endphp
-                                <div
-                                    class="fundamental-heatmap-cell relative flex aspect-square min-h-0 min-w-0 items-center justify-center rounded-[3px] border border-[rgba(34,211,238,.10)]"
-                                    :class="(xMin > {{ $xb }} || yMin > {{ $yb }}) && 'is-dimmed'"
-                                    style="background-color: color-mix(in srgb, #22d3ee {{ round($intensity * 55, 1) }}%, transparent);"
-                                    title="{{ __('Dezil :x / :y: :n Aktien', ['x' => $xb, 'y' => $yb, 'n' => $count]) }}"
-                                ><span class="text-[6px] font-black tabular-nums text-[var(--ak-text)] {{ $count === 0 ? 'opacity-20' : '' }}">{{ $count }}</span></div>
+                    <div class="flex gap-1">
+                        <div class="flex flex-col justify-between py-[1px] text-[6px] font-bold text-[var(--ak-muted)]">
+                            @for($yb = 9; $yb >= 0; $yb--)
+                                <span>{{ $yb === 9 ? '9+' : $yb }}</span>
                             @endfor
-                        @endfor
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div x-ref="plot" class="fundamental-heatmap-plot relative grid aspect-square h-auto w-full grid-cols-10 grid-rows-10 gap-[3px]">
+                                @for($yb = 9; $yb >= 0; $yb--)
+                                    @for($xb = 0; $xb <= 9; $xb++)
+                                        @php
+                                            $count = $panel['grid'][$yb][$xb];
+                                            $intensity = $panel['max'] > 0 ? $count / $panel['max'] : 0;
+                                        @endphp
+                                        <div
+                                            class="fundamental-heatmap-cell relative flex aspect-square min-h-0 min-w-0 items-center justify-center rounded-[3px] border border-[rgba(34,211,238,.10)]"
+                                            :class="(xMin > {{ $xb }} || yMin > {{ $yb }}) && 'is-dimmed'"
+                                            style="background-color: color-mix(in srgb, #22d3ee {{ round($intensity * 55, 1) }}%, transparent);"
+                                            title="{{ __('Dezil :x / :y: :n Aktien', ['x' => $xb, 'y' => $yb, 'n' => $count]) }}"
+                                        ><span class="text-[6px] font-black tabular-nums text-[var(--ak-text)] {{ $count === 0 ? 'opacity-20' : '' }}">{{ $count }}</span></div>
+                                    @endfor
+                                @endfor
+
+                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--x" :style="`left: calc(${xMin * 10}% - ${xMin === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = 'x'">
+                                    <b></b><i></i>
+                                </span>
+                                <span class="fundamental-heatmap-drag fundamental-heatmap-drag--y" :style="`bottom: calc(${yMin * 10}% - ${yMin === 0 ? 0 : 1.5}px)`" @pointerdown="dragging = 'y'">
+                                    <b></b><i></i>
+                                </span>
+                            </div>
+                            <div class="mt-1 flex justify-between text-[6px] font-bold text-[var(--ak-muted)]">
+                                @for($xb = 0; $xb <= 9; $xb++)
+                                    <span>{{ $xb === 9 ? '9+' : $xb }}</span>
+                                @endfor
+                            </div>
+                        </div>
                     </div>
                     <p class="mt-1 text-center text-[8px] font-black uppercase tracking-[.1em] text-[var(--ak-muted)]">{{ $panel['x_label'] }}</p>
-
-                    <div class="mt-2.5 grid gap-2">
-                        <label class="fundamental-heatmap-range">
-                            <span>{{ $panel['x_label'] }} <b x-text="xMin === 0 ? '{{ __('Alle') }}' : xMin + '. Dezil+'"></b></span>
-                            <input type="range" min="0" max="9" step="1" x-model.number="xMin">
-                        </label>
-                        <label class="fundamental-heatmap-range">
-                            <span>{{ $panel['y_label'] }} <b x-text="yMin === 0 ? '{{ __('Alle') }}' : yMin + '. Dezil+'"></b></span>
-                            <input type="range" min="0" max="9" step="1" x-model.number="yMin">
-                        </label>
-                    </div>
+                    <p class="mt-1.5 flex items-center justify-between text-[9px] font-bold text-[var(--ak-muted)]">
+                        <span>{{ $panel['y_label'] }}: <b class="text-[var(--ak-text)]" x-text="yMin === 0 ? '{{ __('Alle') }}' : yMin + '. Dezil+'"></b></span>
+                        <span>{{ $panel['x_label'] }}: <b class="text-[var(--ak-text)]" x-text="xMin === 0 ? '{{ __('Alle') }}' : xMin + '. Dezil+'"></b></span>
+                    </p>
                 </div>
             @endforeach
         </section>
@@ -177,12 +199,16 @@
 
     #fundamental-page .fundamental-heatmap-cell { transition: opacity .15s ease; }
     #fundamental-page .fundamental-heatmap-cell.is-dimmed { opacity: .18; }
-    #fundamental-page .fundamental-heatmap-range { display: block; font-size: .58rem; }
-    #fundamental-page .fundamental-heatmap-range span { display: flex; justify-content: space-between; font-weight: 700; color: var(--ak-muted); margin-bottom: .2rem; }
-    #fundamental-page .fundamental-heatmap-range b { color: var(--ak-text); font-weight: 900; }
-    #fundamental-page .fundamental-heatmap-range input[type="range"] { width: 100%; height: 4px; -webkit-appearance: none; appearance: none; background: var(--ak-border); border-radius: 999px; outline: none; }
-    #fundamental-page .fundamental-heatmap-range input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #22d3ee; cursor: pointer; box-shadow: 0 0 0 3px color-mix(in srgb, #22d3ee 25%, transparent); }
-    #fundamental-page .fundamental-heatmap-range input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #22d3ee; cursor: pointer; box-shadow: 0 0 0 3px color-mix(in srgb, #22d3ee 25%, transparent); }
+
+    /* In-grid draggable filter lines, same visual language as the
+       Strategie page's .ak-heatmap-filter-stroke/-handle. */
+    #fundamental-page .fundamental-heatmap-drag { position: absolute; z-index: 25; display: block; touch-action: none; }
+    #fundamental-page .fundamental-heatmap-drag--x { top: 0; bottom: 0; width: 16px; margin-left: -8px; cursor: ew-resize; }
+    #fundamental-page .fundamental-heatmap-drag--y { left: 0; right: 0; height: 16px; margin-bottom: -8px; cursor: ns-resize; }
+    #fundamental-page .fundamental-heatmap-drag b { position: absolute; display: block; filter: drop-shadow(0 0 2px rgba(34,211,238,.45)); }
+    #fundamental-page .fundamental-heatmap-drag--x b { inset: 0 auto 0 50%; width: 2px; transform: translateX(-50%); background: repeating-linear-gradient(to bottom, rgba(34,211,238,.88) 0 4px, transparent 4px 7px); }
+    #fundamental-page .fundamental-heatmap-drag--y b { inset: 50% 0 auto; height: 2px; transform: translateY(-50%); background: repeating-linear-gradient(to right, rgba(34,211,238,.88) 0 4px, transparent 4px 7px); }
+    #fundamental-page .fundamental-heatmap-drag i { position: absolute; top: 50%; left: 50%; width: 7px; height: 7px; transform: translate(-50%, -50%) rotate(45deg); border: 1px solid rgba(103,232,249,.85); border-radius: 2px; background: #0b2131; box-shadow: 0 0 3px rgba(34,211,238,.45); }
 
     #fundamental-page .fy-block { margin-top: 1.4rem; }
     #fundamental-page .fy-block:first-child { margin-top: 0; }
