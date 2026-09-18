@@ -654,7 +654,7 @@
                                     data-live-base-price="{{ (float) $stock->current_price }}"
                                     data-screener-live-price="{{ $stock->symbol }}"
                                 @endif
-                            >{{ is_numeric($stock->current_price) ? number_format((float) $stock->current_price, 2, ',', '.') : '—' }} <em>{{ $displayCurrencySymbol }}</em></strong>@if($priceChange !== null)<b class="{{ $priceChange >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ ($priceChange > 0 ? '+' : '').number_format($priceChange, 2, ',', '.').' %' }}</b>@endif @if($realtimeQuotes ?? false)<i class="screener-live-status" data-screener-live-status="{{ $stock->symbol }}" hidden>{{ __('Live') }}</i>@endif</span>
+                            >{{ is_numeric($stock->current_price) ? number_format((float) $stock->current_price, 2, ',', '.') : '—' }} <em>{{ $displayCurrencySymbol }}</em></strong>@if($priceChange !== null)<b class="{{ $priceChange >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">{{ ($priceChange > 0 ? '+' : '').number_format($priceChange, 2, ',', '.').' %' }}</b>@endif @if($realtimeQuotes ?? false)<i class="screener-live-dot" data-screener-live-status="{{ $stock->symbol }}" title="{{ __('Nicht live') }}"></i>@endif</span>
                             <svg class="screener-price-sparkline {{ $miniChartPolyline === '' ? 'invisible' : '' }}" viewBox="0 0 88 26" preserveAspectRatio="none" role="img" aria-label="{{ __('Kursverlauf der letzten 20 Handelstage') }}" @if($miniChartPolyline === '') data-screener-minichart-url="{{ route('stocks.chart-data', ['symbol' => $stock->symbol]) }}" @endif><polyline points="{{ $miniChartPolyline }}" fill="none" stroke="{{ $miniChartPositive ? '#34d399' : '#fb7185' }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" /></svg>
                             <small>{{ __('Kurs') }}</small>
                         </span>
@@ -1391,12 +1391,12 @@
                     if(!symbol||!Number.isFinite(price)||price<=0)return;
                     const escaped=CSS.escape(symbol);
                     document.querySelectorAll(`[data-screener-live-status="${escaped}"]`).forEach(status=>{
-                        status.hidden=false;
-                        if(event.detail?.simulation===true)status.textContent='Simulation';
-                        status.title=new Date(Number(event.detail?.timestamp??Date.now()/1000)*1000).toLocaleTimeString(
+                        status.classList.add('is-live');
+                        const time=new Date(Number(event.detail?.timestamp??Date.now()/1000)*1000).toLocaleTimeString(
                             document.documentElement.lang,
                             {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/Berlin'},
                         );
+                        status.title=event.detail?.simulation===true ? `Simulation · ${time}` : time;
                     });
                     const affectedRows=new Set();
                     document.querySelectorAll(`[data-screener-live-forecast="${escaped}"]`).forEach(forecast=>{

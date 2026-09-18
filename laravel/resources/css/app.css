@@ -8463,25 +8463,21 @@ body .ak-topbar-menu > a:focus-visible {
         font-size:1.15rem;
     }
 
-    .screener-page .screener-live-status {
-        display:inline-flex;
-        align-items:center;
-        height:1rem;
-        margin-left:.15rem;
-        padding:0 .28rem;
-        border:1px solid color-mix(in srgb,#34d399 42%,transparent);
+    .screener-page .screener-live-dot {
+        position:absolute;
+        top:.3rem;
+        right:.3rem;
+        width:.4rem;
+        height:.4rem;
         border-radius:999px;
-        color:#34d399;
-        font-size:.48rem;
+        background:#fb7185;
+        box-shadow:0 0 .3rem color-mix(in srgb,#fb7185 60%,transparent);
         font-style:normal;
-        font-weight:900;
-        letter-spacing:.08em;
-        line-height:1;
-        text-transform:uppercase;
     }
 
-    .screener-page .screener-live-status[hidden] {
-        display:none !important;
+    .screener-page .screener-live-dot.is-live {
+        background:#34d399;
+        box-shadow:0 0 .3rem color-mix(in srgb,#34d399 60%,transparent);
     }
 
     .screener-page .screener-desktop-stock > .screener-row-sector-symbol {
@@ -8650,6 +8646,7 @@ body .ak-topbar-menu > a:focus-visible {
     }
 
     .screener-page .screener-desktop-price {
+        position:relative;
         display:grid !important;
         grid-template-columns:minmax(68px,auto) 54px;
         gap:.4rem;
