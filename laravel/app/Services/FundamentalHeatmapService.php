@@ -7,14 +7,19 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Builds 4 decile x decile (10x10) heatmap panels over the whole stock
- * universe's latest fundamentals snapshot, pairing 4 metrics two at a
- * time - KGV, Dividendenrendite, Umsatzwachstum (from instrument_fundamentals)
- * and the current KI-Score (ranking_score, from ServingScreenerService -
- * a *different* physical database, so it's merged in per-instrument in PHP
- * rather than SQL-joined). Each metric is used as an axis in two panels so
- * all four get covered without an arbitrary 5th/6th pairing:
- *   KGV x Dividendenrendite, KGV x Umsatzwachstum,
- *   KI-Score x Dividendenrendite, KI-Score x Umsatzwachstum
+ * universe's latest fundamentals snapshot, pairing KGV and Dividendenrendite
+ * (valuation/income) against Return on Equity and Operating Margin
+ * (quality/efficiency) - all 4 from instrument_fundamentals directly:
+ *   KGV x ROE, KGV x Operating Margin,
+ *   Dividendenrendite x ROE, Dividendenrendite x Operating Margin
+ *
+ * (Market cap, revenue growth, and two serving-DB model scores - KI-Score/
+ * Panel - were tried as axes here first; market cap and revenue growth were
+ * dropped by request, and KI-Score/Panel were dropped because the serving
+ * DB's active-prediction-universe + frozen-panel-model coverage shrank the
+ * "all 4 metrics present" intersection down to ~330 instruments. ROE/
+ * Operating Margin come straight from instrument_fundamentals like KGV/
+ * Dividendenrendite, so coverage stays in the low thousands instead.)
  *
  * Buckets are PERCENTILE deciles (evenly populated), not fixed absolute
  * ranges - trailing PE is heavily right-skewed, so a fixed step size would
@@ -25,8 +30,6 @@ use Illuminate\Support\Facades\DB;
  */
 class FundamentalHeatmapService
 {
-    public function __construct(private readonly ServingScreenerService $servingScreener) {}
-
     private const BUCKETS = 10;
 
     /** Same thresholds as AutomatedPortfolioService's market_cap_group filter. */
@@ -83,23 +86,21 @@ class FundamentalHeatmapService
     }
 
     /**
-     * @param  array<string, array{min?: float, max?: float}>  $metricRanges  Real-value min/max per metric key (trailing_pe, dividend_yield, market_cap in raw currency, revenue_growth), from dragging the heatmap axis lines.
+     * @param  array<string, array{min?: float, max?: float}>  $metricRanges  Real-value min/max per metric key (trailing_pe, dividend_yield, return_on_equity, operating_margin, market_cap in raw currency), from dragging the heatmap axis lines.
      */
     public function build(?string $capGroup = null, ?string $sector = null, ?string $country = null, ?string $region = null, array $metricRanges = []): array
     {
         $labels = [
             'trailing_pe' => ['label' => __('KGV'), 'unit' => 'x'],
             'dividend_yield' => ['label' => __('Dividendenrendite'), 'unit' => '%'],
-            'ki_score' => ['label' => __('Score'), 'unit' => __('Pkt.')],
-            'panel_score' => ['label' => __('Panel'), 'unit' => __('Pkt.')],
+            'return_on_equity' => ['label' => __('ROE'), 'unit' => '%'],
+            'operating_margin' => ['label' => __('Operating Margin'), 'unit' => '%'],
         ];
 
         // Same stock base for all 4 panels: only instruments that have all
         // 4 metrics at once, so "n Aktien" means the same thing on every
         // panel instead of each pairing silently using whichever subset
-        // happens to have that particular pair of metrics (Panel coverage
-        // is much sparser than the others, so panels involving it would
-        // otherwise show noticeably fewer instruments).
+        // happens to have that particular pair of metrics.
         $universe = $this->latestSnapshotPerInstrument()->filter(fn ($row) => $this->hasAllFourMetrics($row))->values();
 
         // The axis SCALE (decile boundaries) is fixed from the whole,
@@ -131,10 +132,10 @@ class FundamentalHeatmapService
         $metrics = $labels;
 
         $panels = [
-            ['x' => 'trailing_pe', 'y' => 'ki_score'],
-            ['x' => 'trailing_pe', 'y' => 'panel_score'],
-            ['x' => 'dividend_yield', 'y' => 'ki_score'],
-            ['x' => 'dividend_yield', 'y' => 'panel_score'],
+            ['x' => 'trailing_pe', 'y' => 'return_on_equity'],
+            ['x' => 'trailing_pe', 'y' => 'operating_margin'],
+            ['x' => 'dividend_yield', 'y' => 'return_on_equity'],
+            ['x' => 'dividend_yield', 'y' => 'operating_margin'],
         ];
 
         return collect($panels)->map(function (array $pair) use ($rows, $metrics, $boundaries): array {
@@ -182,7 +183,7 @@ class FundamentalHeatmapService
     private function applyMetricRanges(Collection $rows, array $metricRanges): Collection
     {
         foreach ($metricRanges as $key => $range) {
-            if (! in_array($key, ['trailing_pe', 'dividend_yield', 'market_cap', 'revenue_growth', 'ki_score', 'panel_score'], true)) {
+            if (! in_array($key, ['trailing_pe', 'dividend_yield', 'market_cap', 'return_on_equity', 'operating_margin'], true)) {
                 continue;
             }
             $rows = $rows->filter(function ($row) use ($key, $range) {
@@ -201,15 +202,20 @@ class FundamentalHeatmapService
     /** @param  array<string, array{min?: float, max?: float}>  $metricRanges */
     private function applyMetricRangesToQuery($query, array $metricRanges)
     {
-        $columns = ['trailing_pe' => 'f.trailing_pe', 'dividend_yield' => 'f.dividend_yield', 'market_cap' => 'f.market_cap', 'revenue_growth' => 'f.revenue_growth'];
+        $columns = [
+            'trailing_pe' => 'f.trailing_pe', 'dividend_yield' => 'f.dividend_yield', 'market_cap' => 'f.market_cap',
+            'return_on_equity' => 'f.return_on_equity', 'operating_margin' => 'f.operating_margin',
+        ];
 
         foreach ($metricRanges as $key => $range) {
             if (! isset($columns[$key])) {
                 continue;
             }
             $column = $columns[$key];
-            // dividend_yield/revenue_growth are stored as fractions (0.05 = 5%) in instrument_fundamentals; the range comes in already as percent from the heatmap, so convert back.
-            $scale = in_array($key, ['dividend_yield', 'revenue_growth'], true) ? 100 : 1;
+            // dividend_yield/return_on_equity/operating_margin are stored as
+            // fractions (0.05 = 5%) in instrument_fundamentals; the range
+            // comes in already as percent from the heatmap, so convert back.
+            $scale = in_array($key, ['dividend_yield', 'return_on_equity', 'operating_margin'], true) ? 100 : 1;
             if (isset($range['min'])) {
                 $query->where($column, '>=', $range['min'] / $scale);
             }
@@ -221,26 +227,22 @@ class FundamentalHeatmapService
         return $query;
     }
 
-    private const SORTABLE_COLUMNS = ['symbol', 'name', 'trailing_pe', 'dividend_yield', 'ki_score', 'panel_score', 'revenue_growth'];
+    private const SORTABLE_COLUMNS = ['symbol', 'name', 'trailing_pe', 'dividend_yield', 'return_on_equity', 'operating_margin', 'market_cap'];
 
     /**
      * Sortable/filterable/paginated stock list backing the table below the
      * heatmaps - same latest-snapshot-per-instrument data and cap-group
-     * filter, joined to instruments for symbol/name/sector. KI-Score lives
-     * in a different physical database (see class docblock), so it's
-     * merged in per-instrument here rather than SQL-joined - the whole
-     * matching set (a few thousand rows at most) is fetched, merged,
-     * sorted and paginated in PHP instead of at the SQL level.
+     * filter, joined to instruments for symbol/name/sector.
      */
     /** @param  array<string, array{min?: float, max?: float}>  $metricRanges */
     public function table(?string $capGroup, string $sort, string $dir, ?string $search, int $page, int $perPage = 50, ?string $sector = null, ?string $country = null, ?string $region = null, array $metricRanges = []): array
     {
-        $sort = in_array($sort, self::SORTABLE_COLUMNS, true) ? $sort : 'ki_score';
+        $sort = in_array($sort, self::SORTABLE_COLUMNS, true) ? $sort : 'market_cap';
         $dir = $dir === 'asc' ? 'asc' : 'desc';
 
         $query = DB::table('instruments as i')
             ->joinSub(
-                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, revenue_growth
+                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, return_on_equity, operating_margin
                  from instrument_fundamentals order by instrument_id, snapshot_date desc, id desc",
                 'f',
                 'f.instrument_id', '=', 'i.id',
@@ -257,7 +259,9 @@ class FundamentalHeatmapService
             ->select([
                 'i.id as instrument_id', 'i.symbol', 'i.name', 'i.sector', 'i.country',
                 'f.trailing_pe', DB::raw('f.dividend_yield * 100 as dividend_yield'),
-                'f.market_cap', DB::raw('f.revenue_growth * 100 as revenue_growth'),
+                'f.market_cap',
+                DB::raw('f.return_on_equity * 100 as return_on_equity'),
+                DB::raw('f.operating_margin * 100 as operating_margin'),
             ]);
 
         if ($capGroup !== null && isset(self::CAP_GROUPS[$capGroup])) {
@@ -276,36 +280,12 @@ class FundamentalHeatmapService
             $query->where(fn ($q) => $q->where('i.symbol', 'ilike', $term)->orWhere('i.name', 'ilike', $term));
         }
 
-        // ki_score isn't a real SQL column here, applyMetricRangesToQuery
-        // ignores it and it's filtered in PHP below instead.
         $this->applyMetricRangesToQuery($query, $metricRanges);
 
-        $servingMetrics = $this->servingMetricsByInstrument();
-        $rows = collect($query->get())->map(function ($row) use ($servingMetrics) {
-            $metrics = $servingMetrics->get((int) $row->instrument_id);
-            $row->ki_score = $metrics?->ki_score;
-            $row->panel_score = $metrics?->panel_score;
+        $total = (clone $query)->count();
 
-            return $row;
-        });
-
-        foreach (['ki_score', 'panel_score'] as $key) {
-            if (! isset($metricRanges[$key])) {
-                continue;
-            }
-            $range = $metricRanges[$key];
-            $rows = $rows->filter(fn ($row) => $row->{$key} !== null
-                && (! isset($range['min']) || $row->{$key} >= $range['min'])
-                && (! isset($range['max']) || $row->{$key} <= $range['max']));
-        }
-
-        $total = $rows->count();
-
-        // Nulls sort last regardless of direction (a missing value isn't "the smallest").
-        $rows = $dir === 'asc'
-            ? $rows->sortBy(fn ($row) => $row->{$sort} ?? INF)
-            : $rows->sortByDesc(fn ($row) => $row->{$sort} ?? -INF);
-        $rows = $rows->values()->forPage($page, $perPage)->values();
+        $rows = $query->orderByRaw("{$sort} {$dir} NULLS LAST")->orderBy('i.symbol')
+            ->forPage($page, $perPage)->get();
 
         return ['rows' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'sort' => $sort, 'dir' => $dir];
     }
@@ -314,13 +294,13 @@ class FundamentalHeatmapService
     {
         $query = DB::table('instruments as i')
             ->joinSub(
-                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, revenue_growth
+                "select distinct on (instrument_id) instrument_id, trailing_pe, dividend_yield, market_cap, return_on_equity, operating_margin
                  from instrument_fundamentals order by instrument_id, snapshot_date desc, id desc",
                 'f',
                 'f.instrument_id', '=', 'i.id',
             )
             ->where('i.type', 'stock')->whereNull('i.deleted_at')
-            ->select(['f.instrument_id', 'f.trailing_pe', 'f.dividend_yield', 'f.market_cap', 'f.revenue_growth']);
+            ->select(['f.instrument_id', 'f.trailing_pe', 'f.dividend_yield', 'f.market_cap', 'f.return_on_equity', 'f.operating_margin']);
 
         if ($sector !== null && $sector !== '') {
             $query->where('i.sector', $sector);
@@ -332,47 +312,20 @@ class FundamentalHeatmapService
             $query->whereIn('i.country', self::REGIONS[$region]['countries']);
         }
 
-        $servingMetrics = $this->servingMetricsByInstrument();
-
-        return collect($query->get())->map(function ($row) use ($servingMetrics) {
-            $metrics = $servingMetrics->get((int) $row->instrument_id);
-
-            return (object) [
-                'instrument_id' => (int) $row->instrument_id,
-                'trailing_pe' => $row->trailing_pe !== null ? (float) $row->trailing_pe : null,
-                'dividend_yield' => $row->dividend_yield !== null ? (float) $row->dividend_yield * 100 : null,
-                'market_cap' => $row->market_cap !== null ? (float) $row->market_cap : null,
-                'revenue_growth' => $row->revenue_growth !== null ? (float) $row->revenue_growth * 100 : null,
-                'ki_score' => $metrics?->ki_score,
-                'panel_score' => $metrics?->panel_score,
-            ];
-        });
-    }
-
-    /**
-     * ranking_score (the raw, unfiltered KI-Score - see
-     * ServingScreenerService::stock(), labelled "KI-Score" in the
-     * screener) and panel_percentile (the separate cross-sectional panel
-     * model's percentile rank) from the serving DB, keyed by instrument_id.
-     * Cached 5 min inside currentStocks() itself.
-     *
-     * @return Collection<int, object{ki_score: ?float, panel_score: ?float}>
-     */
-    private function servingMetricsByInstrument(): Collection
-    {
-        return $this->servingScreener->currentStocks()
-            ->filter(fn ($s) => isset($s->instrument_id))
-            ->keyBy('instrument_id')
-            ->map(fn ($s) => (object) [
-                'ki_score' => is_numeric($s->ranking_score ?? null) ? (float) $s->ranking_score : null,
-                'panel_score' => is_numeric($s->panel_percentile ?? null) ? (float) $s->panel_percentile : null,
-            ]);
+        return collect($query->get())->map(fn ($row) => (object) [
+            'instrument_id' => (int) $row->instrument_id,
+            'trailing_pe' => $row->trailing_pe !== null ? (float) $row->trailing_pe : null,
+            'dividend_yield' => $row->dividend_yield !== null ? (float) $row->dividend_yield * 100 : null,
+            'market_cap' => $row->market_cap !== null ? (float) $row->market_cap : null,
+            'return_on_equity' => $row->return_on_equity !== null ? (float) $row->return_on_equity * 100 : null,
+            'operating_margin' => $row->operating_margin !== null ? (float) $row->operating_margin * 100 : null,
+        ]);
     }
 
     /** True if a row has a plausible (sanitized) value for all 4 heatmap metrics - see sanitizedMetricValues() for the same bounds applied per-metric across a collection. */
     private function hasAllFourMetrics(object $row): bool
     {
-        foreach (['trailing_pe', 'dividend_yield', 'ki_score', 'panel_score'] as $key) {
+        foreach (['trailing_pe', 'dividend_yield', 'return_on_equity', 'operating_margin'] as $key) {
             if ($this->sanitizedMetricValues(collect([$row]), $key)->isEmpty()) {
                 return false;
             }
@@ -387,6 +340,8 @@ class FundamentalHeatmapService
         $values = match ($key) {
             'trailing_pe' => $rows->pluck('trailing_pe')->filter(fn ($v) => $v !== null && $v > 0 && $v < 200),
             'dividend_yield' => $rows->pluck('dividend_yield')->filter(fn ($v) => $v !== null && $v >= 0 && $v <= 20),
+            'return_on_equity' => $rows->pluck('return_on_equity')->filter(fn ($v) => $v !== null && $v > -100 && $v < 200),
+            'operating_margin' => $rows->pluck('operating_margin')->filter(fn ($v) => $v !== null && $v > -100 && $v < 100),
             default => $rows->pluck($key)->filter(fn ($v) => $v !== null),
         };
 

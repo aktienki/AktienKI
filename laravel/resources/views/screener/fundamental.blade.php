@@ -70,11 +70,11 @@
                 $boundariesByMetric[$panel['x_key']] = $panel['x_boundaries_raw'];
                 $boundariesByMetric[$panel['y_key']] = $panel['y_boundaries_raw'];
             }
-            $metricUrlParam = ['trailing_pe' => 'pe', 'dividend_yield' => 'dy', 'ki_score' => 'ks', 'panel_score' => 'ps'];
+            $metricUrlParam = ['trailing_pe' => 'pe', 'dividend_yield' => 'dy', 'return_on_equity' => 'roe', 'operating_margin' => 'om'];
         @endphp
         <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4"
              x-data="{
-                thresholds: { trailing_pe: 0, dividend_yield: 0, ki_score: 0, panel_score: 0 },
+                thresholds: { trailing_pe: 0, dividend_yield: 0, return_on_equity: 0, operating_margin: 0 },
                 boundaries: {{ json_encode($boundariesByMetric) }},
                 urlParam: {{ json_encode($metricUrlParam) }},
                 dragging: null, changed: false,
@@ -202,10 +202,9 @@
                             <th>{{ __('Sektor') }}</th>
                             <th class="text-right">{!! $sortLink('trailing_pe', __('KGV')) !!}</th>
                             <th class="text-right">{!! $sortLink('dividend_yield', __('Div.-Rendite')) !!}</th>
-                            <th class="text-right">{!! $sortLink('ki_score', __('Score')) !!}</th>
-                            <th class="text-right">{!! $sortLink('panel_score', __('Panel')) !!}</th>
-                            <th class="text-right">{{ __('Marktkap.') }}</th>
-                            <th class="text-right">{!! $sortLink('revenue_growth', __('Umsatzwachstum')) !!}</th>
+                            <th class="text-right">{!! $sortLink('return_on_equity', __('ROE')) !!}</th>
+                            <th class="text-right">{!! $sortLink('operating_margin', __('Op.-Marge')) !!}</th>
+                            <th class="text-right">{!! $sortLink('market_cap', __('Marktkap.')) !!}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -217,13 +216,12 @@
                                 <td>{{ __($row->sector ?: '—') }}</td>
                                 <td class="text-right tabular-nums">{{ $row->trailing_pe !== null ? number_format($row->trailing_pe, 1, ',', '.') : '–' }}</td>
                                 <td class="text-right tabular-nums">{{ $row->dividend_yield !== null ? number_format($row->dividend_yield, 2, ',', '.').' %' : '–' }}</td>
-                                <td class="text-right tabular-nums">{{ $row->ki_score !== null ? number_format($row->ki_score, 0, ',', '.') : '–' }}</td>
-                                <td class="text-right tabular-nums">{{ $row->panel_score !== null ? number_format($row->panel_score, 0, ',', '.') : '–' }}</td>
+                                <td class="text-right tabular-nums">{{ $row->return_on_equity !== null ? number_format($row->return_on_equity, 1, ',', '.').' %' : '–' }}</td>
+                                <td class="text-right tabular-nums">{{ $row->operating_margin !== null ? number_format($row->operating_margin, 1, ',', '.').' %' : '–' }}</td>
                                 <td class="text-right tabular-nums">{{ $row->market_cap !== null ? number_format($row->market_cap / 1_000_000_000, 1, ',', '.').' Mrd.' : '–' }}</td>
-                                <td class="text-right tabular-nums">{{ $row->revenue_growth !== null ? number_format($row->revenue_growth, 1, ',', '.').' %' : '–' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="10" class="py-6 text-center text-[var(--ak-muted)]">{{ __('Keine Treffer.') }}</td></tr>
+                            <tr><td colspan="9" class="py-6 text-center text-[var(--ak-muted)]">{{ __('Keine Treffer.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
