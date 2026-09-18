@@ -258,6 +258,7 @@
                             <th class="text-right">{!! $sortLink('trailing_pe', __('KGV')) !!}</th>
                             <th class="text-right" title="{{ __('KGV mit dem gespeicherten KGV skaliert auf den aktuellen Kurs (gleicher Gewinn, aktueller Kurs statt Kurs zum Snapshot-Zeitpunkt).') }}">{{ __('KGV (aktuell)') }}</th>
                             <th class="text-right">{!! $sortLink('dividend_yield', __('Div.-Rendite')) !!}</th>
+                            <th class="text-right" title="{{ __('Dividendenrendite mit derselben Ausschüttung skaliert auf den aktuellen Kurs.') }}">{{ __('Div. (aktuell)') }}</th>
                             <th class="text-right">{!! $sortLink('return_on_equity', __('ROE')) !!}</th>
                             <th class="text-right">{!! $sortLink('operating_margin', __('Op.-Marge')) !!}</th>
                             <th class="text-right">{!! $sortLink('market_cap', __('Marktkap.')) !!}</th>
@@ -291,12 +292,21 @@
                                         –
                                     @endif
                                 </td>
+                                <td class="text-right tabular-nums">
+                                    @if($row->dividend_yield_live !== null)
+                                        @php $divDiff = $row->dividend_yield_live - $row->dividend_yield; @endphp
+                                        {{ number_format($row->dividend_yield_live, 2, ',', '.') }} %
+                                        <span class="fundamental-pe-diff {{ $divDiff > 0 ? 'pos' : ($divDiff < 0 ? 'neg' : '') }}">({{ $divDiff >= 0 ? '+' : '' }}{{ number_format($divDiff, 2, ',', '.') }})</span>
+                                    @else
+                                        –
+                                    @endif
+                                </td>
                                 <td class="text-right tabular-nums">{{ $row->return_on_equity !== null ? number_format($row->return_on_equity, 1, ',', '.').' %' : '–' }}</td>
                                 <td class="text-right tabular-nums">{{ $row->operating_margin !== null ? number_format($row->operating_margin, 1, ',', '.').' %' : '–' }}</td>
                                 <td class="text-right tabular-nums">{{ $row->market_cap !== null ? number_format($row->market_cap / 1_000_000_000, 1, ',', '.').' Mrd.' : '–' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="10" class="py-6 text-center text-[var(--ak-muted)]">{{ __('Keine Treffer.') }}</td></tr>
+                            <tr><td colspan="11" class="py-6 text-center text-[var(--ak-muted)]">{{ __('Keine Treffer.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>

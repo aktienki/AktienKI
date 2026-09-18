@@ -304,6 +304,16 @@ class FundamentalHeatmapService
                          THEN f.trailing_pe * (p.current_close / (f.market_cap / f.shares_outstanding))
                     END as trailing_pe_live
                 "),
+                // Live dividend yield = stored yield scaled INVERSELY to the
+                // price move (yield = dividend/price, so it moves opposite to
+                // price, unlike KGV) - same trailing dividend, current price.
+                DB::raw("
+                    CASE WHEN f.dividend_yield IS NOT NULL AND p.current_close IS NOT NULL
+                              AND f.market_cap IS NOT NULL AND NULLIF(f.shares_outstanding, 0) IS NOT NULL
+                         THEN (CASE WHEN f.dividend_yield > 1 THEN f.dividend_yield ELSE f.dividend_yield * 100 END)
+                              * ((f.market_cap / f.shares_outstanding) / p.current_close)
+                    END as dividend_yield_live
+                "),
             ]);
 
         if ($capGroup !== null && isset(self::CAP_GROUPS[$capGroup])) {
