@@ -7,7 +7,7 @@ Schedule::command('models:refresh-champion-challengers')
     ->withoutOverlapping();
 
 Schedule::command('markets:refresh-indices')
-    ->everyMinute()
+    ->hourly()
     ->withoutOverlapping(2)
     ->runInBackground();
 
