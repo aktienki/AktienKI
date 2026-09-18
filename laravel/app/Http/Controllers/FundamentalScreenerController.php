@@ -79,7 +79,7 @@ final class FundamentalScreenerController extends Controller
             if ($fundamental) {
                 $ratios = [
                     'trailing_pe' => $fundamental->trailing_pe !== null ? (float) $fundamental->trailing_pe : null,
-                    'dividend_yield' => $fundamental->dividend_yield !== null ? (float) $fundamental->dividend_yield * 100 : null,
+                    'dividend_yield' => FundamentalHeatmapService::normalizeYieldPercent($fundamental->dividend_yield),
                     'market_cap' => $fundamental->market_cap !== null ? (float) $fundamental->market_cap : null,
                     'revenue_growth' => $fundamental->revenue_growth !== null ? (float) $fundamental->revenue_growth * 100 : null,
                     'snapshot_date' => $fundamental->snapshot_date,

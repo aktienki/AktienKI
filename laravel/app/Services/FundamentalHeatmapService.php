@@ -57,6 +57,25 @@ class FundamentalHeatmapService
         'TH' => 'Thailand', 'US' => 'USA', 'ZA' => 'Südafrika',
     ];
 
+    /**
+     * A handful of instrument_fundamentals.dividend_yield rows store the
+     * value already as a percent (15.65) instead of the usual fraction
+     * (0.0165) - a source-data inconsistency, not a currency issue. No
+     * real dividend yield exceeds 100% as a fraction, so >1 reliably means
+     * "already a percent" and skips the *100. Mirrors the CASE expression
+     * in table()'s SQL for the PHP-side (build()/ratios) call sites.
+     */
+    public static function normalizeYieldPercent(mixed $rawFraction): ?float
+    {
+        if ($rawFraction === null) {
+            return null;
+        }
+
+        $value = (float) $rawFraction;
+
+        return $value > 1 ? $value : $value * 100;
+    }
+
     public static function countryName(string $code): string
     {
         return self::COUNTRY_NAMES[strtoupper($code)] ?? strtoupper($code);
@@ -258,7 +277,14 @@ class FundamentalHeatmapService
             ->where(fn ($q) => $q->whereNull('f.market_cap')->orWhere('f.market_cap', '<', 5_000_000_000_000))
             ->select([
                 'i.id as instrument_id', 'i.symbol', 'i.name', 'i.sector', 'i.country',
-                'f.trailing_pe', DB::raw('f.dividend_yield * 100 as dividend_yield'),
+                'f.trailing_pe',
+                // A handful of instrument_fundamentals rows store dividend_yield
+                // already as a percent (e.g. 15.65) instead of the usual
+                // fraction (0.0165) - a source-data inconsistency (TwelveData
+                // apparently mixes both), not a currency issue. No real yield
+                // exceeds 100% as a fraction, so >1 reliably means "already a
+                // percent" and skips the *100.
+                DB::raw('CASE WHEN f.dividend_yield > 1 THEN f.dividend_yield ELSE f.dividend_yield * 100 END as dividend_yield'),
                 'f.market_cap',
                 DB::raw('f.return_on_equity * 100 as return_on_equity'),
                 DB::raw('f.operating_margin * 100 as operating_margin'),
@@ -315,7 +341,7 @@ class FundamentalHeatmapService
         return collect($query->get())->map(fn ($row) => (object) [
             'instrument_id' => (int) $row->instrument_id,
             'trailing_pe' => $row->trailing_pe !== null ? (float) $row->trailing_pe : null,
-            'dividend_yield' => $row->dividend_yield !== null ? (float) $row->dividend_yield * 100 : null,
+            'dividend_yield' => self::normalizeYieldPercent($row->dividend_yield),
             'market_cap' => $row->market_cap !== null ? (float) $row->market_cap : null,
             'return_on_equity' => $row->return_on_equity !== null ? (float) $row->return_on_equity * 100 : null,
             'operating_margin' => $row->operating_margin !== null ? (float) $row->operating_margin * 100 : null,
