@@ -21,6 +21,7 @@ final class FundamentalScreenerController extends Controller
 
         $years = [];
         $ratios = null;
+        $kennzahlenTrend = [];
         $panels = [];
         $capGroup = $request->query('cap');
         $capGroup = in_array($capGroup, array_keys(FundamentalHeatmapService::CAP_GROUPS), true) ? $capGroup : null;
@@ -72,6 +73,7 @@ final class FundamentalScreenerController extends Controller
 
         if ($selected) {
             $years = $cards->forInstrument($selected->id);
+            $kennzahlenTrend = $cards->kennzahlenTrend($selected->id);
 
             $fundamental = DB::table('instrument_fundamentals')->where('instrument_id', $selected->id)
                 ->orderByDesc('snapshot_date')->orderByDesc('id')->first([
@@ -92,6 +94,7 @@ final class FundamentalScreenerController extends Controller
             'selected' => $selected,
             'years' => $years,
             'ratios' => $ratios,
+            'kennzahlenTrend' => $kennzahlenTrend,
             'panels' => $panels,
             'capGroup' => $capGroup,
             'sector' => $sector,

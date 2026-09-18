@@ -22,6 +22,8 @@ class EarningsQuarterCardService
 
     private const CANDLE_WINDOW_DAYS = 10;
 
+    private const TREND_QUARTERS_SHOWN = 8;
+
     public function forInstrument(int $instrumentId): array
     {
         $currentYear = (int) CarbonImmutable::now()->format('Y');
@@ -76,6 +78,102 @@ class EarningsQuarterCardService
         }
 
         return $result;
+    }
+
+    /**
+     * The same 4 metrics as the Fundamental heatmaps (KGV, Dividendenrendite,
+     * ROE, Gewinnwachstum) as small per-stock bar charts. KGV and
+     * Gewinnwachstum genuinely vary per quarter (derived from reported EPS +
+     * price, and YoY EPS growth) and get one bar per reported quarter we
+     * have. ROE and Dividendenrendite have no historical time series
+     * anywhere in the data (instrument_fundamentals only ever keeps the
+     * latest snapshot) - rather than fake a flat multi-quarter line, they
+     * get a single "aktuell" bar for the current value.
+     */
+    public function kennzahlenTrend(int $instrumentId): array
+    {
+        $currentYear = (int) CarbonImmutable::now()->format('Y');
+        $sinceYear = $currentYear - self::YEARS_SHOWN + 1;
+
+        $events = DB::table('corporate_events')
+            ->where('instrument_id', $instrumentId)
+            ->where('event_type', 'earnings')
+            ->whereYear('event_date', '>=', $sinceYear)
+            ->orderBy('event_date')
+            ->get(['event_date', 'eps_actual']);
+
+        $byYearQuarter = [];
+        foreach ($events as $event) {
+            if ($event->eps_actual === null) {
+                continue;
+            }
+            $date = CarbonImmutable::parse($event->event_date);
+            $year = (int) $date->format('Y');
+            $quarter = (int) ceil(((int) $date->format('n')) / 3);
+            $key = $year.'-'.$quarter;
+            if (! isset($byYearQuarter[$key])) {
+                $byYearQuarter[$key] = ['year' => $year, 'quarter' => $quarter, 'date' => $date, 'eps' => (float) $event->eps_actual];
+            }
+        }
+
+        $medianAbsEps = $this->medianAbsEps(collect($byYearQuarter)->pluck('eps'));
+        $byYearQuarter = collect($byYearQuarter)
+            ->filter(fn ($q) => ! $this->looksImplausible($q['eps'], $medianAbsEps))
+            ->sortBy(fn ($q) => $q['year'].str_pad((string) $q['quarter'], 2, '0', STR_PAD_LEFT))
+            ->values();
+
+        $bars = DB::table('price_bars')->where('instrument_id', $instrumentId)->where('interval', '1d')
+            ->orderBy('bar_time')
+            ->get(['bar_time', 'close'])
+            ->map(fn ($b) => ['date' => CarbonImmutable::parse($b->bar_time)->toDateString(), 'close' => (float) $b->close])
+            ->values();
+
+        $kgvBars = [];
+        $growthBars = [];
+        foreach ($byYearQuarter as $i => $q) {
+            $label = 'Q'.$q['quarter'].' \''.substr((string) $q['year'], -2);
+
+            $price = $this->closeOnOrAfter($bars, $q['date']->toDateString());
+            $kgvBars[] = [
+                'label' => $label,
+                'value' => ($price !== null && $q['eps'] > 0) ? round($price / ($q['eps'] * 4), 1) : null,
+            ];
+
+            $priorYear = $byYearQuarter->first(fn ($p) => $p['year'] === $q['year'] - 1 && $p['quarter'] === $q['quarter']);
+            $growthBars[] = [
+                'label' => $label,
+                'value' => ($priorYear !== null && $priorYear['eps'] != 0.0)
+                    ? round((($q['eps'] - $priorYear['eps']) / abs($priorYear['eps'])) * 100, 1)
+                    : null,
+            ];
+        }
+
+        $kgvBars = array_slice($kgvBars, -self::TREND_QUARTERS_SHOWN);
+        $growthBars = array_slice($growthBars, -self::TREND_QUARTERS_SHOWN);
+
+        $fundamental = DB::table('instrument_fundamentals')->where('instrument_id', $instrumentId)
+            ->orderByDesc('snapshot_date')->orderByDesc('id')
+            ->first(['return_on_equity', 'dividend_yield']);
+
+        return [
+            'trailing_pe' => ['label' => __('KGV'), 'unit' => 'x', 'bars' => $kgvBars],
+            'earnings_growth' => ['label' => __('Gewinnwachstum'), 'unit' => '%', 'bars' => $growthBars],
+            'return_on_equity' => [
+                'label' => __('ROE'), 'unit' => '%',
+                'bars' => [['label' => __('aktuell'), 'value' => $fundamental?->return_on_equity !== null ? round((float) $fundamental->return_on_equity * 100, 1) : null]],
+            ],
+            'dividend_yield' => [
+                'label' => __('Dividendenrendite'), 'unit' => '%',
+                'bars' => [['label' => __('aktuell'), 'value' => $fundamental?->dividend_yield !== null ? round(FundamentalHeatmapService::normalizeYieldPercent($fundamental->dividend_yield), 1) : null]],
+            ],
+        ];
+    }
+
+    private function closeOnOrAfter(Collection $bars, string $dateIso): ?float
+    {
+        $idx = $bars->search(fn ($b) => $b['date'] >= $dateIso);
+
+        return $idx === false ? null : $bars[$idx]['close'];
     }
 
     private function buildQuarter(int $quarter, object $event, ?object $reaction, Collection $bars, ?float $medianAbsEps): array

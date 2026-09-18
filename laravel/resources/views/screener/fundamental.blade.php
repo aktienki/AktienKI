@@ -423,6 +423,50 @@
                     </div>
                 </div>
 
+                <div class="ak-master-card fundamental-section" x-show="active === 'ratios'" x-cloak>
+                    <div class="ak-master-card-header fundamental-head-inner"><h2 class="text-base font-black">{{ __('Kennzahlen im Verlauf') }}</h2></div>
+                    <div class="fundamental-trend-grid">
+                        @foreach($kennzahlenTrend as $metric)
+                            @php
+                                $values = collect($metric['bars'])->pluck('value')->filter(fn ($v) => $v !== null)->values();
+                                $scaleMax = max(0.0, $values->max() ?? 0.0);
+                                $scaleMin = min(0.0, $values->min() ?? 0.0);
+                                $range = ($scaleMax - $scaleMin) ?: 1.0;
+                                $zeroPct = (0 - $scaleMin) / $range * 100;
+                            @endphp
+                            <div class="fundamental-trend-card">
+                                <p class="fundamental-trend-title">{{ $metric['label'] }} <span>({{ $metric['unit'] }})</span></p>
+                                @if($values->isEmpty())
+                                    <p class="fundamental-trend-empty">{{ __('Keine Daten vorhanden.') }}</p>
+                                @else
+                                    <div class="fundamental-trend-bars">
+                                        <span class="fundamental-trend-zero" style="bottom: {{ round($zeroPct, 2) }}%"></span>
+                                        @foreach($metric['bars'] as $bar)
+                                            @php
+                                                $hasValue = $bar['value'] !== null;
+                                                $heightPct = $hasValue ? abs($bar['value']) / $range * 100 : 0;
+                                                $bottomPct = ($hasValue && $bar['value'] < 0) ? $zeroPct - $heightPct : $zeroPct;
+                                            @endphp
+                                            <div class="fundamental-trend-bar-wrap">
+                                                <div
+                                                    class="fundamental-trend-bar {{ ! $hasValue ? 'is-empty' : '' }}"
+                                                    style="height: {{ round($heightPct, 2) }}%; bottom: {{ round($bottomPct, 2) }}%"
+                                                    title="{{ $bar['label'] }}: {{ $hasValue ? number_format($bar['value'], 1, ',', '.').' '.$metric['unit'] : __('keine Daten') }}"
+                                                >
+                                                    @if($hasValue)
+                                                        <span class="fundamental-trend-bar-value">{{ number_format($bar['value'], 1, ',', '.') }}</span>
+                                                    @endif
+                                                </div>
+                                                <span class="fundamental-trend-bar-label">{{ $bar['label'] }}</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
                 <div class="fundamental-section" x-show="active === 'quarters'" x-cloak>
                     @foreach($years as $yearBlock)
                         <div class="fy-block">
@@ -521,6 +565,19 @@
     #fundamental-page .fundamental-ratio span { display: block; font-size: .6rem; font-weight: 800; color: var(--ak-muted); text-transform: uppercase; letter-spacing: .02em; }
     #fundamental-page .fundamental-ratio b { display: block; margin-top: .25rem; font-size: 1rem; font-weight: 900; }
     #fundamental-page .fundamental-footnote { margin-top: 1rem; font-size: .68rem; color: var(--ak-muted); line-height: 1.6; }
+    #fundamental-page .fundamental-trend-grid { display: grid; grid-template-columns: 1fr; gap: 1.1rem; padding: 1.1rem; }
+    @media (min-width: 900px) { #fundamental-page .fundamental-trend-grid { grid-template-columns: repeat(2, 1fr); } }
+    #fundamental-page .fundamental-trend-card { border: 1px solid var(--ak-border); border-radius: .8rem; padding: .8rem .9rem 1.6rem; overflow-x: auto; }
+    #fundamental-page .fundamental-trend-title { font-size: .68rem; font-weight: 800; color: var(--ak-text); text-transform: uppercase; letter-spacing: .02em; }
+    #fundamental-page .fundamental-trend-title span { font-weight: 600; color: var(--ak-muted); text-transform: none; letter-spacing: normal; }
+    #fundamental-page .fundamental-trend-empty { margin-top: 1.5rem; font-size: .68rem; color: var(--ak-muted); }
+    #fundamental-page .fundamental-trend-bars { position: relative; display: flex; justify-content: center; align-items: stretch; gap: 6px; height: 90px; margin-top: 1.6rem; padding: 0 .25rem; min-width: 180px; }
+    #fundamental-page .fundamental-trend-zero { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--ak-border); }
+    #fundamental-page .fundamental-trend-bar-wrap { position: relative; flex: 0 0 34px; height: 100%; }
+    #fundamental-page .fundamental-trend-bar { position: absolute; left: 5px; right: 5px; min-height: 2px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, #22d3ee, color-mix(in srgb, #22d3ee 45%, transparent)); }
+    #fundamental-page .fundamental-trend-bar.is-empty { background: none; border: 1px dashed color-mix(in srgb, var(--ak-border) 70%, transparent); border-bottom: none; height: 2px !important; }
+    #fundamental-page .fundamental-trend-bar-value { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: .58rem; font-weight: 800; color: var(--ak-text); white-space: nowrap; }
+    #fundamental-page .fundamental-trend-bar-label { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: .56rem; font-weight: 700; color: var(--ak-muted); white-space: nowrap; }
 
     #fundamental-page .fundamental-cap-pill { display: inline-flex; align-items: center; padding: .5rem .9rem; border-radius: .7rem; border: 1px solid var(--ak-border); font-size: .72rem; font-weight: 800; color: var(--ak-muted); text-decoration: none; transition: border-color .15s ease, background .15s ease, color .15s ease; }
     #fundamental-page .fundamental-cap-pill:hover { border-color: color-mix(in srgb, #22d3ee 45%, transparent); color: var(--ak-text); }
