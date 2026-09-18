@@ -236,7 +236,7 @@
             </select>
             <select name="limit" @change="submitFilters($el.form)" class="ak-input h-10 min-w-[105px] flex-1 text-sm">
                 @foreach(['10' => 'Top 10', '25' => 'Top 25', '50' => 'Top 50', '100' => 'Top 100', 'all' => __('Alle')] as $value => $label)
-                    <option value="{{ $value }}" @selected((string) request('limit', 'all') === (string) $value)>{{ $label }}</option>
+                    <option value="{{ $value }}" @selected((string) request('limit', '50') === (string) $value)>{{ $label }}</option>
                 @endforeach
             </select>
             <a href="{{ route('screener.index') }}" @click="filtering = true" class="screener-filter-reset inline-flex h-10 shrink-0 items-center justify-center border border-amber-400/40 bg-amber-400/[.10] px-4 text-xs font-black text-amber-300 transition hover:bg-amber-400/[.18]">{{ __('Reset') }}</a>
@@ -1176,16 +1176,16 @@
                 <div class="rounded-2xl border border-cyan-400/25 bg-[var(--ak-card)] p-8 text-center text-sm text-[var(--ak-muted)] sm:col-span-2 xl:col-span-3">{{ __('Keine Aktien für diese Auswahl gefunden.') }}</div>
             @endforelse
         </section>
-        @if(data_get($mobilePagination ?? [], 'enabled') && data_get($mobilePagination, 'last_page', 1) > 1)
-            <nav class="mt-3 flex items-center justify-between gap-3 border-t border-cyan-500/25 pt-3 md:hidden" aria-label="{{ __('Seitennavigation') }}">
-                @if(data_get($mobilePagination, 'page', 1) > 1)
-                    <a href="{{ request()->fullUrlWithQuery(['mobile_page' => data_get($mobilePagination, 'page') - 1]) }}" class="ak-button-secondary px-3 py-2 text-xs font-black">← {{ __('Zurück') }}</a>
+        @if(data_get($pagination ?? [], 'enabled'))
+            <nav class="mt-3 flex items-center justify-between gap-3 border-t border-cyan-500/25 pt-3" aria-label="{{ __('Seitennavigation') }}">
+                @if(data_get($pagination, 'page', 1) > 1)
+                    <a href="{{ request()->fullUrlWithQuery(['page' => data_get($pagination, 'page') - 1]) }}" class="ak-button-secondary px-3 py-2 text-xs font-black">← {{ __('Zurück') }}</a>
                 @else
                     <span></span>
                 @endif
-                <span class="text-[10px] font-black text-[var(--ak-muted)]">{{ data_get($mobilePagination, 'page') }} / {{ data_get($mobilePagination, 'last_page') }} · {{ data_get($mobilePagination, 'total') }} {{ __('Aktien') }}</span>
-                @if(data_get($mobilePagination, 'page') < data_get($mobilePagination, 'last_page'))
-                    <a href="{{ request()->fullUrlWithQuery(['mobile_page' => data_get($mobilePagination, 'page') + 1]) }}" class="ak-button-secondary px-3 py-2 text-xs font-black">{{ __('Weiter') }} →</a>
+                <span class="text-[10px] font-black text-[var(--ak-muted)]">{{ data_get($pagination, 'page') }} / {{ data_get($pagination, 'last_page') }} · {{ data_get($pagination, 'total') }} {{ __('Aktien') }}</span>
+                @if(data_get($pagination, 'page') < data_get($pagination, 'last_page'))
+                    <a href="{{ request()->fullUrlWithQuery(['page' => data_get($pagination, 'page') + 1]) }}" class="ak-button-secondary px-3 py-2 text-xs font-black">{{ __('Weiter') }} →</a>
                 @else
                     <span></span>
                 @endif

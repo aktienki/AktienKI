@@ -446,24 +446,24 @@ final class ServingScreenerService
                 && Carbon::parse($stock->signal_transition_at)->gte(now()->subDays($transitionDays))))
             ->values();
 
-        $limit = match (strtolower((string) $request->query('limit', 'all'))) {
+        // 'limit' is the page size, defaulting to 50 ("Top 50") rather than
+        // showing the whole ranked universe at once; 'all' still means no
+        // paging. Applies uniformly to desktop and mobile - previously
+        // mobile alone got its own hardcoded 25-per-page slice layered on
+        // top of this, while desktop had no paging UI at all.
+        $perPage = match (strtolower((string) $request->query('limit', '50'))) {
+            '10' => 10,
             '25' => 25,
             '50' => 50,
             '100' => 100,
             'all' => null,
-            default => null,
+            default => 50,
         };
-        if ($limit !== null) {
-            $ranked = $ranked->take($limit)->values();
-        }
-
-        $isMobileRequest = preg_match('/Mobile|iPhone|iPod|Android/i', (string) $request->userAgent()) === 1;
-        $mobilePerPage = 25;
-        $mobileTotal = $ranked->count();
-        $mobileLastPage = max(1, (int) ceil($mobileTotal / $mobilePerPage));
-        $mobilePage = min(max(1, (int) $request->query('mobile_page', 1)), $mobileLastPage);
-        if ($isMobileRequest) {
-            $ranked = $ranked->slice(($mobilePage - 1) * $mobilePerPage, $mobilePerPage)->values();
+        $total = $ranked->count();
+        $lastPage = $perPage !== null ? max(1, (int) ceil($total / $perPage)) : 1;
+        $page = min(max(1, (int) $request->query('page', 1)), $lastPage);
+        if ($perPage !== null) {
+            $ranked = $ranked->slice(($page - 1) * $perPage, $perPage)->values();
         }
 
         $this->applyCachedCharts($ranked);
@@ -482,12 +482,12 @@ final class ServingScreenerService
             'canViewModelOverview' => $this->plans->allowsTariff($request->user(), PlanLevel::Pro),
             'realtimeQuotes' => $this->plans->allowsTariff($request->user(), PlanLevel::Pro),
             'regionalCountry' => $this->regionalUniverse->country($request->user()),
-            'mobilePagination' => [
-                'enabled' => $isMobileRequest,
-                'page' => $mobilePage,
-                'last_page' => $mobileLastPage,
-                'per_page' => $mobilePerPage,
-                'total' => $mobileTotal,
+            'pagination' => [
+                'enabled' => $lastPage > 1,
+                'page' => $page,
+                'last_page' => $lastPage,
+                'per_page' => $perPage ?? $total,
+                'total' => $total,
             ],
         ];
     }
