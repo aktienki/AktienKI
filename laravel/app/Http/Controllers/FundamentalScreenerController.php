@@ -29,11 +29,31 @@ final class FundamentalScreenerController extends Controller
         $region = $request->query('region');
         $region = isset(FundamentalHeatmapService::REGIONS[$region]) ? $region : null;
 
+        // Real-value min/max per metric, set by dragging a heatmap axis line
+        // (released -> page reload). market cap travels in Mrd. in the URL
+        // for readability, converted back to raw currency here.
+        $metricRanges = [];
+        $metricParams = ['pe' => 'trailing_pe', 'dy' => 'dividend_yield', 'mc' => 'market_cap', 'rg' => 'revenue_growth'];
+        foreach ($metricParams as $param => $key) {
+            $min = $request->query("{$param}_min");
+            $max = $request->query("{$param}_max");
+            $range = [];
+            if (is_numeric($min)) {
+                $range['min'] = $key === 'market_cap' ? (float) $min * 1_000_000_000 : (float) $min;
+            }
+            if (is_numeric($max)) {
+                $range['max'] = $key === 'market_cap' ? (float) $max * 1_000_000_000 : (float) $max;
+            }
+            if ($range !== []) {
+                $metricRanges[$key] = $range;
+            }
+        }
+
         $table = [];
         $filterOptions = ['sectors' => [], 'countries' => []];
 
         if (! $selected) {
-            $panels = $heatmaps->build($capGroup, $sector, $country, $region);
+            $panels = $heatmaps->build($capGroup, $sector, $country, $region, $metricRanges);
             $filterOptions = $heatmaps->filterOptions();
             $table = $heatmaps->table(
                 $capGroup,
@@ -45,6 +65,7 @@ final class FundamentalScreenerController extends Controller
                 $sector,
                 $country,
                 $region,
+                $metricRanges,
             );
         }
 
@@ -78,6 +99,9 @@ final class FundamentalScreenerController extends Controller
             'filterOptions' => $filterOptions,
             'table' => $table,
             'tableSearch' => (string) $request->query('q', ''),
+            'metricRangeParams' => collect($metricParams)->mapWithKeys(fn ($fundamentalKey, $param) => [
+                $param => ['min' => $request->query("{$param}_min"), 'max' => $request->query("{$param}_max")],
+            ])->all(),
         ]);
     }
 }

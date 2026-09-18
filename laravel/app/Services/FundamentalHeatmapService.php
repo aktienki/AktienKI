@@ -76,7 +76,10 @@ class FundamentalHeatmapService
         ];
     }
 
-    public function build(?string $capGroup = null, ?string $sector = null, ?string $country = null, ?string $region = null): array
+    /**
+     * @param  array<string, array{min?: float, max?: float}>  $metricRanges  Real-value min/max per metric key (trailing_pe, dividend_yield, market_cap in raw currency, revenue_growth), from dragging the heatmap axis lines.
+     */
+    public function build(?string $capGroup = null, ?string $sector = null, ?string $country = null, ?string $region = null, array $metricRanges = []): array
     {
         $rows = $this->latestSnapshotPerInstrument($sector, $country, $region);
 
@@ -91,6 +94,8 @@ class FundamentalHeatmapService
                     && (! isset($range['max']) || $row->market_cap < $range['max']);
             })->values();
         }
+
+        $rows = $this->applyMetricRanges($rows, $metricRanges);
 
         $metrics = [
             'trailing_pe' => [
@@ -162,11 +167,56 @@ class FundamentalHeatmapService
                 'title' => $metrics[$xKey]['label'].' × '.$metrics[$yKey]['label'],
                 'x_ticks' => $this->axisTicks($xKey, $boundaries[$xKey]),
                 'y_ticks' => $this->axisTicks($yKey, $boundaries[$yKey]),
+                'x_boundaries_raw' => $this->rawBoundaries($xKey, $boundaries[$xKey]),
+                'y_boundaries_raw' => $this->rawBoundaries($yKey, $boundaries[$yKey]),
                 'grid' => $grid,
                 'max' => $max,
                 'instruments_used' => $used,
             ];
         })->all();
+    }
+
+    /** @param  array<string, array{min?: float, max?: float}>  $metricRanges */
+    private function applyMetricRanges(Collection $rows, array $metricRanges): Collection
+    {
+        foreach ($metricRanges as $key => $range) {
+            if (! in_array($key, ['trailing_pe', 'dividend_yield', 'market_cap', 'revenue_growth'], true)) {
+                continue;
+            }
+            $rows = $rows->filter(function ($row) use ($key, $range) {
+                $v = $row->{$key};
+                if ($v === null) {
+                    return false;
+                }
+
+                return (! isset($range['min']) || $v >= $range['min']) && (! isset($range['max']) || $v <= $range['max']);
+            })->values();
+        }
+
+        return $rows;
+    }
+
+    /** @param  array<string, array{min?: float, max?: float}>  $metricRanges */
+    private function applyMetricRangesToQuery($query, array $metricRanges)
+    {
+        $columns = ['trailing_pe' => 'f.trailing_pe', 'dividend_yield' => 'f.dividend_yield', 'market_cap' => 'f.market_cap', 'revenue_growth' => 'f.revenue_growth'];
+
+        foreach ($metricRanges as $key => $range) {
+            if (! isset($columns[$key])) {
+                continue;
+            }
+            $column = $columns[$key];
+            // dividend_yield/revenue_growth are stored as fractions (0.05 = 5%) in instrument_fundamentals; the range comes in already as percent from the heatmap, so convert back.
+            $scale = in_array($key, ['dividend_yield', 'revenue_growth'], true) ? 100 : 1;
+            if (isset($range['min'])) {
+                $query->where($column, '>=', $range['min'] / $scale);
+            }
+            if (isset($range['max'])) {
+                $query->where($column, '<=', $range['max'] / $scale);
+            }
+        }
+
+        return $query;
     }
 
     private const SORTABLE_COLUMNS = ['symbol', 'name', 'trailing_pe', 'dividend_yield', 'market_cap', 'revenue_growth'];
@@ -176,7 +226,8 @@ class FundamentalHeatmapService
      * heatmaps - same latest-snapshot-per-instrument data and cap-group
      * filter, joined to instruments for symbol/name/sector.
      */
-    public function table(?string $capGroup, string $sort, string $dir, ?string $search, int $page, int $perPage = 50, ?string $sector = null, ?string $country = null, ?string $region = null): array
+    /** @param  array<string, array{min?: float, max?: float}>  $metricRanges */
+    public function table(?string $capGroup, string $sort, string $dir, ?string $search, int $page, int $perPage = 50, ?string $sector = null, ?string $country = null, ?string $region = null, array $metricRanges = []): array
     {
         $sort = in_array($sort, self::SORTABLE_COLUMNS, true) ? $sort : 'market_cap';
         $dir = $dir === 'asc' ? 'asc' : 'desc';
@@ -218,6 +269,8 @@ class FundamentalHeatmapService
             $term = '%'.trim($search).'%';
             $query->where(fn ($q) => $q->where('i.symbol', 'ilike', $term)->orWhere('i.name', 'ilike', $term));
         }
+
+        $this->applyMetricRangesToQuery($query, $metricRanges);
 
         $total = (clone $query)->count();
 
@@ -307,6 +360,16 @@ class FundamentalHeatmapService
         }
 
         return $ticks;
+    }
+
+    /** Same 9 boundaries as axisTicks(), but as raw numbers (market cap converted back out of log scale into full currency units) for building real min/max filter values from a dragged decile range. */
+    private function rawBoundaries(string $key, array $boundaries): array
+    {
+        if ($key !== 'market_cap') {
+            return $boundaries;
+        }
+
+        return array_map(fn ($v) => 10 ** $v, $boundaries);
     }
 
     private function bucketFor(float $value, array $boundaries): ?int

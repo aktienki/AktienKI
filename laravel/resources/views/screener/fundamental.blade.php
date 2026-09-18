@@ -13,20 +13,29 @@
         <p class="mb-3 text-xs font-semibold text-[var(--ak-muted)]">{{ __('Verteilung der gesamten Aktien-Universum über die 4 Kernkennzahlen. Regler filtern je Achse ab welchem Dezil Zellen hervorgehoben bleiben. Klick auf eine Aktie im Screener öffnet ihre eigene Detailseite.') }}</p>
 
         @php
-            $carry = ['q' => $tableSearch ?: null, 'sort' => $table['sort'] ?? null, 'dir' => $table['dir'] ?? null];
+            // Every param that can currently be active, so every link/form on
+            // this page can carry the full filter state forward - picking a
+            // sector must not lose a heatmap range drag, sorting must not
+            // lose the search text, etc.
+            $allParams = ['cap' => $capGroup, 'sector' => $sector, 'country' => $country, 'region' => $region, 'q' => $tableSearch ?: null, 'sort' => $table['sort'] ?? null, 'dir' => $table['dir'] ?? null];
+            foreach ($metricRangeParams as $param => $range) {
+                $allParams["{$param}_min"] = $range['min'];
+                $allParams["{$param}_max"] = $range['max'];
+            }
+            $allParams = array_filter($allParams, fn ($v) => $v !== null && $v !== '');
+            $link = fn (array $overrides) => route('fundamental.index', array_filter(array_merge($allParams, $overrides), fn ($v) => $v !== null && $v !== ''));
         @endphp
         <div class="mb-4 flex flex-wrap items-center gap-3">
             <div class="fundamental-cap-filters flex flex-wrap gap-2">
-                <a href="{{ route('fundamental.index', array_filter(['sector' => $sector, 'country' => $country, 'region' => $region, ...$carry])) }}" class="fundamental-cap-pill {{ $capGroup === null ? 'is-active' : '' }}">{{ __('Alle Größen') }}</a>
-                <a href="{{ route('fundamental.index', array_filter(['cap' => 'small', 'sector' => $sector, 'country' => $country, 'region' => $region, ...$carry])) }}" class="fundamental-cap-pill {{ $capGroup === 'small' ? 'is-active' : '' }}">{{ __('Small Cap · unter 2 Mrd.') }}</a>
-                <a href="{{ route('fundamental.index', array_filter(['cap' => 'mid', 'sector' => $sector, 'country' => $country, 'region' => $region, ...$carry])) }}" class="fundamental-cap-pill {{ $capGroup === 'mid' ? 'is-active' : '' }}">{{ __('Mid Cap · 2 bis unter 10 Mrd.') }}</a>
-                <a href="{{ route('fundamental.index', array_filter(['cap' => 'large', 'sector' => $sector, 'country' => $country, 'region' => $region, ...$carry])) }}" class="fundamental-cap-pill {{ $capGroup === 'large' ? 'is-active' : '' }}">{{ __('Large Cap · ab 10 Mrd.') }}</a>
+                <a href="{{ $link(['cap' => null]) }}" class="fundamental-cap-pill {{ $capGroup === null ? 'is-active' : '' }}">{{ __('Alle Größen') }}</a>
+                <a href="{{ $link(['cap' => 'small']) }}" class="fundamental-cap-pill {{ $capGroup === 'small' ? 'is-active' : '' }}">{{ __('Small Cap · unter 2 Mrd.') }}</a>
+                <a href="{{ $link(['cap' => 'mid']) }}" class="fundamental-cap-pill {{ $capGroup === 'mid' ? 'is-active' : '' }}">{{ __('Mid Cap · 2 bis unter 10 Mrd.') }}</a>
+                <a href="{{ $link(['cap' => 'large']) }}" class="fundamental-cap-pill {{ $capGroup === 'large' ? 'is-active' : '' }}">{{ __('Large Cap · ab 10 Mrd.') }}</a>
             </div>
 
             <form method="GET" class="flex flex-wrap gap-2">
-                @if($capGroup)<input type="hidden" name="cap" value="{{ $capGroup }}">@endif
-                @foreach($carry as $key => $value)
-                    @if($value !== null)<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endif
+                @foreach($allParams as $key => $value)
+                    @if(!in_array($key, ['sector', 'country', 'region'], true))<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endif
                 @endforeach
                 <select name="sector" onchange="this.form.requestSubmit()" class="fundamental-select">
                     <option value="">{{ __('Alle Sektoren') }}</option>
@@ -49,13 +58,23 @@
             </form>
         </div>
 
+        @php
+            $boundariesByMetric = [];
+            foreach ($panels as $panel) {
+                $boundariesByMetric[$panel['x_key']] = $panel['x_boundaries_raw'];
+                $boundariesByMetric[$panel['y_key']] = $panel['y_boundaries_raw'];
+            }
+            $metricUrlParam = ['trailing_pe' => 'pe', 'dividend_yield' => 'dy', 'market_cap' => 'mc', 'revenue_growth' => 'rg'];
+        @endphp
         <section class="ak-heatmap-metric-grid grid w-full grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4"
              x-data="{
                 thresholds: {
                     trailing_pe: { min: 0, max: 9 }, dividend_yield: { min: 0, max: 9 },
                     market_cap: { min: 0, max: 9 }, revenue_growth: { min: 0, max: 9 },
                 },
-                dragging: null,
+                boundaries: {{ json_encode($boundariesByMetric) }},
+                urlParam: {{ json_encode($metricUrlParam) }},
+                dragging: null, changed: false,
                 pctFromEvent(e, axis, panel) {
                     const r = this.$refs['plot' + panel].getBoundingClientRect();
                     const p = axis === 'x' ? (e.clientX - r.left) / r.width : (r.bottom - e.clientY) / r.height;
@@ -65,10 +84,40 @@
                     if (!this.dragging) return;
                     const v = this.pctFromEvent(e, this.dragging.axis, this.dragging.panel);
                     const t = this.thresholds[this.dragging.metric];
+                    const before = JSON.stringify(t);
                     if (this.dragging.bound === 'min') { t.min = Math.min(v, t.max); } else { t.max = Math.max(v, t.min); }
+                    if (JSON.stringify(t) !== before) this.changed = true;
+                },
+                onRelease() {
+                    if (this.dragging && this.changed) {
+                        const form = this.$refs.filterForm;
+                        for (const metric in this.thresholds) {
+                            const t = this.thresholds[metric], b = this.boundaries[metric], p = this.urlParam[metric];
+                            const minField = form.elements[p + '_min'], maxField = form.elements[p + '_max'];
+                            minField.value = ''; maxField.value = '';
+                            if (!b || b.length === 0) continue;
+                            if (t.min > 0) minField.value = metric === 'market_cap' ? (b[t.min - 1] / 1e9) : b[t.min - 1];
+                            if (t.max < 9) maxField.value = metric === 'market_cap' ? (b[t.max] / 1e9) : b[t.max];
+                        }
+                        form.elements['page'].value = '';
+                        form.requestSubmit();
+                    }
+                    this.dragging = null;
                 },
              }"
-             @pointermove.window="onMove($event)" @pointerup.window="dragging = null">
+             @pointermove.window="onMove($event)" @pointerup.window="onRelease()">
+            <form method="GET" x-ref="filterForm" class="hidden">
+                @foreach($allParams as $key => $value)
+                    @unless(str_ends_with($key, '_min') || str_ends_with($key, '_max'))
+                        <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                    @endunless
+                @endforeach
+                <input type="hidden" name="page" value="">
+                @foreach($metricUrlParam as $param)
+                    <input type="hidden" name="{{ $param }}_min" value="{{ $metricRangeParams[$param]['min'] ?? '' }}">
+                    <input type="hidden" name="{{ $param }}_max" value="{{ $metricRangeParams[$param]['max'] ?? '' }}">
+                @endforeach
+            </form>
             @foreach($panels as $i => $panel)
                 <div class="fundamental-heatmap-card flex h-auto min-w-0 flex-col rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card)] p-3 pb-4 shadow-[var(--ak-shadow)]">
                     <header class="mb-2">
@@ -137,23 +186,19 @@
             <div class="ak-master-card-header fundamental-table-head">
                 <h3 class="text-sm font-black">{{ __('Aktien') }}</h3>
                 <form method="GET" class="fundamental-table-search">
-                    @if($capGroup)<input type="hidden" name="cap" value="{{ $capGroup }}">@endif
-                    @if($sector)<input type="hidden" name="sector" value="{{ $sector }}">@endif
-                    @if($country)<input type="hidden" name="country" value="{{ $country }}">@endif
-                    @if($region)<input type="hidden" name="region" value="{{ $region }}">@endif
-                    <input type="hidden" name="sort" value="{{ $table['sort'] }}">
-                    <input type="hidden" name="dir" value="{{ $table['dir'] }}">
+                    @foreach($allParams as $key => $value)
+                        @if(!in_array($key, ['q'], true))<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endif
+                    @endforeach
                     <input type="text" name="q" value="{{ $tableSearch }}" placeholder="{{ __('Symbol oder Name suchen') }}" class="ak-input h-8 text-xs" oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.requestSubmit(),400)">
                 </form>
             </div>
 
             @php
-                $sortLink = function (string $col, string $label) use ($table, $capGroup, $sector, $country, $region, $tableSearch) {
+                $sortLink = function (string $col, string $label) use ($table, $link) {
                     $nextDir = ($table['sort'] === $col && $table['dir'] === 'desc') ? 'asc' : 'desc';
-                    $params = array_filter(['cap' => $capGroup, 'sector' => $sector, 'country' => $country, 'region' => $region, 'q' => $tableSearch, 'sort' => $col, 'dir' => $nextDir]);
                     $icon = $table['sort'] === $col ? ($table['dir'] === 'desc' ? '↓' : '↑') : '';
 
-                    return '<a href="'.route('fundamental.index', $params).'" class="fundamental-table-sort">'.$label.' '.$icon.'</a>';
+                    return '<a href="'.$link(['sort' => $col, 'dir' => $nextDir]).'" class="fundamental-table-sort">'.$label.' '.$icon.'</a>';
                 };
             @endphp
 
@@ -195,10 +240,10 @@
                 <span>{{ __(':total Aktien · Seite :page von :last', ['total' => $table['total'], 'page' => $table['page'], 'last' => $lastPage]) }}</span>
                 <div class="flex gap-2">
                     @if($table['page'] > 1)
-                        <a href="{{ route('fundamental.index', array_filter(['cap' => $capGroup, 'sector' => $sector, 'country' => $country, 'region' => $region, 'q' => $tableSearch, 'sort' => $table['sort'], 'dir' => $table['dir'], 'page' => $table['page'] - 1])) }}" class="fundamental-cap-pill">{{ __('Zurück') }}</a>
+                        <a href="{{ $link(['page' => $table['page'] - 1]) }}" class="fundamental-cap-pill">{{ __('Zurück') }}</a>
                     @endif
                     @if($table['page'] < $lastPage)
-                        <a href="{{ route('fundamental.index', array_filter(['cap' => $capGroup, 'sector' => $sector, 'country' => $country, 'region' => $region, 'q' => $tableSearch, 'sort' => $table['sort'], 'dir' => $table['dir'], 'page' => $table['page'] + 1])) }}" class="fundamental-cap-pill">{{ __('Weiter') }}</a>
+                        <a href="{{ $link(['page' => $table['page'] + 1]) }}" class="fundamental-cap-pill">{{ __('Weiter') }}</a>
                     @endif
                 </div>
             </div>
