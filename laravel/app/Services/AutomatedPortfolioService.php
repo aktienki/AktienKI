@@ -23,24 +23,14 @@ final class AutomatedPortfolioService
     ) {}
 
     /**
-     * DISABLED as of 2026-09-17: this whole service reads the local
-     * walk-forward pipeline (predictions/trained_models, horizons
-     * 5/10/15/20T - Vega/Atlas/Nova/Aegis/...), which is being retired in
-     * favor of the serving pipeline (serving_predictions, 10/20/40T,
-     * Standard-Ensemble/Pure TCN). Rewriting execute()/candidates() against
-     * serving_predictions is tracked separately; until then this must not
-     * place any more trades in the 5 live paper depots on stale/wrong
-     * criteria. RunAutomatedPortfolios (scheduled every minute) and
-     * EnsureStrategyTrackingPortfolios's hidden tracking portfolios both
-     * funnel through this single method, so short-circuiting here is
-     * sufficient - no other call site invokes scan() or execute().
+     * Re-enabled 2026-09-18: candidates() was rewritten against the serving
+     * pipeline (serving_predictions, 10/20/40T, Standard-Ensemble/Pure TCN)
+     * instead of the retired local walk-forward pipeline (predictions/
+     * trained_models, 5/10/15/20T). RunAutomatedPortfolios (scheduled every
+     * minute) and EnsureStrategyTrackingPortfolios's hidden tracking
+     * portfolios both funnel through this single method.
      */
     public function scan(): array
-    {
-        return ['strategies' => 0, 'candidates' => 0, 'purchases' => 0, 'skipped' => 0];
-    }
-
-    private function disabledScan(): array
     {
         $stats = ['strategies' => 0, 'candidates' => 0, 'purchases' => 0, 'skipped' => 0];
 
@@ -207,26 +197,49 @@ final class AutomatedPortfolioService
         return ['candidates' => $candidates->count(), 'purchases' => $purchases, 'skipped' => $skipped];
     }
 
+    /**
+     * Rewritten 2026-09-18 to read the serving pipeline (serving_predictions,
+     * 10/20/40T, Standard-Ensemble/Pure TCN) instead of the retired local
+     * walk-forward pipeline (predictions/trained_models, 5/10/15/20T).
+     * serving and the default connection are separate physical Postgres
+     * databases (aktienki_serving_next vs aktienki) - no SQL JOIN is
+     * possible across them, so this runs as two queries (serving BUY-signal
+     * candidates, then local instrument/exchange/fundamentals/quote
+     * filtering) merged in PHP, the same two-phase pattern execute()'s
+     * indexRotation block already used for serving data.
+     *
+     * Several strategy filter fields have no serving equivalent and are no
+     * longer applied: model (local trained_model IDs), quality_tier and
+     * model_quality_min (local model_quality_rankings has no serving
+     * counterpart), ai_type (local-only prediction field). heatmap_selection
+     * still works for the cells backed by serving's own oos_metrics
+     * (profit_factor, drawdown, volatility); cells needing signal_quality or
+     * model_quality_score never exclude anything now (no serving analog).
+     */
     private function candidates(SavedPredictionFilter $strategy): Collection
     {
         $filters = (array) $strategy->filters;
-        $latestPredictionIds = DB::table('predictions')
-            ->whereNotNull('trained_model_id')
-            // A model retired/replaced weeks ago still has a MAX(id) row -
-            // without this cutoff its last-ever signal (e.g. a stale BUY
-            // from before it stopped updating) keeps counting as "current"
-            // forever. Active models update at least daily; 3 days covers
-            // weekends/holidays while still dropping anything abandoned.
-            ->where('prediction_time', '>=', now()->subDays(3))
-            ->selectRaw('trained_model_id, MAX(id) AS prediction_id')
-            ->groupBy('trained_model_id');
+        $profileLimits = match ($this->signals->riskLevel($strategy->user)) {
+            'cautious' => ['risk' => 35.0, 'volatility' => 45.0, 'drawdown' => 25.0, 'confidence' => 65.0, 'trades' => 20],
+            'opportunity_oriented' => ['risk' => 80.0, 'volatility' => 100.0, 'drawdown' => 50.0, 'confidence' => 45.0, 'trades' => 10],
+            default => ['risk' => 60.0, 'volatility' => 65.0, 'drawdown' => 40.0, 'confidence' => 55.0, 'trades' => 15],
+        };
+
+        $servingRows = $this->servingBuySignalCandidates($strategy, $filters, $profileLimits);
+        if ($servingRows->isEmpty()) {
+            return collect();
+        }
+
+        $fundamentalNumber = static fn (string $key): string => match ($key) {
+            'trailingPE' => "COALESCE(fundamental.trailing_pe, CASE WHEN NULLIF(fundamental.data::jsonb->>'trailingPE', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'trailingPE')::numeric END)",
+            'dividendYield' => "COALESCE(fundamental.dividend_yield, CASE WHEN NULLIF(fundamental.data::jsonb->>'dividendYield', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'dividendYield')::numeric END)",
+            'marketCap' => "COALESCE(fundamental.market_cap, CASE WHEN NULLIF(fundamental.data::jsonb->>'marketCap', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'marketCap')::numeric END)",
+            'revenueGrowth' => "COALESCE(fundamental.revenue_growth, CASE WHEN NULLIF(fundamental.data::jsonb->>'revenueGrowth', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'revenueGrowth')::numeric END)",
+        };
         $latestQuoteIds = DB::table('current_stock_quotes')
             ->where('status', 'ok')
             ->selectRaw('instrument_id, MAX(id) AS quote_id')
             ->groupBy('instrument_id');
-        $latestQualityIds = DB::table('model_quality_rankings')
-            ->selectRaw('trained_model_id, MAX(id) AS ranking_id')
-            ->groupBy('trained_model_id');
         $latestTechnicalIds = DB::table('technical_indicators')
             ->where('interval', '1d')
             ->selectRaw('instrument_id, MAX(id) AS technical_id')
@@ -234,96 +247,20 @@ final class AutomatedPortfolioService
         $latestFundamentalIds = DB::table('instrument_fundamentals')
             ->selectRaw('instrument_id, MAX(id) AS fundamental_id')
             ->groupBy('instrument_id');
-        $backtestRunId = (int) DB::table('backtest_runs')
-            ->whereIn('status', ['completed', 'completed_with_errors'])
-            ->whereRaw("COALESCE(settings->>'run_type', 'system') <> 'user_filter'")
-            ->orderByDesc('id')
-            ->value('id');
-        $backtestStats = DB::table('backtest_trades')
-            ->where('backtest_run_id', $backtestRunId)
-            ->select('instrument_id', 'trained_model_id', 'model_definition_id', 'horizon_days')
-            ->selectRaw('MAX(ABS(max_drawdown)) * 100 AS drawdown_percent')
-            // The strategy-level drawdown_max filter (below) walk-forward-tested
-            // as a per-trade drawdown cutoff, not "has this stock/model ever had
-            // one bad outlier trade" - AVG is the closest a live, prospective
-            // filter can get to that (there is no such thing as "this specific
-            // not-yet-executed trade's own drawdown" to filter on directly).
-            // Kept separate from drawdown_percent (MAX) above, which the hard
-            // risk-profile gate and the ranking factors still use unchanged.
-            ->selectRaw('AVG(ABS(max_drawdown)) * 100 AS average_drawdown_percent')
-            ->selectRaw('SUM(CASE WHEN net_return > 0 THEN net_return ELSE 0 END) / NULLIF(ABS(SUM(CASE WHEN net_return < 0 THEN net_return ELSE 0 END)), 0) AS profit_factor')
-            ->selectRaw('AVG(CASE WHEN net_return > 0 THEN 1.0 ELSE 0.0 END) * 100 AS hit_rate')
-            ->selectRaw('COUNT(*) AS historical_trades')
-            ->selectRaw('AVG(signal_quality_score) AS signal_quality')
-            ->selectRaw('AVG(COALESCE(composite_score, signal_quality_score)) AS composite_score')
-            ->selectRaw('AVG(net_return) * 100 AS average_net_return')
-            ->selectRaw('PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY net_return) * 100 AS median_net_return')
-            ->groupBy('instrument_id', 'trained_model_id', 'model_definition_id', 'horizon_days');
-        $signalSql = $this->signals->sql('prediction', $strategy->user);
-        $scoreSql = '(CASE WHEN prediction.prediction_score <= 1 THEN prediction.prediction_score * 10 WHEN prediction.prediction_score <= 10 THEN prediction.prediction_score ELSE prediction.prediction_score / 10 END)';
-        $confidenceSql = '(CASE WHEN prediction.confidence <= 1 THEN prediction.confidence * 100 ELSE prediction.confidence END)';
-        $riskSql = '(CASE WHEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) <= 1 THEN COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) * 100 ELSE COALESCE(prediction.risk_score, prediction.drawdown_risk_factor) END)';
-        // Configurable so a strategy can pin predicted_return_min to whichever
-        // horizon a walk-forward scan (thresholds:scan) found strongest for it,
-        // instead of always the 20-day forecast. Falls back to 20d for every
-        // strategy created before this existed.
-        $predictedReturnHorizon = in_array((int) ($filters['predicted_return_horizon'] ?? 20), [5, 10, 15, 20], true)
-            ? (int) $filters['predicted_return_horizon']
-            : 20;
-        $predictedReturnSql = "((prediction.predicted_price_{$predictedReturnHorizon}d - prediction.current_price) / NULLIF(prediction.current_price, 0)) * 100";
-        $fundamentalNumber = static fn (string $key): string => match ($key) {
-            'trailingPE' => "COALESCE(fundamental.trailing_pe, CASE WHEN NULLIF(fundamental.data::jsonb->>'trailingPE', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'trailingPE')::numeric END)",
-            'dividendYield' => "COALESCE(fundamental.dividend_yield, CASE WHEN NULLIF(fundamental.data::jsonb->>'dividendYield', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'dividendYield')::numeric END)",
-            'marketCap' => "COALESCE(fundamental.market_cap, CASE WHEN NULLIF(fundamental.data::jsonb->>'marketCap', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'marketCap')::numeric END)",
-            'revenueGrowth' => "COALESCE(fundamental.revenue_growth, CASE WHEN NULLIF(fundamental.data::jsonb->>'revenueGrowth', '') ~ '^-?[0-9]+([.][0-9]+)?$' THEN (fundamental.data::jsonb->>'revenueGrowth')::numeric END)",
-        };
-        $modelIds = collect((array) ($filters['model'] ?? []))->map(fn ($id) => (int) $id)->filter()->all();
-        $servingConfigurations = collect((array) ($filters['serving_model_configurations'] ?? []))
-            ->filter(fn (mixed $configuration): bool => is_array($configuration)
-                && filled($configuration['symbol'] ?? null)
-                && in_array((int) ($configuration['horizon_days'] ?? 0), [10, 20, 40], true)
-                && in_array((string) ($configuration['variant'] ?? ''), ['standard', 'pure_tcn'], true))
-            ->values();
-        $minimumTiers = ['top' => ['strong'], 'strong' => ['strong'], 'solid' => ['strong', 'solid'], 'test' => ['strong', 'solid', 'test']];
-        $tier = (string) ($filters['quality_tier'] ?? '');
-        $profileLimits = match ($this->signals->riskLevel($strategy->user)) {
-            'cautious' => ['risk' => 35.0, 'volatility' => 45.0, 'drawdown' => 25.0, 'confidence' => 65.0, 'trades' => 20],
-            'opportunity_oriented' => ['risk' => 80.0, 'volatility' => 100.0, 'drawdown' => 50.0, 'confidence' => 45.0, 'trades' => 10],
-            default => ['risk' => 60.0, 'volatility' => 65.0, 'drawdown' => 40.0, 'confidence' => 55.0, 'trades' => 15],
-        };
 
-        $candidates = DB::table('predictions as prediction')
-            ->joinSub($latestPredictionIds, 'latest_prediction', fn ($join) => $join->on('latest_prediction.prediction_id', '=', 'prediction.id'))
-            ->join('instruments as instrument', 'instrument.id', '=', 'prediction.instrument_id')
+        $localRows = DB::table('instruments as instrument')
+            ->whereIn('instrument.id', $servingRows->keys())
             ->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
-            ->leftJoin('trained_models as trained_model', 'trained_model.id', '=', 'prediction.trained_model_id')
-            ->leftJoin('model_definitions as model_definition', 'model_definition.id', '=', 'trained_model.model_definition_id')
-            ->leftJoinSub($latestQualityIds, 'latest_quality', fn ($join) => $join->on('latest_quality.trained_model_id', '=', 'trained_model.id'))
-            ->leftJoin('model_quality_rankings as quality_ranking', 'quality_ranking.id', '=', 'latest_quality.ranking_id')
-            ->leftJoin('model_quality_tiers as quality_tier', 'quality_tier.id', '=', 'quality_ranking.tier_id')
             ->leftJoinSub($latestTechnicalIds, 'latest_technical', fn ($join) => $join->on('latest_technical.instrument_id', '=', 'instrument.id'))
             ->leftJoin('technical_indicators as technical', 'technical.id', '=', 'latest_technical.technical_id')
             ->leftJoinSub($latestFundamentalIds, 'latest_fundamental', fn ($join) => $join->on('latest_fundamental.instrument_id', '=', 'instrument.id'))
             ->leftJoin('instrument_fundamentals as fundamental', 'fundamental.id', '=', 'latest_fundamental.fundamental_id')
-            ->leftJoinSub($backtestStats, 'backtest_stat', fn ($join) => $join
-                ->on('backtest_stat.instrument_id', '=', 'instrument.id')
-                ->on('backtest_stat.trained_model_id', '=', 'prediction.trained_model_id'))
             ->leftJoinSub($latestQuoteIds, 'latest_quote', fn ($join) => $join->on('latest_quote.instrument_id', '=', 'instrument.id'))
             ->leftJoin('current_stock_quotes as quote', 'quote.id', '=', 'latest_quote.quote_id')
             ->where('instrument.type', 'stock')
             ->where('instrument.is_active', true)
             ->where('instrument.is_german_tradeable', true)
             ->whereNull('instrument.deleted_at')
-            // Each instrument/horizon has one champion (trained_models.status
-            // = 'active') plus several challengers from the same training
-            // cycle ('candidate'/'rejected') and older, superseded ones
-            // ('archived'). Without this, a challenger's or an archived
-            // model's prediction counted as a trading signal exactly like
-            // the champion's - this turns the LEFT JOIN above into an
-            // effective INNER JOIN, which is intentional: a prediction
-            // whose trained_model row is missing or not active must not
-            // become a candidate.
-            ->where('trained_model.status', 'active')
             // is_german_tradeable only means a EUR cross-listing EXISTS
             // somewhere - it does not mean this specific instrument row
             // trades in EUR itself (ADI/1024.HK/2318.HK all have it true
@@ -340,66 +277,6 @@ final class AutomatedPortfolioService
                 $mics = collect((array) $filters['exchange_mics'])->filter()->map(fn ($mic) => strtoupper((string) $mic))->values()->all();
                 $query->whereRaw('UPPER(exchange.mic) IN ('.implode(',', array_fill(0, count($mics), '?')).')', $mics);
             })
-            // A strategy created from the model overview is tied to the exact
-            // stock/horizon/model variant selected there. It must never fall
-            // back to another model of the same stock.
-            ->when($servingConfigurations->isNotEmpty(), function ($query) use ($servingConfigurations): void {
-                $query->where(function ($configurations) use ($servingConfigurations): void {
-                    foreach ($servingConfigurations as $configuration) {
-                        $symbol = strtoupper(trim((string) $configuration['symbol']));
-                        $horizonMinutes = (int) $configuration['horizon_days'] * 1440;
-                        $variant = (string) $configuration['variant'];
-                        // The serving picker's model_name arrives as PascalCase
-                        // ("GradientBoostingRegressor"); the local
-                        // model_definitions.name is snake_case with a
-                        // "future_return_N" suffix
-                        // ("gradient_boosting_regressor future_return_20").
-                        // Comparing the raw, differently-formatted strings
-                        // never matched - stripped to bare alphanumerics both
-                        // become "gradientboostingregressor...", which is what
-                        // LocalModelFeasibilityService checks too.
-                        $modelNameNormalized = preg_replace('/[^a-z0-9]/', '', mb_strtolower(trim((string) ($configuration['model_name'] ?? '')))) ?? '';
-
-                        $configurations->orWhere(function ($candidate) use ($symbol, $horizonMinutes, $variant, $modelNameNormalized): void {
-                            $candidate->whereRaw('UPPER(instrument.symbol) = ?', [$symbol])
-                                ->where('prediction.prediction_horizon_minutes', $horizonMinutes);
-
-                            if ($variant === 'pure_tcn') {
-                                $candidate->where(function ($model): void {
-                                    $model->whereRaw("LOWER(COALESCE(model_definition.public_alias, '')) LIKE '%tcn%'")
-                                        ->orWhereRaw("LOWER(COALESCE(model_definition.name, '')) LIKE '%tcn%'");
-                                });
-                            } elseif ($modelNameNormalized !== '') {
-                                // EXACT equality after stripping the
-                                // " future_return_N" suffix and normalizing -
-                                // a LIKE/substring match would wrongly treat
-                                // "GradientBoostingRegressor" as matching
-                                // "HistGradientBoostingRegressor", a
-                                // different algorithm entirely.
-                                $candidate->where(function ($model) use ($modelNameNormalized): void {
-                                    $model->whereRaw("REGEXP_REPLACE(LOWER(COALESCE(model_definition.public_alias, '')), '[^a-z0-9]', '', 'g') = ?", [$modelNameNormalized])
-                                        ->orWhereRaw("REGEXP_REPLACE(REGEXP_REPLACE(LOWER(COALESCE(model_definition.name, '')), '\\s*future_return_\\d+\\s*$', ''), '[^a-z0-9]', '', 'g') = ?", [$modelNameNormalized]);
-                                });
-                            }
-                        });
-                    }
-                });
-            })
-            ->whereRaw("({$signalSql}) = 'BUY'")
-            // An automated model strategy reacts to the transition into BUY,
-            // not to every newly persisted prediction while BUY remains active.
-            ->whereRaw("COALESCE((SELECT UPPER(previous_prediction.signal) FROM predictions AS previous_prediction WHERE previous_prediction.trained_model_id = prediction.trained_model_id AND previous_prediction.id < prediction.id ORDER BY previous_prediction.prediction_time DESC, previous_prediction.id DESC LIMIT 1), 'NONE') <> 'BUY'")
-            ->whereRaw('COALESCE(prediction.predicted_price_20d, prediction.current_price) >= prediction.current_price')
-            // Hard pre-selection by the user's risk profile. Rotation and ranking only see this reduced universe.
-            ->whereRaw("({$riskSql} IS NULL OR {$riskSql} <= ?)", [$profileLimits['risk']])
-            ->whereRaw("{$confidenceSql} >= ?", [$profileLimits['confidence']])
-            ->whereRaw('(technical.volatility_20 IS NULL OR technical.volatility_20 * 100 <= ?)', [$profileLimits['volatility']])
-            ->whereRaw('(backtest_stat.drawdown_percent IS NULL OR backtest_stat.drawdown_percent <= ?)', [$profileLimits['drawdown']])
-            ->whereRaw('COALESCE(backtest_stat.historical_trades, 0) >= ?', [$profileLimits['trades']])
-            ->whereNotExists(fn (Builder $query) => $query->selectRaw('1')
-                ->from('portfolio_automation_executions as execution')
-                ->where('execution.saved_prediction_filter_id', $strategy->id)
-                ->whereColumn('execution.prediction_id', 'prediction.id'))
             ->when(($filters['q'] ?? '') !== '', function ($query) use ($filters): void {
                 $term = '%'.strtolower(trim((string) $filters['q'])).'%';
                 $query->where(fn ($nested) => $nested
@@ -409,21 +286,7 @@ final class AutomatedPortfolioService
             ->when(($filters['country'] ?? '') !== '', fn ($query) => $query->where('instrument.country', strtoupper((string) $filters['country'])))
             ->when(($filters['sector'] ?? '') !== '', fn ($query) => $query->where('instrument.sector', (string) $filters['sector']))
             ->when(($filters['exchange'] ?? '') !== '', fn ($query) => $query->where('exchange.code', strtoupper((string) $filters['exchange'])))
-            ->when(in_array($filters['ai_type'] ?? null, ['horizon', 'pulse'], true), fn ($query) => $query->where('prediction.ai_type', $filters['ai_type']))
-            ->when($modelIds !== [], fn ($query) => $query->whereIn('model_definition.id', $modelIds))
-            ->when(isset($minimumTiers[$tier]), fn ($query) => $query->whereIn('quality_tier.code', $minimumTiers[$tier]))
-            ->when($tier === 'unqualified', fn ($query) => $query->whereNull('quality_tier.code'))
-            ->whereRaw("{$scoreSql} >= ?", [(float) ($filters['score_min'] ?? 0)])
-            ->whereRaw("{$confidenceSql} >= ?", [(float) ($filters['confidence_min'] ?? 0)])
-            ->when((float) ($filters['predicted_return_min'] ?? -50) > -50, fn ($query) => $query->whereRaw("{$predictedReturnSql} >= ?", [(float) $filters['predicted_return_min']]))
-            ->when((float) ($filters['risk_max'] ?? 100) < 100, fn ($query) => $query->whereRaw("{$riskSql} <= ?", [(float) $filters['risk_max']]))
-            ->when((float) ($filters['drawdown_max'] ?? 50) < 50, fn ($query) => $query->where('backtest_stat.average_drawdown_percent', '<=', (float) $filters['drawdown_max']))
-            ->when((float) ($filters['profit_per_trade_min'] ?? 0) > 0, fn ($query) => $query->where('backtest_stat.average_net_return', '>=', (float) $filters['profit_per_trade_min']))
-            ->when(is_numeric($filters['median_return_min'] ?? null), fn ($query) => $query->where('backtest_stat.median_net_return', '>=', (float) $filters['median_return_min']))
-            ->when((float) ($filters['profit_factor_min'] ?? 0) > 0, fn ($query) => $query->where('backtest_stat.profit_factor', '>=', (float) $filters['profit_factor_min']))
-            ->when((float) ($filters['model_quality_min'] ?? 0) > 0, fn ($query) => $query->whereRaw('COALESCE(quality_ranking.quality_score, 0) * 100 >= ?', [(float) $filters['model_quality_min']]))
-            ->when((float) ($filters['hit_rate_min'] ?? 0) > 0, fn ($query) => $query->where('backtest_stat.hit_rate', '>=', (float) $filters['hit_rate_min']))
-            ->when((float) ($filters['volatility_max'] ?? 100) < 100, fn ($query) => $query->whereRaw('technical.volatility_20 * 100 <= ?', [(float) $filters['volatility_max']]))
+            ->when((float) ($filters['volatility_max'] ?? 100) < 100, fn ($query) => $query->whereRaw('(technical.volatility_20 IS NULL OR technical.volatility_20 * 100 <= ?)', [(float) $filters['volatility_max']]))
             ->when((float) ($filters['pe_max'] ?? 100) < 100, fn ($query) => $query->whereRaw($fundamentalNumber('trailingPE').' <= ?', [(float) $filters['pe_max']]))
             ->when(($filters['dividend_yield_operator'] ?? 'gte') === 'lte' || (float) ($filters['dividend_yield_min'] ?? 0) > 0, function ($query) use ($filters, $fundamentalNumber) {
                 $operator = ($filters['dividend_yield_operator'] ?? 'gte') === 'lte' ? '<=' : '>=';
@@ -441,39 +304,44 @@ final class AutomatedPortfolioService
                 };
             })
             ->when((float) ($filters['revenue_growth_min'] ?? -50) > -50, fn ($query) => $query->whereRaw($fundamentalNumber('revenueGrowth').' >= ?', [(float) $filters['revenue_growth_min'] / 100]))
-            ->select([
-                'prediction.id as prediction_id', 'prediction.instrument_id', 'prediction.prediction_time',
-                'prediction.trained_model_id', 'prediction.prediction_horizon_minutes',
-                'prediction.current_price', 'prediction.predicted_price_5d', 'prediction.predicted_price_10d',
-                'prediction.predicted_price_15d', 'prediction.predicted_price_20d', 'instrument.symbol', 'instrument.name',
-                'prediction.risk_score', 'prediction.drawdown_risk_factor',
-                'instrument.sector', 'instrument.currency', 'quote.price as quote_price',
-                'model_definition.id as model_definition_id', 'backtest_stat.horizon_days',
-                'backtest_stat.profit_factor', 'backtest_stat.hit_rate', 'backtest_stat.drawdown_percent',
-                'backtest_stat.historical_trades', 'backtest_stat.signal_quality', 'backtest_stat.average_net_return',
-                'backtest_stat.median_net_return',
-                'quality_ranking.quality_score as model_quality_score',
-            ])
-            ->selectRaw("{$scoreSql} AS score_10")
-            ->selectRaw("{$confidenceSql} AS confidence_percent")
+            ->select(['instrument.id as instrument_id', 'instrument.symbol', 'instrument.name', 'instrument.sector', 'instrument.currency', 'quote.price as quote_price'])
             ->selectRaw('COALESCE(technical.volatility_20, 0) * 100 AS volatility_percent')
-            ->get();
+            ->get()
+            ->keyBy('instrument_id');
+
+        $candidates = $servingRows->map(function (object $row) use ($localRows): ?object {
+            $local = $localRows->get($row->instrument_id);
+            if (! $local) {
+                return null;
+            }
+            $merged = (object) array_merge((array) $row, (array) $local);
+            // The serving row already covers one specific horizon - unlike
+            // the old pipeline's 4 simultaneous predicted_price_Nd columns,
+            // only this one is ever populated; buyCandidate()/
+            // processEntryReservations() read whichever of 10/20/40 is set
+            // and safely default the others to 0/null via data_get().
+            $merged->{'predicted_price_'.$row->horizon.'d'} = $row->target_price;
+            $merged->current_price = is_numeric($local->quote_price ?? null) ? (float) $local->quote_price : 0.0;
+            $merged->score_10 = (float) $row->confidence * 10;
+            $merged->confidence_percent = (float) $row->confidence * 100;
+            $merged->drawdown_percent = abs((float) ($row->oos_max_drawdown ?? 0)) * 100;
+            $merged->profit_factor = (float) ($row->oos_profit_factor ?? 0);
+            $merged->hit_rate = (float) ($row->oos_hit_rate ?? 0) * 100;
+            $merged->average_net_return = (float) ($row->oos_average_net_trade ?? 0) * 100;
+            $merged->composite_score = $merged->score_10 * 10;
+            $merged->signal_quality = null;
+            $merged->model_quality_score = null;
+
+            return $merged;
+        })->filter()->values();
 
         $selections = json_decode((string) ($filters['heatmap_selection'] ?? ''), true);
         if (! is_array($selections) || collect($selections)->flatten()->isEmpty()) {
-            return $candidates;
+            return $candidates->unique('instrument_id')->values();
         }
         $cellFor = static function (string $map, object $row): ?string {
-            $rawRisk = is_numeric($row->risk_score ?? null)
-                ? (float) $row->risk_score
-                : (is_numeric($row->drawdown_risk_factor ?? null) ? (float) $row->drawdown_risk_factor : null);
-            $riskPercent = $rawRisk === null ? null : match (true) {
-                $rawRisk <= 1 => $rawRisk * 100,
-                $rawRisk <= 5 => ($rawRisk - 1) * 25,
-                default => $rawRisk,
-            };
             [$x, $y, $xMin, $xMax, $xStep, $yMin, $yMax, $yStep] = match ($map) {
-                'score_risk' => [$row->composite_score, $riskPercent, 0, 100, 10, 0, 100, 10],
+                'score_risk' => [$row->composite_score, ($row->risk_score - 1) * 25, 0, 100, 10, 0, 100, 10],
                 'score_drawdown' => [$row->composite_score, $row->drawdown_percent, 0, 100, 10, 0, 50, 5],
                 'score_profit_factor' => [$row->composite_score, $row->profit_factor, 0, 100, 10, 0, 3, .3],
                 'score_volatility' => [$row->composite_score, $row->volatility_percent, 0, 100, 10, 0, 100, 10],
@@ -501,6 +369,128 @@ final class AutomatedPortfolioService
 
             return true;
         })->unique('instrument_id')->values();
+    }
+
+    /**
+     * Selects the serving pipeline's champion-release BUY-signal transitions
+     * (new BUY, previous prediction at the same instrument/horizon/variant
+     * wasn't already BUY) for the given strategy, keyed by instrument_id. A
+     * strategy pinned to specific serving_model_configurations (created from
+     * the model overview) only ever considers those exact stock/horizon/
+     * variant combinations; everything else uses the strategy's own
+     * serving_horizon/serving_variant (default 20T/standard).
+     *
+     * @return Collection<int, object>
+     */
+    private function servingBuySignalCandidates(SavedPredictionFilter $strategy, array $filters, array $profileLimits): Collection
+    {
+        $servingConfigurations = collect((array) ($filters['serving_model_configurations'] ?? []))
+            ->filter(fn (mixed $configuration): bool => is_array($configuration)
+                && filled($configuration['symbol'] ?? null)
+                && in_array((int) ($configuration['horizon_days'] ?? 0), [10, 20, 40], true)
+                && in_array((string) ($configuration['variant'] ?? ''), ['standard', 'pure_tcn'], true))
+            ->values();
+        // Real strategy filters already carry quality_horizons (e.g.
+        // [10, 20, 40]) from the strategy-builder UI - an allow-list of
+        // horizons to consider, not a single pin. Any BUY transition on any
+        // listed horizon (always variant=standard; nothing in the existing
+        // filter schema selects pure_tcn outside serving_model_configurations)
+        // qualifies; duplicates per instrument are resolved below by
+        // preferring the highest-confidence match.
+        $defaultHorizons = collect((array) ($filters['quality_horizons'] ?? [20]))
+            ->map(fn ($horizon) => (int) $horizon)
+            ->filter(fn (int $horizon): bool => in_array($horizon, [10, 20, 40], true))
+            ->unique()->values();
+        if ($defaultHorizons->isEmpty()) {
+            $defaultHorizons = collect([20]);
+        }
+        $defaultVariant = 'standard';
+
+        $previousSignalSql = "(SELECT UPPER(pp.signal) FROM serving_predictions pp
+            WHERE pp.instrument_id = prediction.instrument_id AND pp.horizon = prediction.horizon AND pp.variant = prediction.variant
+              AND pp.id < prediction.id ORDER BY pp.as_of DESC, pp.id DESC LIMIT 1)";
+        $columns = [
+            'prediction.id as prediction_id', 'prediction.instrument_id', 'prediction.as_of',
+            'prediction.horizon', 'prediction.variant', 'prediction.expected_return', 'prediction.target_price',
+            'prediction.risk_score', 'prediction.confidence', 'prediction.compact_context',
+        ];
+
+        $base = fn () => DB::connection('serving')->table('serving_predictions as prediction')
+            ->join('serving_active_models as active', fn ($join) => $join
+                ->on('active.instrument_id', '=', 'prediction.instrument_id')
+                ->on('active.release_id', '=', 'prediction.release_id'))
+            ->whereRaw("UPPER(prediction.signal) = 'BUY'")
+            // An automated model strategy reacts to the transition into BUY,
+            // not to every newly persisted prediction while BUY remains active.
+            ->whereRaw("COALESCE({$previousSignalSql}, 'NONE') <> 'BUY'")
+            // Hard pre-selection by the user's risk profile (risk_score is a
+            // 1-5 scale here, not 0-100 - (risk-1)*25 is the same conversion
+            // the dashboard's chart-pattern cards and heatmap cellFor() use).
+            ->whereRaw('((prediction.risk_score - 1) * 25) <= ?', [$profileLimits['risk']])
+            ->whereRaw('(prediction.confidence * 100) >= ?', [$profileLimits['confidence']])
+            ->when((float) ($filters['risk_max'] ?? 100) < 100, fn ($q) => $q->whereRaw('((prediction.risk_score - 1) * 25) <= ?', [(float) $filters['risk_max']]))
+            ->when((float) ($filters['confidence_min'] ?? 0) > 0, fn ($q) => $q->whereRaw('(prediction.confidence * 100) >= ?', [(float) $filters['confidence_min']]))
+            ->when((float) ($filters['predicted_return_min'] ?? -50) > -50, fn ($q) => $q->whereRaw('(prediction.expected_return * 100) >= ?', [(float) $filters['predicted_return_min']]))
+            ->when((float) ($filters['drawdown_max'] ?? 50) < 50, fn ($q) => $q->whereRaw("ABS(COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'max_drawdown')::numeric, 0)) * 100 <= ?", [(float) $filters['drawdown_max']]))
+            ->when((float) ($filters['profit_per_trade_min'] ?? 0) > 0, fn ($q) => $q->whereRaw("COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'average_net_trade')::numeric, 0) * 100 >= ?", [(float) $filters['profit_per_trade_min']]))
+            ->when(is_numeric($filters['median_return_min'] ?? null), fn ($q) => $q->whereRaw("COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'median_net_trade')::numeric, 0) * 100 >= ?", [(float) $filters['median_return_min']]))
+            ->when((float) ($filters['profit_factor_min'] ?? 0) > 0, fn ($q) => $q->whereRaw("COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'profit_factor')::numeric, 0) >= ?", [(float) $filters['profit_factor_min']]))
+            ->when((float) ($filters['hit_rate_min'] ?? 0) > 0, fn ($q) => $q->whereRaw("COALESCE((prediction.compact_context::jsonb->'oos_metrics'->>'hit_rate')::numeric, 0) * 100 >= ?", [(float) $filters['hit_rate_min']]));
+
+        if ($servingConfigurations->isEmpty()) {
+            $rows = $defaultHorizons->flatMap(fn (int $horizon): array => $base()
+                ->where('prediction.horizon', $horizon)->where('prediction.variant', $defaultVariant)
+                ->get($columns)->all());
+        } else {
+            // A strategy created from the model overview is tied to the exact
+            // stock/horizon/variant selected there - it must never fall back
+            // to another model of the same stock. serving's own horizon/
+            // variant columns make this a direct match now, unlike the old
+            // bridge's fuzzy model-name string comparison against the local
+            // pipeline's differently-formatted model_definitions.name.
+            $symbols = $servingConfigurations->pluck('symbol')->map(fn ($s) => strtoupper(trim((string) $s)))->unique()->values();
+            $placeholders = implode(',', array_fill(0, $symbols->count(), '?'));
+            $instrumentIdBySymbol = DB::table('instruments')
+                ->whereRaw("UPPER(symbol) IN ({$placeholders})", $symbols->all())
+                ->get(['id', 'symbol'])
+                ->mapWithKeys(fn (object $row): array => [strtoupper((string) $row->symbol) => (int) $row->id]);
+
+            $rows = $servingConfigurations->flatMap(function (array $configuration) use ($base, $columns, $instrumentIdBySymbol): array {
+                $instrumentId = $instrumentIdBySymbol->get(strtoupper(trim((string) $configuration['symbol'])));
+                if (! $instrumentId) {
+                    return [];
+                }
+
+                return $base()->where('prediction.instrument_id', $instrumentId)
+                    ->where('prediction.horizon', (int) $configuration['horizon_days'])
+                    ->where('prediction.variant', (string) $configuration['variant'])
+                    ->orderByDesc('prediction.as_of')->orderByDesc('prediction.id')
+                    ->limit(1)->get($columns)->all();
+            });
+        }
+
+        $alreadyExecuted = DB::table('portfolio_automation_executions')
+            ->where('saved_prediction_filter_id', $strategy->id)
+            ->pluck('prediction_id')->map(fn ($id) => (int) $id)->all();
+
+        return collect($rows)
+            ->reject(fn (object $row): bool => in_array((int) $row->prediction_id, $alreadyExecuted, true))
+            ->map(function (object $row): object {
+                $context = json_decode((string) $row->compact_context, true) ?? [];
+                $row->oos_max_drawdown = data_get($context, 'oos_metrics.max_drawdown');
+                $row->oos_profit_factor = data_get($context, 'oos_metrics.profit_factor');
+                $row->oos_hit_rate = data_get($context, 'oos_metrics.hit_rate');
+                $row->oos_average_net_trade = data_get($context, 'oos_metrics.average_net_trade');
+
+                return $row;
+            })
+            // A strategy checking multiple quality_horizons can find a BUY
+            // transition for the same instrument on more than one of them -
+            // keep the most confident one, not just whichever horizon
+            // happened to be queried first.
+            ->sortByDesc(fn (object $row): float => (float) $row->confidence)
+            ->unique('instrument_id')
+            ->keyBy('instrument_id');
     }
 
     /**
@@ -579,7 +569,17 @@ final class AutomatedPortfolioService
             return false;
         }
 
-        $indicator = app(IndicatorEntryGateService::class)->assessLegacyPrediction((int) $candidate->prediction_id);
+        // candidate->prediction_id is now a serving_predictions.id - the real
+        // row, not a reconstructed one, so this calls assessSource()
+        // directly instead of the legacy local-prediction bridge
+        // (assessLegacyPrediction(), which resolved a serving row from a
+        // local prediction's metadata.serving_prediction_id link).
+        $servingSource = DB::connection('serving')->table('serving_predictions')->where('id', (int) $candidate->prediction_id)->first();
+        $indicator = $servingSource
+            ? app(IndicatorEntryGateService::class)->assessSource(array_merge((array) $servingSource, [
+                'compact_context' => json_decode((string) $servingSource->compact_context, true),
+            ]))
+            : ['passed' => false, 'reason_codes' => ['SERVING_SOURCE_MISSING']];
         if (($indicator['passed'] ?? false) !== true) {
             Log::info('portfolio_indicator_entry_rejected', [
                 'prediction_id' => (int) $candidate->prediction_id,
@@ -651,7 +651,10 @@ final class AutomatedPortfolioService
             : $this->exitStrategies->resolve((int) $candidate->instrument_id);
         $allocated = min($cash - $tradeCost, $baseCapital * $factor);
         if (! $reservationReleased && (bool) data_get($strategy->filters, 'entry_wait_5d_enabled', false)) {
-            $targets = collect([5, 10, 15, 20])->map(fn (int $days): float => (float) data_get($candidate, 'predicted_price_'.$days.'d', 0))->filter(fn (float $target): bool => $target > 0);
+            // A serving candidate only ever has one of these three populated
+            // (its own horizon - see candidates()); the old 5/10/15/20d
+            // pipeline had all four simultaneously, hence "highest of them".
+            $targets = collect([10, 20, 40])->map(fn (int $days): float => (float) data_get($candidate, 'predicted_price_'.$days.'d', 0))->filter(fn (float $target): bool => $target > 0);
             $highestTarget = (float) ($targets->max() ?? 0);
             if ($highestTarget > 0 && $price > $highestTarget) {
                 $reservedCapital = min((float) $cashAccount->balance - (float) $cashAccount->reserved_balance, $allocated + $tradeCost);
@@ -814,8 +817,10 @@ final class AutomatedPortfolioService
                     && $tradingDaysHeld >= $dynamicExitDays;
                 $supportTrigger = $supportStop && is_numeric($levels['support']) && $price < (float) $levels['support'] * .99;
                 $latestForecast = $forecastBelowPriceExit
-                    ? DB::table('predictions')->where('instrument_id', $position->instrument_id)
-                        ->orderByDesc('prediction_time')->orderByDesc('id')->value('predicted_price_20d')
+                    ? DB::connection('serving')->table('serving_predictions')
+                        ->where('instrument_id', $position->instrument_id)
+                        ->where('horizon', 20)->where('variant', 'standard')
+                        ->orderByDesc('as_of')->orderByDesc('id')->value('target_price')
                     : null;
                 $forecastBelowPriceTrigger = $forecastBelowPriceExit && is_numeric($latestForecast)
                     && (float) $latestForecast > 0 && (float) $latestForecast < $price;
@@ -913,7 +918,7 @@ final class AutomatedPortfolioService
                 continue;
             }
             $price = (float) ($candidate->quote_price ?: $candidate->current_price);
-            $highestTarget = (float) collect([5, 10, 15, 20])->map(fn (int $days): float => (float) data_get($candidate, 'predicted_price_'.$days.'d', 0))->max();
+            $highestTarget = (float) collect([10, 20, 40])->map(fn (int $days): float => (float) data_get($candidate, 'predicted_price_'.$days.'d', 0))->max();
             if ($price > 0 && $highestTarget > 0 && $price <= $highestTarget) {
                 $this->releaseReservation($reservation, 'converted');
                 DB::transaction(fn (): bool => $this->buyCandidate($strategy, $portfolio, $candidate, 0.0, null, true), 3);

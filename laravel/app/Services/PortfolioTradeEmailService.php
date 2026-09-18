@@ -41,13 +41,12 @@ final class PortfolioTradeEmailService
                     ->join('portfolios as portfolio', 'portfolio.id', '=', 'execution.portfolio_id')
                     ->join('instruments as instrument', 'instrument.id', '=', 'execution.instrument_id')
                     ->leftJoin('portfolio_transactions as transaction', 'transaction.id', '=', 'execution.portfolio_transaction_id')
-                    ->leftJoin('predictions as prediction', 'prediction.id', '=', 'execution.prediction_id')
                     ->where('execution.id', $id)
                     ->where('execution.email_status', 'pending')
                     ->lockForUpdate()
                     ->select([
                         'execution.id', 'execution.action', 'execution.position_factor', 'execution.allocated_capital', 'execution.details',
-                        'execution.sector_average_score', 'execution.created_at', 'strategy.name as strategy_name',
+                        'execution.sector_average_score', 'execution.created_at', 'execution.prediction_id', 'strategy.name as strategy_name',
                         'strategy.filters as strategy_filters',
                         'strategy.user_id', 'portfolio.id as portfolio_id', 'portfolio.name as portfolio_name',
                         'portfolio.currency as portfolio_currency', 'portfolio.meta as portfolio_meta',
@@ -55,7 +54,6 @@ final class PortfolioTradeEmailService
                         'instrument.currency as instrument_currency', 'instrument.sector', 'transaction.quantity',
                         'transaction.price', 'transaction.fees', 'transaction.transaction_date',
                         'transaction.meta as transaction_meta',
-                        'prediction.predicted_price_20d', 'prediction.prediction_score', 'prediction.confidence',
                     ])->first();
                 if (! $execution) {
                     return null;
@@ -104,18 +102,25 @@ final class PortfolioTradeEmailService
 
     private function payload(object $row): array
     {
-        $score = (float) ($row->prediction_score ?? 0);
-        if ($score <= 1) {
-            $score *= 100;
-        } elseif ($score <= 10) {
-            $score *= 10;
-        }
-        $confidence = (float) ($row->confidence ?? 0);
+        // execution.prediction_id is a serving_predictions.id since the
+        // 2026-09-18 rewrite (was a local predictions.id before) - serving
+        // lives in a separate physical database from portfolio_automation_
+        // executions, so this is its own lookup rather than a JOIN.
+        $servingPrediction = $row->prediction_id
+            ? DB::connection('serving')->table('serving_predictions')
+                ->where('id', $row->prediction_id)
+                ->first(['target_price', 'confidence'])
+            : null;
+        // Only used as a fallback below when compositeScores() (serving-
+        // based already) has no entry for this instrument - the local
+        // walk-forward prediction_score this used to read no longer applies.
+        $score = 0.0;
+        $confidence = (float) ($servingPrediction->confidence ?? 0);
         if ($confidence <= 1) {
             $confidence *= 100;
         }
         $price = (float) ($row->price ?? 0);
-        $target = (float) ($row->predicted_price_20d ?? 0);
+        $target = (float) ($servingPrediction->target_price ?? 0);
         $transactionMeta = is_string($row->transaction_meta ?? null)
             ? (json_decode($row->transaction_meta, true) ?: [])
             : (array) ($row->transaction_meta ?? []);
