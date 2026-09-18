@@ -490,7 +490,7 @@
                             @endif
                         @elseif($section['kind'] === 'opportunities-risks')
                             @if($section['available'])
-                                <div class="mb-3 flex items-center justify-between gap-2">
+                                <div class="flex flex-wrap items-center justify-between gap-2 -mx-5 -mt-5 mb-3 px-5 pt-5 pb-3 rounded-t-[1.25rem] border-b border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
                                     <span class="rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-[.1em] {{ $section['source'] === 'external' ? 'border-cyan-400/25 bg-cyan-400/[.06] text-cyan-400' : 'border-[var(--ak-border)] text-[var(--ak-muted)]' }}">
                                         {{ $section['source'] === 'external' ? __('Externe Web-Recherche') : __('Regelbasierte Auswertung') }}
                                     </span>
@@ -740,7 +740,7 @@
                             <div class="concept-classic-dashboard-row">
                                 @if ($strategyPortfolios->isNotEmpty())
                                         <article class="concept-card p-4">
-                                            <div class="flex items-center justify-between gap-2">
+                                            <div class="flex items-center justify-between gap-2 -mx-4 -mt-4 mb-3 px-4 pt-4 pb-3 rounded-t-[1.25rem] border-b border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
                                                 <div class="flex min-w-0 items-center gap-2">
                                                     <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-bolt class="h-4 w-4" /></span>
                                                     <span class="min-w-0">
@@ -754,7 +754,7 @@
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div class="mt-3 border-t border-[var(--ak-border)] pt-3">
+                                            <div>
                                                 <small class="block text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Gesamt') }} (EUR)</small>
                                                 <span class="mt-0.5 flex items-baseline gap-1.5">
                                                     <b class="truncate text-lg font-black tabular-nums text-[var(--ak-text)]">{{ number_format($strategyPortfolioTotals['total_value_eur'], 0, ',', '.') }} €</b>
@@ -814,7 +814,7 @@
                                 @if (true)
                                         @php $compositionPalette = ['#06b6d4', '#f97316', '#10b981', '#8b5cf6', '#f43f5e', '#eab308']; @endphp
                                         <article class="concept-card p-4">
-                                            <div class="flex items-center gap-2">
+                                            <div class="flex items-center gap-2 -mx-4 -mt-4 mb-3 px-4 pt-4 pb-3 rounded-t-[1.25rem] border-b border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
                                                 <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-chart-pie class="h-4 w-4" /></span>
                                                 <span class="min-w-0">
                                                     <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Depot-Zusammensetzung') }}</span>
@@ -953,14 +953,14 @@
                             </div>
                             @if ($strategyPositionHoldings !== [])
                                 <article class="concept-card mb-4 p-4">
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-2 -mx-4 -mt-4 mb-3 px-4 pt-4 pb-3 rounded-t-[1.25rem] border-b border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
                                         <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-briefcase class="h-4 w-4" /></span>
                                         <span class="min-w-0">
                                             <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Depotpositionen') }}</span>
                                             <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Alle gehaltenen Positionen · aktive Strategiedepots') }}</span>
                                         </span>
                                     </div>
-                                    <div class="mt-3 overflow-x-auto">
+                                    <div class="overflow-x-auto">
                                         <table class="w-full border-collapse text-[10px]">
                                             <thead>
                                                 <tr class="text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
@@ -1016,7 +1016,7 @@
                             <div class="concept-classic-dashboard-grid">
                                 <div class="concept-classic-dashboard-col">
                                     <article class="concept-card p-4">
-                                        <div class="flex items-center gap-2">
+                                        <div class="flex items-center gap-2 -mx-4 -mt-4 mb-3 px-4 pt-4 pb-3 rounded-t-[1.25rem] border-b border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
                                             <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-500"><x-heroicon-o-calendar-days class="h-4 w-4" /></span>
                                             <span class="min-w-0">
                                                 <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Anstehende Termine') }}</span>
@@ -1047,14 +1047,14 @@
                                 <div class="concept-classic-dashboard-col">
                                     @if ($strategyRecentTransactions->isNotEmpty())
                                         <article class="concept-card p-4">
-                                            <div class="flex items-center gap-2">
+                                            <div class="flex items-center gap-2 -mx-4 -mt-4 mb-3 px-4 pt-4 pb-3 rounded-t-[1.25rem] border-b border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
                                                 <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-400/10 text-orange-400"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
                                                 <span class="min-w-0">
                                                     <span class="block text-sm font-black text-[var(--ak-text)]">{{ __('Letzte Transaktionen') }}</span>
                                                     <span class="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Über alle Strategiedepots') }}</span>
                                                 </span>
                                             </div>
-                                            <div class="mt-3 overflow-x-auto">
+                                            <div class="overflow-x-auto">
                                                 <table class="w-full border-collapse text-[12px]">
                                                     <thead>
                                                         <tr class="text-[10px] font-black uppercase tracking-wide text-[var(--ak-muted)]">
@@ -1106,7 +1106,7 @@
                                         @php $tone = $row['tone'] === 'positive' ? 'emerald' : ($row['tone'] === 'negative' ? 'rose' : 'slate'); @endphp
                                         <a href="{{ $row['url'] }}" class="concept-card relative flex h-full flex-col p-4 hover:border-{{ $tone }}-400">
                                             <small class="absolute right-3 top-3 text-[8px] font-black uppercase tracking-wide text-[var(--ak-muted)]">{{ \Illuminate\Support\Carbon::parse($row['time'])->format('d.m.Y') }}</small>
-                                            <div class="mb-3 flex items-center gap-2 pr-14">
+                                            <div class="flex items-center gap-2 -mx-4 -mt-4 mb-3 pl-4 pr-14 pt-4 pb-3 rounded-t-[1.25rem] border-b border-[var(--ak-border)] bg-[var(--ak-surface-muted)]">
                                                 <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-{{ $tone }}-500/10 text-{{ $tone }}-500">
                                                     <x-dynamic-component :component="$row['tone'] === 'negative' ? 'heroicon-o-arrow-trending-down' : 'heroicon-o-arrow-trending-up'" class="h-4.5 w-4.5" />
                                                 </span>
