@@ -208,6 +208,12 @@ class EarningsQuarterCardService
         $candles = null;
         $postReturn = $reaction?->return_post_3d !== null ? (float) $reaction->return_post_3d : null;
         $preReturn = $reaction?->return_pre_3d !== null ? (float) $reaction->return_pre_3d : null;
+        // Same +/-10 trading day window as the candlestick chart itself, so
+        // the drift figure matches exactly what the chart shows - computed
+        // ad hoc here rather than via EarningsPriceReactionCalculator,
+        // which is wired to a fixed 3-day window persisted to the
+        // earnings_price_reactions table.
+        $drift10d = $this->driftReturn($bars, $eventDate->toDateString(), self::CANDLE_WINDOW_DAYS);
 
         if (! $unreliable) {
             $candles = $this->candleWindow($bars, $eventDate->toDateString());
@@ -222,6 +228,8 @@ class EarningsQuarterCardService
             'eps_actual' => $eps['actual'],
             'surprise_percent' => $eps['surprise'],
             'is_beat' => $eps['surprise'] !== null && (float) $eps['surprise'] >= 0,
+            'return_pre_10d' => $drift10d['pre'],
+            'return_post_10d' => $drift10d['post'],
             'return_pre_3d' => $preReturn,
             'return_post_3d' => $postReturn,
             'candles' => $candles,
@@ -249,6 +257,33 @@ class EarningsQuarterCardService
         $mid = intdiv($values->count(), 2);
 
         return $values->count() % 2 === 0 ? ($values[$mid - 1] + $values[$mid]) / 2 : $values[$mid];
+    }
+
+    /** @return array{pre: ?float, post: ?float} percent change from N trading days before the event to the event close, and from the event close to N trading days after. */
+    private function driftReturn(Collection $bars, string $eventDateIso, int $windowDays): array
+    {
+        $anchorIndex = $bars->search(fn ($b) => $b['date'] >= $eventDateIso);
+        if ($anchorIndex === false) {
+            return ['pre' => null, 'post' => null];
+        }
+
+        $closeAtEvent = (float) $bars[$anchorIndex]['close'];
+        $preIndex = $anchorIndex - $windowDays;
+        $postIndex = $anchorIndex + $windowDays;
+
+        $pre = null;
+        if ($preIndex >= 0) {
+            $closePre = (float) $bars[$preIndex]['close'];
+            $pre = $closePre != 0.0 ? round((($closeAtEvent - $closePre) / $closePre) * 100, 2) : null;
+        }
+
+        $post = null;
+        if ($postIndex < $bars->count()) {
+            $closePost = (float) $bars[$postIndex]['close'];
+            $post = $closeAtEvent != 0.0 ? round((($closePost - $closeAtEvent) / $closeAtEvent) * 100, 2) : null;
+        }
+
+        return ['pre' => $pre, 'post' => $post];
     }
 
     private function candleWindow(Collection $bars, string $eventDateIso): ?array

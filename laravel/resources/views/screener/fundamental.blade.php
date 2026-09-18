@@ -434,7 +434,7 @@
                                 $range = ($scaleMax - $scaleMin) ?: 1.0;
                                 $zeroPct = (0 - $scaleMin) / $range * 100;
                             @endphp
-                            <div class="fundamental-trend-card">
+                            <div class="fundamental-trend-card {{ count($metric['bars']) > 1 ? 'fundamental-trend-card--wide' : 'fundamental-trend-card--narrow' }}">
                                 <p class="fundamental-trend-title">{{ $metric['label'] }} <span>({{ $metric['unit'] }})</span></p>
                                 @if($values->isEmpty())
                                     <p class="fundamental-trend-empty">{{ __('Keine Daten vorhanden.') }}</p>
@@ -510,6 +510,12 @@
                                                 @if($q['return_post_3d'] !== null)
                                                     <div class="q-row"><span class="lbl">{{ __('Kurs +3T') }}</span><span class="val {{ $q['return_post_3d'] >= 0 ? 'pos' : 'neg' }}">{{ $q['return_post_3d'] >= 0 ? '+' : '' }}{{ number_format($q['return_post_3d'], 1, ',', '.') }}&nbsp;%</span></div>
                                                 @endif
+                                                @if($q['return_pre_10d'] !== null)
+                                                    <div class="q-row"><span class="lbl">{{ __('Drift −10T → Termin') }}</span><span class="val {{ $q['return_pre_10d'] >= 0 ? 'pos' : 'neg' }}">{{ $q['return_pre_10d'] >= 0 ? '+' : '' }}{{ number_format($q['return_pre_10d'], 1, ',', '.') }}&nbsp;%</span></div>
+                                                @endif
+                                                @if($q['return_post_10d'] !== null)
+                                                    <div class="q-row"><span class="lbl">{{ __('Kurs +10T') }}</span><span class="val {{ $q['return_post_10d'] >= 0 ? 'pos' : 'neg' }}">{{ $q['return_post_10d'] >= 0 ? '+' : '' }}{{ number_format($q['return_post_10d'], 1, ',', '.') }}&nbsp;%</span></div>
+                                                @endif
                                             </div>
                                         </div>
                                     @endif
@@ -565,17 +571,16 @@
     #fundamental-page .fundamental-ratio span { display: block; font-size: .6rem; font-weight: 800; color: var(--ak-muted); text-transform: uppercase; letter-spacing: .02em; }
     #fundamental-page .fundamental-ratio b { display: block; margin-top: .25rem; font-size: 1rem; font-weight: 900; }
     #fundamental-page .fundamental-footnote { margin-top: 1rem; font-size: .68rem; color: var(--ak-muted); line-height: 1.6; }
-    #fundamental-page .fundamental-trend-grid { display: grid; grid-template-columns: 1fr; gap: .9rem; padding: 1.1rem; }
-    @media (min-width: 640px) { #fundamental-page .fundamental-trend-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (min-width: 900px) { #fundamental-page .fundamental-trend-grid { grid-template-columns: repeat(4, 1fr); } }
-    #fundamental-page .fundamental-trend-card { border: 1px solid var(--ak-border); border-radius: .8rem; padding: .8rem .9rem 1.6rem; overflow-x: auto; }
+    #fundamental-page .fundamental-trend-grid { display: flex; flex-wrap: wrap; align-items: stretch; gap: .9rem; padding: 1.1rem; }
+    #fundamental-page .fundamental-trend-card { flex: 1 1 340px; border: 1px solid var(--ak-border); border-radius: .8rem; padding: .8rem .9rem 1.6rem; min-width: 0; }
+    #fundamental-page .fundamental-trend-card--narrow { flex: 0 1 190px; }
     #fundamental-page .fundamental-trend-title { font-size: .68rem; font-weight: 800; color: var(--ak-text); text-transform: uppercase; letter-spacing: .02em; }
     #fundamental-page .fundamental-trend-title span { font-weight: 600; color: var(--ak-muted); text-transform: none; letter-spacing: normal; }
     #fundamental-page .fundamental-trend-empty { margin-top: 1.5rem; font-size: .68rem; color: var(--ak-muted); }
-    #fundamental-page .fundamental-trend-bars { position: relative; display: flex; justify-content: center; align-items: stretch; gap: 6px; height: 90px; margin-top: 1.6rem; padding: 0 .25rem; min-width: 180px; }
+    #fundamental-page .fundamental-trend-bars { position: relative; display: flex; justify-content: center; align-items: stretch; gap: 4px; height: 90px; margin-top: 1.6rem; padding: 0 .25rem; }
     #fundamental-page .fundamental-trend-zero { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--ak-border); }
-    #fundamental-page .fundamental-trend-bar-wrap { position: relative; flex: 0 0 34px; height: 100%; }
-    #fundamental-page .fundamental-trend-bar { position: absolute; left: 5px; right: 5px; min-height: 2px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, #22d3ee, color-mix(in srgb, #22d3ee 45%, transparent)); }
+    #fundamental-page .fundamental-trend-bar-wrap { position: relative; flex: 1 1 0; max-width: 40px; min-width: 0; height: 100%; }
+    #fundamental-page .fundamental-trend-bar { position: absolute; left: 3px; right: 3px; min-height: 2px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, #22d3ee, color-mix(in srgb, #22d3ee 45%, transparent)); }
     #fundamental-page .fundamental-trend-bar.is-empty { background: none; border: 1px dashed color-mix(in srgb, var(--ak-border) 70%, transparent); border-bottom: none; height: 2px !important; }
     #fundamental-page .fundamental-trend-bar-value { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: .58rem; font-weight: 800; color: var(--ak-text); white-space: nowrap; }
     #fundamental-page .fundamental-trend-bar-label { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: .56rem; font-weight: 700; color: var(--ak-muted); white-space: nowrap; }
