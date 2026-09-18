@@ -510,8 +510,8 @@
     #fundamental-page .fundamental-help-btn:hover,
     #fundamental-page .fundamental-help-btn[aria-expanded="true"] { border-color: #22d3ee; color: #22d3ee; }
     #fundamental-page .fundamental-help-panel {
-        position: absolute; z-index: 40; top: calc(100% + .4rem); left: 0; width: min(26rem, 88vw);
-        max-height: 70vh; overflow-y: auto; padding: .9rem 1rem; border-radius: .9rem;
+        position: absolute; z-index: 40; top: calc(100% + .4rem); left: 50%; transform: translateX(-50%);
+        width: min(26rem, 88vw); max-height: 70vh; overflow-y: auto; padding: .9rem 1rem; border-radius: .9rem;
         border: 1px solid var(--ak-border); background: var(--ak-card); box-shadow: var(--ak-shadow);
     }
     #fundamental-page .fundamental-help-panel h4 { font-size: .74rem; font-weight: 900; color: var(--ak-text); margin: 0 0 .4rem; }
