@@ -1150,8 +1150,6 @@
                         @else
                             <p class="text-xs text-[var(--ak-muted)]">{{ $section['description'] }}</p>
                         @endif
-
-                        <a href="{{ $section['url'] }}" class="concept-open-link text-cyan-500 hover:text-cyan-400">{{ __('Vollständige Ansicht öffnen') }} →</a>
                     </section>
                 @endforeach
             </div>
