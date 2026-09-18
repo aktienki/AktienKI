@@ -551,6 +551,7 @@ final class DashboardConceptController extends Controller
             ->filter(fn (array $event): bool => $event['sort_at'] <= now()->addDays(7)->toDateString())
             ->take(6)
             ->values();
+
         if ($weekEvents->isNotEmpty()) {
             $symbolToInstrumentId = \DB::table('instruments')
                 ->whereIn('symbol', $weekEvents->pluck('symbol')->unique())
@@ -578,20 +579,23 @@ final class DashboardConceptController extends Controller
 
                 return $event;
             });
-
-            $highlights[] = [
-                'kind' => 'upcoming-events',
-                'label' => __('Diese Woche'),
-                'subtitle' => __('Quartalszahlen & geplante Verkäufe'),
-                'icon' => 'heroicon-o-calendar-days',
-                'color' => 'cyan',
-                'url' => null,
-                'data' => null,
-                'date' => null,
-                'insight' => '',
-                'events' => $weekEvents->all(),
-            ];
         }
+
+        // Always shown, unlike the other highlights above - an empty week
+        // is itself useful information ("nothing due"), not a broken state
+        // to hide.
+        $highlights[] = [
+            'kind' => 'upcoming-events',
+            'label' => __('Diese Woche'),
+            'subtitle' => __('Quartalszahlen & geplante Verkäufe'),
+            'icon' => 'heroicon-o-calendar-days',
+            'color' => 'cyan',
+            'url' => null,
+            'data' => null,
+            'date' => null,
+            'insight' => '',
+            'events' => $weekEvents->all(),
+        ];
 
         return [
             'id' => $id,

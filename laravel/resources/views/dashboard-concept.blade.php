@@ -288,6 +288,9 @@
                                         </div>
 
                                         @if(($highlight['kind'] ?? null) === 'upcoming-events')
+                                            @if(count($highlight['events']) === 0)
+                                                <div class="flex flex-1 items-center justify-center text-[9px] text-[var(--ak-muted)] italic">{{ __('Aktuell keine Termine') }}</div>
+                                            @endif
                                             <div class="grid gap-1.5">
                                                 @foreach($highlight['events'] as $event)
                                                     <div
