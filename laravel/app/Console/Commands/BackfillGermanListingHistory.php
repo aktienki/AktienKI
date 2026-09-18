@@ -22,7 +22,7 @@ final class BackfillGermanListingHistory extends Command
             ->whereNull('instrument.deleted_at')
             ->whereNotNull('instrument.german_listing_symbol')
             ->whereRaw("UPPER(COALESCE(instrument.german_listing_currency, '')) = 'EUR'")
-            ->select('instrument.id', 'instrument.symbol', 'instrument.german_listing_symbol')
+            ->select('instrument.id', 'instrument.symbol', 'instrument.german_listing_symbol', 'instrument.german_listing_exchange')
             ->orderByRaw("(SELECT COUNT(*) FROM price_bars bar WHERE bar.instrument_id=instrument.id AND bar.interval='1d_eur') ASC")
             ->orderBy('instrument.id');
 
@@ -36,7 +36,16 @@ final class BackfillGermanListingHistory extends Command
         $completed = $failed = 0;
         foreach ($query->cursor() as $instrument) {
             try {
-                $history = $marketData->dailyHistory((string) $instrument->german_listing_symbol, $days);
+                $symbol = strtoupper(trim((string) $instrument->german_listing_symbol));
+                // Frankfurt (FSX) has proven more reliable than Xetra (XETR)
+                // for this cross-listing feed - try it first regardless of
+                // the exchange this instrument was originally matched on,
+                // falling back to that recorded exchange if Frankfurt has no
+                // data for this particular symbol.
+                $history = $marketData->dailyHistory($symbol.':FSX', $days);
+                if ($history === [] && $instrument->german_listing_exchange) {
+                    $history = $marketData->dailyHistory($symbol.':'.strtoupper((string) $instrument->german_listing_exchange), $days);
+                }
                 if ($history === []) {
                     throw new \RuntimeException('Keine EUR-Tageskurse geliefert.');
                 }

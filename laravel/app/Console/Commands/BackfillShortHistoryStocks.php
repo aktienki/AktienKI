@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Services\ServingChartCacheService;
 use App\Services\TwelveDataService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -23,7 +22,7 @@ final class BackfillShortHistoryStocks extends Command
 
     protected $description = 'Backfills 1d price_bars for active stocks that have less than N years of history';
 
-    public function handle(TwelveDataService $marketData, ServingChartCacheService $charts): int
+    public function handle(TwelveDataService $marketData): int
     {
         $years = max(1, min(10, (int) $this->option('years')));
         $days = max(20, min(5000, (int) $this->option('days')));
@@ -59,7 +58,14 @@ final class BackfillShortHistoryStocks extends Command
 
         $completed = $failed = 0;
         foreach ($query->cursor() as $instrument) {
-            $providerSymbol = $charts->providerSymbol($instrument);
+            // Deliberately NOT $charts->providerSymbol(): that resolver
+            // prefers an instrument's German Xetra cross-listing (a
+            // different, EUR-denominated symbol) when one exists, which is
+            // correct for chart display but wrong here - this writes the
+            // primary interval='1d' series, which must stay in the
+            // instrument's own currency/listing (see BackfillGermanListingHistory
+            // for the dedicated 1d_eur cross-listing backfill).
+            $providerSymbol = strtoupper(trim((string) ($instrument->provider_symbol ?: $instrument->symbol)));
             try {
                 $history = $marketData->dailyHistory($providerSymbol, $days);
                 if ($history === []) {

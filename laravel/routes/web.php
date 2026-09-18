@@ -7,6 +7,7 @@ use App\Http\Controllers\BacktestTradePerformanceController;
 use App\Http\Controllers\BetaInvitationController;
 use App\Http\Controllers\ChartViewSignalController;
 use App\Http\Controllers\CommodityScreenerController;
+use App\Http\Controllers\FundamentalScreenerController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DailyMarketAnalysisController;
@@ -406,6 +407,7 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::get('/sektoren', [SectorController::class, 'index'])->name('sectors.index');
     Route::get('/indizes', IndexScreenerController::class)->name('indices.index');
     Route::get('/rohstoffe', CommodityScreenerController::class)->name('commodities.index');
+    Route::get('/fundamental', FundamentalScreenerController::class)->name('fundamental.index');
     Route::get('/indizes-neu', IndexScreenerController::class)->name('indices.redesign');
     Route::get('/markt-deep-analysis', MarketDeepAnalysisController::class)->name('markets.deep-analysis');
     Route::get('/etfs-zertifikate', EtfCertificateController::class)->name('securities.index');

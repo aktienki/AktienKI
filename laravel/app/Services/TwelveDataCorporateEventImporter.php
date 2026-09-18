@@ -80,6 +80,153 @@ class TwelveDataCorporateEventImporter
         }
     }
 
+    /**
+     * Per-symbol variant of syncEarnings(). Twelve Data's global
+     * earnings_calendar endpoint hard-caps its response at ~1200 records, so
+     * for a wide date range our few hundred instruments only randomly land
+     * in that page. Querying the per-symbol /earnings endpoint instead gets
+     * complete history per stock, at the cost of one request per instrument.
+     *
+     * The per-symbol endpoint occasionally mixes in records with an
+     * implausible EPS magnitude (a fraction of the stock's normal EPS) at an
+     * irregular cadence between the real quarterly reports - the same kind
+     * of scale-mismatch noise found manually in earnings_price_reactions
+     * earlier. Those are filtered out via a plausibility check against the
+     * instrument's already-trusted eps_actual history before upserting.
+     */
+    public function syncEarningsPerInstrument(int $outputsize = 20, int $sleepMs = 250, ?int $limit = null): array
+    {
+        $run = CorporateEventImport::create([
+            'provider' => 'twelve_data', 'event_type' => 'earnings',
+            'requested_from' => CarbonImmutable::today()->subYears(5), 'requested_until' => CarbonImmutable::today(),
+            'status' => 'running', 'started_at' => now(),
+        ]);
+
+        $universe = $this->universe();
+        if ($limit !== null) {
+            $universe = $universe->take($limit);
+        }
+
+        $received = 0;
+        $matched = 0;
+        $filteredOut = 0;
+        $failed = [];
+
+        foreach ($universe as $instrument) {
+            try {
+                $providerSymbol = $this->marketData->providerSymbol((string) ($instrument->provider_symbol ?: $instrument->symbol));
+                $response = $this->request('earnings', [
+                    'symbol' => $providerSymbol,
+                    'outputsize' => $outputsize,
+                ]);
+                $payload = $response->json() ?: [];
+                if (! $response->successful() || data_get($payload, 'status') === 'error' || data_get($payload, 'code')) {
+                    $failed[] = $instrument->symbol;
+                    if ($sleepMs > 0) {
+                        usleep($sleepMs * 1000);
+                    }
+
+                    continue;
+                }
+
+                $records = collect((array) ($payload['earnings'] ?? []))
+                    ->filter(fn ($row) => is_array($row) && ! empty($row['date']))
+                    ->sortBy('date')->values();
+                $received += $records->count();
+
+                $kept = $this->plausibleRecords($instrument, $records);
+                $filteredOut += $records->count() - $kept->count();
+
+                DB::transaction(function () use ($kept, $instrument, $run, &$matched): void {
+                    foreach ($kept as $record) {
+                        $date = CarbonImmutable::parse($record['date'])->toDateString();
+                        $key = implode(':', ['earnings', $instrument->id, $date, strtoupper((string) $instrument->symbol)]);
+                        CorporateEvent::updateOrCreate(
+                            ['provider' => 'twelve_data', 'provider_event_key' => $key],
+                            [
+                                'instrument_id' => $instrument->id, 'import_id' => $run->id,
+                                'event_type' => 'earnings', 'event_date' => $date,
+                                'event_time' => $record['time'] ?? null,
+                                'title' => __('Quartalszahlen :name', ['name' => $instrument->name]),
+                                'eps_estimate' => $this->number($record['eps_estimate'] ?? null),
+                                'eps_actual' => $this->number($record['eps_actual'] ?? null),
+                                'surprise_percent' => $this->number($record['surprise_prc'] ?? null),
+                                'currency' => $instrument->currency,
+                                'provider_symbol' => $instrument->provider_symbol ?: $instrument->symbol,
+                                'source_url' => 'https://twelvedata.com/docs/fundamentals/earnings',
+                                'retrieved_at' => now(), 'data' => $record,
+                            ],
+                        );
+                        $matched++;
+                    }
+                });
+            } catch (Throwable) {
+                $failed[] = $instrument->symbol;
+            }
+
+            if ($sleepMs > 0) {
+                usleep($sleepMs * 1000);
+            }
+        }
+
+        $run->update([
+            'status' => 'completed', 'records_received' => $received,
+            'records_matched' => $matched, 'records_ignored' => max(0, $received - $matched),
+            'finished_at' => now(),
+        ]);
+
+        return [
+            'instruments' => $universe->count(), 'received' => $received,
+            'matched' => $matched, 'filtered_out' => $filteredOut, 'failed' => $failed,
+        ];
+    }
+
+    private function plausibleRecords(object $instrument, Collection $records): Collection
+    {
+        $historicalMedian = $this->historicalMedianAbsEps($instrument->id);
+
+        $kept = collect();
+        $lastKeptDate = null;
+
+        foreach ($records as $record) {
+            $eps = $this->number($record['eps_actual'] ?? null) ?? $this->number($record['eps_estimate'] ?? null);
+
+            if ($historicalMedian !== null && $eps !== null && $eps !== 0.0) {
+                $ratio = abs($eps) / $historicalMedian;
+                if ($ratio < 0.3 || $ratio > 4.0) {
+                    continue;
+                }
+            }
+
+            $date = CarbonImmutable::parse($record['date']);
+            if ($lastKeptDate !== null && abs($date->diffInDays($lastKeptDate)) < 45) {
+                continue;
+            }
+
+            $kept->push($record);
+            $lastKeptDate = $date;
+        }
+
+        return $kept->values();
+    }
+
+    private function historicalMedianAbsEps(int $instrumentId): ?float
+    {
+        $values = CorporateEvent::query()->where('instrument_id', $instrumentId)->where('event_type', 'earnings')
+            ->whereNotNull('eps_actual')->orderBy('event_date', 'desc')->limit(12)
+            ->pluck('eps_actual')->map(fn ($v) => abs((float) $v))->filter(fn ($v) => $v > 0)->sort()->values();
+
+        if ($values->count() < 3) {
+            return null;
+        }
+
+        $mid = intdiv($values->count(), 2);
+
+        return $values->count() % 2 === 0
+            ? ($values[$mid - 1] + $values[$mid]) / 2
+            : $values[$mid];
+    }
+
     private function universe(): Collection
     {
         return DB::table('instruments as instrument')->leftJoin('exchanges as exchange', 'exchange.id', '=', 'instrument.exchange_id')
