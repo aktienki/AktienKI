@@ -19,6 +19,11 @@ class GenerateInstrumentDescriptions extends Command
 
     public function handle(): int
     {
+        if ((bool) config('aktienki.ai_disabled')) {
+            $this->info('AI-Abfragen sind deaktiviert (aktienki.ai_disabled).');
+
+            return self::SUCCESS;
+        }
         $apiKey = trim((string) config('aktienki.instrument_descriptions.grid_api_key'));
         if ($apiKey === '') {
             $this->error('GRID_API_KEY ist für die Firmenbeschreibungen nicht konfiguriert.');

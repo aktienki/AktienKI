@@ -1,6 +1,11 @@
 <?php
 
 return [
+    // Global kill switch for every paid external AI/LLM call (OpenAI, Grid,
+    // Perplexity) across scheduled commands, queued jobs and the chat
+    // controller. Set to save cost without touching each integration.
+    'ai_disabled' => (bool) env('AKTIENKI_AI_DISABLED', false),
+
     'training_activation_quality_gate' => [
         'minimum_direction_accuracy' => (float) env('TRAINING_GATE_MIN_DIRECTION_ACCURACY', 0.55),
         'minimum_profit_factor' => (float) env('TRAINING_GATE_MIN_PROFIT_FACTOR', 1.30),

@@ -10,6 +10,9 @@ final class PressReleaseAiAnalyzer
 {
     public function analyzePending(int $limit = 500): array
     {
+        if ((bool) config('aktienki.ai_disabled')) {
+            return ['pending' => 0, 'analyzed' => 0, 'batches' => 0, 'skipped' => 'ai_disabled'];
+        }
         $apiKey = (string) env('OPENAI_API_KEY');
         if ($apiKey === '') {
             throw new RuntimeException('OPENAI_API_KEY ist nicht konfiguriert.');

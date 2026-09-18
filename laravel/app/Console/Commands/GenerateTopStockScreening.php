@@ -16,6 +16,9 @@ class GenerateTopStockScreening extends Command
 
     public function handle(): int
     {
+        if ((bool) config('aktienki.ai_disabled')) {
+            $this->info('AI-Abfragen sind deaktiviert (aktienki.ai_disabled) - Screening laeuft ohne KI-Kommentare weiter.');
+        }
         if (! Schema::hasTable('stock_screening_runs')) {
             $this->error('Bitte zuerst php artisan migrate --force ausführen.');
 
@@ -70,7 +73,7 @@ class GenerateTopStockScreening extends Command
         $rows = $rows->take($rankingLimit)->values();
         $runId = DB::table('stock_screening_runs')->insertGetId(['user_id' => $this->option('user') ?: null, 'universe' => 'top'.$rankingLimit, 'model' => $model, 'item_count' => $rows->count(), 'parameters' => json_encode(['ranking' => 'score 40%, confidence 25%, risk 20%, expected return 15%', 'eligible_signals' => ['BUY', 'WATCH']]), 'generated_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
         $comments = [];
-        if ($model && ($apiKey = (string) env('OPENAI_API_KEY')) !== '') {
+        if ($model && ! (bool) config('aktienki.ai_disabled') && ($apiKey = (string) env('OPENAI_API_KEY')) !== '') {
             try {
                 $input = $rows->map(fn (object $r, int $i) => ['rank' => $i + 1, 'symbol' => $r->symbol, 'name' => $r->name, 'signal' => $r->signal, ...$r->metrics])->values()->all();
                 $response = Http::withToken($apiKey)->acceptJson()->asJson()->timeout(120)->post('https://api.openai.com/v1/responses', [

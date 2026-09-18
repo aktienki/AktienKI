@@ -17,6 +17,11 @@ class GenerateDailyIndexMarketInfos extends Command
 
     public function handle(): int
     {
+        if ((bool) config('aktienki.ai_disabled')) {
+            $this->info('AI-Abfragen sind deaktiviert (aktienki.ai_disabled).');
+
+            return self::SUCCESS;
+        }
         if (! Schema::hasTable('daily_index_market_infos')) {
             $this->error('Bitte zuerst die Migrationen ausführen.');
 

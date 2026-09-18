@@ -21,6 +21,9 @@ final class EnglishTranslationService
      */
     public function translate(string $summary, array $lists): array
     {
+        if ((bool) config('aktienki.ai_disabled')) {
+            throw new RuntimeException('AI-Abfragen sind deaktiviert (aktienki.ai_disabled).');
+        }
         $apiKey = trim((string) config('aktienki.instrument_descriptions.grid_api_key'));
         if ($apiKey === '') {
             throw new RuntimeException('GRID_API_KEY ist für Übersetzungen nicht konfiguriert.');

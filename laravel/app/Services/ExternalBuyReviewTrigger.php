@@ -21,6 +21,7 @@ final class ExternalBuyReviewTrigger
     public function queueForTransition(Prediction $prediction, Prediction $previous): bool
     {
         if (! config('aktienki.external_buy_review.enabled', false)
+            || (bool) config('aktienki.ai_disabled')
             || ! Schema::hasTable('external_buy_reviews')
             || strtoupper((string) $prediction->signal) !== 'BUY'
             || strtoupper((string) $previous->signal) === 'BUY') {

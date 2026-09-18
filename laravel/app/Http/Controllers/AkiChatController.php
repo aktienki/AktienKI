@@ -24,6 +24,7 @@ final class AkiChatController extends Controller
             'mode' => ['sometimes', 'in:standard,deep'],
         ]);
 
+        abort_if((bool) config('aktienki.ai_disabled'), 503, 'AKI-Chat ist vorübergehend deaktiviert.');
         $apiKey = (string) env('OPENAI_API_KEY');
         abort_unless($apiKey !== '', 503, 'OpenAI-Chat ist nicht konfiguriert.');
 

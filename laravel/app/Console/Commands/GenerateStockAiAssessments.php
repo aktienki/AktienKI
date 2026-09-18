@@ -16,8 +16,8 @@ final class GenerateStockAiAssessments extends Command
 
     public function handle(ServingScreenerService $screener, StockAiAssessmentService $assessments): int
     {
-        if (! config('aktienki.stock_ai_assessment.enabled', false)) {
-            $this->warn('STOCK_AI_ASSESSMENT_ENABLED is off - nothing done.');
+        if (! config('aktienki.stock_ai_assessment.enabled', false) || (bool) config('aktienki.ai_disabled')) {
+            $this->warn('STOCK_AI_ASSESSMENT_ENABLED is off or ai_disabled is set - nothing done.');
 
             return self::SUCCESS;
         }

@@ -16,6 +16,11 @@ final class GenerateDailyMarketReport extends Command
 
     public function handle(): int
     {
+        if ((bool) config('aktienki.ai_disabled')) {
+            $this->info('AI-Abfragen sind deaktiviert (aktienki.ai_disabled).');
+
+            return self::SUCCESS;
+        }
         $date = now('Europe/Berlin')->toDateString();
         if (! $this->option('force') && DB::table('daily_market_ai_analyses')->where('analysis_date', $date)->exists()) {
             $this->info("Marktbericht für {$date} ist bereits vorhanden.");

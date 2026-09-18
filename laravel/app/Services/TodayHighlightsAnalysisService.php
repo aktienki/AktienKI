@@ -17,6 +17,9 @@ PROMPT;
 
     public function analyzeHighlights(array $highlights): array
     {
+        if ((bool) config('aktienki.ai_disabled')) {
+            return $this->defaultHighlights($highlights);
+        }
         $apiKey = trim((string) config('aktienki.stock_ai_assessment.grid_api_key'));
         if ($apiKey === '') {
             return $this->defaultHighlights($highlights);

@@ -17,6 +17,11 @@ class GenerateSignalChangeReport extends Command
 
     public function handle(): int
     {
+        if ((bool) config('aktienki.ai_disabled')) {
+            $this->info('AI-Abfragen sind deaktiviert (aktienki.ai_disabled).');
+
+            return self::SUCCESS;
+        }
         $locale = strtolower((string) $this->option('locale'));
         if (! in_array($locale, ['de', 'en'], true)) {
             $this->error('Locale must be de or en.');
