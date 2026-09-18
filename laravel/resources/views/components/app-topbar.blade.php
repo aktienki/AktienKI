@@ -83,12 +83,11 @@
                 <x-heroicon-o-squares-2x2 /><span>Dashboard</span>
             </a>
             <div x-data="{open:false,left:0,top:0,toggle(){const b=this.$refs.trigger.getBoundingClientRect();this.left=b.left;this.top=b.bottom+8;this.open=!this.open}}" @click.outside="open=false" data-nav-key="screener" class="relative shrink-0">
-                <button x-ref="trigger" type="button" @click="toggle()" class="{{ request()->routeIs('screener.*', 'indices.*', 'sectors.*', 'commodities.*', 'markets.situation') ? 'ak-top-link-active' : 'ak-top-link' }}" :aria-expanded="open">
+                <button x-ref="trigger" type="button" @click="toggle()" class="{{ request()->routeIs('screener.*', 'indices.*', 'sectors.*', 'commodities.*') ? 'ak-top-link-active' : 'ak-top-link' }}" :aria-expanded="open">
                     <x-heroicon-o-funnel /><span>{{ __('Screener') }}</span><x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition" x-bind:class="{'rotate-180':open}" />
                 </button>
                 <template x-teleport="body">
                     <div x-cloak x-show="open" @keydown.escape.window="open=false" x-transition.origin.top.left class="ak-topbar-menu fixed z-[100] w-56 overflow-hidden rounded-2xl border border-[var(--ak-border)] bg-[var(--ak-card-strong)] p-2 shadow-2xl shadow-black/35 backdrop-blur-xl" :style="`left:${left}px;top:${top}px`">
-                        <a href="{{ route('markets.situation') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-globe-europe-africa class="h-5 w-5 text-cyan-500" />{{ __('Marktlage') }}</a>
                         <a href="{{ route('screener.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-chart-bar-square class="h-5 w-5 text-cyan-500" />{{ __('Aktien') }}</a>
                         <a href="{{ route('indices.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-globe-alt class="h-5 w-5 text-cyan-500" />{{ __('Indizes') }}</a>
                         <a href="{{ route('commodities.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-circle-stack class="h-5 w-5 text-amber-400" />{{ __('Rohstoffe') }}</a>

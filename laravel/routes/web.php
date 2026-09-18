@@ -283,7 +283,6 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
         ->name('predictions.performance-transparency');
     Route::patch('/dashboard/layout', [DashboardController::class, 'updateLayout'])->name('dashboard.layout.update');
     Route::patch('/dashboard/card-layout', [DashboardController::class, 'updateCardLayout'])->name('dashboard.card-layout.update');
-    Route::view('/maerkte/marktlage', 'markets.situation')->name('markets.situation');
     Route::get('/apple', AppleChartController::class)->name('stocks.apple');
     // Route::get('/stocks', StocksIndex::class)->name('stocks.index');
     // Route::get('/stocks/{symbol}', [StockController::class, 'show'])->name('stocks.show');
