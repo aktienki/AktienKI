@@ -3141,12 +3141,17 @@
                     ];
                 @endphp
 
-                <div class="mb-3 flex items-center gap-3">
-                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300"><x-heroicon-o-building-office-2 class="h-5 w-5" /></span>
-                    <div>
-                        <h2 class="font-black text-[var(--ak-text)]">{{ __('Fundamentaldaten') }}</h2>
-                        <p class="text-xs text-[var(--ak-muted)]">{{ __('Thematisch zusammengefasste Unternehmens- und Instrumentendaten') }}</p>
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300"><x-heroicon-o-building-office-2 class="h-5 w-5" /></span>
+                        <div>
+                            <h2 class="font-black text-[var(--ak-text)]">{{ __('Fundamentaldaten') }}</h2>
+                            <p class="text-xs text-[var(--ak-muted)]">{{ __('Thematisch zusammengefasste Unternehmens- und Instrumentendaten') }}</p>
+                        </div>
                     </div>
+                    <a href="{{ route('fundamental.index', ['symbol' => $instrument->symbol]) }}" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-400/[.08] px-3 py-2 text-xs font-bold text-cyan-400 transition hover:bg-cyan-400/[.16]">
+                        <x-heroicon-o-document-chart-bar class="h-4 w-4" />{{ __('Quartalszahlen im Detail') }}
+                    </a>
                 </div>
 
                 <div class="grid gap-3 md:hidden">

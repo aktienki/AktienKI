@@ -11,29 +11,38 @@ final class FundamentalScreenerController extends Controller
 {
     public function __invoke(Request $request, EarningsQuarterCardService $cards): View
     {
-        $query = DB::table('instruments')
-            ->where('type', 'stock')->where('is_active', true)->whereNull('deleted_at');
-
-        if ($term = trim((string) $request->query('q'))) {
-            $query->where(fn ($q) => $q->where('symbol', 'ilike', "%{$term}%")->orWhere('name', 'ilike', "%{$term}%"));
-        }
-
-        $instruments = $query->orderBy('symbol')->get(['id', 'symbol', 'name']);
-
-        $selected = null;
         $requestedSymbol = strtoupper(trim((string) $request->query('symbol', '')));
-        if ($requestedSymbol !== '') {
-            $selected = $instruments->first(fn ($i) => strtoupper($i->symbol) === $requestedSymbol);
-        }
-        $selected ??= $instruments->first();
 
-        $years = $selected ? $cards->forInstrument($selected->id) : [];
+        $selected = $requestedSymbol !== ''
+            ? DB::table('instruments')->where('type', 'stock')->whereNull('deleted_at')
+                ->whereRaw('UPPER(symbol) = ?', [$requestedSymbol])->first(['id', 'symbol', 'name'])
+            : null;
+
+        $years = [];
+        $ratios = null;
+
+        if ($selected) {
+            $years = $cards->forInstrument($selected->id);
+
+            $fundamental = DB::table('instrument_fundamentals')->where('instrument_id', $selected->id)
+                ->orderByDesc('snapshot_date')->orderByDesc('id')->first([
+                    'trailing_pe', 'dividend_yield', 'market_cap', 'revenue_growth', 'snapshot_date',
+                ]);
+            if ($fundamental) {
+                $ratios = [
+                    'trailing_pe' => $fundamental->trailing_pe !== null ? (float) $fundamental->trailing_pe : null,
+                    'dividend_yield' => $fundamental->dividend_yield !== null ? (float) $fundamental->dividend_yield * 100 : null,
+                    'market_cap' => $fundamental->market_cap !== null ? (float) $fundamental->market_cap : null,
+                    'revenue_growth' => $fundamental->revenue_growth !== null ? (float) $fundamental->revenue_growth * 100 : null,
+                    'snapshot_date' => $fundamental->snapshot_date,
+                ];
+            }
+        }
 
         return view('screener.fundamental', [
-            'instruments' => $instruments,
             'selected' => $selected,
             'years' => $years,
-            'searchTerm' => $term ?? '',
+            'ratios' => $ratios,
         ]);
     }
 }
