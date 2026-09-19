@@ -71,4 +71,30 @@ class EarningsCalendarService
             'range_end' => $rangeEnd->subDay(),
         ];
     }
+
+    /** @return array{date: CarbonImmutable, time: ?string, days_until: int}|null the single nearest scheduled-but-not-yet-reported earnings date for one instrument, or null if none is on record. */
+    public function nextForInstrument(int $instrumentId): ?array
+    {
+        $today = CarbonImmutable::now()->startOfDay();
+
+        $event = DB::table('corporate_events')
+            ->where('instrument_id', $instrumentId)
+            ->where('event_type', 'earnings')
+            ->whereNull('eps_actual')
+            ->whereDate('event_date', '>=', $today->toDateString())
+            ->orderBy('event_date')
+            ->first(['event_date', 'event_time']);
+
+        if ($event === null) {
+            return null;
+        }
+
+        $date = CarbonImmutable::parse($event->event_date);
+
+        return [
+            'date' => $date,
+            'time' => $event->event_time,
+            'days_until' => $today->diffInDays($date->startOfDay(), false),
+        ];
+    }
 }

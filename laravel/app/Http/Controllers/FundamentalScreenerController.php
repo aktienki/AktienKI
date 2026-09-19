@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\EarningsCalendarService;
 use App\Services\EarningsQuarterCardService;
 use App\Services\FundamentalHeatmapService;
 use Illuminate\Http\Request;
@@ -10,7 +11,7 @@ use Illuminate\View\View;
 
 final class FundamentalScreenerController extends Controller
 {
-    public function __invoke(Request $request, EarningsQuarterCardService $cards, FundamentalHeatmapService $heatmaps): View
+    public function __invoke(Request $request, EarningsQuarterCardService $cards, FundamentalHeatmapService $heatmaps, EarningsCalendarService $calendar): View
     {
         $requestedSymbol = strtoupper(trim((string) $request->query('symbol', '')));
 
@@ -22,6 +23,7 @@ final class FundamentalScreenerController extends Controller
         $years = [];
         $ratios = null;
         $kennzahlenTrend = [];
+        $nextEarnings = null;
         $panels = [];
         $capGroup = $request->query('cap');
         $capGroup = in_array($capGroup, array_keys(FundamentalHeatmapService::CAP_GROUPS), true) ? $capGroup : null;
@@ -74,6 +76,7 @@ final class FundamentalScreenerController extends Controller
         if ($selected) {
             $years = $cards->forInstrument($selected->id);
             $kennzahlenTrend = $cards->kennzahlenTrend($selected->id);
+            $nextEarnings = $calendar->nextForInstrument($selected->id);
 
             $fundamental = DB::table('instrument_fundamentals')->where('instrument_id', $selected->id)
                 ->orderByDesc('snapshot_date')->orderByDesc('id')->first([
@@ -95,6 +98,7 @@ final class FundamentalScreenerController extends Controller
             'years' => $years,
             'ratios' => $ratios,
             'kennzahlenTrend' => $kennzahlenTrend,
+            'nextEarnings' => $nextEarnings,
             'panels' => $panels,
             'capGroup' => $capGroup,
             'sector' => $sector,

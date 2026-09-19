@@ -29,6 +29,10 @@
                 <x-heroicon-o-document-chart-bar class="h-5 w-5" />
                 <small>{{ __('Quartalszahlen') }}</small>
             </button>
+            <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'termine' }" @click="active = 'termine'" @if(!$selected) disabled @endif>
+                <x-heroicon-o-calendar-days class="h-5 w-5" />
+                <small>{{ __('Termine') }}</small>
+            </button>
         </nav>
 
         <section class="fundamental-main">
@@ -525,6 +529,26 @@
                     @endforeach
                     <p class="fundamental-footnote">{{ __('Kerzenchart = ±10 Handelstage um den Termin, gestrichelte Linie markiert den Bericht. Quartale sind nach Kalenderquartal des Berichtsdatums gruppiert (Q1=Jan-Mär …).') }}</p>
                 </div>
+
+                <div class="ak-master-card fundamental-section" x-show="active === 'termine'" x-cloak>
+                    <div class="ak-master-card-header fundamental-head-inner"><h2 class="text-base font-black">{{ __('Nächster Termin') }}</h2></div>
+                    <div class="fundamental-ratios-body">
+                        @if($nextEarnings)
+                            <div class="fundamental-next-earnings">
+                                <div class="fundamental-next-earnings-date">
+                                    <b>{{ $nextEarnings['date']->format('d.m.Y') }}</b>
+                                    <span>{{ $nextEarnings['date']->locale('de')->isoFormat('dddd') }}@if($nextEarnings['time']) · {{ $nextEarnings['time'] }}@endif</span>
+                                </div>
+                                <p class="fundamental-next-earnings-countdown">
+                                    {{ $nextEarnings['days_until'] === 0 ? __('heute') : ($nextEarnings['days_until'] === 1 ? __('morgen') : __('in :n Tagen', ['n' => $nextEarnings['days_until']])) }}
+                                </p>
+                            </div>
+                        @else
+                            <p class="text-xs text-[var(--ak-muted)]">{{ __('Kein anstehender Quartalstermin für diese Aktie im Feed bekannt.') }}</p>
+                        @endif
+                        <p class="fundamental-footnote">{{ __('Alle anstehenden Termine über das gesamte Aktien-Universum: ') }}<a href="{{ route('earnings-calendar.index') }}" class="text-cyan-500 hover:underline">{{ __('Kalender ansehen') }}</a></p>
+                    </div>
+                </div>
     @endif
         </section>
     </div>
@@ -571,6 +595,10 @@
     #fundamental-page .fundamental-ratio span { display: block; font-size: .6rem; font-weight: 800; color: var(--ak-muted); text-transform: uppercase; letter-spacing: .02em; }
     #fundamental-page .fundamental-ratio b { display: block; margin-top: .25rem; font-size: 1rem; font-weight: 900; }
     #fundamental-page .fundamental-footnote { margin-top: 1rem; font-size: .68rem; color: var(--ak-muted); line-height: 1.6; }
+    #fundamental-page .fundamental-next-earnings { display: inline-flex; flex-direction: column; gap: .3rem; padding: 1rem 1.3rem; border: 1px solid var(--ak-border); border-radius: .9rem; }
+    #fundamental-page .fundamental-next-earnings-date b { font-size: 1.3rem; font-weight: 900; }
+    #fundamental-page .fundamental-next-earnings-date span { margin-left: .5rem; font-size: .72rem; font-weight: 700; color: var(--ak-muted); text-transform: capitalize; }
+    #fundamental-page .fundamental-next-earnings-countdown { margin-top: .1rem; font-size: .78rem; font-weight: 800; color: #22d3ee; }
     #fundamental-page .fundamental-trend-grid { display: flex; flex-wrap: nowrap; align-items: stretch; gap: .9rem; padding: 1.1rem; overflow-x: auto; }
     #fundamental-page .fundamental-trend-card { flex: 1 1 240px; min-width: 200px; border: 1px solid var(--ak-border); border-radius: .8rem; padding: .8rem .9rem 1.6rem; }
     #fundamental-page .fundamental-trend-card--narrow { flex: 0 1 150px; min-width: 140px; }
