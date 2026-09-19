@@ -19,10 +19,6 @@
                 <x-heroicon-o-chart-bar class="h-5 w-5" />
                 <small>{{ __('Verteilung') }}</small>
             </button>
-            <button type="button" class="fundamental-symbol-tile is-disabled" disabled title="{{ __('Vorübergehend deaktiviert') }}">
-                <x-heroicon-o-squares-2x2 class="h-5 w-5" />
-                <small>{{ __('Heatmaps') }}</small>
-            </button>
             <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'ratios' }" @click="active = 'ratios'" @if(!$selected) disabled @endif>
                 <x-heroicon-o-calculator class="h-5 w-5" />
                 <small>{{ __('Kennzahlen') }}</small>
