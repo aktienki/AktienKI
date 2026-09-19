@@ -304,6 +304,13 @@ class FundamentalHeatmapService
                 'p.instrument_id', '=', 'i.id',
             )
             ->where('i.type', 'stock')->whereNull('i.deleted_at')
+            // Only list stocks that actually have quarterly earnings history
+            // (corporate_events) - otherwise clicking through lands on an
+            // empty Kennzahlen-im-Verlauf/Quartalszahlen page. This drops
+            // the list from ~1400+ to ~600 stocks; the heatmaps themselves
+            // are unaffected (they use instrument_fundamentals, not this).
+            ->whereExists(fn ($q) => $q->select(DB::raw(1))->from('corporate_events as e')
+                ->whereColumn('e.instrument_id', 'i.id')->where('e.event_type', 'earnings'))
             ->when($sector !== null && $sector !== '', fn ($q) => $q->where('i.sector', $sector))
             ->when($country !== null && $country !== '', fn ($q) => $q->where('i.country', $country))
             ->when($region !== null && isset(self::REGIONS[$region]), fn ($q) => $q->whereIn('i.country', self::REGIONS[$region]['countries']))
