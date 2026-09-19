@@ -776,7 +776,7 @@ final class DashboardConceptController extends Controller
             'events' => $weekEvents->all(),
         ];
 
-        $highlights[] = $this->tradingOpportunityHighlight($request);
+        $highlights[] = $this->tradingOpportunityHighlight($request, $date);
 
         return [
             'id' => $id,
@@ -795,7 +795,7 @@ final class DashboardConceptController extends Controller
      * (a fairly strict gate that's often empty) - "best available", not
      * "no data", is still the more useful answer for a "pick one" card.
      */
-    private function tradingOpportunityHighlight(Request $request): array
+    private function tradingOpportunityHighlight(Request $request, string $date): array
     {
         $dashboard = app(DashboardController::class);
         $stocks = $dashboard->remoteDashboardStocks($request);
@@ -818,6 +818,13 @@ final class DashboardConceptController extends Controller
         $country = strtoupper((string) ($champion->country ?? ''));
         $expectedReturn = is_numeric($champion->expected_return_20d ?? null) ? (float) $champion->expected_return_20d : null;
 
+        // findAnalog() compares against walk_forward_backtest_trades.predicted_return,
+        // a fraction (0.03 = 3%), same as expected_return_20d here is a
+        // whole percent (2.5 = 2.5%) - divide by 100 to match its scale.
+        $analog = is_numeric($champion->instrument_id ?? null) && $expectedReturn !== null
+            ? app(\App\Services\TodayHighlightsBuilder::class)->findAnalog((int) $champion->instrument_id, $champion->symbol, $expectedReturn / 100, $date)
+            : null;
+
         return $base + [
             'data' => $champion->symbol,
             'url' => route('stocks.show', ['symbol' => $champion->symbol, 'return_to' => '/dashboard/concept']),
@@ -829,7 +836,7 @@ final class DashboardConceptController extends Controller
                 'risk' => is_numeric($champion->risk_percent ?? null) ? round((float) $champion->risk_percent / 10, 1) : null,
                 'confidence' => is_numeric($champion->confidence_percent ?? null) ? round((float) $champion->confidence_percent) : null,
             ],
-            'analog' => null,
+            'analog' => $analog,
             'metric_label' => __('Erwartete Rendite (20T)'),
             'metric_value' => $expectedReturn !== null ? sprintf('%+.1f%%', $expectedReturn) : null,
         ];

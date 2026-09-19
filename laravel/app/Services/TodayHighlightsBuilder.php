@@ -180,7 +180,7 @@ final class TodayHighlightsBuilder
      * Only considers signals >=25 days old, so the outcome is resolved.
      * Attaches a ready-to-draw sparkline of the analog's own 20-day move.
      */
-    private function findAnalog(int $instrumentId, string $symbol, float $comparisonReturn, string $date): ?array
+    public function findAnalog(int $instrumentId, string $symbol, float $comparisonReturn, string $date): ?array
     {
         $cutoff = Carbon::parse($date)->subDays(25)->toDateString();
 
