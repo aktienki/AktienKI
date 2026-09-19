@@ -35,8 +35,8 @@
                         <b>{{ $event['date']->format('d.m.') }}</b>
                         <span>{{ $event['date']->locale('de')->isoFormat('ddd') }}</span>
                     </div>
+                    <span class="calendar-row-symbol">{{ $event['symbol'] }}</span>
                     <div class="calendar-row-main">
-                        <span class="calendar-row-symbol">{{ $event['symbol'] }}</span>
                         <span class="calendar-row-name">{{ $event['name'] }}</span>
                         @if($event['sector'])
                             <span class="calendar-row-sector">{{ __($event['sector']) }}</span>
@@ -88,8 +88,8 @@
     #earnings-calendar-page .calendar-row-date { flex: 0 0 48px; text-align: center; }
     #earnings-calendar-page .calendar-row-date b { display: block; font-size: .78rem; font-weight: 900; }
     #earnings-calendar-page .calendar-row-date span { display: block; font-size: .58rem; font-weight: 700; color: var(--ak-muted); text-transform: uppercase; }
+    #earnings-calendar-page .calendar-row-symbol { flex: 0 0 72px; font-size: .78rem; font-weight: 900; color: #22d3ee; }
     #earnings-calendar-page .calendar-row-main { flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; min-width: 0; }
-    #earnings-calendar-page .calendar-row-symbol { font-size: .78rem; font-weight: 900; color: #22d3ee; }
     #earnings-calendar-page .calendar-row-name { font-size: .74rem; font-weight: 600; color: var(--ak-text); }
     #earnings-calendar-page .calendar-row-sector { font-size: .62rem; font-weight: 700; color: var(--ak-muted); }
     #earnings-calendar-page .calendar-row-countdown {
