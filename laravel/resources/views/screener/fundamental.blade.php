@@ -1,5 +1,5 @@
 <x-app-layout>
-<div id="fundamental-page" x-data="{ active: '{{ $selected ? 'ratios' : 'heatmaps' }}' }" class="mx-auto max-w-7xl px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
+<div id="fundamental-page" x-data="{ active: '{{ $selected ? 'ratios' : 'termine' }}' }" class="mx-auto max-w-7xl px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
     <header class="mb-4 flex items-center justify-between gap-3">
         <div>
             <h1 class="text-3xl font-black tracking-tight">{{ __('Fundamental') }}</h1>
@@ -11,27 +11,17 @@
 
     <div class="fundamental-layout">
         <nav class="fundamental-symbol-grid" aria-label="{{ __('Ansicht') }}">
-            @if($selected)
-                <a href="{{ route('fundamental.index') }}" class="fundamental-symbol-tile fundamental-symbol-tile--current" title="{{ __('Zurück zur Übersicht') }}">
-                    <strong>{{ $selected->symbol }}</strong>
-                </a>
-            @else
-                <div class="fundamental-symbol-tile fundamental-symbol-tile--current is-disabled" title="{{ __('Noch keine Aktie ausgewählt') }}">
-                    <x-heroicon-o-magnifying-glass class="h-5 w-5" />
-                    <small>{{ __('Kein Symbol') }}</small>
-                </div>
-            @endif
-            <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'heatmaps' }" @click="active = 'heatmaps'">
-                <x-heroicon-o-squares-2x2 class="h-5 w-5" />
-                <small>{{ __('Heatmaps') }}</small>
+            <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'termine' }" @click="active = 'termine'">
+                <x-heroicon-o-calendar-days class="h-5 w-5" />
+                <small>{{ __('Termine') }}</small>
             </button>
             <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'verteilung' }" @click="active = 'verteilung'">
                 <x-heroicon-o-chart-bar class="h-5 w-5" />
                 <small>{{ __('Verteilung') }}</small>
             </button>
-            <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'termine' }" @click="active = 'termine'">
-                <x-heroicon-o-calendar-days class="h-5 w-5" />
-                <small>{{ __('Termine') }}</small>
+            <button type="button" class="fundamental-symbol-tile is-disabled" disabled title="{{ __('Vorübergehend deaktiviert') }}">
+                <x-heroicon-o-squares-2x2 class="h-5 w-5" />
+                <small>{{ __('Heatmaps') }}</small>
             </button>
             <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'ratios' }" @click="active = 'ratios'" @if(!$selected) disabled @endif>
                 <x-heroicon-o-calculator class="h-5 w-5" />
@@ -362,30 +352,21 @@
                         </form>
                     </div>
 
-                    @php
-                        $sortLink = function (string $col, string $label) use ($table, $link) {
-                            $nextDir = ($table['sort'] === $col && $table['dir'] === 'desc') ? 'asc' : 'desc';
-                            $icon = $table['sort'] === $col ? ($table['dir'] === 'desc' ? '↓' : '↑') : '';
-
-                            return '<a href="'.$link(['sort' => $col, 'dir' => $nextDir]).'" class="fundamental-table-sort">'.$label.' '.$icon.'</a>';
-                        };
-                    @endphp
-
                     <div class="fundamental-table-scroll">
                         <table class="fundamental-table">
                             <thead>
                                 <tr>
-                                    <th>{!! $sortLink('symbol', __('Symbol')) !!}</th>
-                                    <th>{!! $sortLink('name', __('Name')) !!}</th>
+                                    <th>{{ __('Symbol') }}</th>
+                                    <th>{{ __('Name') }}</th>
                                     <th>{{ __('Land') }}</th>
                                     <th>{{ __('Sektor') }}</th>
-                                    <th class="text-right">{!! $sortLink('trailing_pe', __('KGV')) !!}</th>
+                                    <th class="text-right">{{ __('KGV') }}</th>
                                     <th class="text-right" title="{{ __('KGV mit dem gespeicherten KGV skaliert auf den aktuellen Kurs (gleicher Gewinn, aktueller Kurs statt Kurs zum Snapshot-Zeitpunkt).') }}">{{ __('KGV (aktuell)') }}</th>
-                                    <th class="text-right">{!! $sortLink('dividend_yield', __('Div.-Rendite')) !!}</th>
+                                    <th class="text-right">{{ __('Div.-Rendite') }}</th>
                                     <th class="text-right" title="{{ __('Dividendenrendite mit derselben Ausschüttung skaliert auf den aktuellen Kurs.') }}">{{ __('Div. (aktuell)') }}</th>
-                                    <th class="text-right">{!! $sortLink('return_on_equity', __('ROE')) !!}</th>
-                                    <th class="text-right">{!! $sortLink('earnings_growth', __('Gewinnwachstum')) !!}</th>
-                                    <th class="text-right">{!! $sortLink('market_cap', __('Marktkap.')) !!}</th>
+                                    <th class="text-right">{{ __('ROE') }}</th>
+                                    <th class="text-right">{{ __('Gewinnwachstum') }}</th>
+                                    <th class="text-right">{{ __('Marktkap.') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
