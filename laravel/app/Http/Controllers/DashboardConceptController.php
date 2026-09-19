@@ -776,81 +776,92 @@ final class DashboardConceptController extends Controller
             'events' => $weekEvents->all(),
         ];
 
-        $highlights[] = $this->tradingOpportunityHighlight($request, $date);
-
         return [
             'id' => $id,
             'kind' => 'today-focus',
             'highlights' => $highlights,
+            'opportunities' => $this->tradingOpportunities($request, $date),
         ];
     }
 
     /**
-     * The single #1 pick, in the same highlight-card shape as the others
-     * above - reuses DashboardController::championSummary() (externally
+     * Up to 4 picks, each in the same highlight-card shape as "Heute im
+     * Fokus" - reuses DashboardController::championRanking() (externally
      * GPT-confirmed BUY + panel coverage, same composite score the screener
-     * and main dashboard show), so this never disagrees with those pages
-     * about which stock is "best". Falls back to the plain highest
-     * composite_score stock when no external-confirmed champion exists
-     * (a fairly strict gate that's often empty) - "best available", not
-     * "no data", is still the more useful answer for a "pick one" card.
+     * and main dashboard show), so these never disagree with those pages
+     * about which stocks are "best". That gate is fairly strict and often
+     * has fewer than 4 qualifying stocks, so the remaining slots are filled
+     * with the next-highest composite_score stocks instead - "best
+     * available", not an empty slot, for a "show 4 if you can" section.
+     * Rendered as its own paragraph, separate from the highlight grid.
+     *
+     * @return list<array<string, mixed>>
      */
-    private function tradingOpportunityHighlight(Request $request, string $date): array
+    private function tradingOpportunities(Request $request, string $date, int $limit = 4): array
     {
         $dashboard = app(DashboardController::class);
         $stocks = $dashboard->remoteDashboardStocks($request);
-        $champion = $dashboard->championSummary($request, $stocks)
-            ?? $stocks->sortByDesc(fn (object $s): float => is_numeric($s->composite_score ?? null) ? (float) $s->composite_score : (float) ($s->ranking_score ?? -1))->first();
+        $picks = $dashboard->championRanking($request, $stocks)->take($limit);
 
-        $base = [
-            'label' => __('Trading Opportunities'),
-            'subtitle' => __('Bester bestätigter Kauf heute'),
-            'icon' => 'heroicon-o-bolt',
-            'color' => 'amber',
-            // Top-right date stamp, same spot as the other highlights - the
-            // signal's own prediction_time, not the generic "which trading
-            // day is this batch of cards showing" $date used elsewhere.
-            'date' => isset($champion->prediction_time) ? Carbon::parse($champion->prediction_time)->toDateString() : null,
-            'insight' => '',
-        ];
-
-        if (! $champion) {
-            return $base + ['data' => null, 'url' => null, 'details' => null, 'analog' => null, 'metric_label' => null, 'metric_value' => null];
+        if ($picks->count() < $limit) {
+            $usedSymbols = $picks->map(fn (object $s): string => strtoupper((string) $s->symbol))->all();
+            $fallback = $stocks
+                ->reject(fn (object $s): bool => in_array(strtoupper((string) $s->symbol), $usedSymbols, true))
+                ->sortByDesc(fn (object $s): float => is_numeric($s->composite_score ?? null) ? (float) $s->composite_score : (float) ($s->ranking_score ?? -1))
+                ->take($limit - $picks->count());
+            $picks = $picks->concat($fallback);
         }
 
-        $country = strtoupper((string) ($champion->country ?? ''));
-        $expectedReturn = is_numeric($champion->expected_return_20d ?? null) ? (float) $champion->expected_return_20d : null;
+        return $picks->values()
+            ->map(fn (object $stock, int $i): array => $this->buildOpportunityCard($stock, $date, $i + 1))
+            ->all();
+    }
+
+    private function buildOpportunityCard(object $stock, string $date, int $rank): array
+    {
+        $country = strtoupper((string) ($stock->country ?? ''));
+        $expectedReturn = is_numeric($stock->expected_return_20d ?? null) ? (float) $stock->expected_return_20d : null;
 
         // findAnalog() and aggregate() both compare against
         // walk_forward_backtest_trades.predicted_return, a fraction
         // (0.03 = 3%), whereas expected_return_20d here is a whole percent
         // (2.5 = 2.5%) - divide by 100 to match their scale.
         $comparisonReturn = $expectedReturn !== null ? $expectedReturn / 100 : null;
-        $analog = is_numeric($champion->instrument_id ?? null) && $comparisonReturn !== null
-            ? app(\App\Services\TodayHighlightsBuilder::class)->findAnalog((int) $champion->instrument_id, $champion->symbol, $comparisonReturn, $date)
+        $analog = is_numeric($stock->instrument_id ?? null) && $comparisonReturn !== null
+            ? app(\App\Services\TodayHighlightsBuilder::class)->findAnalog((int) $stock->instrument_id, $stock->symbol, $comparisonReturn, $date)
             : null;
         // A single nearest case is anecdotal; this aggregates the 20
-        // closest-magnitude historical BUY signals into a win-rate/average
-        // outcome instead - an independent "does history back this up"
-        // read shown next to composite_score, not folded into it.
+        // closest-magnitude historical BUY signals (across ALL stocks) into
+        // a win-rate/average outcome instead - an independent "does history
+        // back this up" read shown next to composite_score, not folded
+        // into it.
         $historicalStats = $comparisonReturn !== null
             ? app(\App\Services\HistoricalAnalogStatsService::class)->aggregate($comparisonReturn, 20, $date)
             : null;
 
-        return $base + [
-            'data' => $champion->symbol,
-            'url' => route('stocks.show', ['symbol' => $champion->symbol, 'return_to' => '/dashboard/concept']),
+        return [
+            'label' => __('Trading Opportunities'),
+            'subtitle' => __('Bestätigter Kauf #:rank heute', ['rank' => $rank]),
+            'icon' => 'heroicon-o-bolt',
+            'color' => 'amber',
+            // Top-right date stamp, same spot as the other highlights - the
+            // signal's own prediction_time, not the generic "which trading
+            // day is this batch of cards showing" $date used elsewhere.
+            'date' => isset($stock->prediction_time) ? Carbon::parse($stock->prediction_time)->toDateString() : null,
+            'insight' => '',
+            'data' => $stock->symbol,
+            'url' => route('stocks.show', ['symbol' => $stock->symbol, 'return_to' => '/dashboard/concept']),
             'details' => [
                 'country_flag' => self::COUNTRY_FLAGS[$country] ?? '🌐',
-                'sector' => $champion->sector ?? null,
-                'current_price' => is_numeric($champion->current_price ?? null) ? (float) $champion->current_price : null,
-                'currency' => $champion->currency ?? null,
-                'risk' => is_numeric($champion->risk_percent ?? null) ? round((float) $champion->risk_percent / 10, 1) : null,
-                'confidence' => is_numeric($champion->confidence_percent ?? null) ? round((float) $champion->confidence_percent) : null,
+                'sector' => $stock->sector ?? null,
+                'current_price' => is_numeric($stock->current_price ?? null) ? (float) $stock->current_price : null,
+                'currency' => $stock->currency ?? null,
+                'risk' => is_numeric($stock->risk_percent ?? null) ? round((float) $stock->risk_percent / 10, 1) : null,
+                'confidence' => is_numeric($stock->confidence_percent ?? null) ? round((float) $stock->confidence_percent) : null,
             ],
             'analog' => $analog,
             'historicalStats' => $historicalStats,
-            'compositeScore' => is_numeric($champion->composite_score ?? null) ? (float) $champion->composite_score : null,
+            'compositeScore' => is_numeric($stock->composite_score ?? null) ? (float) $stock->composite_score : null,
             'metric_label' => __('Erwartete Rendite (20T)'),
             'metric_value' => $expectedReturn !== null ? sprintf('%+.1f%%', $expectedReturn) : null,
         ];

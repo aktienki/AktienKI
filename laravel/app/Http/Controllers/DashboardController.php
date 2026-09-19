@@ -1214,19 +1214,26 @@ class DashboardController extends Controller
     }
 
     /**
-     * The single #1 three-factor champion (externally GPT-confirmed BUY +
-     * panel coverage, same composite score/ranking the screener and the main
-     * dashboard card use) - exposed as its own public method so other pages
-     * (the concept dashboard's "Handelsmöglichkeiten" overview) can reuse
-     * the exact same pick instead of recomputing it differently.
+     * The full three-factor ranking (externally GPT-confirmed BUY + panel
+     * coverage, same composite score/ranking the screener and the main
+     * dashboard card use), best first - exposed as its own public method so
+     * other pages (the concept dashboard's "Trading Opportunities" section)
+     * can take the top N instead of just the single champion.
      */
-    public function championSummary(Request $request, ?Collection $remoteDashboardStocks = null): ?object
+    public function championRanking(Request $request, ?Collection $remoteDashboardStocks = null): Collection
     {
         $remoteDashboardStocks ??= $this->remoteDashboardStocks($request);
         $externalConfirmedBuys = $this->externalConfirmedBuys($remoteDashboardStocks);
-        $externalConfirmedRanked = $this->threeFactorRanking($externalConfirmedBuys);
 
-        return $externalConfirmedRanked->first();
+        return $this->threeFactorRanking($externalConfirmedBuys);
+    }
+
+    /**
+     * The single #1 three-factor champion - see championRanking() above.
+     */
+    public function championSummary(Request $request, ?Collection $remoteDashboardStocks = null): ?object
+    {
+        return $this->championRanking($request, $remoteDashboardStocks)->first();
     }
 
     public function signalCockpit(): array
