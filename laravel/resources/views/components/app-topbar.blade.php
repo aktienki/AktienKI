@@ -93,6 +93,7 @@
                         <a href="{{ route('commodities.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-circle-stack class="h-5 w-5 text-amber-400" />{{ __('Rohstoffe') }}</a>
                         <a href="{{ route('sectors.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-building-office-2 class="h-5 w-5 text-cyan-500" />{{ __('Sektoren') }}</a>
                         <a href="{{ route('fundamental.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-document-chart-bar class="h-5 w-5 text-cyan-500" />{{ __('Fundamental') }}</a>
+                        <a href="{{ route('fundamental.distribution') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-chart-bar class="h-5 w-5 text-cyan-500" />{{ __('Verteilung') }}</a>
                         <a href="{{ route('earnings-calendar.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-calendar-days class="h-5 w-5 text-cyan-500" />{{ __('Termine') }}</a>
                     </div>
                 </template>

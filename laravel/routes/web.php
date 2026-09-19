@@ -8,6 +8,7 @@ use App\Http\Controllers\BetaInvitationController;
 use App\Http\Controllers\ChartViewSignalController;
 use App\Http\Controllers\CommodityScreenerController;
 use App\Http\Controllers\EarningsCalendarController;
+use App\Http\Controllers\FundamentalDistributionController;
 use App\Http\Controllers\FundamentalScreenerController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\ContactController;
@@ -409,6 +410,7 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::get('/indizes', IndexScreenerController::class)->name('indices.index');
     Route::get('/rohstoffe', CommodityScreenerController::class)->name('commodities.index');
     Route::get('/fundamental', FundamentalScreenerController::class)->name('fundamental.index');
+    Route::get('/fundamental-verteilung', FundamentalDistributionController::class)->name('fundamental.distribution');
     Route::get('/termine', EarningsCalendarController::class)->name('earnings-calendar.index');
     Route::get('/indizes-neu', IndexScreenerController::class)->name('indices.redesign');
     Route::get('/markt-deep-analysis', MarketDeepAnalysisController::class)->name('markets.deep-analysis');

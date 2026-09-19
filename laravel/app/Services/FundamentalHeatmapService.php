@@ -228,6 +228,88 @@ class FundamentalHeatmapService
         })->all();
     }
 
+    /**
+     * Same universe/filters as build(), but as 4 independent 1D decile
+     * histograms (one bar chart per metric) instead of paired 2D grids -
+     * for the /fundamental-verteilung page, where each metric gets its own
+     * slider instead of sharing an axis with another metric.
+     *
+     * @param  array<string, array{min?: float, max?: float}>  $metricRanges
+     */
+    public function buildHistograms(?string $capGroup = null, ?string $sector = null, ?string $country = null, ?string $region = null, array $metricRanges = [], ?string $search = null): array
+    {
+        $labels = [
+            'trailing_pe' => ['label' => __('KGV'), 'unit' => 'x'],
+            'dividend_yield' => ['label' => __('Dividendenrendite'), 'unit' => '%'],
+            'return_on_equity' => ['label' => __('ROE'), 'unit' => '%'],
+            'earnings_growth' => ['label' => __('Gewinnwachstum'), 'unit' => '%'],
+        ];
+
+        $universe = $this->latestSnapshotPerInstrument()->filter(fn ($row) => $this->hasAllFourMetrics($row))->values();
+        $boundaries = collect($labels)->map(
+            fn ($_, $key) => $this->decileBoundaries($this->sanitizedMetricValues($universe, $key))
+        );
+
+        $baselineRows = $this->latestSnapshotPerInstrument($sector, $country, $region, $search)
+            ->filter(fn ($row) => $this->hasAllFourMetrics($row))->values();
+
+        if ($capGroup !== null && isset(self::CAP_GROUPS[$capGroup])) {
+            $range = self::CAP_GROUPS[$capGroup];
+            $baselineRows = $baselineRows->filter(function ($row) use ($range) {
+                if ($row->market_cap === null) {
+                    return false;
+                }
+
+                return (! isset($range['min']) || $row->market_cap >= $range['min'])
+                    && (! isset($range['max']) || $row->market_cap < $range['max']);
+            })->values();
+        }
+
+        $rows = $this->applyMetricRanges($baselineRows, $metricRanges);
+
+        $buildHistogram = function (string $key, Collection $rowSet) use ($boundaries, $labels): array {
+            $counts = array_fill(0, self::BUCKETS, 0);
+            $used = 0;
+
+            foreach ($rowSet as $row) {
+                $v = $row->{$key};
+                if ($v === null) {
+                    continue;
+                }
+                $bucket = $this->bucketFor($v, $boundaries[$key]);
+                if ($bucket === null) {
+                    continue;
+                }
+                $counts[$bucket]++;
+                $used++;
+            }
+
+            return [
+                'key' => $key,
+                'label' => $labels[$key]['label'],
+                'unit' => $labels[$key]['unit'],
+                'ticks' => $this->axisTicks($key, $boundaries[$key]),
+                'boundaries_raw' => $this->rawBoundaries($key, $boundaries[$key]),
+                'counts' => $counts,
+                'max' => max(1, max($counts)),
+                'instruments_used' => $used,
+            ];
+        };
+
+        return collect(array_keys($labels))->map(function (string $key) use ($rows, $baselineRows, $buildHistogram): array {
+            $current = $buildHistogram($key, $rows);
+            $baseline = $buildHistogram($key, $baselineRows);
+
+            // Same cross-metric "reduced" marking as the heatmaps: a bucket
+            // is greyed if ANY active filter (including from a different
+            // metric's own slider) removed stocks from it, so dragging one
+            // chart's slider visibly affects the other 3 charts too.
+            $reduced = array_map(fn (int $c, int $b) => $c < $b, $current['counts'], $baseline['counts']);
+
+            return [...$current, 'reduced' => $reduced];
+        })->all();
+    }
+
     /** @param  array<string, array{min?: float, max?: float}>  $metricRanges */
     private function applyMetricRanges(Collection $rows, array $metricRanges): Collection
     {
