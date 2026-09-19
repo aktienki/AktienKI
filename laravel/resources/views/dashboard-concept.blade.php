@@ -232,8 +232,6 @@
                 {{ __('Dashboard') }}
                 <small class="text-sm font-bold text-[var(--ak-muted)]" x-text="sectionLabels[active]"></small>
             </h1>
-            <a href="{{ route('dashboard') }}" class="mt-1 inline-flex items-center gap-1 text-[10px] font-black text-cyan-500 hover:text-cyan-400">← {{ __('Zurück zum Dashboard') }}</a>
-            <a href="{{ route('upcoming-events.index') }}" class="mt-1 ml-3 inline-flex items-center gap-1 text-[10px] font-black text-cyan-500 hover:text-cyan-400">{{ __('Anstehende News') }} →</a>
         </header>
 
         {{-- Only this row scrolls internally (min-h-0 lets the grid item
