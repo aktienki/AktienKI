@@ -3,6 +3,12 @@
     $factors = $champion['factors'];
     $indicators = $champion['indicators'];
     $review = $champion['externalReview'] ?? null;
+    $externalTileTone = match ($factors['external_verdict'] ?? null) {
+        'NO_OBJECTION' => "text-{$champion['color']}-500",
+        'CAUTION' => 'text-amber-500',
+        'OBJECTION' => 'text-rose-500',
+        default => 'text-[var(--ak-muted)]',
+    };
 @endphp
 <a href="{{ $champion['url'] }}" class="concept-card relative block p-4 hover:border-{{ $champion['color'] }}-400">
     @if($champion['date'])
@@ -46,7 +52,7 @@
                 </div>
                 <div class="rounded border border-[var(--ak-border)] px-2 py-1.5">
                     <span class="block text-[var(--ak-muted)]">{{ __('Externe Bestätigung') }}</span>
-                    <span class="font-black text-{{ $champion['color'] }}-500">{{ $factors['external_confidence'] !== null ? number_format($factors['external_confidence'], 0, ',', '.').'%' : '–' }}</span>
+                    <span class="font-black {{ $externalTileTone }}">{{ $factors['external_confidence'] !== null ? number_format($factors['external_confidence'], 0, ',', '.').'%' : '–' }}</span>
                 </div>
                 <div class="rounded border border-[var(--ak-border)] px-2 py-1.5">
                     <span class="block text-[var(--ak-muted)]">{{ __('Panel-Perzentil') }}</span>

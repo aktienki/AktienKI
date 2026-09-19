@@ -698,6 +698,28 @@ final class DashboardConceptController extends Controller
         $dashboard = app(DashboardController::class);
         $stocks = $dashboard->remoteDashboardStocks($request);
         $champion = $dashboard->championSummary($request, $stocks);
+        $championIsConfirmed = $champion !== null;
+
+        // No stock currently clears the full three-factor bar most days -
+        // championRanking() requires the external review to match the
+        // stock's exact CURRENT serving_batch_id, which a slower web-
+        // research review often lags behind. Rather than show an empty
+        // hero slot then, fall back in two steps: first to a real BUY with
+        // a completed NO_OBJECTION review (even if from a slightly earlier
+        // batch - it's still an actually-confirmed pick, just not
+        // re-verified against today's exact batch), then to the best
+        // composite_score stock overall if even that doesn't exist. The
+        // card marks both fallback cases explicitly instead of implying
+        // full confirmation.
+        $champion ??= $stocks
+            ->sortByDesc(fn (object $s): array => [
+                (($s->personalized_signal ?? null) === 'BUY'
+                    && ($s->external_review_status ?? null) === 'completed'
+                    && ($s->external_review_verdict ?? null) === 'NO_OBJECTION') ? 1 : 0,
+                is_numeric($s->composite_score ?? null) ? (float) $s->composite_score : (float) ($s->ranking_score ?? -1),
+            ])
+            ->first();
+
         $championInstrumentId = is_numeric($champion->instrument_id ?? null) ? (int) $champion->instrument_id : null;
 
         $highlights = app(TodayHighlightsBuilder::class)->build($date, $championInstrumentId)['highlights'];
@@ -729,7 +751,7 @@ final class DashboardConceptController extends Controller
         return [
             'id' => $id,
             'kind' => 'today-focus',
-            'champion' => $champion ? $this->buildChampionCard($champion, $date) : null,
+            'champion' => $champion ? $this->buildChampionCard($champion, $date, $championIsConfirmed) : null,
             'highlights' => $highlights,
             'opportunities' => $this->tradingOpportunities($request, $date, $stocks, $champion),
         ];
@@ -903,7 +925,7 @@ final class DashboardConceptController extends Controller
      * above the rest of Heute im Fokus with more depth (chart, indicators,
      * external review inline) than the compact highlight cards.
      */
-    private function buildChampionCard(object $champion, string $date): array
+    private function buildChampionCard(object $champion, string $date, bool $isConfirmed = true): array
     {
         $country = strtoupper((string) ($champion->country ?? ''));
         $expectedReturn = is_numeric($champion->expected_return_20d ?? null) ? (float) $champion->expected_return_20d : null;
@@ -911,10 +933,12 @@ final class DashboardConceptController extends Controller
         $builder = app(\App\Services\TodayHighlightsBuilder::class);
 
         return [
-            'label' => __('3-Faktor-Champion'),
-            'subtitle' => __('Intern, extern und über das Panel-Modell bestätigt'),
-            'icon' => 'heroicon-o-trophy',
-            'color' => 'emerald',
+            'label' => $isConfirmed ? __('3-Faktor-Champion') : __('Bester Titel nach Score'),
+            'subtitle' => $isConfirmed
+                ? __('Intern, extern und über das Panel-Modell bestätigt')
+                : __('Kein Titel erfüllt aktuell alle 3 Faktoren – bester Titel nach internem Score'),
+            'icon' => $isConfirmed ? 'heroicon-o-trophy' : 'heroicon-o-star',
+            'color' => $isConfirmed ? 'emerald' : 'cyan',
             'date' => isset($champion->prediction_time) ? Carbon::parse($champion->prediction_time)->toDateString() : null,
             'name' => $champion->name ?? $champion->symbol,
             'url' => route('stocks.show', ['symbol' => $champion->symbol, 'return_to' => '/dashboard/concept']),
@@ -929,6 +953,12 @@ final class DashboardConceptController extends Controller
             'factors' => [
                 'internal_score' => is_numeric($champion->composite_score ?? null) ? (float) $champion->composite_score : null,
                 'external_confidence' => is_numeric($champion->external_review_confidence ?? null) ? (float) $champion->external_review_confidence : null,
+                // The confidence figure alone doesn't say whether the
+                // external review was actually favorable - a CAUTION/
+                // OBJECTION verdict can still carry a high confidence score,
+                // so the card needs the verdict too to color that tile
+                // honestly instead of implying "confirmed" either way.
+                'external_verdict' => ($champion->external_review_status ?? null) === 'completed' ? $champion->external_review_verdict : null,
                 'panel_percentile' => is_numeric($champion->panel_percentile ?? null) ? (float) $champion->panel_percentile : null,
             ],
             'indicators' => $instrumentId ? $builder->technicalIndicators($instrumentId) : null,
