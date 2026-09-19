@@ -807,7 +807,10 @@ final class DashboardConceptController extends Controller
             'subtitle' => __('Bester bestätigter Kauf heute'),
             'icon' => 'heroicon-o-bolt',
             'color' => 'amber',
-            'date' => null,
+            // Top-right date stamp, same spot as the other highlights - the
+            // signal's own prediction_time, not the generic "which trading
+            // day is this batch of cards showing" $date used elsewhere.
+            'date' => isset($champion->prediction_time) ? Carbon::parse($champion->prediction_time)->toDateString() : null,
             'insight' => '',
         ];
 
@@ -818,11 +821,20 @@ final class DashboardConceptController extends Controller
         $country = strtoupper((string) ($champion->country ?? ''));
         $expectedReturn = is_numeric($champion->expected_return_20d ?? null) ? (float) $champion->expected_return_20d : null;
 
-        // findAnalog() compares against walk_forward_backtest_trades.predicted_return,
-        // a fraction (0.03 = 3%), same as expected_return_20d here is a
-        // whole percent (2.5 = 2.5%) - divide by 100 to match its scale.
-        $analog = is_numeric($champion->instrument_id ?? null) && $expectedReturn !== null
-            ? app(\App\Services\TodayHighlightsBuilder::class)->findAnalog((int) $champion->instrument_id, $champion->symbol, $expectedReturn / 100, $date)
+        // findAnalog() and aggregate() both compare against
+        // walk_forward_backtest_trades.predicted_return, a fraction
+        // (0.03 = 3%), whereas expected_return_20d here is a whole percent
+        // (2.5 = 2.5%) - divide by 100 to match their scale.
+        $comparisonReturn = $expectedReturn !== null ? $expectedReturn / 100 : null;
+        $analog = is_numeric($champion->instrument_id ?? null) && $comparisonReturn !== null
+            ? app(\App\Services\TodayHighlightsBuilder::class)->findAnalog((int) $champion->instrument_id, $champion->symbol, $comparisonReturn, $date)
+            : null;
+        // A single nearest case is anecdotal; this aggregates the 20
+        // closest-magnitude historical BUY signals into a win-rate/average
+        // outcome instead - an independent "does history back this up"
+        // read shown next to composite_score, not folded into it.
+        $historicalStats = $comparisonReturn !== null
+            ? app(\App\Services\HistoricalAnalogStatsService::class)->aggregate($comparisonReturn, 20, $date)
             : null;
 
         return $base + [
@@ -837,6 +849,8 @@ final class DashboardConceptController extends Controller
                 'confidence' => is_numeric($champion->confidence_percent ?? null) ? round((float) $champion->confidence_percent) : null,
             ],
             'analog' => $analog,
+            'historicalStats' => $historicalStats,
+            'compositeScore' => is_numeric($champion->composite_score ?? null) ? (float) $champion->composite_score : null,
             'metric_label' => __('Erwartete Rendite (20T)'),
             'metric_value' => $expectedReturn !== null ? sprintf('%+.1f%%', $expectedReturn) : null,
         ];

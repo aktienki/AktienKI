@@ -391,7 +391,12 @@
                                             @endif
 
                                             <div class="mb-2 rounded-lg bg-{{ $highlight['color'] }}-500/[.08] px-2.5 py-2">
-                                                <div class="text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $highlight['metric_label'] }}</div>
+                                                <div class="flex items-center justify-between">
+                                                    <div class="text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ $highlight['metric_label'] }}</div>
+                                                    @if(($highlight['compositeScore'] ?? null) !== null)
+                                                        <div class="text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Score') }} <span class="font-black text-{{ $highlight['color'] }}-500">{{ number_format($highlight['compositeScore'], 0, ',', '.') }}</span></div>
+                                                    @endif
+                                                </div>
                                                 <div class="text-[15px] font-black text-{{ $highlight['color'] }}-500">{{ $highlight['metric_value'] }}</div>
                                             </div>
 
@@ -441,6 +446,16 @@
                                                             <polyline points="{{ $analog['sparkline'] }}" fill="none" stroke="currentColor" stroke-width="3" class="{{ $outcomeClass }}" stroke-linecap="round" stroke-linejoin="round" />
                                                         </svg>
                                                     @endif
+                                                </div>
+                                            @endif
+
+                                            @if($highlight['historicalStats'] ?? null)
+                                                @php $stats = $highlight['historicalStats']; @endphp
+                                                <div class="mb-2 rounded-lg border border-[var(--ak-border)] px-2 py-1.5 text-[9px] leading-4 text-[var(--ak-muted)]">
+                                                    <span class="text-[var(--ak-text)]">•</span>
+                                                    {{ __('Historisch (:n ähnliche Signale)', ['n' => $stats['count']]) }}:
+                                                    <span class="font-black {{ $stats['win_rate'] >= 50 ? 'text-emerald-500' : 'text-rose-500' }}">{{ number_format($stats['win_rate'], 0, ',', '.') }}%</span> {{ __('positiv') }}
+                                                    · Ø <span class="font-black {{ $stats['avg_return'] >= 0 ? 'text-emerald-500' : 'text-rose-500' }}">{{ $stats['avg_return'] >= 0 ? '+' : '' }}{{ number_format($stats['avg_return'], 1, ',', '.') }}%</span>
                                                 </div>
                                             @endif
 
