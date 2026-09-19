@@ -776,10 +776,62 @@ final class DashboardConceptController extends Controller
             'events' => $weekEvents->all(),
         ];
 
+        $highlights[] = $this->tradingOpportunityHighlight($request);
+
         return [
             'id' => $id,
             'kind' => 'today-focus',
             'highlights' => $highlights,
+        ];
+    }
+
+    /**
+     * The single #1 pick, in the same highlight-card shape as the others
+     * above - reuses DashboardController::championSummary() (externally
+     * GPT-confirmed BUY + panel coverage, same composite score the screener
+     * and main dashboard show), so this never disagrees with those pages
+     * about which stock is "best". Falls back to the plain highest
+     * composite_score stock when no external-confirmed champion exists
+     * (a fairly strict gate that's often empty) - "best available", not
+     * "no data", is still the more useful answer for a "pick one" card.
+     */
+    private function tradingOpportunityHighlight(Request $request): array
+    {
+        $dashboard = app(DashboardController::class);
+        $stocks = $dashboard->remoteDashboardStocks($request);
+        $champion = $dashboard->championSummary($request, $stocks)
+            ?? $stocks->sortByDesc(fn (object $s): float => is_numeric($s->composite_score ?? null) ? (float) $s->composite_score : (float) ($s->ranking_score ?? -1))->first();
+
+        $base = [
+            'label' => __('Trading Opportunities'),
+            'subtitle' => __('Bester bestätigter Kauf heute'),
+            'icon' => 'heroicon-o-bolt',
+            'color' => 'amber',
+            'date' => null,
+            'insight' => '',
+        ];
+
+        if (! $champion) {
+            return $base + ['data' => null, 'url' => null, 'details' => null, 'analog' => null, 'metric_label' => null, 'metric_value' => null];
+        }
+
+        $country = strtoupper((string) ($champion->country ?? ''));
+        $expectedReturn = is_numeric($champion->expected_return_20d ?? null) ? (float) $champion->expected_return_20d : null;
+
+        return $base + [
+            'data' => $champion->symbol,
+            'url' => route('stocks.show', ['symbol' => $champion->symbol, 'return_to' => '/dashboard/concept']),
+            'details' => [
+                'country_flag' => self::COUNTRY_FLAGS[$country] ?? '🌐',
+                'sector' => $champion->sector ?? null,
+                'current_price' => is_numeric($champion->current_price ?? null) ? (float) $champion->current_price : null,
+                'currency' => $champion->currency ?? null,
+                'risk' => is_numeric($champion->risk_percent ?? null) ? round((float) $champion->risk_percent / 10, 1) : null,
+                'confidence' => is_numeric($champion->confidence_percent ?? null) ? round((float) $champion->confidence_percent) : null,
+            ],
+            'analog' => null,
+            'metric_label' => __('Erwartete Rendite (20T)'),
+            'metric_value' => $expectedReturn !== null ? sprintf('%+.1f%%', $expectedReturn) : null,
         ];
     }
 
