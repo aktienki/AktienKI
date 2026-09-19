@@ -869,6 +869,14 @@ final class DashboardConceptController extends Controller
             'analog' => $analog,
             'historicalStats' => $historicalStats,
             'compositeScore' => is_numeric($stock->composite_score ?? null) ? (float) $stock->composite_score : null,
+            'externalReview' => ($stock->external_review_status ?? null) === 'completed' ? [
+                'verdict' => $stock->external_review_verdict,
+                'summary' => $stock->external_review_summary,
+                'confidence' => $stock->external_review_confidence,
+                'positive_factors' => $stock->external_review_positive_factors ?? [],
+                'risk_factors' => $stock->external_review_risk_factors ?? [],
+                'researched_at' => $stock->external_review_researched_at ?? $stock->external_review_triggered_at ?? null,
+            ] : null,
             'metric_label' => __('Erwartete Rendite (20T)'),
             'metric_value' => $expectedReturn !== null ? sprintf('%+.1f%%', $expectedReturn) : null,
         ];

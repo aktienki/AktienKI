@@ -194,8 +194,57 @@
             </div>
         @endif
 
-        @if($highlight['insight'])
-            <div class="mt-auto pt-2 border-t border-[var(--ak-border)] text-[9px] leading-4 text-[var(--ak-muted)]">{{ $highlight['insight'] }}</div>
+        @if($highlight['insight'] || ($highlight['externalReview'] ?? null))
+            <div class="mt-auto border-t border-[var(--ak-border)] pt-2">
+                @if($highlight['insight'])
+                    <div class="text-[9px] leading-4 text-[var(--ak-muted)]">{{ $highlight['insight'] }}</div>
+                @endif
+                @if($highlight['externalReview'] ?? null)
+                    @php
+                        $review = $highlight['externalReview'];
+                        [$reviewLabel, $reviewTone] = match ($review['verdict']) {
+                            'NO_OBJECTION' => [__('Kein Einwand'), 'border-emerald-400/35 bg-emerald-400/10 text-emerald-500'],
+                            'CAUTION' => [__('Vorsicht'), 'border-amber-400/35 bg-amber-400/10 text-amber-500'],
+                            'OBJECTION' => [__('Einwand'), 'border-rose-400/35 bg-rose-400/10 text-rose-500'],
+                            default => [__('Unklar'), 'border-slate-400/25 bg-slate-400/10 text-[var(--ak-muted)]'],
+                        };
+                    @endphp
+                    {{-- Closed by default (no `open` attribute) - a rating, not
+                         something that should push the card's own content down
+                         on first view. stopPropagation keeps toggling it from
+                         also triggering the card's own <a> navigation. --}}
+                    <details onclick="event.stopPropagation()" class="{{ $highlight['insight'] ? 'mt-2' : '' }} rounded-lg border border-[var(--ak-border)] px-2 py-1.5 text-[9px]">
+                        <summary class="flex cursor-pointer list-none items-center gap-1.5">
+                            <span class="rounded border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide {{ $reviewTone }}">{{ $reviewLabel }}</span>
+                            <span class="min-w-0 flex-1 truncate text-[var(--ak-muted)]">{{ __('Externe Bewertung') }}</span>
+                            <span class="shrink-0 text-[var(--ak-muted)]">▾</span>
+                        </summary>
+                        <div class="mt-2 space-y-1.5 leading-4 text-[var(--ak-muted)]">
+                            @if($review['summary'])
+                                <p>{{ $review['summary'] }}</p>
+                            @endif
+                            @foreach ([
+                                [__('Positiv'), $review['positive_factors'], 'text-emerald-500'],
+                                [__('Risiko'), $review['risk_factors'], 'text-rose-500'],
+                            ] as [$factorTitle, $factorItems, $factorTone])
+                                @if(count($factorItems))
+                                    <div>
+                                        <span class="font-black {{ $factorTone }}">{{ $factorTitle }}:</span>
+                                        {{ implode(' · ', array_slice($factorItems, 0, 2)) }}
+                                    </div>
+                                @endif
+                            @endforeach
+                            @if($review['confidence'] !== null || $review['researched_at'])
+                                <p class="text-[8px]">
+                                    @if($review['confidence'] !== null){{ $review['confidence'] }}% {{ __('Konfidenz') }}@endif
+                                    @if($review['confidence'] !== null && $review['researched_at']) · @endif
+                                    @if($review['researched_at']){{ \Illuminate\Support\Carbon::parse($review['researched_at'])->format('d.m.Y') }}@endif
+                                </p>
+                            @endif
+                        </div>
+                    </details>
+                @endif
+            </div>
         @endif
     @else
         <div class="flex flex-1 items-center justify-center text-[9px] text-[var(--ak-muted)] italic">{{ __('Keine Daten heute') }}</div>

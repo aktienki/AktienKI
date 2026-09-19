@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ExternalBuyReview;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -60,6 +61,7 @@ final class TodayHighlightsBuilder
                 'url' => route('stocks.show', ['symbol' => $topBuy->symbol, 'return_to' => '/dashboard/concept']),
                 'details' => $this->enrich((int) $topBuy->instrument_id),
                 'analog' => $this->findAnalog((int) $topBuy->instrument_id, $topBuy->symbol, (float) $topBuy->expected_return, $date),
+                'externalReview' => $this->externalReview((int) $topBuy->instrument_id),
             ];
         }
 
@@ -85,6 +87,7 @@ final class TodayHighlightsBuilder
                 'url' => route('stocks.show', ['symbol' => $holdingSwings->symbol, 'return_to' => '/dashboard/concept']),
                 'details' => $this->enrich((int) $holdingSwings->instrument_id),
                 'analog' => $this->findAnalog((int) $holdingSwings->instrument_id, $holdingSwings->symbol, (float) $holdingSwings->perf_pct / 100, $date),
+                'externalReview' => $this->externalReview((int) $holdingSwings->instrument_id),
             ];
         }
 
@@ -104,6 +107,7 @@ final class TodayHighlightsBuilder
                 'url' => route('stocks.show', ['symbol' => $surprise->symbol, 'return_to' => '/dashboard/concept']),
                 'details' => $this->enrich((int) $surprise->instrument_id),
                 'analog' => $this->findAnalog((int) $surprise->instrument_id, $surprise->symbol, (float) $surprise->expected_return, $date),
+                'externalReview' => $this->externalReview((int) $surprise->instrument_id),
             ];
         }
 
@@ -121,6 +125,7 @@ final class TodayHighlightsBuilder
                 'url' => route('stocks.show', ['symbol' => $trendSwitchRow->symbol, 'return_to' => '/dashboard/concept']),
                 'details' => $this->enrich((int) $trendSwitchRow->instrument_id),
                 'analog' => $this->findAnalog((int) $trendSwitchRow->instrument_id, $trendSwitchRow->symbol, (float) ($trendSwitchRow->expected_return ?? 0), $date),
+                'externalReview' => $this->externalReview((int) $trendSwitchRow->instrument_id),
             ];
         }
 
@@ -135,6 +140,7 @@ final class TodayHighlightsBuilder
                 'url' => $topSignal['url'] ?? null,
                 'details' => $topSignal['details'] ?? null,
                 'analog' => $topSignal['analog'] ?? null,
+                'externalReview' => $topSignal['externalReview'] ?? null,
                 'metric_label' => __('Erwartete Rendite'),
                 'metric_value' => $topSignal ? sprintf('+%.1f%%', $topSignal['return']) : null,
             ],
@@ -148,6 +154,7 @@ final class TodayHighlightsBuilder
                 'url' => $swingStock['url'] ?? null,
                 'details' => $swingStock['details'] ?? null,
                 'analog' => $swingStock['analog'] ?? null,
+                'externalReview' => $swingStock['externalReview'] ?? null,
                 'metric_label' => __('Performance seit Kauf'),
                 'metric_value' => $swingStock ? sprintf('%+.1f%%', $swingStock['perf_pct']) : null,
             ],
@@ -161,6 +168,7 @@ final class TodayHighlightsBuilder
                 'url' => $surpriseSignal['url'] ?? null,
                 'details' => $surpriseSignal['details'] ?? null,
                 'analog' => $surpriseSignal['analog'] ?? null,
+                'externalReview' => $surpriseSignal['externalReview'] ?? null,
                 'metric_label' => __('Erwartete Rendite'),
                 'metric_value' => $surpriseSignal ? sprintf('+%.1f%%', $surpriseSignal['return']) : null,
             ],
@@ -174,6 +182,7 @@ final class TodayHighlightsBuilder
                 'url' => $trendSwitch['url'] ?? null,
                 'details' => $trendSwitch['details'] ?? null,
                 'analog' => $trendSwitch['analog'] ?? null,
+                'externalReview' => $trendSwitch['externalReview'] ?? null,
                 'metric_label' => __('Neues Signal'),
                 'metric_value' => $trendSwitch ? __('BUY') : null,
             ],
@@ -419,6 +428,35 @@ final class TodayHighlightsBuilder
             'confidence' => is_numeric($serving?->confidence ?? null)
                 ? round((float) $serving->confidence <= 1 ? (float) $serving->confidence * 100 : (float) $serving->confidence)
                 : null,
+        ];
+    }
+
+    /**
+     * The independent web-research check for a current BUY signal (see
+     * ServingScreenerService::applyExternalReviewAdjustments() for the same
+     * lookup applied across the whole screener). Only completed reviews are
+     * shown - a pending/failed one isn't useful as a rating on its own.
+     */
+    private function externalReview(int $instrumentId): ?array
+    {
+        $review = ExternalBuyReview::query()
+            ->where('instrument_id', $instrumentId)
+            ->where('status', 'completed')
+            ->orderByDesc('triggered_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $review) {
+            return null;
+        }
+
+        return [
+            'verdict' => $review->verdict,
+            'summary' => $review->summary,
+            'confidence' => $review->confidence,
+            'positive_factors' => $review->positive_factors ?? [],
+            'risk_factors' => $review->risk_factors ?? [],
+            'researched_at' => $review->researched_at ?? $review->triggered_at,
         ];
     }
 }
