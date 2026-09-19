@@ -83,7 +83,7 @@
                 <x-heroicon-o-squares-2x2 /><span>Dashboard</span>
             </a>
             <div x-data="{open:false,left:0,top:0,toggle(){const b=this.$refs.trigger.getBoundingClientRect();this.left=b.left;this.top=b.bottom+8;this.open=!this.open}}" @click.outside="open=false" data-nav-key="screener" class="relative shrink-0">
-                <button x-ref="trigger" type="button" @click="toggle()" class="{{ request()->routeIs('screener.*', 'indices.*', 'sectors.*', 'commodities.*', 'fundamental.*', 'earnings-calendar.*') ? 'ak-top-link-active' : 'ak-top-link' }}" :aria-expanded="open">
+                <button x-ref="trigger" type="button" @click="toggle()" class="{{ request()->routeIs('screener.*', 'indices.*', 'sectors.*', 'commodities.*', 'fundamental.*') ? 'ak-top-link-active' : 'ak-top-link' }}" :aria-expanded="open">
                     <x-heroicon-o-funnel /><span>{{ __('Screener') }}</span><x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition" x-bind:class="{'rotate-180':open}" />
                 </button>
                 <template x-teleport="body">
@@ -93,7 +93,6 @@
                         <a href="{{ route('commodities.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-circle-stack class="h-5 w-5 text-amber-400" />{{ __('Rohstoffe') }}</a>
                         <a href="{{ route('sectors.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-building-office-2 class="h-5 w-5 text-cyan-500" />{{ __('Sektoren') }}</a>
                         <a href="{{ route('fundamental.index') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-document-chart-bar class="h-5 w-5 text-cyan-500" />{{ __('Fundamental') }}</a>
-                        <a href="{{ route('fundamental.distribution') }}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[var(--ak-text)] transition hover:bg-teal-500/10 hover:text-teal-500"><x-heroicon-o-chart-bar class="h-5 w-5 text-cyan-500" />{{ __('Verteilung') }}</a>
                     </div>
                 </template>
             </div>

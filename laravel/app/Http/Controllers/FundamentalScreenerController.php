@@ -24,17 +24,18 @@ final class FundamentalScreenerController extends Controller
         $ratios = null;
         $kennzahlenTrend = [];
         $nextEarnings = null;
-        $panels = [];
         $capGroup = $request->query('cap');
         $capGroup = in_array($capGroup, array_keys(FundamentalHeatmapService::CAP_GROUPS), true) ? $capGroup : null;
         $sector = $request->query('sector') ?: null;
         $country = $request->query('country') ?: null;
         $region = $request->query('region');
         $region = isset(FundamentalHeatmapService::REGIONS[$region]) ? $region : null;
+        $search = $request->query('q');
 
-        // Real-value min/max per metric, set by dragging a heatmap axis line
-        // (released -> page reload). market cap travels in Mrd. in the URL
-        // for readability, converted back to raw currency here.
+        // Real-value min/max per metric, set by dragging a heatmap/
+        // distribution axis line (released -> page reload). market cap
+        // travels in Mrd. in the URL for readability, converted back to
+        // raw currency here.
         $metricRanges = [];
         $metricParams = ['pe' => 'trailing_pe', 'dy' => 'dividend_yield', 'roe' => 'return_on_equity', 'eg' => 'earnings_growth', 'mc' => 'market_cap'];
         foreach ($metricParams as $param => $key) {
@@ -52,26 +53,25 @@ final class FundamentalScreenerController extends Controller
             }
         }
 
-        $table = [];
-        $filterOptions = ['sectors' => [], 'countries' => []];
-
-        if (! $selected) {
-            $search = $request->query('q');
-            $panels = $heatmaps->build($capGroup, $sector, $country, $region, $metricRanges, $search);
-            $filterOptions = $heatmaps->filterOptions();
-            $table = $heatmaps->table(
-                $capGroup,
-                (string) $request->query('sort', 'market_cap'),
-                (string) $request->query('dir', 'desc'),
-                $search,
-                max(1, (int) $request->query('page', 1)),
-                50,
-                $sector,
-                $country,
-                $region,
-                $metricRanges,
-            );
-        }
+        // Heatmaps/Verteilung/Termine are universe-wide views, reachable
+        // from the left nav regardless of whether a stock is selected - not
+        // just on the bare overview - so all 3 are always built.
+        $panels = $heatmaps->build($capGroup, $sector, $country, $region, $metricRanges, $search);
+        $histograms = $heatmaps->buildHistograms($capGroup, $sector, $country, $region, $metricRanges, $search);
+        $filterOptions = $heatmaps->filterOptions();
+        $table = $heatmaps->table(
+            $capGroup,
+            (string) $request->query('sort', 'market_cap'),
+            (string) $request->query('dir', 'desc'),
+            $search,
+            max(1, (int) $request->query('page', 1)),
+            50,
+            $sector,
+            $country,
+            $region,
+            $metricRanges,
+        );
+        $calendarData = $calendar->upcoming();
 
         if ($selected) {
             $years = $cards->forInstrument($selected->id);
@@ -99,7 +99,9 @@ final class FundamentalScreenerController extends Controller
             'ratios' => $ratios,
             'kennzahlenTrend' => $kennzahlenTrend,
             'nextEarnings' => $nextEarnings,
+            'calendarData' => $calendarData,
             'panels' => $panels,
+            'histograms' => $histograms,
             'capGroup' => $capGroup,
             'sector' => $sector,
             'country' => $country,
