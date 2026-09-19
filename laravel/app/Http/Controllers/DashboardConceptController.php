@@ -35,6 +35,7 @@ final class DashboardConceptController extends Controller
     /** The core navigation destinations for the left column. */
     private const LEFT_COLUMN_ICONS = [
         ['today-focus', 'Heute im Fokus', 'heroicon-o-fire'],
+        ['termine', 'Termine', 'heroicon-o-calendar-days'],
         ['market-report', 'Aktuelle Marktlage', 'heroicon-o-globe-europe-africa'],
         ['chartview', 'ChartView', 'heroicon-o-chart-bar-square'],
         ['pattern-analysis', 'Muster & Wahrscheinlichkeiten', 'heroicon-o-puzzle-piece'],
@@ -75,6 +76,7 @@ final class DashboardConceptController extends Controller
 
         $sections = collect([
             $this->todayFocusSection('today-focus', $request),
+            $this->terminSection('termine', $request),
             $this->chartPatternSection('chartview'),
             $this->patternAnalysisSection('pattern-analysis'),
             $this->marketSection('market-report', $snapshot),
@@ -718,22 +720,29 @@ final class DashboardConceptController extends Controller
             fn (array $h): bool => ($h['kind'] ?? null) === 'indicators' ? $h['indicators'] !== null : $h['data'] !== null,
         ));
 
-        // Reuses classicDashboardSection()'s own data source
-        // (DashboardController::buildViewData()'s strategyPositionEvents,
-        // itself earnings + planned-sell events over the next 21 days) -
-        // narrowed here to the next 7 days ("diese Woche") instead of
-        // duplicating that query with a different window. Appended after
-        // the insight-analysis/date-stamping above since this card is
-        // forward-looking (not "yesterday's trading day" like the rest)
-        // and has no AI narrative to align by index with.
-        $weekEvents = app(DashboardController::class)->buildViewData($request)['strategyPositionEvents']
-            ->filter(fn (array $event): bool => $event['sort_at'] <= now()->addDays(7)->toDateString())
-            ->take(6)
-            ->values();
+        return [
+            'id' => $id,
+            'kind' => 'today-focus',
+            'highlights' => $highlights,
+            'opportunities' => $this->tradingOpportunities($request, $date),
+        ];
+    }
 
-        if ($weekEvents->isNotEmpty()) {
+    /**
+     * Earnings + planned-sell events, with the per-event reminder toggle -
+     * moved out of "Heute im Fokus" into its own left-nav destination so it
+     * isn't squeezed into a small tile (was narrowed to 7 days/6 items for
+     * that reason; now shows the full underlying 21-day window). Same data
+     * source as classicDashboardSection() (DashboardController::
+     * buildViewData()'s strategyPositionEvents).
+     */
+    private function terminSection(string $id, Request $request): array
+    {
+        $events = app(DashboardController::class)->buildViewData($request)['strategyPositionEvents']->values();
+
+        if ($events->isNotEmpty()) {
             $symbolToInstrumentId = \DB::table('instruments')
-                ->whereIn('symbol', $weekEvents->pluck('symbol')->unique())
+                ->whereIn('symbol', $events->pluck('symbol')->unique())
                 ->pluck('id', 'symbol');
             $userId = $request->user()?->id;
             $reminderStates = $userId
@@ -743,7 +752,7 @@ final class DashboardConceptController extends Controller
                     ->keyBy(fn ($r) => $r->event_type.':'.$r->reference_id)
                 : collect();
 
-            $weekEvents = $weekEvents->map(function (array $event) use ($symbolToInstrumentId, $reminderStates): array {
+            $events = $events->map(function (array $event) use ($symbolToInstrumentId, $reminderStates): array {
                 // upcomingPositionEvents() ids are "earnings-{corporate_event_id}"
                 // / "exit-{position_id}" - the numeric suffix is the reference_id
                 // calendar_event_reminders needs, and 'exit' maps to the
@@ -760,27 +769,10 @@ final class DashboardConceptController extends Controller
             });
         }
 
-        // Always shown, unlike the other highlights above - an empty week
-        // is itself useful information ("nothing due"), not a broken state
-        // to hide.
-        $highlights[] = [
-            'kind' => 'upcoming-events',
-            'label' => __('Diese Woche'),
-            'subtitle' => __('Quartalszahlen & geplante Verkäufe'),
-            'icon' => 'heroicon-o-calendar-days',
-            'color' => 'cyan',
-            'url' => null,
-            'data' => null,
-            'date' => null,
-            'insight' => '',
-            'events' => $weekEvents->all(),
-        ];
-
         return [
             'id' => $id,
-            'kind' => 'today-focus',
-            'highlights' => $highlights,
-            'opportunities' => $this->tradingOpportunities($request, $date),
+            'kind' => 'termine',
+            'events' => $events->all(),
         ];
     }
 
@@ -864,6 +856,7 @@ final class DashboardConceptController extends Controller
             'date' => isset($stock->prediction_time) ? Carbon::parse($stock->prediction_time)->toDateString() : null,
             'insight' => '',
             'data' => $stock->symbol,
+            'name' => $stock->name ?? $stock->symbol,
             'url' => route('stocks.show', ['symbol' => $stock->symbol, 'return_to' => '/dashboard/concept']),
             'details' => [
                 'country_flag' => self::COUNTRY_FLAGS[$country] ?? '🌐',

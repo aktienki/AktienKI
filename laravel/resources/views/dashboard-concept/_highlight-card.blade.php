@@ -109,8 +109,8 @@
         @endif
     @elseif($highlight['data'] && $details)
         <div class="flex items-center gap-1.5 mb-2">
-            <span class="text-base leading-none">{{ $details['country_flag'] }}</span>
-            <span class="text-[13px] font-black text-[var(--ak-text)]">{{ explode(' ', $highlight['data'])[0] }}</span>
+            <span class="text-base leading-none shrink-0">{{ $details['country_flag'] }}</span>
+            <span class="min-w-0 flex-1 truncate text-[13px] font-black text-[var(--ak-text)]">{{ $highlight['name'] ?? explode(' ', $highlight['data'])[0] }}</span>
         </div>
         @if($details['sector'])
             <div class="text-[9px] uppercase tracking-wide text-[var(--ak-muted)] mb-2">{{ $details['sector'] }}</div>

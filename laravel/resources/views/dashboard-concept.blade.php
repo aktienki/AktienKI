@@ -289,6 +289,76 @@
                                     </div>
                                 </div>
                             @endif
+                        @elseif($section['kind'] === 'termine')
+                            @if(count($section['events']) === 0)
+                                <div class="concept-empty">{{ __('Aktuell keine Termine.') }}</div>
+                            @endif
+                            <div class="grid gap-1.5 sm:grid-cols-2">
+                                @foreach($section['events'] as $event)
+                                    <div
+                                        x-data="{
+                                            open: false,
+                                            enabled: {{ $event['reminder_enabled'] ? 'true' : 'false' }},
+                                            saving: false,
+                                            async toggle() {
+                                                this.saving = true;
+                                                try {
+                                                    const response = await fetch('{{ route('calendar-event-reminders.toggle') }}', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=\'csrf-token\']')?.content || '' },
+                                                        body: JSON.stringify({ event_type: '{{ $event['reminder_type'] }}', reference_id: {{ $event['reference_id'] }}, instrument_id: {{ $event['instrument_id'] ?? 'null' }}, event_date: '{{ $event['date'] }}' }),
+                                                    });
+                                                    if (response.ok) { const payload = await response.json(); this.enabled = payload.enabled; this.open = false; }
+                                                } finally { this.saving = false; }
+                                            },
+                                        }"
+                                        class="relative flex items-center gap-2 rounded-lg border border-[var(--ak-border)] px-2.5 py-2"
+                                    >
+                                        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-md {{ $event['type'] === 'earnings' ? 'bg-cyan-400/10 text-cyan-500' : 'bg-amber-400/10 text-amber-500' }}">
+                                            @if($event['type'] === 'earnings')
+                                                <x-heroicon-o-chart-bar class="h-3.5 w-3.5" />
+                                            @else
+                                                <x-heroicon-o-banknotes class="h-3.5 w-3.5" />
+                                            @endif
+                                        </span>
+                                        <span class="min-w-0 flex-1">
+                                            <b class="block truncate text-[10px] text-[var(--ak-text)]">{{ $event['symbol'] }} · {{ $event['label'] }}</b>
+                                            <small class="block truncate text-[8px] text-[var(--ak-muted)]">{{ $event['schedule'] }}</small>
+                                        </span>
+                                        <button
+                                            type="button"
+                                            @click="open = true"
+                                            :class="enabled ? 'text-cyan-500' : 'text-[var(--ak-muted)]'"
+                                            class="grid h-6 w-6 shrink-0 place-items-center rounded-md hover:text-cyan-400"
+                                            :title="enabled ? '{{ __('Erinnerung aktiv') }}' : '{{ __('Erinnerung inaktiv') }}'"
+                                        >
+                                            <x-heroicon-o-bell class="h-3.5 w-3.5" x-show="!enabled" x-cloak />
+                                            <x-heroicon-s-bell class="h-3.5 w-3.5" x-show="enabled" x-cloak />
+                                        </button>
+
+                                        <div x-show="open" x-cloak @click.self="open = false" class="ak-modal-overlay fixed inset-0 z-[190] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+                                            <div class="ak-modal-panel w-full max-w-xs rounded-2xl border border-cyan-400/35 bg-[var(--ak-card)] p-4 text-[var(--ak-text)] shadow-2xl" @click.stop>
+                                                <p class="text-sm font-black">{{ $event['symbol'] }} · {{ $event['label'] }}</p>
+                                                <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ $event['schedule'] }}</p>
+                                                <p class="mt-2 text-[10px] leading-4 text-[var(--ak-muted)]">
+                                                    @if($event['type'] === 'earnings')
+                                                        {{ __('E-Mail-Erinnerung am Vortag der Quartalszahlen.') }}
+                                                    @else
+                                                        {{ __('E-Mail-Erinnerung am Tag des geplanten Verkaufs.') }}
+                                                    @endif
+                                                </p>
+                                                <div class="mt-3 flex justify-end gap-2">
+                                                    <button type="button" @click="open = false" class="rounded-lg border border-[var(--ak-border)] px-3 py-1.5 text-[10px] font-black text-[var(--ak-muted)]">{{ __('Schließen') }}</button>
+                                                    <button type="button" @click="toggle()" :disabled="saving" class="rounded-lg px-3 py-1.5 text-[10px] font-black text-slate-950 disabled:opacity-50" :class="enabled ? 'bg-rose-400' : 'bg-cyan-400'">
+                                                        <span x-show="!saving" x-text="enabled ? '{{ __('Erinnerung deaktivieren') }}' : '{{ __('Erinnerung aktivieren') }}'"></span>
+                                                        <span x-show="saving" x-cloak>{{ __('Speichert …') }}</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
                         @elseif($section['kind'] === 'list')
                             @if(count($section['items']))
                                 <div class="grid gap-1.5 sm:grid-cols-2">
