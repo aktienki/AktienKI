@@ -21,6 +21,17 @@
                     <small>{{ __('Kein Symbol') }}</small>
                 </div>
             @endif
+            @if($selected)
+                <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'termine' }" @click="active = 'termine'">
+                    <x-heroicon-o-calendar-days class="h-5 w-5" />
+                    <small>{{ __('Termine') }}</small>
+                </button>
+            @else
+                <a href="{{ route('earnings-calendar.index') }}" class="fundamental-symbol-tile" title="{{ __('Alle anstehenden Termine') }}">
+                    <x-heroicon-o-calendar-days class="h-5 w-5" />
+                    <small>{{ __('Termine') }}</small>
+                </a>
+            @endif
             <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'ratios' }" @click="active = 'ratios'" @if(!$selected) disabled @endif>
                 <x-heroicon-o-calculator class="h-5 w-5" />
                 <small>{{ __('Kennzahlen') }}</small>
@@ -28,10 +39,6 @@
             <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'quarters' }" @click="active = 'quarters'" @if(!$selected) disabled @endif>
                 <x-heroicon-o-document-chart-bar class="h-5 w-5" />
                 <small>{{ __('Quartalszahlen') }}</small>
-            </button>
-            <button type="button" class="fundamental-symbol-tile" :class="{ 'is-active': active === 'termine' }" @click="active = 'termine'" @if(!$selected) disabled @endif>
-                <x-heroicon-o-calendar-days class="h-5 w-5" />
-                <small>{{ __('Termine') }}</small>
             </button>
         </nav>
 
