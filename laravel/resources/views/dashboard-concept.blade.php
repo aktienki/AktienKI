@@ -226,11 +226,12 @@
         }
     </style>
 
-    <div id="dashboard-concept-page" x-data="{ active: 'today-focus' }" class="flex min-h-[calc(100dvh-73px)] flex-col xl:h-[calc(100dvh-89px)] xl:min-h-0">
+    <div id="dashboard-concept-page" x-data="{ active: 'today-focus', sectionLabels: {{ json_encode($leftIcons->pluck('label', 'id')) }} }" class="flex min-h-[calc(100dvh-73px)] flex-col xl:h-[calc(100dvh-89px)] xl:min-h-0">
         <header class="mb-5 shrink-0">
-            <p class="text-[10px] font-black uppercase tracking-[.16em] text-cyan-500">{{ __('Konzept') }}</p>
-            <h1 class="mt-1 text-2xl font-black text-[var(--ak-text)]">{{ __('Persönlicher Bereich') }}</h1>
-            <p class="mt-1 text-xs text-[var(--ak-muted)]">{{ __('Links: 1×8-Symbolraster. Ein Klick auf ein Symbol wechselt den Inhalt rechts zur Kurzübersicht dieses Bereichs.') }}</p>
+            <h1 class="flex items-baseline gap-2 text-2xl font-black text-[var(--ak-text)]">
+                {{ __('Dashboard') }}
+                <small class="text-sm font-bold text-[var(--ak-muted)]" x-text="sectionLabels[active]"></small>
+            </h1>
             <a href="{{ route('dashboard') }}" class="mt-1 inline-flex items-center gap-1 text-[10px] font-black text-cyan-500 hover:text-cyan-400">← {{ __('Zurück zum Dashboard') }}</a>
             <a href="{{ route('upcoming-events.index') }}" class="mt-1 ml-3 inline-flex items-center gap-1 text-[10px] font-black text-cyan-500 hover:text-cyan-400">{{ __('Anstehende News') }} →</a>
         </header>
