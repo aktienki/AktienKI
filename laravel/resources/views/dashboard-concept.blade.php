@@ -269,6 +269,12 @@
                         </div>
 
                         @if($section['kind'] === 'today-focus')
+                            @if($section['champion'] ?? null)
+                                <div class="mb-5">
+                                    @include('dashboard-concept._champion-card', ['champion' => $section['champion']])
+                                </div>
+                            @endif
+
                             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
                                 @foreach($section['highlights'] as $highlight)
                                     @include('dashboard-concept._highlight-card', ['highlight' => $highlight])

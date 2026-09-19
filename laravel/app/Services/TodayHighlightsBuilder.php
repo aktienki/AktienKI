@@ -24,7 +24,13 @@ final class TodayHighlightsBuilder
 
     public function __construct(private readonly ChartPatternSignalService $patterns) {}
 
-    public function build(?string $date = null): array
+    /**
+     * $excludeInstrumentId lets the concept dashboard keep its full-width
+     * "3-Faktor-Champion" hero card from also being re-picked as one of
+     * these highlights - each query/selection below falls through to its
+     * next-best alternative instead of showing the same stock twice.
+     */
+    public function build(?string $date = null, ?int $excludeInstrumentId = null): array
     {
         $date ??= now()->toDateString();
 
@@ -36,6 +42,7 @@ final class TodayHighlightsBuilder
         $topBuy = DB::table('today_highlights_mv')
             ->where('serving_signal', 'BUY')
             ->whereDate('prediction_date', $date)
+            ->when($excludeInstrumentId, fn ($q) => $q->where('instrument_id', '!=', $excludeInstrumentId))
             ->orderByDesc('expected_return')
             ->select('instrument_id', 'expected_return', 'symbol', 'name')
             ->first();
@@ -48,7 +55,9 @@ final class TodayHighlightsBuilder
         // the same detection/statistics ChartView itself shows) rather than
         // just re-showing whichever stock the model already picked as #1.
         $bestPattern = $this->patterns->recentEvents()
-            ->filter(fn (array $e): bool => $e['tone'] === 'positive' && is_numeric($e['rise_probability_20d'] ?? null))
+            ->filter(fn (array $e): bool => $e['tone'] === 'positive'
+                && is_numeric($e['rise_probability_20d'] ?? null)
+                && (int) $e['instrument_id'] !== $excludeInstrumentId)
             ->sortByDesc(fn (array $e): float => (float) $e['rise_probability_20d'])
             ->first();
         $bestPatternIndicators = $bestPattern ? $this->technicalIndicators((int) $bestPattern['instrument_id']) : null;
@@ -76,6 +85,7 @@ final class TodayHighlightsBuilder
                 DB::raw('(pp.current_price - pp.average_buy_price) / NULLIF(pp.average_buy_price, 0) * 100 as perf_pct'),
             ])
             ->where('pp.quantity', '>', 0)
+            ->when($excludeInstrumentId, fn ($q) => $q->where('pp.instrument_id', '!=', $excludeInstrumentId))
             ->orderByDesc(DB::raw('ABS((pp.current_price - pp.average_buy_price) / NULLIF(pp.average_buy_price, 0) * 100)'))
             ->first();
 
@@ -95,6 +105,7 @@ final class TodayHighlightsBuilder
             ->where('serving_signal', 'BUY')
             ->whereIn('predictions_signal', ['SELL', 'HOLD'])
             ->whereDate('prediction_date', $date)
+            ->when($excludeInstrumentId, fn ($q) => $q->where('instrument_id', '!=', $excludeInstrumentId))
             ->orderByDesc('expected_return')
             ->select('instrument_id', 'expected_return', 'symbol', 'name')
             ->first();
@@ -115,6 +126,7 @@ final class TodayHighlightsBuilder
             ->where('predictions_signal', 'SELL')
             ->where('serving_signal', 'BUY')
             ->whereDate('prediction_date', $date)
+            ->when($excludeInstrumentId, fn ($q) => $q->where('instrument_id', '!=', $excludeInstrumentId))
             ->select('instrument_id', 'symbol', 'name', 'expected_return')
             ->first();
 
@@ -260,6 +272,16 @@ final class TodayHighlightsBuilder
      * Renders a normalized SVG polyline (viewBox 0 0 100 32) of the daily
      * closes between two dates, for a tiny inline "how it went" chart.
      */
+    /**
+     * A plain recent-price-trend sparkline for a given stock (as opposed
+     * to sparkline() below, which draws a resolved historical trade's own
+     * signal-to-exit window for the "ähnlicher Fall" analog box).
+     */
+    public function recentSparkline(int $instrumentId, int $days = 60): ?string
+    {
+        return $this->sparkline($instrumentId, now()->subDays($days)->toDateString(), now()->toDateString());
+    }
+
     private function sparkline(int $instrumentId, string $startDate, ?string $endDate): ?string
     {
         // exit_date should always be present for a resolved historical
@@ -303,7 +325,7 @@ final class TodayHighlightsBuilder
      *
      * @return array<string, mixed>|null
      */
-    private function technicalIndicators(int $instrumentId): ?array
+    public function technicalIndicators(int $instrumentId): ?array
     {
         $bars = DB::table('price_bars')
             ->where('instrument_id', $instrumentId)

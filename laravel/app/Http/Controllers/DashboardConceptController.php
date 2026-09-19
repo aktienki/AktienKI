@@ -694,7 +694,13 @@ final class DashboardConceptController extends Controller
         // so the user can see a fully-populated example. Revert to
         // now()->toDateString() afterwards.
         $date = now()->subDay()->toDateString();
-        $highlights = app(TodayHighlightsBuilder::class)->build($date)['highlights'];
+
+        $dashboard = app(DashboardController::class);
+        $stocks = $dashboard->remoteDashboardStocks($request);
+        $champion = $dashboard->championSummary($request, $stocks);
+        $championInstrumentId = is_numeric($champion->instrument_id ?? null) ? (int) $champion->instrument_id : null;
+
+        $highlights = app(TodayHighlightsBuilder::class)->build($date, $championInstrumentId)['highlights'];
 
         $insights = $this->loadCachedInsights($highlights)
             ?? app(TodayHighlightsAnalysisService::class)->analyzeHighlights($highlights);
@@ -723,8 +729,9 @@ final class DashboardConceptController extends Controller
         return [
             'id' => $id,
             'kind' => 'today-focus',
+            'champion' => $champion ? $this->buildChampionCard($champion, $date) : null,
             'highlights' => $highlights,
-            'opportunities' => $this->tradingOpportunities($request, $date),
+            'opportunities' => $this->tradingOpportunities($request, $date, $stocks, $champion),
         ];
     }
 
@@ -794,17 +801,24 @@ final class DashboardConceptController extends Controller
      *
      * @return list<array<string, mixed>>
      */
-    private function tradingOpportunities(Request $request, string $date, int $limit = 4): array
+    /**
+     * $champion is the single 3-factor champion already shown as its own
+     * full-width hero card above - excluded here so it isn't duplicated as
+     * "Opportunity #1" too; the next-best alternatives fill its spot.
+     */
+    private function tradingOpportunities(Request $request, string $date, Collection $stocks, ?object $champion, int $limit = 4): array
     {
         $dashboard = app(DashboardController::class);
-        $stocks = $dashboard->remoteDashboardStocks($request);
         $champions = $dashboard->championRanking($request, $stocks);
+        $excludeSymbol = $champion ? strtoupper((string) $champion->symbol) : null;
 
         $championSymbols = $champions->map(fn (object $s): string => strtoupper((string) $s->symbol))->all();
         $fallback = $stocks
             ->reject(fn (object $s): bool => in_array(strtoupper((string) $s->symbol), $championSymbols, true))
             ->sortByDesc(fn (object $s): float => is_numeric($s->composite_score ?? null) ? (float) $s->composite_score : (float) ($s->ranking_score ?? -1));
-        $candidates = $champions->concat($fallback)->values();
+        $candidates = $champions->concat($fallback)
+            ->reject(fn (object $s): bool => $excludeSymbol !== null && strtoupper((string) $s->symbol) === $excludeSymbol)
+            ->values();
 
         $cards = [];
         foreach ($candidates as $stock) {
@@ -879,6 +893,54 @@ final class DashboardConceptController extends Controller
             ] : null,
             'metric_label' => __('Erwartete Rendite (20T)'),
             'metric_value' => $expectedReturn !== null ? sprintf('%+.1f%%', $expectedReturn) : null,
+        ];
+    }
+
+    /**
+     * The single best three-factor champion (internal ranking + external
+     * web-research confirmation + panel-model coverage - see
+     * DashboardController::championRanking()), shown as a full-width hero
+     * above the rest of Heute im Fokus with more depth (chart, indicators,
+     * external review inline) than the compact highlight cards.
+     */
+    private function buildChampionCard(object $champion, string $date): array
+    {
+        $country = strtoupper((string) ($champion->country ?? ''));
+        $expectedReturn = is_numeric($champion->expected_return_20d ?? null) ? (float) $champion->expected_return_20d : null;
+        $instrumentId = is_numeric($champion->instrument_id ?? null) ? (int) $champion->instrument_id : null;
+        $builder = app(\App\Services\TodayHighlightsBuilder::class);
+
+        return [
+            'label' => __('3-Faktor-Champion'),
+            'subtitle' => __('Intern, extern und über das Panel-Modell bestätigt'),
+            'icon' => 'heroicon-o-trophy',
+            'color' => 'emerald',
+            'date' => isset($champion->prediction_time) ? Carbon::parse($champion->prediction_time)->toDateString() : null,
+            'name' => $champion->name ?? $champion->symbol,
+            'url' => route('stocks.show', ['symbol' => $champion->symbol, 'return_to' => '/dashboard/concept']),
+            'details' => [
+                'country_flag' => self::COUNTRY_FLAGS[$country] ?? '🌐',
+                'sector' => $champion->sector ?? null,
+                'current_price' => is_numeric($champion->current_price ?? null) ? (float) $champion->current_price : null,
+                'currency' => $champion->currency ?? null,
+            ],
+            'metric_label' => __('Erwartete Rendite (20T)'),
+            'metric_value' => $expectedReturn !== null ? sprintf('%+.1f%%', $expectedReturn) : null,
+            'factors' => [
+                'internal_score' => is_numeric($champion->composite_score ?? null) ? (float) $champion->composite_score : null,
+                'external_confidence' => is_numeric($champion->external_review_confidence ?? null) ? (float) $champion->external_review_confidence : null,
+                'panel_percentile' => is_numeric($champion->panel_percentile ?? null) ? (float) $champion->panel_percentile : null,
+            ],
+            'indicators' => $instrumentId ? $builder->technicalIndicators($instrumentId) : null,
+            'sparkline' => $instrumentId ? $builder->recentSparkline($instrumentId) : null,
+            'externalReview' => ($champion->external_review_status ?? null) === 'completed' ? [
+                'verdict' => $champion->external_review_verdict,
+                'summary' => $champion->external_review_summary,
+                'confidence' => $champion->external_review_confidence,
+                'positive_factors' => $champion->external_review_positive_factors ?? [],
+                'risk_factors' => $champion->external_review_risk_factors ?? [],
+                'researched_at' => $champion->external_review_researched_at ?? $champion->external_review_triggered_at ?? null,
+            ] : null,
         ];
     }
 
