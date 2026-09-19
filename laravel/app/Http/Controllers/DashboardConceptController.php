@@ -140,6 +140,12 @@ final class DashboardConceptController extends Controller
             ->map(fn (array $market): array => array_merge($market, $situations->get($market['name'], [])))
             ->all();
 
+        // Prefer the daily web-researched report over the rule-based
+        // snapshot's own Chancen/Risiken/Beobachtungsliste, same as the
+        // dedicated Chancen & Risiken tab already does - real citations
+        // beat an internally-derived heuristic wherever both exist.
+        $oppRisks = $this->externalOrInternalOpportunitiesRisks($snapshot, full: false);
+
         return [
             'id' => $id,
             'kind' => 'market',
@@ -147,9 +153,10 @@ final class DashboardConceptController extends Controller
             'assessment' => $assessment,
             'metrics' => array_slice($metrics, 0, 4),
             'breadth' => $analysis['breadth'] ?? null,
-            'opportunities' => $analysis['opportunities'] ?? [],
-            'risks' => $analysis['risks'] ?? [],
-            'watchlist' => $analysis['watchlist'] ?? [],
+            'opportunities' => $oppRisks['opportunities'],
+            'risks' => $oppRisks['risks'],
+            'watchlist' => $oppRisks['watchlist'],
+            'oppRisksSource' => $oppRisks['source'],
             'markets' => $markets,
             'countryAiScores' => $indexAiScores->countryScores(),
             'signalTransitionStats' => $snapshot['transition_stats'] ?? [],
@@ -166,31 +173,49 @@ final class DashboardConceptController extends Controller
      */
     private function opportunitiesRisksSection(string $id, array $snapshot): array
     {
+        $oppRisks = $this->externalOrInternalOpportunitiesRisks($snapshot, full: true);
+
+        return [
+            'id' => $id,
+            'kind' => 'opportunities-risks',
+            'available' => $oppRisks['source'] === 'external' || (bool) ($snapshot['available'] ?? false),
+            'source' => $oppRisks['source'],
+            'date' => $oppRisks['date'],
+            'opportunities' => $oppRisks['opportunities'],
+            'risks' => $oppRisks['risks'],
+            'watchlist' => $oppRisks['watchlist'],
+        ];
+    }
+
+    /**
+     * The daily web-researched report (real citations) when available,
+     * else the rule-based snapshot's own Chancen/Risiken/Beobachtungsliste -
+     * shared by both the Marktlage tab's preview (capped at 5) and the
+     * dedicated Chancen & Risiken tab (uncapped).
+     */
+    private function externalOrInternalOpportunitiesRisks(array $snapshot, bool $full): array
+    {
         $external = $this->externalMarketAnalysis();
         if ($external) {
+            $limit = fn (array $list): array => $full ? $list : array_slice($list, 0, 5);
+
             return [
-                'id' => $id,
-                'kind' => 'opportunities-risks',
-                'available' => true,
                 'source' => 'external',
                 'date' => $external['date'],
-                'opportunities' => $external['opportunities'],
-                'risks' => $external['risks'],
-                'watchlist' => $external['watchlist'],
+                'opportunities' => $limit($external['opportunities']),
+                'risks' => $limit($external['risks']),
+                'watchlist' => $limit($external['watchlist']),
             ];
         }
 
         $analysis = $snapshot['analysis'] ?? [];
 
         return [
-            'id' => $id,
-            'kind' => 'opportunities-risks',
-            'available' => (bool) ($snapshot['available'] ?? false),
             'source' => 'internal',
             'date' => $analysis['date'] ?? null,
-            'opportunities' => $analysis['opportunitiesFull'] ?? [],
-            'risks' => $analysis['risksFull'] ?? [],
-            'watchlist' => $analysis['watchlistFull'] ?? [],
+            'opportunities' => $analysis[$full ? 'opportunitiesFull' : 'opportunities'] ?? [],
+            'risks' => $analysis[$full ? 'risksFull' : 'risks'] ?? [],
+            'watchlist' => $analysis[$full ? 'watchlistFull' : 'watchlist'] ?? [],
         ];
     }
 

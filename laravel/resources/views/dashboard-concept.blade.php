@@ -459,6 +459,9 @@
                                             <x-heroicon-o-light-bulb class="h-4.5 w-4.5" />
                                         </span>
                                         <b class="text-[12px] font-black text-[var(--ak-text)]">{{ __('Chancen & Risiken') }}</b>
+                                        @if(($section['oppRisksSource'] ?? null) === 'external')
+                                            <span class="ml-auto rounded-lg border border-cyan-400/25 bg-cyan-400/[.06] px-2.5 py-1 text-[9px] font-black uppercase tracking-[.1em] text-cyan-400">{{ __('Externe Web-Recherche') }}</span>
+                                        @endif
                                     </div>
                                     <div class="ak-master-card-body grid gap-3 sm:grid-cols-3">
                                         @foreach([
