@@ -6,11 +6,12 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Builds the four "Heute im Fokus" highlights (top BUY signal, biggest
- * held-position swing, surprise signal against yesterday's trend, and a
- * SELL→BUY flip) from today_highlights_mv and the live portfolio positions.
- * Shared by the dashboard section and the daily Grid analysis command so
- * both always see the same data.
+ * Builds the five "Heute im Fokus" highlights (top BUY signal, biggest
+ * held-position swing, surprise signal against yesterday's trend, a
+ * SELL→BUY flip, and the stock with the currently most conspicuous bullish
+ * technical pattern) from today_highlights_mv, the live portfolio positions,
+ * and ChartPatternSignalService. Shared by the dashboard section and the
+ * daily Grid analysis command so both always see the same data.
  */
 final class TodayHighlightsBuilder
 {
@@ -19,6 +20,8 @@ final class TodayHighlightsBuilder
         'NL' => '🇳🇱', 'DK' => '🇩🇰', 'SE' => '🇸🇪', 'NO' => '🇳🇴', 'FI' => '🇫🇮', 'IT' => '🇮🇹',
         'ES' => '🇪🇸', 'JP' => '🇯🇵', 'CN' => '🇨🇳', 'HK' => '🇭🇰', 'CA' => '🇨🇦', 'AU' => '🇦🇺',
     ];
+
+    public function __construct(private readonly ChartPatternSignalService $patterns) {}
 
     public function build(?string $date = null): array
     {
@@ -36,7 +39,18 @@ final class TodayHighlightsBuilder
             ->select('instrument_id', 'expected_return', 'symbol', 'name')
             ->first();
 
-        $topSignalIndicators = null;
+        // Independent of the top BUY signal above - the stock with the
+        // most conspicuous CURRENT bullish technical pattern (golden cross,
+        // RSI oversold, resistance breakout, ...), ranked by that pattern's
+        // own backtested "does the price rise over the next 20 trading
+        // days" probability (ChartPatternSignalService::recentEvents(),
+        // the same detection/statistics ChartView itself shows) rather than
+        // just re-showing whichever stock the model already picked as #1.
+        $bestPattern = $this->patterns->recentEvents()
+            ->filter(fn (array $e): bool => $e['tone'] === 'positive' && is_numeric($e['rise_probability_20d'] ?? null))
+            ->sortByDesc(fn (array $e): float => (float) $e['rise_probability_20d'])
+            ->first();
+        $bestPatternIndicators = $bestPattern ? $this->technicalIndicators((int) $bestPattern['instrument_id']) : null;
 
         if ($topBuy) {
             $topSignal = [
@@ -47,7 +61,6 @@ final class TodayHighlightsBuilder
                 'details' => $this->enrich((int) $topBuy->instrument_id),
                 'analog' => $this->findAnalog((int) $topBuy->instrument_id, $topBuy->symbol, (float) $topBuy->expected_return, $date),
             ];
-            $topSignalIndicators = $this->technicalIndicators((int) $topBuy->instrument_id);
         }
 
         $holdingSwings = DB::table('portfolio_positions as pp')
@@ -166,13 +179,15 @@ final class TodayHighlightsBuilder
             ],
             [
                 'label' => __('Indikatoren'),
-                'subtitle' => $topSignal ? __('Top-Signal: :symbol', ['symbol' => $topSignal['symbol']]) : __('Technische Kennzahlen'),
+                'subtitle' => $bestPattern ? $bestPattern['label'] : __('Technische Kennzahlen'),
                 'icon' => 'heroicon-o-signal',
                 'color' => 'violet',
                 'kind' => 'indicators',
-                'data' => $topSignalIndicators ? $topSignal['symbol'] : null,
-                'url' => $topSignal['url'] ?? null,
-                'indicators' => $topSignalIndicators,
+                'data' => $bestPatternIndicators ? $bestPattern['symbol'] : null,
+                'name' => $bestPattern['name'] ?? null,
+                'url' => $bestPattern ? route('stocks.show', ['symbol' => $bestPattern['symbol'], 'return_to' => '/dashboard/concept']) : null,
+                'indicators' => $bestPatternIndicators,
+                'rise_probability' => $bestPattern['rise_probability_20d'] ?? null,
             ],
         ]];
     }

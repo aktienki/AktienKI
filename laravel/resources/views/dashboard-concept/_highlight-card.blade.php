@@ -86,6 +86,15 @@
     @elseif(($highlight['kind'] ?? null) === 'indicators')
         @php $indicators = $highlight['indicators'] ?? null; @endphp
         @if($indicators)
+            @if($highlight['name'] ?? null)
+                <div class="mb-2 truncate text-[13px] font-black text-[var(--ak-text)]">{{ $highlight['name'] }}</div>
+            @endif
+            @if(is_numeric($highlight['rise_probability'] ?? null))
+                <div class="mb-2 rounded-lg bg-{{ $highlight['color'] }}-500/10 px-2.5 py-1.5">
+                    <span class="block text-[8px] text-{{ $highlight['color'] }}-600">{{ __('Wahrscheinlichkeit steigender Kurs (20T)') }}</span>
+                    <span class="font-black text-{{ $highlight['color'] }}-500">{{ number_format((float) $highlight['rise_probability'], 1) }}%</span>
+                </div>
+            @endif
             <div class="mb-2 text-[8px] text-[var(--ak-muted)]">{{ __('Stand: :date', ['date' => \Illuminate\Support\Carbon::parse($indicators['as_of'])->format('d.m.Y')]) }}</div>
             <div class="grid grid-cols-3 gap-1.5 text-[9px]">
                 <div class="rounded border border-[var(--ak-border)] px-2 py-1.5">
