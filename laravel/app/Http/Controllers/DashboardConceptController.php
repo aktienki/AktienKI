@@ -790,10 +790,15 @@ final class DashboardConceptController extends Controller
      * GPT-confirmed BUY + panel coverage, same composite score the screener
      * and main dashboard show), so these never disagree with those pages
      * about which stocks are "best". That gate is fairly strict and often
-     * has fewer than 4 qualifying stocks, so the remaining slots are filled
-     * with the next-highest composite_score stocks instead - "best
-     * available", not an empty slot, for a "show 4 if you can" section.
-     * Rendered as its own paragraph, separate from the highlight grid.
+     * has fewer than 4 qualifying stocks, so the candidate pool continues
+     * into the next-highest composite_score stocks instead of stopping at
+     * an empty slot - "best available", not "no data", for a "show 4 if you
+     * can" section. Walks the combined, ranked candidate list one at a time
+     * and skips any stock whose closest historical analog (see
+     * buildOpportunityCard()) resolved negatively - a pick history says lost
+     * last time isn't "best available" just because nothing else qualified;
+     * skip it and keep going down the list instead. Rendered as its own
+     * paragraph, separate from the highlight grid.
      *
      * @return list<array<string, mixed>>
      */
@@ -801,20 +806,29 @@ final class DashboardConceptController extends Controller
     {
         $dashboard = app(DashboardController::class);
         $stocks = $dashboard->remoteDashboardStocks($request);
-        $picks = $dashboard->championRanking($request, $stocks)->take($limit);
+        $champions = $dashboard->championRanking($request, $stocks);
 
-        if ($picks->count() < $limit) {
-            $usedSymbols = $picks->map(fn (object $s): string => strtoupper((string) $s->symbol))->all();
-            $fallback = $stocks
-                ->reject(fn (object $s): bool => in_array(strtoupper((string) $s->symbol), $usedSymbols, true))
-                ->sortByDesc(fn (object $s): float => is_numeric($s->composite_score ?? null) ? (float) $s->composite_score : (float) ($s->ranking_score ?? -1))
-                ->take($limit - $picks->count());
-            $picks = $picks->concat($fallback);
+        $championSymbols = $champions->map(fn (object $s): string => strtoupper((string) $s->symbol))->all();
+        $fallback = $stocks
+            ->reject(fn (object $s): bool => in_array(strtoupper((string) $s->symbol), $championSymbols, true))
+            ->sortByDesc(fn (object $s): float => is_numeric($s->composite_score ?? null) ? (float) $s->composite_score : (float) ($s->ranking_score ?? -1));
+        $candidates = $champions->concat($fallback)->values();
+
+        $cards = [];
+        foreach ($candidates as $stock) {
+            if (count($cards) >= $limit) {
+                break;
+            }
+
+            $card = $this->buildOpportunityCard($stock, $date, count($cards) + 1);
+            if (($card['analog']['outcome_pct'] ?? 0) < 0) {
+                continue;
+            }
+
+            $cards[] = $card;
         }
 
-        return $picks->values()
-            ->map(fn (object $stock, int $i): array => $this->buildOpportunityCard($stock, $date, $i + 1))
-            ->all();
+        return $cards;
     }
 
     private function buildOpportunityCard(object $stock, string $date, int $rank): array
