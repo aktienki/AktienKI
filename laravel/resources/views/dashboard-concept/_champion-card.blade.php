@@ -66,8 +66,7 @@
                 <div class="mb-1.5 text-[8px] uppercase tracking-wide text-[var(--ak-muted)]">{{ __('Kursverlauf (60 Tage)') }}</div>
                 @if($champion['sparkline'])
                     <svg viewBox="0 0 100 32" class="h-14 w-full" preserveAspectRatio="none">
-                        <polyline points="0,32 {{ $champion['sparkline'] }} 100,32" fill="currentColor" class="text-{{ $champion['color'] }}-500/10" stroke="none" />
-                        <polyline points="{{ $champion['sparkline'] }}" fill="none" stroke="currentColor" stroke-width="1.25" class="text-{{ $champion['color'] }}-500/70" stroke-linecap="round" stroke-linejoin="round" />
+                        <polyline points="{{ $champion['sparkline'] }}" fill="none" stroke="currentColor" stroke-width="1.25" class="text-cyan-500" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 @else
                     <div class="flex h-14 items-center justify-center text-[9px] italic text-[var(--ak-muted)]">{{ __('Keine Daten') }}</div>
