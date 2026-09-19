@@ -275,8 +275,13 @@ Route::middleware(['auth', 'verified', 'beta'])->group(function () {
     Route::post('/hilfe/neu-starten', [TutorialController::class, 'restart'])->name('tutorial.restart');
     Route::post('/aki/chat', AkiChatController::class)->middleware('throttle:10,1')->name('aki.chat');
     Route::post('/live-prices/subscribe', LivePriceSubscriptionController::class)->name('live-prices.subscribe');
-    Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    // The concept page is now the dashboard - it already embeds the
+    // classic view in full as its own "Depots" tab (classicDashboardSection()),
+    // so nothing is lost. /dashboard/classic keeps the old standalone page
+    // reachable directly in case anything still needs it.
+    Route::get('/dashboard', DashboardConceptController::class)->name('dashboard');
     Route::get('/dashboard/concept', DashboardConceptController::class)->name('dashboard.concept');
+    Route::get('/dashboard/classic', DashboardController::class)->name('dashboard.classic');
     Route::post('/dashboard/concept/calendar-reminders/toggle', [CalendarEventReminderController::class, 'toggle'])->name('calendar-event-reminders.toggle');
     Route::get('/anstehende-news', UpcomingEventsController::class)->name('upcoming-events.index');
     Route::get('/tabellen/performance-transparenz', PerformanceTransparencyController::class)
