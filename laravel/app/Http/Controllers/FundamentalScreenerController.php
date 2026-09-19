@@ -73,6 +73,15 @@ final class FundamentalScreenerController extends Controller
         );
         $calendarData = $calendar->upcoming();
 
+        // Which tab to land on: a stock always opens on Kennzahlen; the
+        // bare overview opens on Termine (the default landing tab); but a
+        // page reload triggered BY a Verteilung filter/sort/search (any of
+        // these params present) must stay on Verteilung instead of
+        // snapping back to Termine.
+        $hasDistributionFilters = $capGroup !== null || $sector !== null || $country !== null
+            || $region !== null || $search !== null || $metricRanges !== [];
+        $defaultTab = $selected ? 'ratios' : ($hasDistributionFilters ? 'verteilung' : 'termine');
+
         if ($selected) {
             $years = $cards->forInstrument($selected->id);
             $kennzahlenTrend = $cards->kennzahlenTrend($selected->id);
@@ -95,6 +104,7 @@ final class FundamentalScreenerController extends Controller
 
         return view('screener.fundamental', [
             'selected' => $selected,
+            'defaultTab' => $defaultTab,
             'years' => $years,
             'ratios' => $ratios,
             'kennzahlenTrend' => $kennzahlenTrend,

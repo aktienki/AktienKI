@@ -1,5 +1,5 @@
 <x-app-layout>
-<div id="fundamental-page" x-data="{ active: '{{ $selected ? 'ratios' : 'termine' }}' }" class="mx-auto max-w-7xl px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
+<div id="fundamental-page" x-data="{ active: '{{ $defaultTab }}' }" class="mx-auto max-w-7xl px-3 py-5 text-[var(--ak-text)] sm:px-5 lg:py-8">
     <header class="mb-4 flex items-center justify-between gap-3">
         <div>
             <h1 class="text-3xl font-black tracking-tight">{{ __('Fundamental') }}</h1>
@@ -743,7 +743,7 @@
     #fundamental-page .fundamental-dist-bar-wrap { flex: 1 1 0; height: 100%; display: flex; align-items: flex-end; }
     #fundamental-page .fundamental-dist-bar {
         position: relative; width: 100%; min-height: 4px; border-radius: 3px 3px 0 0;
-        background: linear-gradient(180deg, #22d3ee, color-mix(in srgb, #22d3ee 45%, transparent));
+        background: linear-gradient(180deg, #22d3ee, color-mix(in srgb, #22d3ee 85%, transparent));
         transition: opacity .15s ease;
     }
     #fundamental-page .fundamental-dist-bar.is-dimmed { opacity: .55; }
