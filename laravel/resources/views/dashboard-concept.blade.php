@@ -417,7 +417,7 @@
                             <x-detail-page-theme />
                             <div class="ak-detail-design mt-3 grid gap-3 border-t border-[var(--ak-border)] pt-3 lg:grid-cols-2">
                                 <x-dashboard.market-atlas :country-ai-scores="$section['countryAiScores']" />
-                                <x-dashboard.signal-overview :stats="$section['signalTransitionStats']" />
+                                <x-dashboard.opportunities-risks-compact :opportunities="$section['opportunities']" :risks="$section['risks']" />
                             </div>
                             <div class="ak-detail-design mt-3">
                                 <x-dashboard.macro-indicator-cards :cards="$section['macroCards']" :collapsible="true" />
