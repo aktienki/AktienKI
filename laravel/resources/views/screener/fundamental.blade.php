@@ -746,7 +746,7 @@
         background: linear-gradient(180deg, #22d3ee, color-mix(in srgb, #22d3ee 45%, transparent));
         transition: opacity .15s ease;
     }
-    #fundamental-page .fundamental-dist-bar.is-dimmed { opacity: .18; }
+    #fundamental-page .fundamental-dist-bar.is-dimmed { opacity: .55; }
     #fundamental-page .fundamental-dist-bar-value { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: .58rem; font-weight: 900; color: var(--ak-text); white-space: nowrap; }
     #fundamental-page .fundamental-dist-ticks { display: flex; gap: 3px; margin-top: .35rem; }
     #fundamental-page .fundamental-dist-ticks span { flex: 1 1 0; text-align: center; font-size: .56rem; font-weight: 700; color: var(--ak-muted); }
